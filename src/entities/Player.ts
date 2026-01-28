@@ -248,6 +248,22 @@ export class Player extends Phaser.GameObjects.Container {
     private handleHorizontalMovement(): void {
         const input = this.currentInput;
 
+        // BRAWLHALLA STYLE: Stationary while charging heavy attacks on ground
+        if (this.isCharging && this.isGrounded) {
+            this.velocity.x = 0;
+            this.acceleration.x = 0;
+            return;
+        }
+
+        // BRAWLHALLA STYLE: Aerial heavy attacks reduce air mobility
+        let moveAccel = PhysicsConfig.MOVE_ACCEL;
+        let maxSpeed = PhysicsConfig.MAX_SPEED;
+
+        if (this.isAttacking && !this.isGrounded && this.currentAttack?.data.type === AttackType.HEAVY) {
+            moveAccel *= 0.3; // Significantly reduced air control during heavy aerials
+            maxSpeed *= 0.5; // Reduced max speed
+        }
+
         // Running is active while dodge key is held (after initial dodge triggers it)
         // The dodge activates running, then holding dodge key maintains it
         this.isRunning = input.dodgeHeld && !this.isDodging;
@@ -255,7 +271,8 @@ export class Player extends Phaser.GameObjects.Container {
         // Apply run multipliers if running (significantly faster!)
         const speedMult = this.isRunning ? PhysicsConfig.RUN_SPEED_MULT : 1;
         const accelMult = this.isRunning ? PhysicsConfig.RUN_ACCEL_MULT : 1;
-        const baseAccel = PhysicsConfig.MOVE_ACCEL * accelMult;
+
+        const baseAccel = moveAccel * accelMult;
 
         // Use analog input if available, otherwise digital
         if (Math.abs(input.moveX) > 0.1) {
@@ -270,9 +287,9 @@ export class Player extends Phaser.GameObjects.Container {
         }
 
         // Cap max speed (higher when running)
-        const maxSpeed = PhysicsConfig.MAX_SPEED * speedMult;
-        if (Math.abs(this.velocity.x) > maxSpeed) {
-            this.velocity.x = Math.sign(this.velocity.x) * maxSpeed;
+        const finalMaxSpeed = maxSpeed * speedMult;
+        if (Math.abs(this.velocity.x) > finalMaxSpeed) {
+            this.velocity.x = Math.sign(this.velocity.x) * finalMaxSpeed;
         }
     }
 
@@ -491,7 +508,10 @@ export class Player extends Phaser.GameObjects.Container {
     private getInputDirection(): AttackDirection {
         const input = this.currentInput;
 
-        if (input.aimUp && !input.aimDown) return AttackDirection.UP;
+        // BRAWLHALLA STYLE: Up input counts as Neutral for attacks/dodges
+        // (allows performing neutral attacks/spot dodges while holding up)
+        if (input.aimUp && !input.aimDown) return AttackDirection.NEUTRAL;
+
         if (input.aimDown && !input.aimUp) return AttackDirection.DOWN;
         if ((input.aimLeft || input.aimRight) && !input.aimUp && !input.aimDown) return AttackDirection.SIDE;
         return AttackDirection.NEUTRAL;
