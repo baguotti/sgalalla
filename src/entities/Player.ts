@@ -826,8 +826,10 @@ export class Player extends Phaser.GameObjects.Container {
 
         // Visual Effects for Down Air (Spike)
         if (attackData.direction === AttackDirection.DOWN && attackData.isAerial) {
-            // Screen shake
-            this.scene.cameras.main.shake(100, 0.01);
+            // Screen shake (Only on heavy/charged attacks)
+            if (attackData.type === AttackType.HEAVY) {
+                this.scene.cameras.main.shake(100, 0.005);
+            }
 
             // Visual Spike Effect
             const effect = this.scene.add.graphics();
