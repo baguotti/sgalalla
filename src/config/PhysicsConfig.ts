@@ -59,7 +59,7 @@ export const PhysicsConfig = {
 
   // Damage system - Smash/Brawlhalla style (higher damage = further knockback)
   MAX_DAMAGE: 999, // Maximum damage percentage
-  KNOCKBACK_SCALING: 0.015, // Reduced scaling (survive longer)
+  KNOCKBACK_SCALING: 0.012, // Very low scaling for longer survival
   HIT_STUN_DURATION: 300, // ms - time player is stunned after being hit
 
   // Ledge detection
@@ -84,7 +84,7 @@ export const PhysicsConfig = {
   // Ground pound (down + attack in air)
   GROUND_POUND_STARTUP: 200,   // Pause in air before dropping
   GROUND_POUND_SPEED: 1200,    // Fast fall speed during ground pound
-  GROUND_POUND_DAMAGE: 11,     // Reduced from 13
+  GROUND_POUND_DAMAGE: 8,      // Reduced from 11
   GROUND_POUND_KNOCKBACK: 900, // Strong knockback for spikes
 
   // Directional attack hitbox offsets
