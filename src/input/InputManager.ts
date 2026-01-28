@@ -20,6 +20,7 @@ export interface InputState {
     jumpHeld: boolean;
     lightAttack: boolean;
     heavyAttack: boolean;
+    heavyAttackHeld: boolean; // For charge attacks
     dodge: boolean;
     recovery: boolean;
 
@@ -145,6 +146,7 @@ export class InputManager {
             jumpHeld: spaceDown,
             lightAttack: lightPressed,
             heavyAttack: heavyPressed,
+            heavyAttackHeld: kDown, // Track held state for charging
             dodge: dodgePressed,
             recovery: this.shiftKey.isDown,
             aimUp: up,
@@ -167,6 +169,7 @@ export class InputManager {
             jumpHeld: state.jumpHeld,
             lightAttack: state.lightAttack,
             heavyAttack: state.heavyAttack,
+            heavyAttackHeld: state.heavyAttackHeld, // Track B/Y held for charging
             dodge: state.dodge,
             recovery: state.heavyAttack && state.aimUp && !this.isGroundedCheck(), // Up + Heavy in air = recovery
             aimUp: state.aimUp,

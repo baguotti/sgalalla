@@ -86,4 +86,9 @@ export const PhysicsConfig = {
   SIDE_ATTACK_OFFSET_X: 50,    // How far in front of player
   UP_ATTACK_OFFSET_Y: -50,     // How far above player
   DOWN_ATTACK_OFFSET_Y: 50,    // How far below player
+
+  // Chargeable heavy attacks
+  CHARGE_MAX_TIME: 1000,       // Max charge time in ms
+  CHARGE_DAMAGE_MULT: 2.0,     // 2x damage at full charge
+  CHARGE_KNOCKBACK_MULT: 1.8,  // 1.8x knockback at full charge
 } as const;

@@ -20,6 +20,7 @@ export interface GamepadState {
     jumpHeld: boolean;
     lightAttack: boolean;
     heavyAttack: boolean;
+    heavyAttackHeld: boolean; // For charge attacks
     dodge: boolean;
     throw: boolean;
 
@@ -96,6 +97,7 @@ export class GamepadInput {
             jumpHeld: false,
             lightAttack: false,
             heavyAttack: false,
+            heavyAttackHeld: false,
             dodge: false,
             throw: false,
             aimUp: false,
@@ -170,6 +172,7 @@ export class GamepadInput {
         const heavyNewPress = (bPressed && !this.wasButtonPressed(XBOX_BUTTONS.B)) ||
             (yPressed && !this.wasButtonPressed(XBOX_BUTTONS.Y));
         state.heavyAttack = heavyNewPress;
+        state.heavyAttackHeld = bPressed || yPressed; // Track held state for charging
 
         // Dodge (LT or RT) - detect new press only
         state.dodge = triggerPressed && !this.wasTriggerPressed();

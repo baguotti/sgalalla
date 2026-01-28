@@ -55,6 +55,12 @@ export class Player extends Phaser.GameObjects.Container {
     private isGroundPounding: boolean = false;
     private groundPoundStartupTimer: number = 0;
 
+    // Charge attack system
+    private isCharging: boolean = false;
+    private chargeTime: number = 0;
+    private chargeDirection: AttackDirection = AttackDirection.NEUTRAL;
+    private chargeGlow: Phaser.GameObjects.Graphics | null = null;
+
     // Dodge system
     private isDodging: boolean = false;
     private dodgeTimer: number = 0;
@@ -176,6 +182,7 @@ export class Player extends Phaser.GameObjects.Container {
         this.handleJump(delta);
         this.handleFastFall();
         this.handleAttackInput();
+        this.updateChargeState(delta); // Update charge visual effects
         this.handleDodgeInput();
 
         // Apply physics
@@ -330,22 +337,136 @@ export class Player extends Phaser.GameObjects.Container {
 
         const input = this.currentInput;
 
-        if (!input.lightAttack && !input.heavyAttack) return;
-
-        // Determine attack type and direction
-        const attackType = input.lightAttack ? AttackType.LIGHT : AttackType.HEAVY;
-        const direction = this.getInputDirection();
-        const isAerial = !this.isGrounded;
-
-        // Special case: down + heavy in air = ground pound
-        if (attackType === AttackType.HEAVY && direction === AttackDirection.DOWN && isAerial) {
-            this.startGroundPound();
+        // Light attack - instant activation
+        if (input.lightAttack) {
+            const direction = this.getInputDirection();
+            const isAerial = !this.isGrounded;
+            const attackKey = Attack.getAttackKey(AttackType.LIGHT, direction, isAerial);
+            this.startAttack(attackKey);
             return;
         }
 
-        // Get attack key and start attack
-        const attackKey = Attack.getAttackKey(attackType, direction, isAerial);
-        this.startAttack(attackKey);
+        // Heavy attack - chargeable
+        if (input.heavyAttack && !this.isCharging) {
+            // Start charging
+            this.isCharging = true;
+            this.chargeTime = 0;
+            this.chargeDirection = this.getInputDirection();
+
+            // Create charge glow effect
+            if (!this.chargeGlow) {
+                this.chargeGlow = this.scene.add.graphics();
+                this.add(this.chargeGlow);
+            }
+            return;
+        }
+
+        // Update charge while holding
+        if (this.isCharging && input.heavyAttackHeld) {
+            // Charge continues in update loop
+            return;
+        }
+
+        // Release charge - execute attack
+        if (this.isCharging && !input.heavyAttackHeld) {
+            const direction = this.chargeDirection;
+            const isAerial = !this.isGrounded;
+
+            // Special case: down + heavy in air = ground pound (not chargeable)
+            if (direction === AttackDirection.DOWN && isAerial) {
+                this.clearChargeState();
+                this.startGroundPound();
+                return;
+            }
+
+            // Calculate charge multiplier (0 to 1 based on charge time)
+            const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
+
+            // Get attack key and start charged attack
+            const attackKey = Attack.getAttackKey(AttackType.HEAVY, direction, isAerial);
+            this.startChargedAttack(attackKey, chargePercent);
+            this.clearChargeState();
+            return;
+        }
+    }
+
+    private updateChargeState(delta: number): void {
+        if (!this.isCharging) return;
+
+        // Accumulate charge time
+        this.chargeTime += delta;
+        const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
+
+        // Update visual glow effect
+        if (this.chargeGlow) {
+            this.chargeGlow.clear();
+
+            // Pulsing glow that intensifies with charge
+            const pulseSpeed = 5 + chargePercent * 10; // Faster pulse at higher charge
+            const pulse = 0.5 + Math.sin(this.scene.time.now / 100 * pulseSpeed) * 0.5;
+            const glowIntensity = 0.3 + chargePercent * 0.7;
+            const alpha = glowIntensity * pulse;
+
+            // Color shifts from yellow to orange to red as charge builds
+            let color: number;
+            if (chargePercent < 0.5) {
+                color = 0xffff00; // Yellow
+            } else if (chargePercent < 0.8) {
+                color = 0xff8800; // Orange
+            } else {
+                color = 0xff0000; // Red at max charge
+            }
+
+            // Draw glow ring around player
+            const radius = 35 + chargePercent * 15;
+            this.chargeGlow.lineStyle(3 + chargePercent * 4, color, alpha);
+            this.chargeGlow.strokeCircle(0, 0, radius);
+
+            // At full charge, add extra particles/sparkles
+            if (chargePercent >= 1) {
+                const sparkleAngle = (this.scene.time.now * 0.01) % (Math.PI * 2);
+                for (let i = 0; i < 4; i++) {
+                    const angle = sparkleAngle + (i * Math.PI / 2);
+                    const sparkleX = Math.cos(angle) * (radius + 10);
+                    const sparkleY = Math.sin(angle) * (radius + 10);
+                    this.chargeGlow.fillStyle(0xffffff, alpha);
+                    this.chargeGlow.fillCircle(sparkleX, sparkleY, 4);
+                }
+            }
+        }
+
+        // Flash body color based on charge
+        if (chargePercent >= 1) {
+            // Full charge - flash rapidly
+            const flash = Math.sin(this.scene.time.now / 50) > 0;
+            this.bodyRect.setFillStyle(flash ? 0xffff00 : 0x4a90e2);
+        } else if (chargePercent > 0.5) {
+            // Partial charge - tint slightly
+            this.bodyRect.setFillStyle(0x7ab0e2);
+        }
+    }
+
+    private clearChargeState(): void {
+        this.isCharging = false;
+        this.chargeTime = 0;
+        if (this.chargeGlow) {
+            this.chargeGlow.clear();
+        }
+        // Reset body color
+        this.bodyRect.setFillStyle(0x4a90e2);
+    }
+
+    private startChargedAttack(attackKey: string, chargePercent: number): void {
+        try {
+            this.currentAttack = new Attack(attackKey, this.facingDirection, chargePercent);
+            this.isAttacking = true;
+            this.hitTargets.clear();
+
+            // Set cooldown
+            this.attackCooldownTimer = this.currentAttack.data.recoveryDuration;
+        } catch (e) {
+            console.warn(`Attack ${attackKey} not found`);
+        }
     }
 
     private getInputDirection(): AttackDirection {

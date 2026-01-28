@@ -264,14 +264,32 @@ export class Attack {
     phase: AttackPhase = AttackPhase.NONE;
     phaseTimer: number = 0;
     facingDirection: number = 1; // 1 = right, -1 = left
+    chargePercent: number = 0; // 0-1 charge level
 
-    constructor(attackKey: string, facingDirection: number = 1) {
+    constructor(attackKey: string, facingDirection: number = 1, chargePercent: number = 0) {
         const data = AttackRegistry[attackKey];
         if (!data) {
             throw new Error(`Unknown attack: ${attackKey}`);
         }
-        this.data = data;
+
+        // Apply charge multipliers if charged
+        if (chargePercent > 0 && data.type === AttackType.HEAVY) {
+            // Calculate multipliers based on charge (linear interpolation from 1.0 to max)
+            const damageMult = 1 + chargePercent * (PhysicsConfig.CHARGE_DAMAGE_MULT - 1);
+            const knockbackMult = 1 + chargePercent * (PhysicsConfig.CHARGE_KNOCKBACK_MULT - 1);
+
+            // Create a modified copy of the attack data
+            this.data = {
+                ...data,
+                damage: Math.round(data.damage * damageMult),
+                knockback: Math.round(data.knockback * knockbackMult),
+            };
+        } else {
+            this.data = data;
+        }
+
         this.facingDirection = facingDirection;
+        this.chargePercent = chargePercent;
         this.phase = AttackPhase.STARTUP;
         this.phaseTimer = 0;
     }
