@@ -233,7 +233,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: true,
         damage: PhysicsConfig.GROUND_POUND_DAMAGE,
         knockback: PhysicsConfig.GROUND_POUND_KNOCKBACK,
-        knockbackAngle: 270, // Spike
+        knockbackAngle: 45, // Diagonal knockback (ground pound sends up-diagonal)
         startupDuration: PhysicsConfig.GROUND_POUND_STARTUP,
         activeDuration: 500, // Active until landing
         recoveryDuration: 150,

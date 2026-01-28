@@ -7,9 +7,9 @@ export const PhysicsConfig = {
   GRAVITY: 2500,
 
   // Movement - acceleration-based for responsive feel with slight slide
-  MOVE_ACCEL: 1500,
+  MOVE_ACCEL: 2000, // Faster acceleration
   FRICTION: 0.85, // Applied each frame (0.85 = 15% speed reduction per frame)
-  MAX_SPEED: 400,
+  MAX_SPEED: 550, // Faster run speed
 
   // Jump mechanics
   JUMP_FORCE: -700, // Full jump (hold)
@@ -54,7 +54,7 @@ export const PhysicsConfig = {
 
   // Damage system - Smash/Brawlhalla style (higher damage = further knockback)
   MAX_DAMAGE: 999, // Maximum damage percentage
-  KNOCKBACK_SCALING: 0.025, // How much damage affects knockback (higher = more scaling)
+  KNOCKBACK_SCALING: 0.02, // 3x knockback at 100% damage (1 + 100*0.02 = 3)
   HIT_STUN_DURATION: 300, // ms - time player is stunned after being hit
 
   // Ledge detection
