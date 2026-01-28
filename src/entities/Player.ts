@@ -247,14 +247,12 @@ export class Player extends Phaser.GameObjects.Container {
 
     private handleHorizontalMovement(): void {
         const input = this.currentInput;
-        const hasMovement = input.moveLeft || input.moveRight || Math.abs(input.moveX) > 0.1;
 
-        // Check if running (activated by directional dodge, maintained while moving)
-        if (this.isRunning && !hasMovement) {
-            this.isRunning = false; // Stop running when not moving
-        }
+        // Running is active while dodge key is held (after initial dodge triggers it)
+        // The dodge activates running, then holding dodge key maintains it
+        this.isRunning = input.dodgeHeld && !this.isDodging;
 
-        // Apply run multipliers if running
+        // Apply run multipliers if running (significantly faster!)
         const speedMult = this.isRunning ? PhysicsConfig.RUN_SPEED_MULT : 1;
         const accelMult = this.isRunning ? PhysicsConfig.RUN_ACCEL_MULT : 1;
         const baseAccel = PhysicsConfig.MOVE_ACCEL * accelMult;
@@ -631,12 +629,17 @@ export class Player extends Phaser.GameObjects.Container {
         const input = this.currentInput;
         const hasDirectionalInput = input.moveLeft || input.moveRight;
 
-        if (!hasDirectionalInput && this.isGrounded) {
-            // SPOT DODGE - dodge in place with invincibility
+        if (!hasDirectionalInput) {
+            // SPOT DODGE - dodge in place with invincibility (works in air too!)
             this.isSpotDodging = true;
             this.dodgeDirection = 0;
             this.dodgeTimer = PhysicsConfig.SPOT_DODGE_DURATION;
-            this.velocity.x = 0; // Stay in place
+            this.velocity.x = 0; // Stay in place horizontally
+
+            // In air, also freeze vertical momentum briefly
+            if (!this.isGrounded) {
+                this.velocity.y *= 0.2; // Almost freeze vertical movement
+            }
 
             // Visual feedback - flash white
             this.bodyRect.setFillStyle(0xffffff);
@@ -689,18 +692,8 @@ export class Player extends Phaser.GameObjects.Container {
         this.dodgeCooldownTimer = PhysicsConfig.DODGE_COOLDOWN;
         this.bodyRect.setFillStyle(0x4a90e2);
         this.bodyRect.setAlpha(1);
-
-        // Activate running state if directional dodge and still holding direction
-        const input = this.currentInput;
-        if (!this.isSpotDodging && this.dodgeDirection !== 0) {
-            const holdingDirection = (this.dodgeDirection === -1 && input.moveLeft) ||
-                (this.dodgeDirection === 1 && input.moveRight);
-            if (holdingDirection) {
-                this.isRunning = true; // Activate run mode!
-            }
-        }
-
         this.isSpotDodging = false;
+        // Running is now controlled by dodgeHeld in handleHorizontalMovement
     }
 
     private updateFacing(): void {

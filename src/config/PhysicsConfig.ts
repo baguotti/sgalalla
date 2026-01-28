@@ -54,8 +54,8 @@ export const PhysicsConfig = {
   SPOT_DODGE_DURATION: 300, // ms - spot dodge lasts slightly longer
 
   // Run mechanics (dodge kickstarts running)
-  RUN_SPEED_MULT: 1.5, // 50% faster than walking
-  RUN_ACCEL_MULT: 1.3, // Faster acceleration when running
+  RUN_SPEED_MULT: 2.0, // 2x faster than walking (significantly faster!)
+  RUN_ACCEL_MULT: 1.5, // Faster acceleration when running
 
   // Damage system - Smash/Brawlhalla style (higher damage = further knockback)
   MAX_DAMAGE: 999, // Maximum damage percentage
