@@ -63,10 +63,14 @@ export class Player extends Phaser.GameObjects.Container {
 
     // Dodge system
     private isDodging: boolean = false;
+    private isSpotDodging: boolean = false; // Dodge in place without direction
     private dodgeTimer: number = 0;
     private dodgeCooldownTimer: number = 0;
     private isInvincible: boolean = false;
     private dodgeDirection: number = 0;
+
+    // Running state (activated by dodge)
+    private isRunning: boolean = false;
 
     // Hit stun
     private isHitStunned: boolean = false;
@@ -243,17 +247,34 @@ export class Player extends Phaser.GameObjects.Container {
 
     private handleHorizontalMovement(): void {
         const input = this.currentInput;
+        const hasMovement = input.moveLeft || input.moveRight || Math.abs(input.moveX) > 0.1;
+
+        // Check if running (activated by directional dodge, maintained while moving)
+        if (this.isRunning && !hasMovement) {
+            this.isRunning = false; // Stop running when not moving
+        }
+
+        // Apply run multipliers if running
+        const speedMult = this.isRunning ? PhysicsConfig.RUN_SPEED_MULT : 1;
+        const accelMult = this.isRunning ? PhysicsConfig.RUN_ACCEL_MULT : 1;
+        const baseAccel = PhysicsConfig.MOVE_ACCEL * accelMult;
 
         // Use analog input if available, otherwise digital
         if (Math.abs(input.moveX) > 0.1) {
-            this.acceleration.x = input.moveX * PhysicsConfig.MOVE_ACCEL;
+            this.acceleration.x = input.moveX * baseAccel;
             this.facingDirection = input.moveX > 0 ? 1 : -1;
         } else if (input.moveLeft && !input.moveRight) {
-            this.acceleration.x = -PhysicsConfig.MOVE_ACCEL;
+            this.acceleration.x = -baseAccel;
             this.facingDirection = -1;
         } else if (input.moveRight && !input.moveLeft) {
-            this.acceleration.x = PhysicsConfig.MOVE_ACCEL;
+            this.acceleration.x = baseAccel;
             this.facingDirection = 1;
+        }
+
+        // Cap max speed (higher when running)
+        const maxSpeed = PhysicsConfig.MAX_SPEED * speedMult;
+        if (Math.abs(this.velocity.x) > maxSpeed) {
+            this.velocity.x = Math.sign(this.velocity.x) * maxSpeed;
         }
     }
 
@@ -604,40 +625,56 @@ export class Player extends Phaser.GameObjects.Container {
 
     private startDodge(): void {
         this.isDodging = true;
-        this.dodgeTimer = PhysicsConfig.DODGE_DURATION;
         this.isInvincible = true;
 
         // Determine dodge direction from current input
         const input = this.currentInput;
+        const hasDirectionalInput = input.moveLeft || input.moveRight;
 
-        if (input.moveLeft && !input.moveRight) {
-            this.dodgeDirection = -1;
-        } else if (input.moveRight && !input.moveLeft) {
-            this.dodgeDirection = 1;
+        if (!hasDirectionalInput && this.isGrounded) {
+            // SPOT DODGE - dodge in place with invincibility
+            this.isSpotDodging = true;
+            this.dodgeDirection = 0;
+            this.dodgeTimer = PhysicsConfig.SPOT_DODGE_DURATION;
+            this.velocity.x = 0; // Stay in place
+
+            // Visual feedback - flash white
+            this.bodyRect.setFillStyle(0xffffff);
+            this.bodyRect.setAlpha(0.7);
         } else {
-            this.dodgeDirection = this.facingDirection;
-        }
+            // DIRECTIONAL DODGE - move in direction
+            this.isSpotDodging = false;
+            this.dodgeTimer = PhysicsConfig.DODGE_DURATION;
 
-        // Apply dodge velocity
-        if (this.isGrounded) {
-            // Grounded dash
-            this.velocity.x = this.dodgeDirection * (PhysicsConfig.DODGE_DISTANCE / (PhysicsConfig.DODGE_DURATION / 1000));
-        } else {
-            // Air dodge - less horizontal, some vertical freeze
-            this.velocity.x = this.dodgeDirection * (PhysicsConfig.DODGE_DISTANCE / (PhysicsConfig.DODGE_DURATION / 1000)) * 0.7;
-            this.velocity.y *= 0.3;
-        }
+            if (input.moveLeft && !input.moveRight) {
+                this.dodgeDirection = -1;
+            } else if (input.moveRight && !input.moveLeft) {
+                this.dodgeDirection = 1;
+            } else {
+                this.dodgeDirection = this.facingDirection;
+            }
 
-        // Visual feedback
-        this.bodyRect.setFillStyle(0x3498db);
-        this.bodyRect.setAlpha(0.5);
+            // Apply dodge velocity
+            if (this.isGrounded) {
+                // Grounded dash
+                this.velocity.x = this.dodgeDirection * (PhysicsConfig.DODGE_DISTANCE / (PhysicsConfig.DODGE_DURATION / 1000));
+            } else {
+                // Air dodge - less horizontal, some vertical freeze
+                this.velocity.x = this.dodgeDirection * (PhysicsConfig.DODGE_DISTANCE / (PhysicsConfig.DODGE_DURATION / 1000)) * 0.7;
+                this.velocity.y *= 0.3;
+            }
+
+            // Visual feedback
+            this.bodyRect.setFillStyle(0x3498db);
+            this.bodyRect.setAlpha(0.5);
+        }
     }
 
     private updateDodgeState(delta: number): void {
         this.dodgeTimer -= delta;
 
         // End invincibility after DODGE_INVINCIBILITY ms
-        if (this.dodgeTimer < PhysicsConfig.DODGE_DURATION - PhysicsConfig.DODGE_INVINCIBILITY) {
+        if (this.dodgeTimer < (this.isSpotDodging ? PhysicsConfig.SPOT_DODGE_DURATION : PhysicsConfig.DODGE_DURATION) - PhysicsConfig.DODGE_INVINCIBILITY) {
             this.isInvincible = false;
         }
 
@@ -653,9 +690,17 @@ export class Player extends Phaser.GameObjects.Container {
         this.bodyRect.setFillStyle(0x4a90e2);
         this.bodyRect.setAlpha(1);
 
-        // Brawlhalla-style: maintain dodge velocity as run momentum
-        // The velocity from dodge carries into movement
-        // (Don't reset velocity.x here - let it carry over)
+        // Activate running state if directional dodge and still holding direction
+        const input = this.currentInput;
+        if (!this.isSpotDodging && this.dodgeDirection !== 0) {
+            const holdingDirection = (this.dodgeDirection === -1 && input.moveLeft) ||
+                (this.dodgeDirection === 1 && input.moveRight);
+            if (holdingDirection) {
+                this.isRunning = true; // Activate run mode!
+            }
+        }
+
+        this.isSpotDodging = false;
     }
 
     private updateFacing(): void {
