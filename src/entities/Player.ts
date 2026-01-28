@@ -453,25 +453,29 @@ export class Player extends Phaser.GameObjects.Container {
 
         // Release charge - execute attack
         if (this.isCharging && !input.heavyAttackHeld) {
-            const direction = this.chargeDirection;
-            const isAerial = !this.isGrounded;
-
-            // Special case: down + heavy in air = ground pound (not chargeable)
-            if (direction === AttackDirection.DOWN && isAerial) {
-                this.clearChargeState();
-                this.startGroundPound();
-                return;
-            }
-
-            // Calculate charge multiplier (0 to 1 based on charge time)
-            const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
-
-            // Get attack key and start charged attack
-            const attackKey = Attack.getAttackKey(AttackType.HEAVY, direction, isAerial);
-            this.startChargedAttack(attackKey, chargePercent);
-            this.clearChargeState();
+            this.executeChargedAttack();
             return;
         }
+    }
+
+    private executeChargedAttack(): void {
+        const direction = this.chargeDirection;
+        const isAerial = !this.isGrounded;
+
+        // Special case: down + heavy in air = ground pound (not chargeable)
+        if (direction === AttackDirection.DOWN && isAerial) {
+            this.clearChargeState();
+            this.startGroundPound();
+            return;
+        }
+
+        // Calculate charge multiplier (0 to 1 based on charge time)
+        const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
+
+        // Get attack key and start charged attack
+        const attackKey = Attack.getAttackKey(AttackType.HEAVY, direction, isAerial);
+        this.startChargedAttack(attackKey, chargePercent);
+        this.clearChargeState();
     }
 
     private updateChargeState(delta: number): void {
@@ -479,6 +483,13 @@ export class Player extends Phaser.GameObjects.Container {
 
         // Accumulate charge time
         this.chargeTime += delta;
+
+        // Auto-release if max charge exceeded (Brawlhalla style limit)
+        if (this.chargeTime >= PhysicsConfig.CHARGE_MAX_TIME) {
+            this.executeChargedAttack();
+            return;
+        }
+
         const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
 
         // Update visual glow effect
