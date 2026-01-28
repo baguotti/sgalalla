@@ -31,10 +31,10 @@ export const PhysicsConfig = {
   PLATFORM_DROP_GRACE_PERIOD: 200, // ms - time to ignore platform collision
 
   // Attack system
-  LIGHT_ATTACK_DAMAGE: 5, // Light attack damage percentage
-  HEAVY_ATTACK_DAMAGE: 12, // Heavy attack damage percentage
-  LIGHT_ATTACK_KNOCKBACK: 300, // Base knockback for light
-  HEAVY_ATTACK_KNOCKBACK: 600, // Base knockback for heavy
+  LIGHT_ATTACK_DAMAGE: 4, // Reduced from 5
+  HEAVY_ATTACK_DAMAGE: 9, // Reduced from 12
+  LIGHT_ATTACK_KNOCKBACK: 300,
+  HEAVY_ATTACK_KNOCKBACK: 600,
   LIGHT_ATTACK_DURATION: 200, // ms - how long light attack lasts
   HEAVY_ATTACK_DURATION: 400, // ms - how long heavy attack lasts
   LIGHT_ATTACK_COOLDOWN: 300, // ms - time between light attacks
@@ -84,7 +84,7 @@ export const PhysicsConfig = {
   // Ground pound (down + attack in air)
   GROUND_POUND_STARTUP: 200,   // Pause in air before dropping
   GROUND_POUND_SPEED: 1200,    // Fast fall speed during ground pound
-  GROUND_POUND_DAMAGE: 18,     // Higher damage for commitment
+  GROUND_POUND_DAMAGE: 13,     // Reduced from 18
   GROUND_POUND_KNOCKBACK: 900, // Strong knockback for spikes
 
   // Directional attack hitbox offsets

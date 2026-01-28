@@ -821,16 +821,21 @@ export class Player extends Phaser.GameObjects.Container {
             -Math.sin(angleRad) * knockbackForce
         );
 
+        // Ground Bounce: If knocking down into floor while grounded, bounce up
+        if (target.isGrounded && knockbackVector.y > 0) {
+            knockbackVector.y *= -0.8; // Bounce up with 80% force
+        }
+
         // Apply damage and knockback (also calls applyHitStun)
         DamageSystem.applyDamage(target, attackData.damage, knockbackVector);
 
+        // Screen Shake (Heavy Attacks)
+        if (attackData.type === AttackType.HEAVY) {
+            this.scene.cameras.main.shake(100, 0.005);
+        }
+
         // Visual Effects for Down Air (Spike)
         if (attackData.direction === AttackDirection.DOWN && attackData.isAerial) {
-            // Screen shake (Only on heavy/charged attacks)
-            if (attackData.type === AttackType.HEAVY) {
-                this.scene.cameras.main.shake(100, 0.005);
-            }
-
             // Visual Spike Effect
             const effect = this.scene.add.graphics();
             effect.fillStyle(0xffffff, 0.8);
