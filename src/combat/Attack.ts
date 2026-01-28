@@ -196,6 +196,22 @@ export const AttackRegistry: Record<string, AttackData> = {
         hitboxOffsetY: 25,
     },
 
+    'heavy_up_grounded': {
+        type: AttackType.HEAVY,
+        direction: AttackDirection.UP,
+        isAerial: false,
+        damage: 12,
+        knockback: 500,
+        knockbackAngle: 85, // Slightly more vertical than neutral
+        startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
+        activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
+        recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES,
+        hitboxWidth: 70,
+        hitboxHeight: 60, // Taller hitbox
+        hitboxOffsetX: 30, // Slightly closer to center
+        hitboxOffsetY: -20, // Hitting upwards
+    },
+
     // ========== AERIAL HEAVY ATTACKS ==========
     'heavy_neutral_aerial': {
         type: AttackType.HEAVY,

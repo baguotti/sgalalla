@@ -90,28 +90,59 @@ export class Player extends Phaser.GameObjects.Container {
     private jumpHoldTime: number = 0;
     private wasJumpHeld: boolean = false;
 
-    constructor(scene: Phaser.Scene, x: number, y: number) {
+    // AI Control
+    public isAI: boolean = false;
+    private aiTimer: number = 0;
+    private aiState: 'IDLE' | 'CHASE' | 'ATTACK' | 'RECOVER' = 'IDLE';
+    private aiInput: any = {}; // Store AI generated input
+
+    constructor(scene: Phaser.Scene, x: number, y: number, isAI: boolean = false) {
         super(scene, x, y);
 
-        // Create player body (main rectangle)
-        this.bodyRect = scene.add.rectangle(
-            0,
-            0,
-            PhysicsConfig.PLAYER_WIDTH,
-            PhysicsConfig.PLAYER_HEIGHT,
-            0x4a90e2
-        );
-        this.add(this.bodyRect);
+        this.isAI = isAI;
 
-        // Create nose (directional indicator)
-        this.nose = scene.add.rectangle(
-            PhysicsConfig.PLAYER_WIDTH / 2,
-            0,
-            PhysicsConfig.NOSE_SIZE,
-            PhysicsConfig.NOSE_SIZE,
-            0xffffff
-        );
-        this.add(this.nose);
+        // Create player body (main rectangle)
+        if (this.isAI) {
+            // AI Opponent Visuals (Red)
+            this.bodyRect = scene.add.rectangle(0, 0, PhysicsConfig.PLAYER_WIDTH, PhysicsConfig.PLAYER_HEIGHT, 0xe74c3c); // Red
+
+            // Add Nose (Dark Red)
+            this.nose = scene.add.rectangle(PhysicsConfig.PLAYER_WIDTH / 2, -10, 10, 10, 0xc0392b);
+            this.add(this.bodyRect);
+            this.add(this.nose);
+
+            // Add Face
+            const face = scene.add.graphics();
+            face.fillStyle(0x000000);
+            // Angry Eyes
+            face.fillCircle(-8, -10, 3);
+            face.fillCircle(8, -10, 3);
+            // Angry Eyebrows
+            face.lineStyle(2, 0x000000);
+            face.beginPath();
+            face.moveTo(-12, -14);
+            face.lineTo(-4, -10);
+            face.moveTo(4, -10);
+            face.lineTo(12, -14);
+            face.strokePath();
+            this.add(face);
+        } else {
+            // Player Visuals (Blue)
+            this.bodyRect = scene.add.rectangle(0, 0, PhysicsConfig.PLAYER_WIDTH, PhysicsConfig.PLAYER_HEIGHT, 0x4a90e2);
+            this.add(this.bodyRect);
+
+            // Add Nose
+            this.nose = scene.add.rectangle(PhysicsConfig.PLAYER_WIDTH / 2, -10, 10, 10, 0xffffff);
+            this.add(this.nose);
+
+            // Add Face
+            const face = scene.add.graphics();
+            face.fillStyle(0x000000);
+            face.fillCircle(-8, -10, 4);
+            face.fillCircle(8, -10, 4);
+            face.fillRect(-10, 5, 20, 3); // Neutral mouth
+            this.add(face);
+        }
 
         // Create damage text
         this.damageText = scene.add.text(0, -40, '0%', {
@@ -142,8 +173,14 @@ export class Player extends Phaser.GameObjects.Container {
     update(delta: number): void {
         const deltaSeconds = delta / 1000;
 
-        // Poll input at start of frame
-        this.currentInput = this.inputManager.poll();
+        // Get input (from InputManager or AI)
+        if (this.isAI) {
+            this.updateAI(delta);
+            this.currentInput = this.aiInput;
+        } else {
+            // Unified Input Handling
+            this.currentInput = this.inputManager.poll();
+        }
 
         // Update timers
         this.updateTimers(delta);
@@ -508,9 +545,8 @@ export class Player extends Phaser.GameObjects.Container {
     private getInputDirection(): AttackDirection {
         const input = this.currentInput;
 
-        // BRAWLHALLA STYLE: Up input counts as Neutral for attacks/dodges
-        // (allows performing neutral attacks/spot dodges while holding up)
-        if (input.aimUp && !input.aimDown) return AttackDirection.NEUTRAL;
+        // BRAWLHALLA STYLE: Up input mapped to UP (Restored for Up Air Light)
+        if (input.aimUp && !input.aimDown) return AttackDirection.UP;
 
         if (input.aimDown && !input.aimUp) return AttackDirection.DOWN;
         if ((input.aimLeft || input.aimRight) && !input.aimUp && !input.aimDown) return AttackDirection.SIDE;
@@ -649,7 +685,12 @@ export class Player extends Phaser.GameObjects.Container {
         const input = this.currentInput;
         const hasDirectionalInput = input.moveLeft || input.moveRight;
 
-        if (!hasDirectionalInput) {
+        // Spot Dodge conditions:
+        // 1. No horizontal input (Neutral Spot Dodge)
+        // 2. Up input (Up Spot Dodge - Brawlhalla style)
+        const isSpotDodge = !hasDirectionalInput || (input.aimUp && !input.moveLeft && !input.moveRight);
+
+        if (isSpotDodge) {
             // SPOT DODGE - dodge in place with invincibility (works in air too!)
             this.isSpotDodging = true;
             this.dodgeDirection = 0;
@@ -871,5 +912,86 @@ export class Player extends Phaser.GameObjects.Container {
 
     isGamepadConnected(): boolean {
         return this.inputManager.isGamepadConnected();
+    }
+
+    // Simple AI Implementation
+    private updateAI(delta: number): void {
+        this.aiTimer -= delta;
+
+        // Find Target
+        const players = this.scene.children.list.filter(c => c instanceof Player && c !== this && !(c as Player).isAI) as Player[];
+        const target = players[0];
+
+        // Reset Inputs
+        this.aiInput = {
+            moveLeft: false, moveRight: false, moveUp: false, moveDown: false,
+            moveX: 0, moveY: 0,
+            jump: false, jumpHeld: false,
+            lightAttack: false, heavyAttack: false, heavyAttackHeld: false,
+            dodge: false, dodgeHeld: false, recovery: false,
+            aimUp: false, aimDown: false, aimLeft: false, aimRight: false,
+            usingGamepad: false
+        };
+
+        if (!target) return; // No target
+
+        const dx = target.x - this.x;
+        // dy removed (unused)
+
+        // Update decision every random interval (simulating reaction time)
+        if (this.aiTimer <= 0) {
+            this.aiTimer = 500 + Math.random() * 500; // Decision every 0.5-1s
+
+            // Basic behavior state machine
+            if (Math.abs(dx) > 150) {
+                this.aiState = 'CHASE';
+            } else {
+                this.aiState = 'ATTACK';
+            }
+        }
+
+        // Execute based on state
+        if (this.aiState === 'CHASE') {
+            if (dx > 0) {
+                this.aiInput.moveRight = true;
+                this.aiInput.moveX = 1;
+                this.aiInput.aimRight = true;
+            } else {
+                this.aiInput.moveLeft = true;
+                this.aiInput.moveX = -1;
+                this.aiInput.aimLeft = true;
+            }
+
+            // Jump if stuck or target is higher
+            if ((this.y > target.y + 100 && this.isGrounded) || (this.velocity.x === 0 && this.isGrounded && Math.abs(dx) > 50)) {
+                this.aiInput.jump = true;
+                this.aiInput.jumpHeld = true;
+            }
+        } else if (this.aiState === 'ATTACK') {
+            // Face target
+            if (dx > 0) {
+                this.aiInput.aimRight = true;
+            } else {
+                this.aiInput.aimLeft = true;
+            }
+
+            // Randomly attack
+            if (Math.random() > 0.95) {
+                this.aiInput.lightAttack = true;
+            } else if (Math.random() > 0.98) {
+                this.aiInput.heavyAttack = true;
+                // Sometimes hold heavy
+                if (Math.random() > 0.5) this.aiInput.heavyAttackHeld = true;
+            }
+        }
+
+        // Recover if falling
+        if (this.y > 600) {
+            this.aiInput.jump = true;
+            this.aiInput.jumpHeld = true;
+            this.aiInput.aimUp = true;
+            this.aiInput.recovery = true; // Attempt recovery
+            if (this.y > 650) this.aiInput.heavyAttack = true; // Use recovery attack
+        }
     }
 }
