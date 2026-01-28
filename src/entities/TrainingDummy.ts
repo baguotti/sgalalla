@@ -83,8 +83,12 @@ export class TrainingDummy extends Phaser.GameObjects.Container {
         // Apply gravity
         this.velocity.y += PhysicsConfig.GRAVITY * deltaSeconds;
 
-        // Apply friction
-        this.velocity.x *= 0.9;
+        // Apply friction - less when in hitstun (to allow knockback travel)
+        if (this.isHitStunned) {
+            this.velocity.x *= 0.98; // Very light air friction during knockback
+        } else {
+            this.velocity.x *= 0.85; // Normal ground friction
+        }
 
         // Update position
         this.x += this.velocity.x * deltaSeconds;

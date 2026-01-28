@@ -46,15 +46,15 @@ export const PhysicsConfig = {
   HEAVY_HITBOX_WIDTH: 80,
   HEAVY_HITBOX_HEIGHT: 60,
 
-  // Dodge/Dash
-  DODGE_DISTANCE: 150, // Distance traveled during dodge
-  DODGE_DURATION: 250, // ms - how long dodge lasts
-  DODGE_COOLDOWN: 800, // ms - time between dodges
+  // Dodge/Dash - Brawlhalla style (fast and covers ground)
+  DODGE_DISTANCE: 280, // Distance traveled during dodge (increased for speed)
+  DODGE_DURATION: 200, // ms - shorter for snappier feel
+  DODGE_COOLDOWN: 600, // ms - slightly shorter cooldown
   DODGE_INVINCIBILITY: 150, // ms - invincibility frames
 
-  // Damage system
+  // Damage system - Smash/Brawlhalla style (higher damage = further knockback)
   MAX_DAMAGE: 999, // Maximum damage percentage
-  KNOCKBACK_SCALING: 0.01, // How much damage affects knockback
+  KNOCKBACK_SCALING: 0.025, // How much damage affects knockback (higher = more scaling)
   HIT_STUN_DURATION: 300, // ms - time player is stunned after being hit
 
   // Ledge detection
@@ -79,8 +79,8 @@ export const PhysicsConfig = {
   // Ground pound (down + attack in air)
   GROUND_POUND_STARTUP: 200,   // Pause in air before dropping
   GROUND_POUND_SPEED: 1200,    // Fast fall speed during ground pound
-  GROUND_POUND_DAMAGE: 15,     // Higher damage for commitment
-  GROUND_POUND_KNOCKBACK: 700,
+  GROUND_POUND_DAMAGE: 18,     // Higher damage for commitment
+  GROUND_POUND_KNOCKBACK: 900, // Strong knockback for spikes
 
   // Directional attack hitbox offsets
   SIDE_ATTACK_OFFSET_X: 50,    // How far in front of player
