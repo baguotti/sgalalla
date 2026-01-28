@@ -217,6 +217,13 @@ export class Player extends Phaser.GameObjects.Container {
         // Reset acceleration
         this.acceleration.set(0, PhysicsConfig.GRAVITY);
 
+        // GROUND POUND HOVER: If charging down heavy in air, freeze gravity/velocity
+        if (this.isCharging && !this.isGrounded && this.chargeDirection === AttackDirection.DOWN) {
+            this.acceleration.y = 0;
+            this.velocity.y = 0;
+            this.velocity.x *= 0.9; // Apply strong air friction to hold position
+        }
+
         // Normal input handling using unified input
         this.handleHorizontalMovement();
         this.handleRecovery();
@@ -816,6 +823,29 @@ export class Player extends Phaser.GameObjects.Container {
 
         // Apply damage and knockback (also calls applyHitStun)
         DamageSystem.applyDamage(target, attackData.damage, knockbackVector);
+
+        // Visual Effects for Down Air (Spike)
+        if (attackData.direction === AttackDirection.DOWN && attackData.isAerial) {
+            // Screen shake
+            this.scene.cameras.main.shake(100, 0.01);
+
+            // Visual Spike Effect
+            const effect = this.scene.add.graphics();
+            effect.fillStyle(0xffffff, 0.8);
+            effect.fillTriangle(
+                target.x, target.y - 20,
+                target.x - 20, target.y - 60,
+                target.x + 20, target.y - 60
+            );
+
+            // Animate out
+            this.scene.tweens.add({
+                targets: effect,
+                alpha: 0,
+                duration: 200,
+                onComplete: () => effect.destroy()
+            });
+        }
     }
 
     setKnockback(x: number, y: number): void {
