@@ -233,6 +233,10 @@ export class Player extends Phaser.GameObjects.Container {
         this.updateChargeState(delta); // Update charge visual effects
         this.handleDodgeInput();
 
+        if (this.isRecovering) {
+            this.updateRecoveryHitbox();
+        }
+
         // Apply physics
         this.applyPhysics(deltaSeconds);
 
@@ -644,17 +648,25 @@ export class Player extends Phaser.GameObjects.Container {
         const hitboxX = this.x + offset.x;
         const hitboxY = this.y + offset.y;
 
+        this.updateActiveHitbox(hitboxX, hitboxY, this.currentAttack.data.hitboxWidth, this.currentAttack.data.hitboxHeight);
+    }
+
+    private updateRecoveryHitbox(): void {
+        // Centered hitbox for recovery
+        this.updateActiveHitbox(this.x, this.y, 60, 60);
+    }
+
+    private updateActiveHitbox(x: number, y: number, width: number, height: number): void {
         if (!this.activeHitbox) {
             this.activeHitbox = new Hitbox(
                 this.scene,
-                hitboxX,
-                hitboxY,
-                this.currentAttack.data.hitboxWidth,
-                this.currentAttack.data.hitboxHeight
+                x,
+                y,
+                width,
+                height
             );
         }
-
-        this.activeHitbox.activate(hitboxX, hitboxY);
+        this.activeHitbox.activate(x, y);
     }
 
     private deactivateHitbox(): void {
@@ -791,9 +803,12 @@ export class Player extends Phaser.GameObjects.Container {
 
     // Called by GameScene to check hits against other players
     checkHitAgainst(target: Player): void {
-        if (!this.activeHitbox || !this.currentAttack) return;
+        if (!this.activeHitbox) return;
         if (this.hitTargets.has(target)) return; // Already hit this target
         if (target.isInvincible) return; // Target is invincible
+
+        // Need source data (Attack or Recovery)
+        if (!this.currentAttack && !this.isRecovering) return;
 
         const targetBounds = target.getBounds();
         if (this.activeHitbox.checkCollision(targetBounds)) {
@@ -803,19 +818,42 @@ export class Player extends Phaser.GameObjects.Container {
     }
 
     private applyHitTo(target: Player): void {
-        if (!this.currentAttack) return;
+        let damage = 0;
+        let knockback = 0;
+        let knockbackAngle = 45;
+        let isHeavy = false;
+        let direction: AttackDirection = AttackDirection.NEUTRAL;
+        let isAerial = false;
 
-        const attackData = this.currentAttack.data;
+        if (this.currentAttack) {
+            const data = this.currentAttack.data;
+            damage = data.damage;
+            knockback = data.knockback;
+            knockbackAngle = data.knockbackAngle;
+            isHeavy = data.type === AttackType.HEAVY;
+            direction = data.direction;
+            isAerial = data.isAerial;
+        } else if (this.isRecovering) {
+            // Recovery Hit Data
+            damage = 8;
+            knockback = 500;
+            knockbackAngle = 80; // Upwards
+            isHeavy = false;
+            direction = AttackDirection.UP;
+            isAerial = true;
+        } else {
+            return;
+        }
 
         // Calculate knockback
         const knockbackForce = DamageSystem.calculateKnockback(
-            attackData.damage,
-            attackData.knockback,
+            damage,
+            knockback,
             target.damagePercent
         );
 
         // Calculate knockback direction based on attack angle
-        const angleRad = (attackData.knockbackAngle * Math.PI) / 180;
+        const angleRad = (knockbackAngle * Math.PI) / 180;
         const knockbackVector = new Phaser.Math.Vector2(
             Math.cos(angleRad) * knockbackForce * this.facingDirection,
             -Math.sin(angleRad) * knockbackForce
@@ -824,18 +862,20 @@ export class Player extends Phaser.GameObjects.Container {
         // Ground Bounce: If knocking down into floor while grounded, bounce up
         if (target.isGrounded && knockbackVector.y > 0) {
             knockbackVector.y *= -0.8; // Bounce up with 80% force
+            target.y -= 10; // Lift off ground to prevent immediate snap-back
+            target.isGrounded = false; // Mark as airborne
         }
 
         // Apply damage and knockback (also calls applyHitStun)
-        DamageSystem.applyDamage(target, attackData.damage, knockbackVector);
+        DamageSystem.applyDamage(target, damage, knockbackVector);
 
         // Screen Shake (Heavy Attacks)
-        if (attackData.type === AttackType.HEAVY) {
+        if (isHeavy) {
             this.scene.cameras.main.shake(100, 0.005);
         }
 
         // Visual Effects for Down Air (Spike)
-        if (attackData.direction === AttackDirection.DOWN && attackData.isAerial) {
+        if (direction === AttackDirection.DOWN && isAerial) {
             // Visual Spike Effect
             const effect = this.scene.add.graphics();
             effect.fillStyle(0xffffff, 0.8);
