@@ -5,8 +5,7 @@
  * Brawlhalla Xbox Default Controls:
  * - A: Jump
  * - X: Light Attack
- * - B: Heavy Attack
- * - Y: Pickup/Throw (not implemented yet)
+ * - B/Y: Heavy Attack
  * - LT/RT: Dodge
  * - Left Stick / D-pad: Movement
  */
@@ -167,8 +166,10 @@ export class GamepadInput {
         // Light Attack (X) - detect new press only
         state.lightAttack = xPressed && !this.wasButtonPressed(XBOX_BUTTONS.X);
 
-        // Heavy Attack (B) - detect new press only
-        state.heavyAttack = bPressed && !this.wasButtonPressed(XBOX_BUTTONS.B);
+        // Heavy Attack (B or Y) - detect new press only
+        const heavyNewPress = (bPressed && !this.wasButtonPressed(XBOX_BUTTONS.B)) ||
+            (yPressed && !this.wasButtonPressed(XBOX_BUTTONS.Y));
+        state.heavyAttack = heavyNewPress;
 
         // Dodge (LT or RT) - detect new press only
         state.dodge = triggerPressed && !this.wasTriggerPressed();

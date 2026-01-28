@@ -61,7 +61,7 @@ export class GameScene extends Phaser.Scene {
             '',
             'Xbox Controller:',
             'Left Stick/D-pad - Move',
-            'A - Jump | X - Light | B - Heavy',
+            'A - Jump | X - Light | B/Y - Heavy',
             'LT/RT - Dodge',
         ].join('\n');
 

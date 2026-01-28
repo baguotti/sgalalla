@@ -404,6 +404,12 @@ export class Player extends Phaser.GameObjects.Container {
             return;
         }
 
+        // During ground pound descent, always keep hitbox active
+        if (this.isGroundPounding && this.groundPoundStartupTimer <= 0) {
+            this.updateHitbox();
+            return; // Skip normal attack phase update during ground pound
+        }
+
         // Update attack phase
         const attackComplete = this.currentAttack.update(delta);
 
@@ -525,6 +531,10 @@ export class Player extends Phaser.GameObjects.Container {
         this.dodgeCooldownTimer = PhysicsConfig.DODGE_COOLDOWN;
         this.bodyRect.setFillStyle(0x4a90e2);
         this.bodyRect.setAlpha(1);
+
+        // Brawlhalla-style: maintain dodge velocity as run momentum
+        // The velocity from dodge carries into movement
+        // (Don't reset velocity.x here - let it carry over)
     }
 
     private updateFacing(): void {
