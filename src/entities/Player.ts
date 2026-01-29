@@ -102,7 +102,12 @@ export class Player extends Phaser.GameObjects.Container {
 
         // Create player sprite (Phaser Dude)
         this.sprite = scene.add.sprite(0, 0, 'dude');
-        this.sprite.setScale(1.25); // Scale to approx 40x60
+
+        // Auto-scale to fit hitbox height (60px)
+        const targetHeight = PhysicsConfig.PLAYER_HEIGHT;
+        const scale = targetHeight / this.sprite.height;
+        this.sprite.setScale(scale);
+
         this.add(this.sprite);
 
         // Tint for AI distinction
