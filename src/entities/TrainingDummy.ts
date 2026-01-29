@@ -113,6 +113,9 @@ export class TrainingDummy extends Phaser.GameObjects.Container {
         if (this.y > 700) {
             this.respawn();
         }
+
+        // Reset grounded state (will be set true by collision if on ground)
+        this.isGrounded = false;
     }
 
     applyHitStun(): void {
@@ -148,6 +151,7 @@ export class TrainingDummy extends Phaser.GameObjects.Container {
             if (dummyBottom - this.velocity.y * (1 / 60) <= platformTop + 5) {
                 this.y = platformTop - PhysicsConfig.PLAYER_HEIGHT / 2;
                 this.velocity.y = 0;
+                this.isGrounded = true;
             }
         }
     }

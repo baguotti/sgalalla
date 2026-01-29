@@ -158,8 +158,8 @@ export class GameScene extends Phaser.Scene {
         // Update Entity (Dummy or Opponent)
         if (this.trainingDummy) {
             this.trainingDummy.update(delta);
-            this.player.checkHitAgainst(this.trainingDummy as any);
 
+            // Check collisions FIRST to establish grounded state
             // Check collisions with main platforms
             for (const platform of this.platforms) {
                 this.trainingDummy.checkPlatformCollision(platform, false);
@@ -168,18 +168,22 @@ export class GameScene extends Phaser.Scene {
             for (const platform of this.softPlatforms) {
                 this.trainingDummy.checkPlatformCollision(platform, true);
             }
+
+            // Then check hits
+            this.player.checkHitAgainst(this.trainingDummy as any);
         } else if (this.opponent) {
             this.opponent.update(delta);
-            this.player.checkHitAgainst(this.opponent);
-            this.opponent.checkHitAgainst(this.player);
 
-            // Check collisions
+            // Check collisions FIRST
             for (const platform of this.platforms) {
                 this.opponent.checkPlatformCollision(platform, false);
             }
             for (const platform of this.softPlatforms) {
                 this.opponent.checkPlatformCollision(platform, true);
             }
+
+            this.player.checkHitAgainst(this.opponent);
+            this.opponent.checkHitAgainst(this.player);
 
             // Bounds check for opponent
             const opBounds = this.opponent.getBounds();
