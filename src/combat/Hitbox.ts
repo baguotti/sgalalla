@@ -41,6 +41,11 @@ export class Hitbox {
             );
             this.debugGraphics.setStrokeStyle(2, 0xff0000);
             this.debugGraphics.setDepth(999);
+
+            // Exclude from UI camera if scene supports it
+            if ((this.scene as any).addToCameraIgnore) {
+                (this.scene as any).addToCameraIgnore(this.debugGraphics);
+            }
         } else {
             this.debugGraphics.setPosition(this.x, this.y);
             this.debugGraphics.setVisible(true);

@@ -11,6 +11,10 @@ export class GameScene extends Phaser.Scene {
     private debugOverlay!: DebugOverlay;
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
+    private background!: Phaser.GameObjects.Graphics;
+    private walls: Phaser.GameObjects.Rectangle[] = [];
+    private wallTexts: Phaser.GameObjects.Text[] = [];
+
     private toggleKey!: Phaser.Input.Keyboard.Key;
 
     // Debug visibility
@@ -23,11 +27,19 @@ export class GameScene extends Phaser.Scene {
     private opponentKills: number = 0;
     private killCountText!: Phaser.GameObjects.Text;
 
+    // Wall configuration
+    private readonly WALL_THICKNESS = 30;
+    private readonly WALL_LEFT_X = 100;
+    private readonly WALL_RIGHT_X = 1180;
+    // Playable area bounds (inner edges of walls)
+    private readonly PLAY_BOUND_LEFT = this.WALL_LEFT_X + this.WALL_THICKNESS / 2;
+    private readonly PLAY_BOUND_RIGHT = this.WALL_RIGHT_X - this.WALL_THICKNESS / 2;
+
     // Blast zone boundaries
-    private readonly BLAST_ZONE_LEFT = -100;
-    private readonly BLAST_ZONE_RIGHT = 900;
-    private readonly BLAST_ZONE_TOP = -100;
-    private readonly BLAST_ZONE_BOTTOM = 700;
+    private readonly BLAST_ZONE_LEFT = -200;
+    private readonly BLAST_ZONE_RIGHT = 1480;
+    private readonly BLAST_ZONE_TOP = -200;
+    private readonly BLAST_ZONE_BOTTOM = 900;
 
     private uiCamera!: Phaser.Cameras.Scene2D.Camera;
 
@@ -107,52 +119,87 @@ export class GameScene extends Phaser.Scene {
     }
 
     private setupCameras(): void {
+        // Main camera is manually controlled via updateCamera() using centerOn()
+
         // Create a separate UI camera that ignores zoom
-        this.uiCamera = this.cameras.add(0, 0, 800, 600);
+        this.uiCamera = this.cameras.add(0, 0, this.scale.width, this.scale.height);
         this.uiCamera.setScroll(0, 0);
         // UI camera ignores main camera zoom
         this.uiCamera.setZoom(1);
+
+        // PREVENT GHOSTING: UI Camera should ignore game world objects
+        this.configureCameraExclusions();
+    }
+
+    private configureCameraExclusions(): void {
+        if (!this.uiCamera) return;
+
+        // Ignore static world elements
+        if (this.background) this.uiCamera.ignore(this.background);
+        if (this.platforms.length > 0) this.uiCamera.ignore(this.platforms);
+        if (this.softPlatforms.length > 0) this.uiCamera.ignore(this.softPlatforms);
+        if (this.walls.length > 0) this.uiCamera.ignore(this.walls);
+        if (this.wallTexts.length > 0) this.uiCamera.ignore(this.wallTexts);
+
+        // Ignore entities (and their damage text)
+        if (this.player) this.player.addToCameraIgnore(this.uiCamera);
+        if (this.trainingDummy) this.trainingDummy.addToCameraIgnore(this.uiCamera);
+        if (this.opponent) this.opponent.addToCameraIgnore(this.uiCamera);
+    }
+
+    /**
+     * Expose method to add dynamic objects to camera ignore list
+     * (Called by Hitboxes and other dynamic entities)
+     */
+    public addToCameraIgnore(object: Phaser.GameObjects.GameObject): void {
+        if (this.uiCamera) {
+            this.uiCamera.ignore(object);
+        }
     }
 
     private createStage(): void {
         // Background gradient to show play area
-        const bg = this.add.graphics();
-        bg.fillGradientStyle(0x0a0a1a, 0x0a0a1a, 0x1a1a2e, 0x1a1a2e, 1);
-        bg.fillRect(0, 0, 800, 600);
-        bg.setDepth(-10);
+        this.background = this.add.graphics();
+        this.background.fillGradientStyle(0x0a0a1a, 0x0a0a1a, 0x1a1a2e, 0x1a1a2e, 1);
+        this.background.fillRect(0, 0, this.scale.width, this.scale.height);
+        this.background.setDepth(-10);
 
         // Main platform (centered, wide - Brawlhalla style)
-        const mainPlatform = this.add.rectangle(400, 480, 600, 30, 0x16213e);
+        // At 1280x720: center is x=640, place main platform lower at y=550
+        const mainPlatform = this.add.rectangle(640, 550, 900, 30, 0x16213e);
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
 
-        // Soft platform 1 (left-center, above main)
-        const softPlatform1 = this.add.rectangle(250, 340, 200, 16, 0x0f3460);
+        // Soft platform 1 (left, above main)
+        const softPlatform1 = this.add.rectangle(380, 400, 240, 16, 0x0f3460);
         softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform1.setAlpha(0.85);
         this.softPlatforms.push(softPlatform1);
 
-        // Soft platform 2 (right-center, above main)
-        const softPlatform2 = this.add.rectangle(550, 340, 200, 16, 0x0f3460);
+        // Soft platform 2 (right, above main)
+        const softPlatform2 = this.add.rectangle(900, 400, 240, 16, 0x0f3460);
         softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform2.setAlpha(0.85);
         this.softPlatforms.push(softPlatform2);
 
         // VISIBLE SIDE WALLS for wall mechanics testing
+        this.walls = [];
         // Left wall
-        const leftWall = this.add.rectangle(15, 300, 30, 600, 0x2a3a4e);
+        const leftWall = this.add.rectangle(this.WALL_LEFT_X, 360, this.WALL_THICKNESS, 720, 0x2a3a4e);
         leftWall.setStrokeStyle(4, 0x4a6a8e);
         leftWall.setAlpha(0.6);
         leftWall.setDepth(-5);
+        this.walls.push(leftWall);
 
         // Right wall
-        const rightWall = this.add.rectangle(785, 300, 30, 600, 0x2a3a4e);
+        const rightWall = this.add.rectangle(this.WALL_RIGHT_X, 360, this.WALL_THICKNESS, 720, 0x2a3a4e);
         rightWall.setStrokeStyle(4, 0x4a6a8e);
         rightWall.setAlpha(0.6);
         rightWall.setDepth(-5);
+        this.walls.push(rightWall);
 
         // Add wall indicators (text labels)
-        const leftWallText = this.add.text(8, 250, 'WALL', {
+        const leftWallText = this.add.text(this.WALL_LEFT_X - 8, 250, 'WALL', {
             fontSize: '12px',
             color: '#8ab4f8',
             fontFamily: 'Arial',
@@ -161,8 +208,9 @@ export class GameScene extends Phaser.Scene {
         leftWallText.setRotation(-Math.PI / 2);
         leftWallText.setAlpha(0.5);
         leftWallText.setDepth(-4);
+        this.wallTexts.push(leftWallText);
 
-        const rightWallText = this.add.text(792, 350, 'WALL', {
+        const rightWallText = this.add.text(this.WALL_RIGHT_X + 8, 350, 'WALL', {
             fontSize: '12px',
             color: '#8ab4f8',
             fontFamily: 'Arial',
@@ -171,6 +219,7 @@ export class GameScene extends Phaser.Scene {
         rightWallText.setRotation(Math.PI / 2);
         rightWallText.setAlpha(0.5);
         rightWallText.setDepth(-4);
+        this.wallTexts.push(rightWallText);
     }
 
     private createControlsHint(): void {
@@ -215,8 +264,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     update(_time: number, delta: number): void {
-        // Handle Pause Toggle (ESC)
-        if (Phaser.Input.Keyboard.JustDown(this.pauseKey)) {
+        // Handle Pause Toggle (ESC key or START button on gamepad)
+        const pauseKeyPressed = Phaser.Input.Keyboard.JustDown(this.pauseKey);
+        const gamepadPausePressed = this.checkGamepadPause();
+
+        if (pauseKeyPressed || gamepadPausePressed) {
             this.togglePause();
         }
 
@@ -242,6 +294,8 @@ export class GameScene extends Phaser.Scene {
                 this.trainingDummy = null;
 
                 this.opponent = new Player(this, x, y, true);
+                // Important: Exclude new opponent from UI camera
+                if (this.uiCamera) this.opponent.addToCameraIgnore(this.uiCamera);
                 // isAI handled in constructor now
                 // (Already handled in constructor based on isAI, but we set isAI after construction)
                 // Wait, constructor checks isAI. We need to set it BEFORE adding children?
@@ -275,6 +329,8 @@ export class GameScene extends Phaser.Scene {
                 this.opponent = null;
 
                 this.trainingDummy = new TrainingDummy(this, x, y);
+                // Important: Exclude new dummy from UI camera
+                if (this.uiCamera) this.trainingDummy.addToCameraIgnore(this.uiCamera);
             }
         }
 
@@ -298,37 +354,38 @@ export class GameScene extends Phaser.Scene {
                 this.trainingDummy.checkPlatformCollision(platform, true);
             }
 
+            // Wall collision for training dummy (using bounds)
+            this.trainingDummy.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
+
             // Then check hits
             this.player.checkHitAgainst(this.trainingDummy as any);
         } else if (this.opponent) {
+            // Update opponent
             this.opponent.update(delta);
+            this.opponent.physics.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
 
-            // Check collisions FIRST
-            for (const platform of this.platforms) {
-                this.opponent.checkPlatformCollision(platform, false);
-            }
-            for (const platform of this.softPlatforms) {
-                this.opponent.checkPlatformCollision(platform, true);
-            }
+            // Opponent Platform Collision
+            for (const platform of this.platforms) this.opponent.checkPlatformCollision(platform, false);
+            for (const platform of this.softPlatforms) this.opponent.checkPlatformCollision(platform, true);
 
+            // Hits
             this.player.checkHitAgainst(this.opponent);
             this.opponent.checkHitAgainst(this.player);
 
-            // Wall collision for opponent
-            this.opponent.checkWallCollision(0, 800);
+            // Hits
+            this.player.checkHitAgainst(this.opponent);
+            this.opponent.checkHitAgainst(this.player);
 
-            // Bounds check for opponent (now handled by wall collision)
-            // const opBounds = this.opponent.getBounds();
-            // if (opBounds.left < 0) this.opponent.x = opBounds.width / 2;
-            // else if (opBounds.right > 800) this.opponent.x = 800 - opBounds.width / 2;
-
-            // Respawn opponent
-            if (this.opponent.y > 700) {
+            // Respawn opponent if out of bounds
+            if (this.opponent.y > this.BLAST_ZONE_BOTTOM) {
                 this.respawnPlayer(this.opponent, false);
             }
         }
 
-        // Player platform collisions
+        // Check Player Wall Collision
+        this.player.physics.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
+
+        // Player Platform Collision
         for (const platform of this.platforms) {
             this.player.checkPlatformCollision(platform, false);
         }
@@ -336,33 +393,15 @@ export class GameScene extends Phaser.Scene {
             this.player.checkPlatformCollision(platform, true);
         }
 
-        // Check edge grab for player (must be after collision detection)
-        const platformData = [
-            ...this.platforms.map(p => ({ rect: p, isSoft: false })),
-            ...this.softPlatforms.map(p => ({ rect: p, isSoft: true }))
-        ];
-        this.player.checkLedgeGrab(platformData);
+        // Check edge grab for player
+        // const platformData = [
+        //    ...this.platforms.map(p => ({ rect: p, isSoft: false })),
+        //    ...this.softPlatforms.map(p => ({ rect: p, isSoft: true }))
+        // ];
+        // this.player.physics.checkLedgeGrab(platformData); // Call if needed
 
-        // Player wall collisions
-        this.player.checkWallCollision(0, 800);
-
-        // Check blast zones for kills
+        // Check Blast Zones
         this.checkBlastZones();
-
-        // Keep player in bounds (horizontal) - removed, handled by wall collision
-        // const playerBounds = this.player.getBounds();
-        // if (playerBounds.left < 0) {
-        //     this.player.x = playerBounds.width / 2;
-        // } else if (playerBounds.right > 800) {
-        //     this.player.x = 800 - playerBounds.width / 2;
-        // }
-
-        // Removed old respawn - now handled by blast zones
-        // if (this.player.y > 700) {
-        //     this.player.x = 300;
-        //     this.player.y = 200;
-        //     this.player.damagePercent = 0;
-        // }
 
         // Update debug overlay
         const velocity = this.player.getVelocity();
@@ -484,8 +523,8 @@ export class GameScene extends Phaser.Scene {
         const width = (maxX - minX) + padX * 2;
         const height = (maxY - minY) + padY * 2;
 
-        const zoomX = 800 / width;
-        const zoomY = 600 / height;
+        const zoomX = this.scale.width / width;
+        const zoomY = this.scale.height / height;
 
         // Clamp zoom
         const targetZoom = Phaser.Math.Clamp(Math.min(zoomX, zoomY), 0.55, 1.1);
@@ -497,6 +536,28 @@ export class GameScene extends Phaser.Scene {
             Phaser.Math.Linear(cam.midPoint.x, centerX, 0.1),
             Phaser.Math.Linear(cam.midPoint.y, centerY, 0.1)
         );
+    }
+
+    private previousStartPressed: boolean = false;
+
+    private checkGamepadPause(): boolean {
+        // Check if gamepad START button was just pressed
+        const gamepads = navigator.getGamepads();
+        let currentStartPressed = false;
+
+        for (let i = 0; i < gamepads.length; i++) {
+            const gamepad = gamepads[i];
+            if (gamepad) {
+                currentStartPressed = gamepad.buttons[9]?.pressed || false; // Button 9 is START
+                break; // Only check first connected gamepad
+            }
+        }
+
+        // Detect rising edge (was not pressed, now is pressed)
+        const justPressed = currentStartPressed && !this.previousStartPressed;
+        this.previousStartPressed = currentStartPressed;
+
+        return justPressed;
     }
 
     private togglePause(): void {

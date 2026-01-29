@@ -63,6 +63,17 @@ export class PauseMenu {
     private enterKey!: Phaser.Input.Keyboard.Key;
     private escKey!: Phaser.Input.Keyboard.Key;
 
+    // Gamepad state tracking
+    private previousGamepadState = {
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+        a: false,
+        b: false,
+        start: false
+    };
+
     private hintText!: Phaser.GameObjects.Text;
 
     constructor(scene: Phaser.Scene) {
@@ -241,14 +252,14 @@ export class PauseMenu {
         this.titleText.setText('PAUSED');
         this.mainMenuItems.forEach(item => item.setVisible(true));
         this.settingsMenuItems.forEach(item => item.setVisible(false));
-        this.updateHint('[ESC] Resume  [ENTER] Select');
+        this.updateHint('[ESC / B / START] Resume  [ENTER / A] Select');
     }
 
     private showSettingsMenu(): void {
         this.titleText.setText('SETTINGS');
         this.mainMenuItems.forEach(item => item.setVisible(false));
         this.settingsMenuItems.forEach(item => item.setVisible(true));
-        this.updateHint('[LEFT/RIGHT] Change  [ENTER] Select  [ESC] Back');
+        this.updateHint('[LEFT/RIGHT / D-Pad] Change  [ENTER / A] Select  [ESC / B] Back');
     }
 
     private updateHint(text: string): void {
@@ -270,48 +281,52 @@ export class PauseMenu {
     }
 
     private handleMainMenuInput(): void {
-        if (Phaser.Input.Keyboard.JustDown(this.upKey)) {
+        const gp = this.getGamepadInput();
+
+        if (Phaser.Input.Keyboard.JustDown(this.upKey) || gp.upPressed) {
             this.mainSelectedIndex = (this.mainSelectedIndex - 1 + this.menuOptions.length) % this.menuOptions.length;
             this.updateSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
+        } else if (Phaser.Input.Keyboard.JustDown(this.downKey) || gp.downPressed) {
             this.mainSelectedIndex = (this.mainSelectedIndex + 1) % this.menuOptions.length;
             this.updateSelection();
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.enterKey) || gp.aPressed) {
             this.selectOption();
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.escKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.escKey) || gp.bPressed || gp.startPressed) {
             this.executeOption(MenuOption.RESUME);
         }
     }
 
     private handleSettingsInput(): void {
+        const gp = this.getGamepadInput();
+
         // Navigation (Up/Down)
-        if (Phaser.Input.Keyboard.JustDown(this.upKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.upKey) || gp.upPressed) {
             this.settingsSelectedIndex = (this.settingsSelectedIndex - 1 + this.settingsMenuItems.length) % this.settingsMenuItems.length;
             this.updateSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
+        } else if (Phaser.Input.Keyboard.JustDown(this.downKey) || gp.downPressed) {
             this.settingsSelectedIndex = (this.settingsSelectedIndex + 1) % this.settingsMenuItems.length;
             this.updateSelection();
         }
 
         // Modification (Left/Right)
         if (this.settingsSelectedIndex === SettingsOption.RESOLUTION) {
-            if (Phaser.Input.Keyboard.JustDown(this.leftKey)) {
+            if (Phaser.Input.Keyboard.JustDown(this.leftKey) || gp.leftPressed) {
                 this.cycleResolution(-1);
-            } else if (Phaser.Input.Keyboard.JustDown(this.rightKey)) {
+            } else if (Phaser.Input.Keyboard.JustDown(this.rightKey) || gp.rightPressed) {
                 this.cycleResolution(1);
             }
         } else if (this.settingsSelectedIndex === SettingsOption.FULLSCREEN) {
-            if (Phaser.Input.Keyboard.JustDown(this.leftKey) || Phaser.Input.Keyboard.JustDown(this.rightKey)) {
+            if (Phaser.Input.Keyboard.JustDown(this.leftKey) || Phaser.Input.Keyboard.JustDown(this.rightKey) || gp.leftPressed || gp.rightPressed) {
                 this.toggleFullscreen();
             }
         }
 
         // Select / Back
-        if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.enterKey) || gp.aPressed) {
             if (this.settingsSelectedIndex === SettingsOption.BACK) {
                 this.menuState = 'MAIN';
                 this.showMainMenu();
@@ -322,7 +337,7 @@ export class PauseMenu {
             }
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.escKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.escKey) || gp.bPressed || gp.startPressed) {
             this.menuState = 'MAIN';
             this.showMainMenu();
         }
@@ -399,6 +414,58 @@ export class PauseMenu {
                 console.log('Exit to menu - Not yet implemented');
                 break;
         }
+    }
+
+    private getGamepadInput() {
+        const gamepads = navigator.getGamepads();
+        let currentState = {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            a: false,
+            b: false,
+            start: false
+        };
+
+        for (let i = 0; i < gamepads.length; i++) {
+            const gamepad = gamepads[i];
+            if (gamepad) {
+                // D-pad
+                const dpadUp = gamepad.buttons[12]?.pressed || false;
+                const dpadDown = gamepad.buttons[13]?.pressed || false;
+                const dpadLeft = gamepad.buttons[14]?.pressed || false;
+                const dpadRight = gamepad.buttons[15]?.pressed || false;
+
+                // Left stick
+                const stickX = gamepad.axes[0] || 0;
+                const stickY = gamepad.axes[1] || 0;
+                const DEADZONE = 0.5;
+
+                currentState.up = dpadUp || stickY < -DEADZONE;
+                currentState.down = dpadDown || stickY > DEADZONE;
+                currentState.left = dpadLeft || stickX < -DEADZONE;
+                currentState.right = dpadRight || stickX > DEADZONE;
+                currentState.a = gamepad.buttons[0]?.pressed || false; // A button
+                currentState.b = gamepad.buttons[1]?.pressed || false; // B button
+                currentState.start = gamepad.buttons[9]?.pressed || false; // START button
+                break;
+            }
+        }
+
+        // Detect rising edges (just pressed)
+        const result = {
+            upPressed: currentState.up && !this.previousGamepadState.up,
+            downPressed: currentState.down && !this.previousGamepadState.down,
+            leftPressed: currentState.left && !this.previousGamepadState.left,
+            rightPressed: currentState.right && !this.previousGamepadState.right,
+            aPressed: currentState.a && !this.previousGamepadState.a,
+            bPressed: currentState.b && !this.previousGamepadState.b,
+            startPressed: currentState.start && !this.previousGamepadState.start
+        };
+
+        this.previousGamepadState = currentState;
+        return result;
     }
 
     getElements(): Phaser.GameObjects.GameObject[] {

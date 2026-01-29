@@ -159,4 +159,23 @@ export class TrainingDummy extends Fighter {
             PhysicsConfig.PLAYER_HEIGHT
         );
     }
+
+    checkWallCollision(leftBound: number, rightBound: number): void {
+        const dummyBounds = this.getBounds();
+
+        if (dummyBounds.left <= leftBound) {
+            this.x = leftBound + PhysicsConfig.PLAYER_WIDTH / 2;
+            this.velocity.x = 0; // Stop horizontal movement on wall collision
+        }
+        else if (dummyBounds.right >= rightBound) {
+            this.x = rightBound - PhysicsConfig.PLAYER_WIDTH / 2;
+            this.velocity.x = 0; // Stop horizontal movement on wall collision
+        }
+    }
+    public addToCameraIgnore(camera: Phaser.Cameras.Scene2D.Camera): void {
+        camera.ignore(this);
+        if (this.damageText) {
+            camera.ignore(this.damageText);
+        }
+    }
 }

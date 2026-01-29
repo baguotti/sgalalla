@@ -78,8 +78,8 @@ export const PhysicsConfig = {
   LIGHT_ACTIVE_FRAMES: 100,    // 6 frames - hitbox active
   LIGHT_RECOVERY_FRAMES: 50,   // Reduced for snappy feel (was 100)
 
-  // Heavy attacks - slower startup, longer active, longer recovery
-  HEAVY_STARTUP_FRAMES: 150,   // 9 frames
+  // Heavy attacks - reduced startup for more responsive feel
+  HEAVY_STARTUP_FRAMES: 80,    // ~5 frames (reduced from 150ms/9 frames)
   HEAVY_ACTIVE_FRAMES: 150,    // 9 frames
   HEAVY_RECOVERY_FRAMES: 200,  // 12 frames
 

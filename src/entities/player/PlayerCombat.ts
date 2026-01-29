@@ -23,6 +23,7 @@ export class PlayerCombat {
     // Ground Pound
     public isGroundPounding: boolean = false;
     public groundPoundStartupTimer: number = 0;
+    private groundPoundReleaseBuffer: number = 0; // Buffer time before canceling on release
 
     // Charge Attack System
     public isCharging: boolean = false;
@@ -56,9 +57,31 @@ export class PlayerCombat {
         if (this.attackCooldownTimer > 0) {
             this.attackCooldownTimer -= delta;
         }
+        if (this.groundPoundReleaseBuffer > 0) {
+            this.groundPoundReleaseBuffer -= delta;
+        }
     }
 
     public handleInput(input: InputState): void {
+        // Allow button release check during ground pound
+        if (this.isGroundPounding && this.groundPoundStartupTimer <= 0) {
+            // Check if player is still holding Down + Heavy
+            if (input.heavyAttackHeld && input.aimDown) {
+                // Reset buffer - player is still holding
+                this.groundPoundReleaseBuffer = 0;
+            } else {
+                // Buttons released - start buffer countdown
+                if (this.groundPoundReleaseBuffer === 0) {
+                    // Just released, start the buffer timer (150ms grace period)
+                    this.groundPoundReleaseBuffer = 150;
+                } else if (this.groundPoundReleaseBuffer < 0) {
+                    // Buffer expired, end ground pound
+                    this.endGroundPound();
+                    return;
+                }
+            }
+        }
+
         if (this.attackCooldownTimer > 0) return;
 
         // Use player.isDodging which is synced from Physics
@@ -74,12 +97,29 @@ export class PlayerCombat {
             return;
         }
 
-        // Heavy attack - chargeable
+
+        // Heavy attack - chargeable (except for aerial down = ground pound, and aerial up/neutral = recovery)
         if (input.heavyAttack && !this.isCharging) {
-            // Start charging
+            const direction = this.getInputDirection(input);
+            const isAerial = !this.player.isGrounded;
+
+            // Special case: Down + Heavy in air = Ground Pound (starts immediately, no charge)
+            if (direction === AttackDirection.DOWN && isAerial) {
+                this.startGroundPound();
+                return;
+            }
+
+            // Special case: Up/Neutral + Heavy in air = Recovery (starts immediately, no charge)
+            if ((direction === AttackDirection.UP || direction === AttackDirection.NEUTRAL) && isAerial) {
+                this.hitTargets.clear(); // Reset hit tracking for the new move
+                this.player.physics.startRecovery();
+                return;
+            }
+
+            // All other heavy attacks (including grounded neutral sig): Start charging
             this.isCharging = true;
             this.chargeTime = 0;
-            this.chargeDirection = this.getInputDirection(input);
+            this.chargeDirection = direction;
 
             // Create charge glow effect
             if (!this.chargeGlow) {
@@ -153,22 +193,6 @@ export class PlayerCombat {
     private executeChargedAttack(): void {
         const direction = this.chargeDirection;
         const isAerial = !this.player.isGrounded;
-
-        // Special case: down + heavy in air = ground pound (not chargeable)
-        if (direction === AttackDirection.DOWN && isAerial) {
-            this.clearChargeState();
-            this.startGroundPound();
-            return;
-        }
-
-        // Special case: up/neutral + heavy in air = Recovery
-        if ((direction === AttackDirection.UP || direction === AttackDirection.NEUTRAL) && isAerial) {
-            this.clearChargeState();
-            // Start Recovery logic
-            this.hitTargets.clear(); // Reset hit tracking for the new move
-            this.player.physics.startRecovery();
-            return;
-        }
 
         // Calculate charge multiplier (0 to 1 based on charge time)
         const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
@@ -295,8 +319,7 @@ export class PlayerCombat {
         if (this.isGroundPounding && this.groundPoundStartupTimer <= 0) {
             // Check if we hit the ground
             if (this.player.isGrounded) {
-                this.endAttack();
-                // Optional: Add landing lag or shockwave effect here
+                this.endGroundPound();
                 return;
             }
 
@@ -339,6 +362,24 @@ export class PlayerCombat {
 
         // Set cooldown (shorter for light attacks)
         this.attackCooldownTimer = 100;
+    }
+
+    private endGroundPound(): void {
+        // End the ground pound and enter recovery state
+        this.player.isAttacking = false;
+        this.isGroundPounding = false;
+        this.currentAttack = null;
+        this.deactivateHitbox();
+        this.player.resetVisuals();
+
+        // Enter recovery frames (endlag)
+        // Ground pounds have significant recovery on landing or cancellation
+        this.attackCooldownTimer = PhysicsConfig.GROUND_POUND_STARTUP; // Use startup time as recovery duration
+
+        // Apply landing lag if on ground
+        if (this.player.isGrounded) {
+            this.player.velocity.x *= 0.5; // Reduce horizontal momentum on landing
+        }
     }
 
     private updateHitbox(): void {

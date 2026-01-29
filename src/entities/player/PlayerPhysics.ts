@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Player } from '../Player';
 import { PhysicsConfig } from '../../config/PhysicsConfig';
 import type { InputState } from '../../input/InputManager';
+import { AttackPhase } from '../../combat/Attack';
 
 export class PlayerPhysics {
     private player: Player;
@@ -139,7 +140,13 @@ export class PlayerPhysics {
             }
         }
         else if (this.player.isAttacking) {
-            friction = 0.95; // Slide slightly during active frames
+            // Check if we're in recovery phase
+            const currentAttack = this.player.getCurrentAttack();
+            if (currentAttack && currentAttack.phase === AttackPhase.RECOVERY) {
+                friction = 0.75; // Higher friction during recovery to prevent sliding
+            } else {
+                friction = 0.95; // Slide slightly during startup/active frames
+            }
         }
 
         velocity.x *= friction;
@@ -187,14 +194,23 @@ export class PlayerPhysics {
         if (this.isWallSliding) return;
         if (this.isDodging && this.isSpotDodging) return; // Spot dodge locks X
 
+        // Prevent movement during attack startup and active frames, but allow during recovery
+        if (this.player.isAttacking) {
+            const currentAttack = this.player.getCurrentAttack();
+            if (currentAttack && currentAttack.phase !== AttackPhase.RECOVERY) {
+                return; // Lock movement during STARTUP and ACTIVE phases only
+            }
+        }
+
         // Calculate Move Force
         let moveForce = 0;
         // Disable movement if dodging (unless it's a directional dodge which carries momentum, implemented in startDodge)
         if (this.isDodging) return;
 
-        // Run Mechanic: Grounded + Moving + Dodge Held
+        // Run Mechanic: Grounded + Moving + Dodge Held (but not during attack recovery)
         const isMoving = input.moveLeft || input.moveRight;
-        this.isRunning = this.player.isGrounded && isMoving && input.dodgeHeld;
+        const inRecovery = this.player.isAttacking; // If isAttacking is true here, we're in recovery (due to check above)
+        this.isRunning = this.player.isGrounded && isMoving && input.dodgeHeld && !inRecovery;
 
         let accel = PhysicsConfig.MOVE_ACCEL;
         if (this.isRunning) {
@@ -354,11 +370,12 @@ export class PlayerPhysics {
                 this.dodgeDirection = this.player.getFacingDirection();
             }
 
-            // Apply dodge velocity
-            if (this.player.isGrounded) {
-                this.player.velocity.x = this.dodgeDirection * (PhysicsConfig.DODGE_DISTANCE / (PhysicsConfig.DODGE_DURATION / 1000));
-            } else {
-                this.player.velocity.x = this.dodgeDirection * (PhysicsConfig.DODGE_DISTANCE / (PhysicsConfig.DODGE_DURATION / 1000)) * 0.7;
+            // Apply dodge velocity (same distance for ground and air)
+            const dodgeSpeed = this.dodgeDirection * (PhysicsConfig.DODGE_DISTANCE / (PhysicsConfig.DODGE_DURATION / 1000));
+            this.player.velocity.x = dodgeSpeed;
+
+            if (!this.player.isGrounded) {
+                // Reduce vertical velocity during air dodge for better control
                 this.player.velocity.y *= 0.3;
             }
 

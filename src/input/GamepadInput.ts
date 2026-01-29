@@ -24,6 +24,7 @@ export interface GamepadState {
     dodge: boolean;
     dodgeHeld: boolean; // For running (trigger held)
     throw: boolean;
+    pause: boolean; // START button for pause menu
 
     // Direction for attacks
     aimUp: boolean;
@@ -102,6 +103,7 @@ export class GamepadInput {
             dodge: false,
             dodgeHeld: false,
             throw: false,
+            pause: false,
             aimUp: false,
             aimDown: false,
             aimLeft: false,
@@ -182,6 +184,10 @@ export class GamepadInput {
 
         // Throw (Y) - detect new press only
         state.throw = yPressed && !this.wasButtonPressed(XBOX_BUTTONS.Y);
+
+        // Pause (START button) - detect new press only
+        const startPressed = gamepad.buttons[XBOX_BUTTONS.START]?.pressed || false;
+        state.pause = startPressed && !this.wasButtonPressed(XBOX_BUTTONS.START);
 
         this.previousState = { ...state };
         this.cacheButtonStates(gamepad);

@@ -6,7 +6,7 @@ import type { InputState } from '../input/InputManager';
 import { Fighter } from './Fighter';
 import { PlayerPhysics } from './player/PlayerPhysics';
 import { PlayerCombat } from './player/PlayerCombat';
-import { Attack } from '../combat/Attack';
+import { Attack, AttackPhase } from '../combat/Attack';
 import { PlayerAI } from './player/PlayerAI';
 
 export const PlayerState = {
@@ -146,24 +146,31 @@ export class Player extends Fighter {
     }
 
     private updateFacing(): void {
-        // Don't flip while attacking if using certain attacks, or during stun
-        if (this.isHitStunned || (this.isAttacking)) {
+        // Don't update facing during hit stun
+        if (this.isHitStunned) {
             return;
         }
 
-        // Don't flip during wall slide
+        // Don't update facing during attack startup/active, but allow during recovery
+        if (this.isAttacking) {
+            const currentAttack = this.getCurrentAttack();
+            if (currentAttack && currentAttack.phase !== AttackPhase.RECOVERY) {
+                return; // Lock facing during STARTUP and ACTIVE only
+            }
+        }
+
+        // Don't update facing during wall slide  
         if (this.physics.isWallSliding) {
-            this.sprite.setFlipX(this.physics.wallDirection === -1);
+            this.facingDirection = this.physics.wallDirection;
             return;
         }
 
-        // Normal facing
-        if (this.physics.acceleration.x > 0) {
+        // Update facing direction based on velocity
+        // Note: The sprite animations ('left' and 'right') handle the visual direction
+        if (this.velocity.x > 5) {
             this.facingDirection = 1;
-            this.sprite.setFlipX(false);
-        } else if (this.physics.acceleration.x < 0) {
+        } else if (this.velocity.x < -5) {
             this.facingDirection = -1;
-            this.sprite.setFlipX(true);
         }
     }
 
@@ -336,5 +343,11 @@ export class Player extends Fighter {
         this.isInvincible = false;
         this.resetVisuals();
         this.physics.resetOnGround();
+    }
+    public addToCameraIgnore(camera: Phaser.Cameras.Scene2D.Camera): void {
+        camera.ignore(this);
+        if (this.damageText) {
+            camera.ignore(this.damageText);
+        }
     }
 }
