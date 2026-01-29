@@ -165,12 +165,26 @@ export class Player extends Phaser.GameObjects.Container {
         // Handle attack state (limited movement during attacks)
         if (this.isAttacking || this.isGroundPounding) {
             this.updateAttackState(delta);
-            if (this.isGroundPounding && this.groundPoundStartupTimer <= 0) {
-                this.velocity.y = PhysicsConfig.GROUND_POUND_SPEED;
+
+            // JUMP CANCEL: Allow jumping out of Light Attack Recovery for "snappy" feel
+            let jumpCancelled = false;
+            if (this.currentAttack &&
+                this.currentAttack.data.type === AttackType.LIGHT &&
+                this.currentAttack.phase === AttackPhase.RECOVERY &&
+                this.currentInput.jump &&
+                this.jumpsRemaining > 0) {
+                this.endAttack();
+                jumpCancelled = true;
             }
-            this.applyPhysics(deltaSeconds);
-            this.updateDamageDisplay();
-            return;
+
+            if (!jumpCancelled) {
+                if (this.isGroundPounding && this.groundPoundStartupTimer <= 0) {
+                    this.velocity.y = PhysicsConfig.GROUND_POUND_SPEED;
+                }
+                this.applyPhysics(deltaSeconds);
+                this.updateDamageDisplay();
+                return;
+            }
         }
 
         // Handle dodge state
