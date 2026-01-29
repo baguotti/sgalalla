@@ -97,12 +97,14 @@ export class GameScene extends Phaser.Scene {
             'O - Toggle Sparring AI',
         ].join('\n');
 
-        this.add.text(10, 500, controlsText, {
+        const controlsTextObj = this.add.text(10, 500, controlsText, {
             fontSize: '10px',
             color: '#888888',
             fontFamily: 'Arial',
             lineSpacing: 1,
         });
+        controlsTextObj.setScrollFactor(0);
+        controlsTextObj.setDepth(500);
     }
 
     update(_time: number, delta: number): void {
@@ -154,6 +156,9 @@ export class GameScene extends Phaser.Scene {
 
         // Update player
         this.player.update(delta);
+
+        // Update Camera
+        this.updateCamera();
 
         // Update Entity (Dummy or Opponent)
         if (this.trainingDummy) {
@@ -235,6 +240,48 @@ export class GameScene extends Phaser.Scene {
             this.player.getRecoveryAvailable(),
             attackInfo,
             this.player.isGamepadConnected()
+        );
+    }
+
+
+    private updateCamera(): void {
+        const targets: Phaser.GameObjects.Components.Transform[] = [];
+        if (this.player) targets.push(this.player);
+        if (this.trainingDummy) targets.push(this.trainingDummy);
+        if (this.opponent) targets.push(this.opponent);
+
+        if (targets.length === 0) return;
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        targets.forEach(t => {
+            minX = Math.min(minX, t.x);
+            maxX = Math.max(maxX, t.x);
+            minY = Math.min(minY, t.y);
+            maxY = Math.max(maxY, t.y);
+        });
+
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        // Viewport padding
+        const padX = 250;
+        const padY = 200;
+
+        const width = (maxX - minX) + padX * 2;
+        const height = (maxY - minY) + padY * 2;
+
+        const zoomX = 800 / width;
+        const zoomY = 600 / height;
+
+        // Clamp zoom
+        const targetZoom = Phaser.Math.Clamp(Math.min(zoomX, zoomY), 0.55, 1.1);
+
+        // Lerp Camera
+        const cam = this.cameras.main;
+        cam.zoom = Phaser.Math.Linear(cam.zoom, targetZoom, 0.05);
+        cam.centerOn(
+            Phaser.Math.Linear(cam.midPoint.x, centerX, 0.1),
+            Phaser.Math.Linear(cam.midPoint.y, centerY, 0.1)
         );
     }
 }

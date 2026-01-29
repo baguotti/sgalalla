@@ -66,6 +66,14 @@ export class DebugOverlay {
             padding: { x: 5, y: 3 },
         });
         this.gamepadText.setDepth(1000);
+
+        // Fix UI to screen
+        this.velocityText.setScrollFactor(0);
+        this.stateText.setScrollFactor(0);
+        this.fpsText.setScrollFactor(0);
+        this.recoveryText.setScrollFactor(0);
+        this.attackText.setScrollFactor(0);
+        this.gamepadText.setScrollFactor(0);
     }
 
     update(
