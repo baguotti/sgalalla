@@ -43,6 +43,14 @@ export class GameScene extends Phaser.Scene {
 
     private uiCamera!: Phaser.Cameras.Scene2D.Camera;
 
+    // Camera Settings
+    private currentZoomLevel: 'CLOSE' | 'NORMAL' | 'WIDE' = 'CLOSE';
+    private readonly ZOOM_SETTINGS = {
+        CLOSE: { padX: 100, padY: 100, minZoom: 0.8, maxZoom: 1.5 },
+        NORMAL: { padX: 250, padY: 200, minZoom: 0.6, maxZoom: 1.1 },
+        WIDE: { padX: 400, padY: 300, minZoom: 0.4, maxZoom: 0.8 }
+    };
+
     // Pause menu
     private isPaused: boolean = false;
     private pauseMenu!: PauseMenu;
@@ -497,6 +505,10 @@ export class GameScene extends Phaser.Scene {
         this.killCountText.setText(`Eliminations: ${this.playerKills}`);
     }
 
+    public setZoomLevel(level: 'CLOSE' | 'NORMAL' | 'WIDE'): void {
+        this.currentZoomLevel = level;
+    }
+
     private updateCamera(): void {
         const targets: Phaser.GameObjects.Components.Transform[] = [];
         if (this.player) targets.push(this.player);
@@ -516,9 +528,10 @@ export class GameScene extends Phaser.Scene {
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
 
-        // Viewport padding
-        const padX = 250;
-        const padY = 200;
+        // Viewport padding based on zoom level
+        const settings = this.ZOOM_SETTINGS[this.currentZoomLevel];
+        const padX = settings.padX;
+        const padY = settings.padY;
 
         const width = (maxX - minX) + padX * 2;
         const height = (maxY - minY) + padY * 2;
@@ -527,7 +540,7 @@ export class GameScene extends Phaser.Scene {
         const zoomY = this.scale.height / height;
 
         // Clamp zoom
-        const targetZoom = Phaser.Math.Clamp(Math.min(zoomX, zoomY), 0.55, 1.1);
+        const targetZoom = Phaser.Math.Clamp(Math.min(zoomX, zoomY), settings.minZoom, settings.maxZoom);
 
         // Lerp Camera
         const cam = this.cameras.main;

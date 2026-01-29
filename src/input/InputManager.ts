@@ -125,7 +125,9 @@ export class InputManager {
             state.jumpHeld ||
             state.lightAttack ||
             state.heavyAttack ||
-            state.dodge
+            state.heavyAttackHeld || // Important: Check held state to prevent fallback to keyboard while charging
+            state.dodge ||
+            state.dodgeHeld
         );
     }
 
@@ -197,7 +199,7 @@ export class InputManager {
             jumpHeld: state.jumpHeld,
             lightAttack: state.lightAttack,
             heavyAttack: state.heavyAttack,
-            heavyAttackHeld: state.heavyAttackHeld, // Track B/Y held for charging
+            heavyAttackHeld: state.heavyAttackHeld, // Track B held for charging
             dodge: state.dodge,
             dodgeHeld: state.dodgeHeld, // Track LT/RT held for running
             recovery: state.heavyAttack && state.aimUp && !this.isGroundedCheck(), // Up + Heavy in air = recovery

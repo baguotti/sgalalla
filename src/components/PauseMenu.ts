@@ -13,7 +13,8 @@ type MenuOption = typeof MenuOption[keyof typeof MenuOption];
 const SettingsOption = {
     RESOLUTION: 0,
     FULLSCREEN: 1,
-    BACK: 2
+    ZOOM: 2,
+    BACK: 3
 } as const;
 type SettingsOption = typeof SettingsOption[keyof typeof SettingsOption];
 
@@ -42,6 +43,8 @@ export class PauseMenu {
     // Settings State
     private currentResolutionIndex: number = 1; // Default to middle (720p)
     private isFullscreen: boolean = false;
+    private zoomLevels: ('CLOSE' | 'NORMAL' | 'WIDE')[] = ['CLOSE', 'NORMAL', 'WIDE'];
+    private currentZoomIndex: number = 0; // CLOSE index (Default)
 
     private visible: boolean = false;
 
@@ -162,8 +165,20 @@ export class PauseMenu {
         fsText.setVisible(false);
         this.settingsMenuItems.push(fsText);
 
-        // 3. Back
-        const backText = this.scene.add.text(centerX, settingsStartY + spacing * 2, 'Back', {
+        // 3. Zoom
+        const zoomText = this.scene.add.text(centerX, settingsStartY + spacing * 2, `Camera Zoom: NORMAL`, {
+            fontSize: '32px',
+            color: '#ffffff',
+            fontFamily: 'Arial'
+        });
+        zoomText.setOrigin(0.5);
+        zoomText.setScrollFactor(0);
+        zoomText.setDepth(1001);
+        zoomText.setVisible(false);
+        this.settingsMenuItems.push(zoomText);
+
+        // 4. Back
+        const backText = this.scene.add.text(centerX, settingsStartY + spacing * 3, 'Back', {
             fontSize: '32px',
             color: '#ffffff',
             fontFamily: 'Arial'
@@ -204,7 +219,7 @@ export class PauseMenu {
         this.settingsMenuItems.forEach((item, index) => {
             if (index === SettingsOption.BACK) {
                 // Add extra spacing for Back button
-                item.setPosition(centerX, startY + (SettingsOption.FULLSCREEN * spacing) + (spacing * 2));
+                item.setPosition(centerX, startY + ((this.settingsMenuItems.length - 1) * spacing) + (spacing));
             } else {
                 item.setPosition(centerX, startY + (index * spacing));
             }
@@ -224,6 +239,9 @@ export class PauseMenu {
         this.visible = true;
         this.menuState = 'MAIN';
         this.mainSelectedIndex = 0;
+
+        // Sync gamepad state to prevent immediate re-trigger
+        this.syncGamepadState();
 
         // Update fullscreen state in case it changed externally (F11 etc)
         this.isFullscreen = this.scene.scale.isFullscreen;
@@ -313,6 +331,7 @@ export class PauseMenu {
         }
 
         // Modification (Left/Right)
+        // Modification (Left/Right)
         if (this.settingsSelectedIndex === SettingsOption.RESOLUTION) {
             if (Phaser.Input.Keyboard.JustDown(this.leftKey) || gp.leftPressed) {
                 this.cycleResolution(-1);
@@ -322,6 +341,12 @@ export class PauseMenu {
         } else if (this.settingsSelectedIndex === SettingsOption.FULLSCREEN) {
             if (Phaser.Input.Keyboard.JustDown(this.leftKey) || Phaser.Input.Keyboard.JustDown(this.rightKey) || gp.leftPressed || gp.rightPressed) {
                 this.toggleFullscreen();
+            }
+        } else if (this.settingsSelectedIndex === SettingsOption.ZOOM) {
+            if (Phaser.Input.Keyboard.JustDown(this.leftKey) || gp.leftPressed) {
+                this.cycleZoom(-1);
+            } else if (Phaser.Input.Keyboard.JustDown(this.rightKey) || gp.rightPressed) {
+                this.cycleZoom(1);
             }
         }
 
@@ -334,6 +359,8 @@ export class PauseMenu {
                 this.cycleResolution(1);
             } else if (this.settingsSelectedIndex === SettingsOption.FULLSCREEN) {
                 this.toggleFullscreen();
+            } else if (this.settingsSelectedIndex === SettingsOption.ZOOM) {
+                this.cycleZoom(1);
             }
         }
 
@@ -366,6 +393,18 @@ export class PauseMenu {
             this.isFullscreen = true;
         }
         this.settingsMenuItems[SettingsOption.FULLSCREEN].setText(`Fullscreen: ${this.isFullscreen ? 'ON' : 'OFF'}`);
+    }
+
+    private cycleZoom(dir: number): void {
+        this.currentZoomIndex = (this.currentZoomIndex + dir + this.zoomLevels.length) % this.zoomLevels.length;
+        const level = this.zoomLevels[this.currentZoomIndex];
+
+        this.settingsMenuItems[SettingsOption.ZOOM].setText(`Camera Zoom: ${level}`);
+
+        // Update Scene
+        if ((this.scene as any).setZoomLevel) {
+            (this.scene as any).setZoomLevel(level);
+        }
     }
 
 
@@ -466,6 +505,45 @@ export class PauseMenu {
 
         this.previousGamepadState = currentState;
         return result;
+    }
+
+    private syncGamepadState(): void {
+        const gamepads = navigator.getGamepads();
+        let currentState = {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            a: false,
+            b: false,
+            start: false
+        };
+
+        for (let i = 0; i < gamepads.length; i++) {
+            const gamepad = gamepads[i];
+            if (gamepad) {
+                // D-pad
+                const dpadUp = gamepad.buttons[12]?.pressed || false;
+                const dpadDown = gamepad.buttons[13]?.pressed || false;
+                const dpadLeft = gamepad.buttons[14]?.pressed || false;
+                const dpadRight = gamepad.buttons[15]?.pressed || false;
+
+                // Left stick
+                const stickX = gamepad.axes[0] || 0;
+                const stickY = gamepad.axes[1] || 0;
+                const DEADZONE = 0.5;
+
+                currentState.up = dpadUp || stickY < -DEADZONE;
+                currentState.down = dpadDown || stickY > DEADZONE;
+                currentState.left = dpadLeft || stickX < -DEADZONE;
+                currentState.right = dpadRight || stickX > DEADZONE;
+                currentState.a = gamepad.buttons[0]?.pressed || false; // A button
+                currentState.b = gamepad.buttons[1]?.pressed || false; // B button
+                currentState.start = gamepad.buttons[9]?.pressed || false; // START button
+                break;
+            }
+        }
+        this.previousGamepadState = currentState;
     }
 
     getElements(): Phaser.GameObjects.GameObject[] {

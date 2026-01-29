@@ -173,17 +173,19 @@ export class GamepadInput {
         state.lightAttack = xPressed && !this.wasButtonPressed(XBOX_BUTTONS.X);
 
         // Heavy Attack (B or Y) - detect new press only
+        // User wants Y and B to be exactly the same: Heavy Attack
         const heavyNewPress = (bPressed && !this.wasButtonPressed(XBOX_BUTTONS.B)) ||
             (yPressed && !this.wasButtonPressed(XBOX_BUTTONS.Y));
         state.heavyAttack = heavyNewPress;
-        state.heavyAttackHeld = bPressed || yPressed; // Track held state for charging
+        state.heavyAttackHeld = bPressed || yPressed;
 
         // Dodge (LT or RT) - detect new press only
         state.dodge = triggerPressed && !this.wasTriggerPressed();
         state.dodgeHeld = triggerPressed; // Track held state for running
 
-        // Throw (Y) - detect new press only
-        state.throw = yPressed && !this.wasButtonPressed(XBOX_BUTTONS.Y);
+        // Throw (Right Bumper/RB) - detect new press only
+        const rbPressed = gamepad.buttons[XBOX_BUTTONS.RB]?.pressed || false;
+        state.throw = rbPressed && !this.wasButtonPressed(XBOX_BUTTONS.RB);
 
         // Pause (START button) - detect new press only
         const startPressed = gamepad.buttons[XBOX_BUTTONS.START]?.pressed || false;
