@@ -63,13 +63,12 @@ export class Player extends Fighter {
         this.isAI = config.isAI || false;
         this.playerId = config.playerId || 0;
 
-        // Create player spine object (Raptor Placeholder)
-        this.spine = (scene.add as any).spine(0, 0, 'raptor-data', 'raptor-atlas');
+        // Create player spine object (Humanoid Placeholder)
+        this.spine = (scene.add as any).spine(0, 0, 'humanoid-data', 'humanoid-atlas');
 
-        // Offset so the feet are at (0,0) in container coordinates
-        // Raptor is quite large, let's scale it down
-        this.spine.setScale(0.15);
-        this.spine.y = 30; // Move down inside container so feet align with physics bottom
+        // Humanoid (Spineboy) scaling and offset
+        this.spine.setScale(0.25);
+        this.spine.y = 30; // Feet position
 
         this.add(this.spine);
 
@@ -81,7 +80,7 @@ export class Player extends Fighter {
         }
 
         // Create damage text
-        this.damageText = scene.add.text(0, -50, '0%', {
+        this.damageText = scene.add.text(0, -60, '0%', {
             fontSize: '16px',
             color: '#ffffff',
             fontFamily: 'Arial',
@@ -220,13 +219,13 @@ export class Player extends Fighter {
         let loop = true;
 
         if (this.isHitStunned) {
-            animName = 'roar'; // Use roar as a reactive animation?
+            animName = 'aim';
             loop = false;
         } else if (!this.isGrounded) {
             animName = 'jump';
             loop = false;
         } else if (Math.abs(this.velocity.x) > 10) {
-            animName = 'walk';
+            animName = 'run';
             loop = true;
         }
 
