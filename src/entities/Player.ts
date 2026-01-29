@@ -7,6 +7,7 @@ import { Fighter } from './Fighter';
 import { PlayerPhysics } from './player/PlayerPhysics';
 import { PlayerCombat } from './player/PlayerCombat';
 import { Attack } from '../combat/Attack';
+import { PlayerAI } from './player/PlayerAI';
 
 export const PlayerState = {
     GROUNDED: 'Grounded',
@@ -25,12 +26,6 @@ export class Player extends Fighter {
     private sprite: Phaser.GameObjects.Sprite;
     public physics: PlayerPhysics; // Public for debugging/GameScene access if needed
 
-    // velocity inherited from Fighter (managed by PlayerPhysics)
-    // acceleration managed by PlayerPhysics
-
-    // Physics state managed by PlayerPhysics
-    // (acceleration, jumps, wall, ledge, platform logic moved to component)
-
     // Combat system delegated to PlayerCombat
     private _isAttacking: boolean = false;
     public get isAttacking(): boolean { return this._isAttacking; }
@@ -42,10 +37,6 @@ export class Player extends Fighter {
     public isDodging: boolean = false; // Public for Physics access
 
     private dodgeCooldownTimer: number = 0;
-    // isInvincible inherited from Fighter
-
-
-    // Hit stun (inherited)
 
     // Facing direction
     private facingDirection: number = 1;
@@ -60,8 +51,7 @@ export class Player extends Fighter {
 
     // AI Control
     public isAI: boolean = false;
-    private aiTimer: number = 0;
-    private aiState: 'IDLE' | 'CHASE' | 'ATTACK' | 'RECOVER' = 'IDLE';
+    private ai: PlayerAI | null = null;
     private aiInput: any = {}; // Store AI generated input
 
     constructor(scene: Phaser.Scene, x: number, y: number, isAI: boolean = false) {
@@ -95,13 +85,13 @@ export class Player extends Fighter {
         this.damageText.setOrigin(0.5);
         this.add(this.damageText);
 
-        this.add(this.damageText);
-
-        this.add(this.damageText);
-
         // Initialize Components
         this.physics = new PlayerPhysics(this);
         this.combat = new PlayerCombat(this, scene);
+
+        if (this.isAI) {
+            this.ai = new PlayerAI(this, scene);
+        }
 
         // Setup input
         this.setupInput();
@@ -136,8 +126,6 @@ export class Player extends Fighter {
         // Update Combat/Timers
         this.updateTimers(delta);
 
-        // Handle hit stun (Physics handles movement, but we handle visuals/state blocking)
-
         // Visuals
         this.updateFacing();
         this.updateAnimation();
@@ -152,14 +140,9 @@ export class Player extends Fighter {
             this.resetVisuals();
         }
 
-
-
         if (this.dodgeCooldownTimer > 0) {
             this.dodgeCooldownTimer -= delta;
         }
-
-        // Attack Cooldown delegated to Combat, but kept here if needed for interface specific logic? 
-        // No, let's remove references if PlayerCombat handles it.
     }
 
     private updateFacing(): void {
@@ -207,54 +190,13 @@ export class Player extends Fighter {
         this.physics.checkWallCollision(left, right);
     }
 
-
-    // Delegated Methods
     public checkLedgeGrab(platforms: Array<{ rect: Phaser.GameObjects.Rectangle; isSoft?: boolean }>): void {
         this.physics.checkLedgeGrab(platforms);
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     public checkHitAgainst(target: Player): void {
         this.combat.checkAttackCollision(target);
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     private updateAnimation(): void {
         if (this.isHitStunned) {
@@ -307,20 +249,10 @@ export class Player extends Fighter {
         }
     }
 
-    // Called by GameScene to check hits against other players
-
-
-
-
     setKnockback(x: number, y: number): void {
         this.velocity.x = x;
         this.velocity.y = y;
     }
-
-
-
-    // Platform collision handling
-
 
     // Getters
     getVelocity(): Phaser.Math.Vector2 {
@@ -342,7 +274,6 @@ export class Player extends Fighter {
         return this.physics.recoveryAvailable;
     }
 
-
     getIsInvincible(): boolean {
         return this.isInvincible;
     }
@@ -354,8 +285,6 @@ export class Player extends Fighter {
     public get spriteObject(): Phaser.GameObjects.Sprite {
         return this.sprite;
     }
-
-
 
     getBounds(): Phaser.Geom.Rectangle {
         return new Phaser.Geom.Rectangle(
@@ -370,95 +299,19 @@ export class Player extends Fighter {
         return this.inputManager.isGamepadConnected();
     }
 
-    // Simple AI Implementation
+    // Simple AI Implementation -> Delegated to PlayerAI
     private updateAI(delta: number): void {
-        this.aiTimer -= delta;
-
-        // Find Target
-        const players = this.scene.children.list.filter(c => c instanceof Player && c !== this && !(c as Player).isAI) as Player[];
-        const target = players[0];
-
-        // Reset Inputs
-        this.aiInput = {
-            moveLeft: false, moveRight: false, moveUp: false, moveDown: false,
-            moveX: 0, moveY: 0,
-            jump: false, jumpHeld: false,
-            lightAttack: false, heavyAttack: false, heavyAttackHeld: false,
-            dodge: false, dodgeHeld: false, recovery: false,
-            aimUp: false, aimDown: false, aimLeft: false, aimRight: false,
-            usingGamepad: false
-        };
-
-        if (!target) return; // No target
-
-        const dx = target.x - this.x;
-        // dy removed (unused)
-
-        // Update decision every random interval (simulating reaction time)
-        if (this.aiTimer <= 0) {
-            this.aiTimer = 500 + Math.random() * 500; // Decision every 0.5-1s
-
-            // Basic behavior state machine
-            if (Math.abs(dx) > 150) {
-                this.aiState = 'CHASE';
-            } else {
-                this.aiState = 'ATTACK';
-            }
-        }
-
-        // Execute based on state
-        if (this.aiState === 'CHASE') {
-            if (dx > 0) {
-                this.aiInput.moveRight = true;
-                this.aiInput.moveX = 1;
-                this.aiInput.aimRight = true;
-            } else {
-                this.aiInput.moveLeft = true;
-                this.aiInput.moveX = -1;
-                this.aiInput.aimLeft = true;
-            }
-
-            // Jump if stuck or target is higher
-            if ((this.y > target.y + 100 && this.isGrounded) || (this.velocity.x === 0 && this.isGrounded && Math.abs(dx) > 50)) {
-                this.aiInput.jump = true;
-                this.aiInput.jumpHeld = true;
-            }
-        } else if (this.aiState === 'ATTACK') {
-            // Face target
-            if (dx > 0) {
-                this.aiInput.aimRight = true;
-            } else {
-                this.aiInput.aimLeft = true;
-            }
-
-            // Randomly attack
-            if (Math.random() > 0.95) {
-                this.aiInput.lightAttack = true;
-            } else if (Math.random() > 0.98) {
-                this.aiInput.heavyAttack = true;
-                // Sometimes hold heavy
-                if (Math.random() > 0.5) this.aiInput.heavyAttackHeld = true;
-            }
-        }
-
-        // Recover if falling
-        if (this.y > 600) {
-            this.aiInput.jump = true;
-            this.aiInput.jumpHeld = true;
-            this.aiInput.aimUp = true;
-            this.aiInput.recovery = true; // Attempt recovery
-            if (this.y > 650) this.aiInput.heavyAttack = true; // Use recovery attack
-        }
+        if (!this.ai) return;
+        this.aiInput = this.ai.update(delta);
     }
+
     // Inherited from Fighter, but we override to add specific logic or keep implementation
     public applyHitStun(): void {
         super.applyHitStun();
 
         // Cancel any active states
-        // Cancel any active states
         this.isAttacking = false;
-        // isCharging, isGroundPounding managed by Combat now, we should reset them
-        // this.combat.reset() ?
+
         if (this.combat) {
             this.combat.isCharging = false;
             this.combat.isGroundPounding = false;
@@ -466,7 +319,6 @@ export class Player extends Fighter {
             this.combat.deactivateHitbox();
         }
         this.isDodging = false;
-
 
         // Reset visuals (clears attack tints)
         this.resetVisuals();
@@ -485,5 +337,4 @@ export class Player extends Fighter {
         this.resetVisuals();
         this.physics.resetOnGround();
     }
-
 }
