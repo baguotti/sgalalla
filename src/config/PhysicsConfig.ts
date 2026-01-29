@@ -10,6 +10,7 @@ export const PhysicsConfig = {
   MOVE_ACCEL: 2000, // Faster acceleration
   FRICTION: 0.85, // Applied each frame (0.85 = 15% speed reduction per frame)
   MAX_SPEED: 550, // Faster run speed
+  MAX_FALL_SPEED: 1000, // Maximum fall speed to prevent glitches
 
   // Jump mechanics
   JUMP_FORCE: -700, // Full jump (hold)
@@ -96,4 +97,19 @@ export const PhysicsConfig = {
   CHARGE_MAX_TIME: 1000,       // Max charge time in ms
   CHARGE_DAMAGE_MULT: 2.0,     // 2x damage at full charge
   CHARGE_KNOCKBACK_MULT: 1.8,  // 1.8x knockback at full charge
+
+  // Wall mechanics - Brawlhalla style
+  WALL_SLIDE_SPEED: 150,       // Max fall speed while wall sliding (much slower than normal)
+  WALL_JUMP_FORCE_X: 600,      // Horizontal force away from wall
+  WALL_JUMP_FORCE_Y: -650,     // Vertical force (similar to double jump)
+  WALL_FRICTION: 0.7,          // Friction applied while sliding on wall
+
+  // Edge grab mechanics
+  EDGE_GRAB_HORIZONTAL_RANGE: 20,
+  EDGE_GRAB_VERTICAL_RANGE: 30,
+  LEDGE_HANG_OFFSET_X: 15, // Distance from edge while hanging
+  LEDGE_HANG_OFFSET_Y: 15, // Distance below platform top
+  LEDGE_CLIMB_SPEED: -400, // Upward velocity when climbing
+  LEDGE_JUMP_X: 450, // Horizontal boost when jumping from ledge
+  LEDGE_JUMP_Y: -600, // Vertical boost when jumping from ledge
 } as const;

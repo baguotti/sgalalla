@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { TrainingDummy } from '../entities/TrainingDummy';
 import { DebugOverlay } from '../components/DebugOverlay';
+import { PauseMenu } from '../components/PauseMenu';
 
 export class GameScene extends Phaser.Scene {
     private player!: Player;
@@ -11,6 +12,29 @@ export class GameScene extends Phaser.Scene {
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
     private toggleKey!: Phaser.Input.Keyboard.Key;
+
+    // Debug visibility
+    private debugVisible: boolean = true;
+    private debugToggleKey!: Phaser.Input.Keyboard.Key;
+    private controlsHintText!: Phaser.GameObjects.Text;
+
+    // Kill tracking
+    private playerKills: number = 0;
+    private opponentKills: number = 0;
+    private killCountText!: Phaser.GameObjects.Text;
+
+    // Blast zone boundaries
+    private readonly BLAST_ZONE_LEFT = -100;
+    private readonly BLAST_ZONE_RIGHT = 900;
+    private readonly BLAST_ZONE_TOP = -100;
+    private readonly BLAST_ZONE_BOTTOM = 700;
+
+    private uiCamera!: Phaser.Cameras.Scene2D.Camera;
+
+    // Pause menu
+    private isPaused: boolean = false;
+    private pauseMenu!: PauseMenu;
+    private pauseKey!: Phaser.Input.Keyboard.Key;
 
     constructor() {
         super({ key: 'GameScene' });
@@ -54,60 +78,160 @@ export class GameScene extends Phaser.Scene {
         // Create training dummy
         this.trainingDummy = new TrainingDummy(this, 500, 200);
 
+        // Setup cameras
+        this.setupCameras();
+
         // Create debug overlay
         this.debugOverlay = new DebugOverlay(this);
+        // Make debug overlay ignore main camera (only render on UI camera)
+        this.debugOverlay.setCameraIgnore(this.cameras.main);
 
         // Add controls hint
         this.createControlsHint();
 
+        // Add kill counter display
+        this.createKillCounter();
+
         // Toggle key
-        this.toggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.O);
+        this.toggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
+        this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F3);
+        this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+        // Create pause menu
+        this.pauseMenu = new PauseMenu(this);
+        this.cameras.main.ignore(this.pauseMenu.getElements());
+
+        // Pause menu event listeners
+        this.events.on('pauseMenuResume', () => this.togglePause());
+        this.events.on('pauseMenuRestart', () => this.restartMatch());
+    }
+
+    private setupCameras(): void {
+        // Create a separate UI camera that ignores zoom
+        this.uiCamera = this.cameras.add(0, 0, 800, 600);
+        this.uiCamera.setScroll(0, 0);
+        // UI camera ignores main camera zoom
+        this.uiCamera.setZoom(1);
     }
 
     private createStage(): void {
-        // Main platform (large, centered)
-        const mainPlatform = this.add.rectangle(400, 500, 800, 40, 0x16213e);
+        // Background gradient to show play area
+        const bg = this.add.graphics();
+        bg.fillGradientStyle(0x0a0a1a, 0x0a0a1a, 0x1a1a2e, 0x1a1a2e, 1);
+        bg.fillRect(0, 0, 800, 600);
+        bg.setDepth(-10);
+
+        // Main platform (centered, wide - Brawlhalla style)
+        const mainPlatform = this.add.rectangle(400, 480, 600, 30, 0x16213e);
+        mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
 
-        // Soft platform 1 (left)
-        const softPlatform1 = this.add.rectangle(250, 350, 400, 20, 0x0f3460);
+        // Soft platform 1 (left-center, above main)
+        const softPlatform1 = this.add.rectangle(250, 340, 200, 16, 0x0f3460);
+        softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
+        softPlatform1.setAlpha(0.85);
         this.softPlatforms.push(softPlatform1);
 
-        // Soft platform 2 (right)
-        const softPlatform2 = this.add.rectangle(550, 250, 400, 20, 0x0f3460);
+        // Soft platform 2 (right-center, above main)
+        const softPlatform2 = this.add.rectangle(550, 340, 200, 16, 0x0f3460);
+        softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
+        softPlatform2.setAlpha(0.85);
         this.softPlatforms.push(softPlatform2);
 
-        // Add visual distinction for soft platforms (dashed effect)
-        softPlatform1.setAlpha(0.7);
-        softPlatform2.setAlpha(0.7);
+        // VISIBLE SIDE WALLS for wall mechanics testing
+        // Left wall
+        const leftWall = this.add.rectangle(15, 300, 30, 600, 0x2a3a4e);
+        leftWall.setStrokeStyle(4, 0x4a6a8e);
+        leftWall.setAlpha(0.6);
+        leftWall.setDepth(-5);
+
+        // Right wall
+        const rightWall = this.add.rectangle(785, 300, 30, 600, 0x2a3a4e);
+        rightWall.setStrokeStyle(4, 0x4a6a8e);
+        rightWall.setAlpha(0.6);
+        rightWall.setDepth(-5);
+
+        // Add wall indicators (text labels)
+        const leftWallText = this.add.text(8, 250, 'WALL', {
+            fontSize: '12px',
+            color: '#8ab4f8',
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        });
+        leftWallText.setRotation(-Math.PI / 2);
+        leftWallText.setAlpha(0.5);
+        leftWallText.setDepth(-4);
+
+        const rightWallText = this.add.text(792, 350, 'WALL', {
+            fontSize: '12px',
+            color: '#8ab4f8',
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        });
+        rightWallText.setRotation(Math.PI / 2);
+        rightWallText.setAlpha(0.5);
+        rightWallText.setDepth(-4);
     }
 
     private createControlsHint(): void {
         const controlsText = [
-            'Keyboard:',
-            'WASD/Arrows - Move',
-            'Space - Jump | J - Light | K - Heavy',
-            'L - Dodge | Shift - Recovery',
+            'Keyboard Controls:',
+            'Arrow Keys / WASD - Move',
+            '↑ Arrow / Space - Jump',
+            'C / J - Light Attack',
+            'X / K - Heavy Attack',
+            'Z / L - Dodge',
+            'V / Shift - Recovery',
             '',
-            'Xbox Controller:',
-            'Left Stick/D-pad - Move',
-            'A - Jump | X - Light | B/Y - Heavy',
-            'LT/RT - Dodge',
-            '',
-            'O - Toggle Sparring AI',
+            'F3 - Toggle Debug | O - Toggle AI | T - Toggle Dummy/Opponent',
         ].join('\n');
 
-        const controlsTextObj = this.add.text(10, 500, controlsText, {
+        this.controlsHintText = this.add.text(10, 500, controlsText, {
             fontSize: '10px',
             color: '#888888',
             fontFamily: 'Arial',
             lineSpacing: 1,
         });
-        controlsTextObj.setScrollFactor(0);
-        controlsTextObj.setDepth(500);
+        this.controlsHintText.setScrollFactor(0);
+        this.controlsHintText.setDepth(500);
+        // Make controls hint ignore main camera zoom
+        this.cameras.main.ignore(this.controlsHintText);
+    }
+
+    private createKillCounter(): void {
+        this.killCountText = this.add.text(400, 20, 'Eliminations: 0', {
+            fontSize: '20px',
+            color: '#ffffff',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4,
+        });
+        this.killCountText.setOrigin(0.5);
+        this.killCountText.setScrollFactor(0);
+        this.killCountText.setDepth(1000);
+        // Make kill counter ignore main camera zoom
+        this.cameras.main.ignore(this.killCountText);
     }
 
     update(_time: number, delta: number): void {
+        // Handle Pause Toggle (ESC)
+        if (Phaser.Input.Keyboard.JustDown(this.pauseKey)) {
+            this.togglePause();
+        }
+
+        // If paused, only update pause menu
+        if (this.isPaused) {
+            this.pauseMenu.update(delta);
+            return;
+        }
+
+        // Handle Debug Toggle (F3)
+        if (Phaser.Input.Keyboard.JustDown(this.debugToggleKey)) {
+            this.debugVisible = !this.debugVisible;
+            // No visual indicator needed - the debug info itself shows/hides
+        }
+
         // Handle Toggle
         if (Phaser.Input.Keyboard.JustDown(this.toggleKey)) {
             if (this.trainingDummy) {
@@ -190,16 +314,17 @@ export class GameScene extends Phaser.Scene {
             this.player.checkHitAgainst(this.opponent);
             this.opponent.checkHitAgainst(this.player);
 
-            // Bounds check for opponent
-            const opBounds = this.opponent.getBounds();
-            if (opBounds.left < 0) this.opponent.x = opBounds.width / 2;
-            else if (opBounds.right > 800) this.opponent.x = 800 - opBounds.width / 2;
+            // Wall collision for opponent
+            this.opponent.checkWallCollision(0, 800);
+
+            // Bounds check for opponent (now handled by wall collision)
+            // const opBounds = this.opponent.getBounds();
+            // if (opBounds.left < 0) this.opponent.x = opBounds.width / 2;
+            // else if (opBounds.right > 800) this.opponent.x = 800 - opBounds.width / 2;
 
             // Respawn opponent
             if (this.opponent.y > 700) {
-                this.opponent.x = 500;
-                this.opponent.y = 200;
-                this.opponent.damagePercent = 0;
+                this.respawnPlayer(this.opponent, false);
             }
         }
 
@@ -211,20 +336,33 @@ export class GameScene extends Phaser.Scene {
             this.player.checkPlatformCollision(platform, true);
         }
 
-        // Keep player in bounds (horizontal)
-        const playerBounds = this.player.getBounds();
-        if (playerBounds.left < 0) {
-            this.player.x = playerBounds.width / 2;
-        } else if (playerBounds.right > 800) {
-            this.player.x = 800 - playerBounds.width / 2;
-        }
+        // Check edge grab for player (must be after collision detection)
+        const platformData = [
+            ...this.platforms.map(p => ({ rect: p, isSoft: false })),
+            ...this.softPlatforms.map(p => ({ rect: p, isSoft: true }))
+        ];
+        this.player.checkLedgeGrab(platformData);
 
-        // Respawn if player falls off screen
-        if (this.player.y > 700) {
-            this.player.x = 300;
-            this.player.y = 200;
-            this.player.damagePercent = 0;
-        }
+        // Player wall collisions
+        this.player.checkWallCollision(0, 800);
+
+        // Check blast zones for kills
+        this.checkBlastZones();
+
+        // Keep player in bounds (horizontal) - removed, handled by wall collision
+        // const playerBounds = this.player.getBounds();
+        // if (playerBounds.left < 0) {
+        //     this.player.x = playerBounds.width / 2;
+        // } else if (playerBounds.right > 800) {
+        //     this.player.x = 800 - playerBounds.width / 2;
+        // }
+
+        // Removed old respawn - now handled by blast zones
+        // if (this.player.y > 700) {
+        //     this.player.x = 300;
+        //     this.player.y = 200;
+        //     this.player.damagePercent = 0;
+        // }
 
         // Update debug overlay
         const velocity = this.player.getVelocity();
@@ -233,16 +371,92 @@ export class GameScene extends Phaser.Scene {
             ? `${currentAttack.data.type} ${currentAttack.data.direction} (${currentAttack.phase})`
             : 'None';
 
-        this.debugOverlay.update(
-            velocity.x,
-            velocity.y,
-            this.player.getState(),
-            this.player.getRecoveryAvailable(),
-            attackInfo,
-            this.player.isGamepadConnected()
-        );
+        if (this.debugVisible) {
+            this.debugOverlay.update(
+                velocity.x,
+                velocity.y,
+                this.player.getState(),
+                this.player.getRecoveryAvailable(),
+                attackInfo,
+                this.player.isGamepadConnected()
+            );
+            this.debugOverlay.setVisible(true);
+            this.controlsHintText.setVisible(true);
+        } else {
+            this.debugOverlay.setVisible(false);
+            this.controlsHintText.setVisible(false);
+        }
     }
 
+    private checkBlastZones(): void {
+        // Check player
+        const playerBounds = this.player.getBounds();
+        if (playerBounds.left < this.BLAST_ZONE_LEFT ||
+            playerBounds.right > this.BLAST_ZONE_RIGHT ||
+            playerBounds.top < this.BLAST_ZONE_TOP ||
+            playerBounds.bottom > this.BLAST_ZONE_BOTTOM) {
+
+            // Player was eliminated - opponent gets a kill
+            if (this.opponent) {
+                this.opponentKills++;
+                this.updateKillCounter();
+            }
+            this.respawnPlayer(this.player, true);
+        }
+
+        // Check opponent
+        if (this.opponent) {
+            const opponentBounds = this.opponent.getBounds();
+            if (opponentBounds.left < this.BLAST_ZONE_LEFT ||
+                opponentBounds.right > this.BLAST_ZONE_RIGHT ||
+                opponentBounds.top < this.BLAST_ZONE_TOP ||
+                opponentBounds.bottom > this.BLAST_ZONE_BOTTOM) {
+
+                // Opponent was eliminated - player gets a kill
+                this.playerKills++;
+                this.updateKillCounter();
+                this.respawnPlayer(this.opponent, false);
+            }
+        }
+
+        // Check training dummy (no kill tracking, just respawn)
+        if (this.trainingDummy) {
+            const dummyBounds = this.trainingDummy.getBounds();
+            if (dummyBounds.left < this.BLAST_ZONE_LEFT ||
+                dummyBounds.right > this.BLAST_ZONE_RIGHT ||
+                dummyBounds.top < this.BLAST_ZONE_TOP ||
+                dummyBounds.bottom > this.BLAST_ZONE_BOTTOM) {
+
+                this.respawnPlayer(this.trainingDummy as any, false);
+            }
+        }
+    }
+
+    private respawnPlayer(entity: Player | TrainingDummy, isPlayer: boolean): void {
+        // Respawn position
+        const spawnX = isPlayer ? 300 : 500;
+        const spawnY = 200;
+
+        entity.x = spawnX;
+        entity.y = spawnY;
+        entity.damagePercent = 0;
+
+        // Visual respawn effect (flash)
+        const flash = this.add.graphics();
+        flash.fillStyle(0xffffff, 0.8);
+        flash.fillCircle(spawnX, spawnY, 50);
+        this.tweens.add({
+            targets: flash,
+            alpha: 0,
+            scale: 2,
+            duration: 300,
+            onComplete: () => flash.destroy()
+        });
+    }
+
+    private updateKillCounter(): void {
+        this.killCountText.setText(`Eliminations: ${this.playerKills}`);
+    }
 
     private updateCamera(): void {
         const targets: Phaser.GameObjects.Components.Transform[] = [];
@@ -283,5 +497,36 @@ export class GameScene extends Phaser.Scene {
             Phaser.Math.Linear(cam.midPoint.x, centerX, 0.1),
             Phaser.Math.Linear(cam.midPoint.y, centerY, 0.1)
         );
+    }
+
+    private togglePause(): void {
+        this.isPaused = !this.isPaused;
+        if (this.isPaused) {
+            this.pauseMenu.show();
+        } else {
+            this.pauseMenu.hide();
+        }
+    }
+
+    private restartMatch(): void {
+        // Reset player positions and damage
+        this.player.x = 300;
+        this.player.y = 200;
+        this.player.damagePercent = 0;
+
+        if (this.opponent) {
+            this.opponent.x = 500;
+            this.opponent.y = 200;
+            this.opponent.damagePercent = 0;
+        }
+
+        // Reset kill counts
+        this.playerKills = 0;
+        this.opponentKills = 0;
+        this.updateKillCounter();
+
+        // Close pause menu
+        this.isPaused = false;
+        this.pauseMenu.hide();
     }
 }

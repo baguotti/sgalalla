@@ -93,4 +93,25 @@ export class DebugOverlay {
         this.attackText.setText(`Attack: ${attackInfo}`);
         this.gamepadText.setText(`Gamepad: ${gamepadConnected ? '🎮 Connected' : 'Not connected'}`);
     }
+
+    setVisible(visible: boolean): void {
+        this.velocityText.setVisible(visible);
+        this.stateText.setVisible(visible);
+        this.fpsText.setVisible(visible);
+        this.recoveryText.setVisible(visible);
+        this.attackText.setVisible(visible);
+        this.gamepadText.setVisible(visible);
+    }
+
+    // Set which camera renders these UI elements
+    setCameraIgnore(camera: Phaser.Cameras.Scene2D.Camera): void {
+        camera.ignore([
+            this.velocityText,
+            this.stateText,
+            this.fpsText,
+            this.recoveryText,
+            this.attackText,
+            this.gamepadText
+        ]);
+    }
 }

@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
 import { PhysicsConfig } from '../config/PhysicsConfig';
-import { Attack, AttackType, AttackDirection, AttackPhase } from '../combat/Attack';
-import { Hitbox } from '../combat/Hitbox';
-import { DamageSystem } from '../combat/DamageSystem';
+
 import { InputManager } from '../input/InputManager';
 import type { InputState } from '../input/InputManager';
+import { Fighter } from './Fighter';
+import { PlayerPhysics } from './player/PlayerPhysics';
+import { PlayerCombat } from './player/PlayerCombat';
+import { Attack } from '../combat/Attack';
 
 export const PlayerState = {
     GROUNDED: 'Grounded',
@@ -19,64 +21,35 @@ export const PlayerState = {
 
 export type PlayerState = typeof PlayerState[keyof typeof PlayerState];
 
-export class Player extends Phaser.GameObjects.Container {
+export class Player extends Fighter {
     private sprite: Phaser.GameObjects.Sprite;
-    private velocity: Phaser.Math.Vector2;
-    private acceleration: Phaser.Math.Vector2;
+    public physics: PlayerPhysics; // Public for debugging/GameScene access if needed
 
-    // Jump mechanics
-    private isGrounded: boolean = false;
-    private jumpsRemaining: number = 2;
+    // velocity inherited from Fighter (managed by PlayerPhysics)
+    // acceleration managed by PlayerPhysics
 
-    // Fast-fall
-    private isFastFalling: boolean = false;
+    // Physics state managed by PlayerPhysics
+    // (acceleration, jumps, wall, ledge, platform logic moved to component)
 
-    // Recovery attack
-    private isRecovering: boolean = false;
-    private recoveryAvailable: boolean = true;
-    private lastRecoveryTime: number = 0;
-    private recoveryTimer: number = 0;
+    // Combat system delegated to PlayerCombat
+    private _isAttacking: boolean = false;
+    public get isAttacking(): boolean { return this._isAttacking; }
+    public set isAttacking(value: boolean) { this._isAttacking = value; }
 
-    // Platform drop-through
-    private droppingThroughPlatform: Phaser.GameObjects.Rectangle | null = null;
-    private dropGraceTimer: number = 0;
-    private currentPlatform: Phaser.GameObjects.Rectangle | null = null;
-
-    // Combat system
-    public damagePercent: number = 0;
-    private isAttacking: boolean = false;
-    private currentAttack: Attack | null = null;
-    private attackCooldownTimer: number = 0;
-    private activeHitbox: Hitbox | null = null;
-    public hitTargets: Set<Player> = new Set();
-
-    // Ground pound
-    private isGroundPounding: boolean = false;
-    private groundPoundStartupTimer: number = 0;
-
-    // Charge attack system
-    private isCharging: boolean = false;
-    private chargeTime: number = 0;
-    private chargeDirection: AttackDirection = AttackDirection.NEUTRAL;
-    private chargeGlow: Phaser.GameObjects.Graphics | null = null;
+    public combat: PlayerCombat;
 
     // Dodge system
-    private isDodging: boolean = false;
-    private isSpotDodging: boolean = false; // Dodge in place without direction
-    private dodgeTimer: number = 0;
+    public isDodging: boolean = false; // Public for Physics access
+
     private dodgeCooldownTimer: number = 0;
-    private isInvincible: boolean = false;
-    private dodgeDirection: number = 0;
+    // isInvincible inherited from Fighter
 
-    // Running state (activated by dodge)
-    private isRunning: boolean = false;
 
-    // Hit stun
-    private isHitStunned: boolean = false;
-    private hitStunTimer: number = 0;
+    // Hit stun (inherited)
 
-    // Facing direction (1 = right, -1 = left)
+    // Facing direction
     private facingDirection: number = 1;
+    public getFacingDirection(): number { return this.facingDirection; }
 
     // Damage display
     private damageText: Phaser.GameObjects.Text;
@@ -84,10 +57,6 @@ export class Player extends Phaser.GameObjects.Container {
     // Unified input system (keyboard + gamepad)
     private inputManager!: InputManager;
     private currentInput!: InputState;
-
-    // Track jump hold time for variable jump height
-    private jumpHoldTime: number = 0;
-    private wasJumpHeld: boolean = false;
 
     // AI Control
     public isAI: boolean = false;
@@ -126,9 +95,13 @@ export class Player extends Phaser.GameObjects.Container {
         this.damageText.setOrigin(0.5);
         this.add(this.damageText);
 
-        // Initialize physics
-        this.velocity = new Phaser.Math.Vector2(0, 0);
-        this.acceleration = new Phaser.Math.Vector2(0, 0);
+        this.add(this.damageText);
+
+        this.add(this.damageText);
+
+        // Initialize Components
+        this.physics = new PlayerPhysics(this);
+        this.combat = new PlayerCombat(this, scene);
 
         // Setup input
         this.setupInput();
@@ -142,645 +115,81 @@ export class Player extends Phaser.GameObjects.Container {
     }
 
     update(delta: number): void {
-        const deltaSeconds = delta / 1000;
-
-        // Get input (from InputManager or AI)
+        // Get input
         if (this.isAI) {
             this.updateAI(delta);
             this.currentInput = this.aiInput;
         } else {
-            // Unified Input Handling
             this.currentInput = this.inputManager.poll();
         }
 
-        // Update timers
+        // Update Physics Component
+        this.physics.update(delta, this.currentInput);
+
+        // Update Combat Component
+        this.combat.update(delta);
+
+        // Handle input for combat if not stunned/disabled
+        // Logic handled inside combat.handleInput but we pass input state
+        this.combat.handleInput(this.currentInput);
+
+        // Update Combat/Timers
         this.updateTimers(delta);
 
-        // Handle hit stun (disables input)
-        if (this.isHitStunned) {
-            this.hitStunTimer -= delta;
-            if (this.hitStunTimer <= 0) {
-                this.isHitStunned = false;
-                this.resetVisuals();
-            }
-            this.applyPhysics(deltaSeconds);
-            return;
-        }
+        // Handle hit stun (Physics handles movement, but we handle visuals/state blocking)
 
-        // Handle attack state (limited movement during attacks)
-        if (this.isAttacking || this.isGroundPounding) {
-            this.updateAttackState(delta);
-
-            // JUMP CANCEL: Allow jumping out of Light Attack Recovery for "snappy" feel
-            let jumpCancelled = false;
-            if (this.currentAttack &&
-                this.currentAttack.data.type === AttackType.LIGHT &&
-                this.currentAttack.phase === AttackPhase.RECOVERY &&
-                this.currentInput.jump &&
-                this.jumpsRemaining > 0) {
-                this.endAttack();
-                jumpCancelled = true;
-            }
-
-            if (!jumpCancelled) {
-                if (this.isGroundPounding && this.groundPoundStartupTimer <= 0) {
-                    this.velocity.y = PhysicsConfig.GROUND_POUND_SPEED;
-                }
-                this.applyPhysics(deltaSeconds);
-                this.updateDamageDisplay();
-                return;
-            }
-        }
-
-        // Handle dodge state
-        if (this.isDodging) {
-            this.updateDodgeState(delta);
-            this.applyPhysics(deltaSeconds);
-            return;
-        }
-
-        // Reset acceleration
-        this.acceleration.set(0, PhysicsConfig.GRAVITY);
-
-        // GROUND POUND HOVER: If charging down heavy in air, freeze gravity/velocity
-        if (this.isCharging && !this.isGrounded && this.chargeDirection === AttackDirection.DOWN) {
-            this.acceleration.y = 0;
-            this.velocity.y = 0;
-            this.velocity.x *= 0.9; // Apply strong air friction to hold position
-        }
-
-        // Normal input handling using unified input
-        this.handleHorizontalMovement();
-        this.handleRecovery();
-        this.handleJump(delta);
-        this.handleFastFall();
-        this.handleAttackInput();
-        this.updateChargeState(delta); // Update charge visual effects
-        this.handleDodgeInput();
-
-        if (this.isRecovering) {
-            this.updateRecoveryHitbox();
-        }
-
-        // Apply physics
-        this.applyPhysics(deltaSeconds);
-
-        // Update facing direction
+        // Visuals
         this.updateFacing();
-
-        // Update animation
         this.updateAnimation();
-
-        // Update damage display
         this.updateDamageDisplay();
     }
 
     private updateTimers(delta: number): void {
-        if (this.dropGraceTimer > 0) {
-            this.dropGraceTimer -= delta;
-            if (this.dropGraceTimer <= 0) {
-                this.droppingThroughPlatform = null;
-            }
+        this.hitStunTimer -= delta;
+
+        if (this.hitStunTimer <= 0 && this.isHitStunned) {
+            this.isHitStunned = false;
+            this.resetVisuals();
         }
 
-        if (this.recoveryTimer > 0) {
-            this.recoveryTimer -= delta;
-            if (this.recoveryTimer <= 0) {
-                this.isRecovering = false;
-                this.resetVisuals();
-            }
-        }
 
-        if (this.attackCooldownTimer > 0) {
-            this.attackCooldownTimer -= delta;
-        }
 
         if (this.dodgeCooldownTimer > 0) {
             this.dodgeCooldownTimer -= delta;
         }
+
+        // Attack Cooldown delegated to Combat, but kept here if needed for interface specific logic? 
+        // No, let's remove references if PlayerCombat handles it.
     }
 
-    private applyPhysics(deltaSeconds: number): void {
-        // Apply acceleration to velocity
-        this.velocity.x += this.acceleration.x * deltaSeconds;
-        this.velocity.y += this.acceleration.y * deltaSeconds;
-
-        // Apply friction to horizontal movement (less during attacks)
-        const friction = this.isAttacking ? 0.95 : PhysicsConfig.FRICTION;
-        this.velocity.x *= friction;
-
-        // Clamp horizontal speed
-        this.velocity.x = Phaser.Math.Clamp(
-            this.velocity.x,
-            -PhysicsConfig.MAX_SPEED,
-            PhysicsConfig.MAX_SPEED
-        );
-
-        // Update position
-        this.x += this.velocity.x * deltaSeconds;
-        this.y += this.velocity.y * deltaSeconds;
-    }
-
-    private handleHorizontalMovement(): void {
-        const input = this.currentInput;
-
-        // BRAWLHALLA STYLE: Stationary while charging heavy attacks on ground
-        if (this.isCharging && this.isGrounded) {
-            this.velocity.x = 0;
-            this.acceleration.x = 0;
+    private updateFacing(): void {
+        // Don't flip while attacking if using certain attacks, or during stun
+        if (this.isHitStunned || (this.isAttacking)) {
             return;
         }
 
-        // BRAWLHALLA STYLE: Aerial heavy attacks reduce air mobility
-        let moveAccel = PhysicsConfig.MOVE_ACCEL;
-        let maxSpeed = PhysicsConfig.MAX_SPEED;
-
-        if (this.isAttacking && !this.isGrounded && this.currentAttack?.data.type === AttackType.HEAVY) {
-            moveAccel *= 0.3; // Significantly reduced air control during heavy aerials
-            maxSpeed *= 0.5; // Reduced max speed
+        // Don't flip during wall slide
+        if (this.physics.isWallSliding) {
+            this.sprite.setFlipX(this.physics.wallDirection === -1);
+            return;
         }
 
-        // Running is active while dodge key is held (after initial dodge triggers it)
-        // The dodge activates running, then holding dodge key maintains it
-        this.isRunning = input.dodgeHeld && !this.isDodging;
-
-        // Apply run multipliers if running (significantly faster!)
-        const speedMult = this.isRunning ? PhysicsConfig.RUN_SPEED_MULT : 1;
-        const accelMult = this.isRunning ? PhysicsConfig.RUN_ACCEL_MULT : 1;
-
-        const baseAccel = moveAccel * accelMult;
-
-        // Use analog input if available, otherwise digital
-        if (Math.abs(input.moveX) > 0.1) {
-            this.acceleration.x = input.moveX * baseAccel;
-            this.facingDirection = input.moveX > 0 ? 1 : -1;
-        } else if (input.moveLeft && !input.moveRight) {
-            this.acceleration.x = -baseAccel;
-            this.facingDirection = -1;
-        } else if (input.moveRight && !input.moveLeft) {
-            this.acceleration.x = baseAccel;
+        // Normal facing
+        if (this.physics.acceleration.x > 0) {
             this.facingDirection = 1;
-        }
-
-        // Cap max speed (higher when running)
-        const finalMaxSpeed = maxSpeed * speedMult;
-        if (Math.abs(this.velocity.x) > finalMaxSpeed) {
-            this.velocity.x = Math.sign(this.velocity.x) * finalMaxSpeed;
+            this.sprite.setFlipX(false);
+        } else if (this.physics.acceleration.x < 0) {
+            this.facingDirection = -1;
+            this.sprite.setFlipX(true);
         }
     }
 
-    private handleJump(delta: number): void {
-        const input = this.currentInput;
-
-        // Platform drop-through: Jump + Down while grounded on soft platform
-        if (input.jump && input.moveDown && this.isGrounded && this.currentPlatform) {
-            this.droppingThroughPlatform = this.currentPlatform;
-            this.dropGraceTimer = PhysicsConfig.PLATFORM_DROP_GRACE_PERIOD;
-            this.isGrounded = false;
-            return;
-        }
-
-        // Jump on button press
-        if (input.jump && this.jumpsRemaining > 0) {
-            this.performJump();
-            this.jumpHoldTime = 0;
-        }
-
-        // Track jump hold for variable jump height
-        if (input.jumpHeld && this.wasJumpHeld) {
-            this.jumpHoldTime += delta;
-        } else if (!input.jumpHeld && this.wasJumpHeld) {
-            // Released jump early - cut velocity for short hop
-            if (this.jumpHoldTime < PhysicsConfig.JUMP_HOLD_THRESHOLD && this.velocity.y < 0) {
-                this.velocity.y *= 0.5;
-            }
-        }
-
-        this.wasJumpHeld = input.jumpHeld;
+    // Visual Helpers
+    public setVisualTint(color: number): void {
+        this.sprite.setTint(color);
     }
 
-    private performJump(): void {
-        this.velocity.y = PhysicsConfig.JUMP_FORCE;
-        this.jumpsRemaining--;
-        this.isGrounded = false;
-        this.isFastFalling = false;
-    }
-
-    private handleFastFall(): void {
-        const input = this.currentInput;
-
-        if (
-            input.moveDown &&
-            !this.isGrounded &&
-            !this.isFastFalling &&
-            this.velocity.y < PhysicsConfig.FAST_FALL_THRESHOLD &&
-            this.velocity.y > -PhysicsConfig.FAST_FALL_THRESHOLD
-        ) {
-            this.isFastFalling = true;
-            this.velocity.y *= PhysicsConfig.FAST_FALL_MULTIPLIER;
-        }
-    }
-
-    private handleRecovery(): void {
-        const input = this.currentInput;
-        const currentTime = this.scene.time.now;
-
-        if (
-            input.recovery &&
-            !this.isGrounded &&
-            this.recoveryAvailable &&
-            currentTime - this.lastRecoveryTime > PhysicsConfig.RECOVERY_COOLDOWN
-        ) {
-            this.velocity.y = PhysicsConfig.RECOVERY_FORCE_Y;
-            this.velocity.x += this.facingDirection * PhysicsConfig.RECOVERY_FORCE_X;
-
-            this.isRecovering = true;
-            this.recoveryAvailable = false;
-            this.lastRecoveryTime = currentTime;
-            this.recoveryTimer = PhysicsConfig.RECOVERY_DURATION;
-            this.isFastFalling = false;
-
-            this.sprite.setTint(0xffaa00);
-        }
-    }
-
-    private handleAttackInput(): void {
-        if (this.attackCooldownTimer > 0) return;
-
-        const input = this.currentInput;
-
-        // Light attack - instant activation
-        if (input.lightAttack) {
-            const direction = this.getInputDirection();
-            const isAerial = !this.isGrounded;
-            const attackKey = Attack.getAttackKey(AttackType.LIGHT, direction, isAerial);
-            this.startAttack(attackKey);
-            return;
-        }
-
-        // Heavy attack - chargeable
-        if (input.heavyAttack && !this.isCharging) {
-            // Start charging
-            this.isCharging = true;
-            this.chargeTime = 0;
-            this.chargeDirection = this.getInputDirection();
-
-            // Create charge glow effect
-            if (!this.chargeGlow) {
-                this.chargeGlow = this.scene.add.graphics();
-                this.add(this.chargeGlow);
-            }
-            return;
-        }
-
-        // Update charge while holding
-        if (this.isCharging && input.heavyAttackHeld) {
-            // Charge continues in update loop
-            return;
-        }
-
-        // Release charge - execute attack
-        if (this.isCharging && !input.heavyAttackHeld) {
-            this.executeChargedAttack();
-            return;
-        }
-    }
-
-    private executeChargedAttack(): void {
-        const direction = this.chargeDirection;
-        const isAerial = !this.isGrounded;
-
-        // Special case: down + heavy in air = ground pound (not chargeable)
-        if (direction === AttackDirection.DOWN && isAerial) {
-            this.clearChargeState();
-            this.startGroundPound();
-            return;
-        }
-
-        // Calculate charge multiplier (0 to 1 based on charge time)
-        const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
-
-        // Get attack key and start charged attack
-        const attackKey = Attack.getAttackKey(AttackType.HEAVY, direction, isAerial);
-        this.startChargedAttack(attackKey, chargePercent);
-        this.clearChargeState();
-    }
-
-    private updateChargeState(delta: number): void {
-        if (!this.isCharging) return;
-
-        // Accumulate charge time
-        this.chargeTime += delta;
-
-        // Auto-release if max charge exceeded (Brawlhalla style limit)
-        if (this.chargeTime >= PhysicsConfig.CHARGE_MAX_TIME) {
-            this.executeChargedAttack();
-            return;
-        }
-
-        const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
-
-        // Update visual glow effect
-        if (this.chargeGlow) {
-            this.chargeGlow.clear();
-
-            // Pulsing glow that intensifies with charge
-            const pulseSpeed = 5 + chargePercent * 10; // Faster pulse at higher charge
-            const pulse = 0.5 + Math.sin(this.scene.time.now / 100 * pulseSpeed) * 0.5;
-            const glowIntensity = 0.3 + chargePercent * 0.7;
-            const alpha = glowIntensity * pulse;
-
-            // Color shifts from yellow to orange to red as charge builds
-            let color: number;
-            if (chargePercent < 0.5) {
-                color = 0xffff00; // Yellow
-            } else if (chargePercent < 0.8) {
-                color = 0xff8800; // Orange
-            } else {
-                color = 0xff0000; // Red at max charge
-            }
-
-            // Draw glow ring around player
-            const radius = 35 + chargePercent * 15;
-            this.chargeGlow.lineStyle(3 + chargePercent * 4, color, alpha);
-            this.chargeGlow.strokeCircle(0, 0, radius);
-
-            // At full charge, add extra particles/sparkles
-            if (chargePercent >= 1) {
-                const sparkleAngle = (this.scene.time.now * 0.01) % (Math.PI * 2);
-                for (let i = 0; i < 4; i++) {
-                    const angle = sparkleAngle + (i * Math.PI / 2);
-                    const sparkleX = Math.cos(angle) * (radius + 10);
-                    const sparkleY = Math.sin(angle) * (radius + 10);
-                    this.chargeGlow.fillStyle(0xffffff, alpha);
-                    this.chargeGlow.fillCircle(sparkleX, sparkleY, 4);
-                }
-            }
-        }
-
-        // Flash body color based on charge
-        if (chargePercent >= 1) {
-            // Full charge - flash rapidly
-            const flash = Math.sin(this.scene.time.now / 50) > 0;
-            if (flash) {
-                this.sprite.setTint(0xffff00);
-            } else {
-                this.resetVisuals();
-            }
-        } else if (chargePercent > 0.5) {
-            // Partial charge - tint slightly
-            this.sprite.setTint(0x88ccff);
-        }
-    }
-
-    private clearChargeState(): void {
-        this.isCharging = false;
-        this.chargeTime = 0;
-        if (this.chargeGlow) {
-            this.chargeGlow.clear();
-        }
-        // Reset body color
-        this.resetVisuals();
-    }
-
-    private startChargedAttack(attackKey: string, chargePercent: number): void {
-        try {
-            this.currentAttack = new Attack(attackKey, this.facingDirection, chargePercent);
-            this.isAttacking = true;
-            this.hitTargets.clear();
-
-            // Set cooldown
-            this.attackCooldownTimer = this.currentAttack.data.recoveryDuration;
-        } catch (e) {
-            console.warn(`Attack ${attackKey} not found`);
-        }
-    }
-
-    private getInputDirection(): AttackDirection {
-        const input = this.currentInput;
-
-        // BRAWLHALLA STYLE: Up input mapped to UP (Restored for Up Air Light)
-        if (input.aimUp && !input.aimDown) return AttackDirection.UP;
-
-        if (input.aimDown && !input.aimUp) return AttackDirection.DOWN;
-        if ((input.aimLeft || input.aimRight) && !input.aimUp && !input.aimDown) return AttackDirection.SIDE;
-        return AttackDirection.NEUTRAL;
-    }
-
-    private startAttack(attackKey: string): void {
-        try {
-            this.currentAttack = new Attack(attackKey, this.facingDirection);
-            this.isAttacking = true;
-            this.hitTargets.clear();
-
-            // Visual feedback
-            this.sprite.setTint(0xff0000); // Red during attack
-        } catch (e) {
-            console.warn('Unknown attack:', attackKey);
-        }
-    }
-
-    private startGroundPound(): void {
-        this.isGroundPounding = true;
-        this.groundPoundStartupTimer = PhysicsConfig.GROUND_POUND_STARTUP;
-        this.velocity.set(0, 0); // Pause in air
-
-        // Start the attack for hitbox purposes
-        const attackKey = Attack.getAttackKey(AttackType.HEAVY, AttackDirection.DOWN, true);
-        try {
-            this.currentAttack = new Attack(attackKey, this.facingDirection);
-            this.isAttacking = true;
-            this.hitTargets.clear();
-        } catch (e) {
-            console.warn('Ground pound attack not found');
-        }
-
-        this.sprite.setTint(0x9b59b6); // Purple for ground pound startup
-    }
-
-    private updateAttackState(delta: number): void {
-        if (!this.currentAttack) {
-            this.endAttack();
-            return;
-        }
-
-        // Ground pound startup
-        if (this.isGroundPounding && this.groundPoundStartupTimer > 0) {
-            this.groundPoundStartupTimer -= delta;
-            this.velocity.set(0, 0); // Stay suspended
-            if (this.groundPoundStartupTimer <= 0) {
-                this.sprite.setTint(0xff0000); // Switch to attack color
-            }
-            return;
-        }
-
-        // During ground pound descent, always keep hitbox active
-        if (this.isGroundPounding && this.groundPoundStartupTimer <= 0) {
-            this.updateHitbox();
-            return; // Skip normal attack phase update during ground pound
-        }
-
-        // Update attack phase
-        const attackComplete = this.currentAttack.update(delta);
-
-        // Handle hitbox
-        if (this.currentAttack.isHitboxActive()) {
-            this.updateHitbox();
-        } else {
-            this.deactivateHitbox();
-        }
-
-        // Visual feedback based on phase
-        if (this.currentAttack.phase === AttackPhase.STARTUP) {
-            this.sprite.setTint(0xf39c12); // Orange during startup
-        } else if (this.currentAttack.phase === AttackPhase.ACTIVE) {
-            this.sprite.setTint(0xff0000); // Red during active
-        } else if (this.currentAttack.phase === AttackPhase.RECOVERY) {
-            this.sprite.setTint(0x888888); // Gray during recovery
-        }
-
-        if (attackComplete) {
-            this.endAttack();
-        }
-    }
-
-    private updateHitbox(): void {
-        if (!this.currentAttack) return;
-
-        const offset = this.currentAttack.getHitboxOffset();
-        const hitboxX = this.x + offset.x;
-        const hitboxY = this.y + offset.y;
-
-        this.updateActiveHitbox(hitboxX, hitboxY, this.currentAttack.data.hitboxWidth, this.currentAttack.data.hitboxHeight);
-    }
-
-    private updateRecoveryHitbox(): void {
-        // Centered hitbox for recovery
-        this.updateActiveHitbox(this.x, this.y, 60, 60);
-    }
-
-    private updateActiveHitbox(x: number, y: number, width: number, height: number): void {
-        if (!this.activeHitbox) {
-            this.activeHitbox = new Hitbox(
-                this.scene,
-                x,
-                y,
-                width,
-                height
-            );
-        }
-        this.activeHitbox.setSize(width, height);
-        this.activeHitbox.activate(x, y);
-    }
-
-    private deactivateHitbox(): void {
-        if (this.activeHitbox) {
-            this.activeHitbox.deactivate();
-        }
-    }
-
-    private endAttack(): void {
-        this.isAttacking = false;
-        this.isGroundPounding = false;
-        this.currentAttack = null;
-        this.deactivateHitbox();
-        this.resetVisuals();
-
-        // Set cooldown (shorter for light attacks)
-        this.attackCooldownTimer = 100;
-    }
-
-    private handleDodgeInput(): void {
-        if (this.dodgeCooldownTimer > 0) return;
-
-        const input = this.currentInput;
-
-        if (!input.dodge) return;
-
-        this.startDodge();
-    }
-
-    private startDodge(): void {
-        this.isDodging = true;
-        this.isInvincible = true;
-
-        // Determine dodge direction from current input
-        const input = this.currentInput;
-        const hasDirectionalInput = input.moveLeft || input.moveRight;
-
-        // Spot Dodge conditions:
-        // 1. No horizontal input (Neutral Spot Dodge)
-        // 2. Up input (Up Spot Dodge - Brawlhalla style)
-        const isSpotDodge = !hasDirectionalInput || (input.aimUp && !input.moveLeft && !input.moveRight);
-
-        if (isSpotDodge) {
-            // SPOT DODGE - dodge in place with invincibility (works in air too!)
-            this.isSpotDodging = true;
-            this.dodgeDirection = 0;
-            this.dodgeTimer = PhysicsConfig.SPOT_DODGE_DURATION;
-            this.velocity.x = 0; // Stay in place horizontally
-
-            // In air, also freeze vertical momentum briefly
-            if (!this.isGrounded) {
-                this.velocity.y *= 0.2; // Almost freeze vertical movement
-            }
-
-            // Visual feedback - flash white
-            this.sprite.setTint(0xffffff);
-            this.sprite.setAlpha(0.7);
-        } else {
-            // DIRECTIONAL DODGE - move in direction
-            this.isSpotDodging = false;
-            this.dodgeTimer = PhysicsConfig.DODGE_DURATION;
-
-            if (input.moveLeft && !input.moveRight) {
-                this.dodgeDirection = -1;
-            } else if (input.moveRight && !input.moveLeft) {
-                this.dodgeDirection = 1;
-            } else {
-                this.dodgeDirection = this.facingDirection;
-            }
-
-            // Apply dodge velocity
-            if (this.isGrounded) {
-                // Grounded dash
-                this.velocity.x = this.dodgeDirection * (PhysicsConfig.DODGE_DISTANCE / (PhysicsConfig.DODGE_DURATION / 1000));
-            } else {
-                // Air dodge - less horizontal, some vertical freeze
-                this.velocity.x = this.dodgeDirection * (PhysicsConfig.DODGE_DISTANCE / (PhysicsConfig.DODGE_DURATION / 1000)) * 0.7;
-                this.velocity.y *= 0.3;
-            }
-
-            // Visual feedback
-            this.sprite.setTint(0x8888ff);
-            this.sprite.setAlpha(0.5);
-        }
-    }
-
-    private updateDodgeState(delta: number): void {
-        this.dodgeTimer -= delta;
-
-        // End invincibility after DODGE_INVINCIBILITY ms
-        if (this.dodgeTimer < (this.isSpotDodging ? PhysicsConfig.SPOT_DODGE_DURATION : PhysicsConfig.DODGE_DURATION) - PhysicsConfig.DODGE_INVINCIBILITY) {
-            this.isInvincible = false;
-        }
-
-        if (this.dodgeTimer <= 0) {
-            this.endDodge();
-        }
-    }
-
-    private endDodge(): void {
-        this.isDodging = false;
-        this.isInvincible = false;
-        this.dodgeCooldownTimer = PhysicsConfig.DODGE_COOLDOWN;
-        this.resetVisuals();
-        this.sprite.setAlpha(1);
-        this.isSpotDodging = false;
-        // Running is now controlled by dodgeHeld in handleHorizontalMovement
-    }
-
-    private resetVisuals(): void {
+    public resetVisuals(): void {
         this.sprite.setAlpha(1);
         if (this.isAI) {
             this.sprite.setTint(0xff5555);
@@ -789,13 +198,63 @@ export class Player extends Phaser.GameObjects.Container {
         }
     }
 
-    private updateFacing(): void {
-        if (this.velocity.x > 10) {
-            this.facingDirection = 1;
-        } else if (this.velocity.x < -10) {
-            this.facingDirection = -1;
-        }
+    // Delegated Methods for GameScene
+    public checkPlatformCollision(platform: Phaser.GameObjects.Rectangle, isSoft: boolean = false): void {
+        this.physics.checkPlatformCollision(platform, isSoft);
     }
+
+    public checkWallCollision(left: number, right: number): void {
+        this.physics.checkWallCollision(left, right);
+    }
+
+
+    // Delegated Methods
+    public checkLedgeGrab(platforms: Array<{ rect: Phaser.GameObjects.Rectangle; isSoft?: boolean }>): void {
+        this.physics.checkLedgeGrab(platforms);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    public checkHitAgainst(target: Player): void {
+        this.combat.checkAttackCollision(target);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     private updateAnimation(): void {
         if (this.isHitStunned) {
@@ -849,153 +308,19 @@ export class Player extends Phaser.GameObjects.Container {
     }
 
     // Called by GameScene to check hits against other players
-    checkHitAgainst(target: Player): void {
-        if (!this.activeHitbox) return;
-        if (this.hitTargets.has(target)) return; // Already hit this target
-        if (target.isInvincible) return; // Target is invincible
 
-        // Need source data (Attack or Recovery)
-        if (!this.currentAttack && !this.isRecovering) return;
 
-        const targetBounds = target.getBounds();
-        if (this.activeHitbox.checkCollision(targetBounds)) {
-            this.hitTargets.add(target);
-            this.applyHitTo(target);
-        }
-    }
 
-    private applyHitTo(target: Player): void {
-        let damage = 0;
-        let knockback = 0;
-        let knockbackAngle = 45;
-        let isHeavy = false;
-        let direction: AttackDirection = AttackDirection.NEUTRAL;
-        let isAerial = false;
-
-        if (this.currentAttack) {
-            const data = this.currentAttack.data;
-            damage = data.damage;
-            knockback = data.knockback;
-            knockbackAngle = data.knockbackAngle;
-            isHeavy = data.type === AttackType.HEAVY;
-            direction = data.direction;
-            isAerial = data.isAerial;
-        } else if (this.isRecovering) {
-            // Recovery Hit Data
-            damage = 8;
-            knockback = 500;
-            knockbackAngle = 80; // Upwards
-            isHeavy = false;
-            direction = AttackDirection.UP;
-            isAerial = true;
-        } else {
-            return;
-        }
-
-        // Calculate knockback
-        const knockbackForce = DamageSystem.calculateKnockback(
-            damage,
-            knockback,
-            target.damagePercent
-        );
-
-        // Calculate knockback direction based on attack angle
-        const angleRad = (knockbackAngle * Math.PI) / 180;
-        const knockbackVector = new Phaser.Math.Vector2(
-            Math.cos(angleRad) * knockbackForce * this.facingDirection,
-            -Math.sin(angleRad) * knockbackForce
-        );
-
-        // Ground Bounce: If knocking down into floor while grounded, bounce up
-        if (target.isGrounded && knockbackVector.y > 0) {
-            knockbackVector.y *= -0.8; // Bounce up with 80% force
-            target.y -= 10; // Lift off ground to prevent immediate snap-back
-            target.isGrounded = false; // Mark as airborne
-        }
-
-        // Apply damage and knockback (also calls applyHitStun)
-        DamageSystem.applyDamage(target, damage, knockbackVector);
-
-        // Screen Shake (Heavy Attacks)
-        if (isHeavy) {
-            this.scene.cameras.main.shake(100, 0.005);
-        }
-
-        // Visual Effects for Down Air (Spike)
-        if (direction === AttackDirection.DOWN && isAerial) {
-            // Visual Spike Effect
-            const effect = this.scene.add.graphics();
-            effect.fillStyle(0xffffff, 0.8);
-            effect.fillTriangle(
-                target.x, target.y - 20,
-                target.x - 20, target.y - 60,
-                target.x + 20, target.y - 60
-            );
-
-            // Animate out
-            this.scene.tweens.add({
-                targets: effect,
-                alpha: 0,
-                duration: 200,
-                onComplete: () => effect.destroy()
-            });
-        }
-    }
 
     setKnockback(x: number, y: number): void {
         this.velocity.x = x;
         this.velocity.y = y;
     }
 
-    applyHitStun(): void {
-        this.isHitStunned = true;
-        this.hitStunTimer = PhysicsConfig.HIT_STUN_DURATION;
-        this.isAttacking = false;
-        this.isDodging = false;
-        this.isGroundPounding = false;
-        this.currentAttack = null;
-        this.deactivateHitbox();
 
-        // Visual feedback
-        this.sprite.setTint(0xffffff);
-    }
 
     // Platform collision handling
-    checkPlatformCollision(platform: Phaser.GameObjects.Rectangle, isSoft: boolean = false): void {
-        if (this.droppingThroughPlatform === platform && this.dropGraceTimer > 0) {
-            return;
-        }
 
-        const playerBounds = this.getBounds();
-        const platformBounds = platform.getBounds();
-
-        if (this.velocity.y <= 0 && isSoft) return;
-
-        if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, platformBounds)) {
-            const playerBottom = playerBounds.bottom;
-            const platformTop = platformBounds.top;
-
-            if (playerBottom - this.velocity.y * (1 / 60) <= platformTop + 5) {
-                this.y = platformTop - PhysicsConfig.PLAYER_HEIGHT / 2;
-                this.velocity.y = 0;
-                this.isGrounded = true;
-                this.isFastFalling = false;
-                this.isRecovering = false;
-                this.jumpsRemaining = 2;
-                this.recoveryAvailable = true;
-                this.currentPlatform = isSoft ? platform : null;
-
-                // End ground pound on landing
-                if (this.isGroundPounding) {
-                    this.endAttack();
-                }
-
-                if (!this.isAttacking && !this.isDodging && !this.isHitStunned) {
-                    this.resetVisuals();
-                }
-            }
-        }
-    }
 
     // Getters
     getVelocity(): Phaser.Math.Vector2 {
@@ -1005,25 +330,32 @@ export class Player extends Phaser.GameObjects.Container {
     getState(): PlayerState {
         if (this.isHitStunned) return PlayerState.HIT_STUN;
         if (this.isDodging) return PlayerState.DODGING;
-        if (this.isGroundPounding) return PlayerState.GROUND_POUND;
+        if (this.combat.isGroundPounding) return PlayerState.GROUND_POUND;
         if (this.isAttacking) return PlayerState.ATTACKING;
-        if (this.isRecovering) return PlayerState.RECOVERING;
+        if (this.physics.isRecovering) return PlayerState.RECOVERING;
         if (this.isGrounded) return PlayerState.GROUNDED;
-        if (this.isFastFalling) return PlayerState.FAST_FALLING;
+        if (this.physics.isFastFalling) return PlayerState.FAST_FALLING;
         return PlayerState.AIRBORNE;
     }
 
     getRecoveryAvailable(): boolean {
-        return this.recoveryAvailable;
+        return this.physics.recoveryAvailable;
     }
+
 
     getIsInvincible(): boolean {
         return this.isInvincible;
     }
 
     getCurrentAttack(): Attack | null {
-        return this.currentAttack;
+        return this.combat.currentAttack;
     }
+
+    public get spriteObject(): Phaser.GameObjects.Sprite {
+        return this.sprite;
+    }
+
+
 
     getBounds(): Phaser.Geom.Rectangle {
         return new Phaser.Geom.Rectangle(
@@ -1118,4 +450,40 @@ export class Player extends Phaser.GameObjects.Container {
             if (this.y > 650) this.aiInput.heavyAttack = true; // Use recovery attack
         }
     }
+    // Inherited from Fighter, but we override to add specific logic or keep implementation
+    public applyHitStun(): void {
+        super.applyHitStun();
+
+        // Cancel any active states
+        // Cancel any active states
+        this.isAttacking = false;
+        // isCharging, isGroundPounding managed by Combat now, we should reset them
+        // this.combat.reset() ?
+        if (this.combat) {
+            this.combat.isCharging = false;
+            this.combat.isGroundPounding = false;
+            this.combat.currentAttack = null;
+            this.combat.deactivateHitbox();
+        }
+        this.isDodging = false;
+
+
+        // Reset visuals (clears attack tints)
+        this.resetVisuals();
+
+        // Flash white for hit feedback
+        this.sprite.setTintFill(0xffffff);
+    }
+
+    public respawn(): void {
+        // Reset state
+        this.velocity.set(0, 0);
+        this.physics.acceleration.set(0, 0);
+        this.damagePercent = 0;
+        this.isHitStunned = false;
+        this.isInvincible = false;
+        this.resetVisuals();
+        this.physics.resetOnGround();
+    }
+
 }

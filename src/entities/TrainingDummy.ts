@@ -1,23 +1,23 @@
 import Phaser from 'phaser';
 import { PhysicsConfig } from '../config/PhysicsConfig';
+import { Fighter } from './Fighter';
 
 /**
  * A stationary training dummy for testing combat mechanics.
  * Can be hit, takes damage, shows knockback, but respawns after falling.
  */
-export class TrainingDummy extends Phaser.GameObjects.Container {
+export class TrainingDummy extends Fighter {
     private bodyRect: Phaser.GameObjects.Rectangle;
     private faceGraphics: Phaser.GameObjects.Graphics;
-    public velocity: Phaser.Math.Vector2;
 
-    // Combat properties (same interface as Player for DamageSystem compatibility)
-    public damagePercent: number = 0;
-    public isInvincible: boolean = false;
-    public isGrounded: boolean = true; // For damage logic compatibility
+    // Combat properties inherited from Fighter
+    // public velocity: Phaser.Math.Vector2;
+    // public damagePercent: number = 0;
+    // public isInvincible: boolean = false;
+    // public isGrounded: boolean = true;
+    // public isHitStunned: boolean = false;
+    // private hitStunTimer: number = 0;
 
-    // Hit stun
-    private isHitStunned: boolean = false;
-    private hitStunTimer: number = 0;
 
     // Spawn position
     private spawnX: number;
@@ -63,8 +63,10 @@ export class TrainingDummy extends Phaser.GameObjects.Container {
         this.damageText.setOrigin(0.5);
         this.add(this.damageText);
 
-        // Initialize physics
-        this.velocity = new Phaser.Math.Vector2(0, 0);
+        this.add(this.damageText);
+
+        // Physics initialized in Fighter constructor
+        this.isGrounded = true;
 
         scene.add.existing(this);
     }
@@ -72,17 +74,15 @@ export class TrainingDummy extends Phaser.GameObjects.Container {
     update(delta: number): void {
         const deltaSeconds = delta / 1000;
 
-        // Handle hit stun
-        if (this.isHitStunned) {
-            this.hitStunTimer -= delta;
-            if (this.hitStunTimer <= 0) {
-                this.isHitStunned = false;
-                this.bodyRect.setFillStyle(0xe67e22);
-            }
+        // Base physics (Timer, Gravity)
+        this.updatePhysics(delta);
+
+        // Visual update state
+        if (!this.isHitStunned) {
+            this.bodyRect.setFillStyle(0xe67e22);
         }
 
-        // Apply gravity
-        this.velocity.y += PhysicsConfig.GRAVITY * deltaSeconds;
+        // Note: Gravity is applied in super.updatePhysics()
 
         // Apply friction - less when in hitstun (to allow knockback travel)
         if (this.isHitStunned) {
@@ -118,16 +118,11 @@ export class TrainingDummy extends Phaser.GameObjects.Container {
         this.isGrounded = false;
     }
 
-    applyHitStun(): void {
-        this.isHitStunned = true;
-        this.hitStunTimer = PhysicsConfig.HIT_STUN_DURATION;
+    protected onHitStun(): void {
         this.bodyRect.setFillStyle(0xffffff); // Flash white
     }
 
-    setKnockback(x: number, y: number): void {
-        this.velocity.x = x;
-        this.velocity.y = y;
-    }
+    // setKnockback handled by Fighter
 
     respawn(): void {
         this.x = this.spawnX;

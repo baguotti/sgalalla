@@ -53,11 +53,21 @@ export class InputManager {
     private kKey!: Phaser.Input.Keyboard.Key;
     private lKey!: Phaser.Input.Keyboard.Key;
 
+    // Brawlhalla default keys
+    private cKey!: Phaser.Input.Keyboard.Key; // Light attack
+    private xKey!: Phaser.Input.Keyboard.Key; // Heavy attack
+    private zKey!: Phaser.Input.Keyboard.Key; // Dodge
+    private vKey!: Phaser.Input.Keyboard.Key; // Recovery
+
     // Track key states for single-press detection
     private jKeyWasPressed: boolean = false;
     private kKeyWasPressed: boolean = false;
     private lKeyWasPressed: boolean = false;
     private spaceWasPressed: boolean = false;
+    private upArrowWasPressed: boolean = false; // For arrow-based jump
+    private cKeyWasPressed: boolean = false;
+    private xKeyWasPressed: boolean = false;
+    private zKeyWasPressed: boolean = false;
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
@@ -81,6 +91,12 @@ export class InputManager {
         this.jKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
         this.kKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
         this.lKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L);
+
+        // Brawlhalla defaults
+        this.cKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+        this.xKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+        this.zKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
+        this.vKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V);
     }
 
     /**
@@ -120,21 +136,31 @@ export class InputManager {
         const down = this.cursors.down.isDown || this.wasd.down.isDown;
 
         const spaceDown = this.spaceKey.isDown;
+        const upArrowDown = this.cursors.up.isDown;
         const jDown = this.jKey.isDown;
         const kDown = this.kKey.isDown;
         const lDown = this.lKey.isDown;
+        const cDown = this.cKey.isDown;
+        const xDown = this.xKey.isDown;
+        const zDown = this.zKey.isDown;
+        const vDown = this.vKey.isDown;
+        const shiftDown = this.shiftKey.isDown;
 
-        // Single press detection
-        const jumpPressed = spaceDown && !this.spaceWasPressed;
-        const lightPressed = jDown && !this.jKeyWasPressed;
-        const heavyPressed = kDown && !this.kKeyWasPressed;
-        const dodgePressed = lDown && !this.lKeyWasPressed;
+        // Single press detection - support both control schemes
+        const jumpPressed = (spaceDown && !this.spaceWasPressed) || (upArrowDown && !this.upArrowWasPressed);
+        const lightPressed = (jDown && !this.jKeyWasPressed) || (cDown && !this.cKeyWasPressed);
+        const heavyPressed = (kDown && !this.kKeyWasPressed) || (xDown && !this.xKeyWasPressed);
+        const dodgePressed = (lDown && !this.lKeyWasPressed) || (zDown && !this.zKeyWasPressed);
 
         // Update previous states
         this.spaceWasPressed = spaceDown;
+        this.upArrowWasPressed = upArrowDown;
         this.jKeyWasPressed = jDown;
         this.kKeyWasPressed = kDown;
         this.lKeyWasPressed = lDown;
+        this.cKeyWasPressed = cDown;
+        this.xKeyWasPressed = xDown;
+        this.zKeyWasPressed = zDown;
 
         return {
             moveLeft: left,
@@ -144,13 +170,13 @@ export class InputManager {
             moveX: left ? -1 : right ? 1 : 0,
             moveY: up ? -1 : down ? 1 : 0,
             jump: jumpPressed,
-            jumpHeld: spaceDown,
+            jumpHeld: spaceDown || upArrowDown,
             lightAttack: lightPressed,
             heavyAttack: heavyPressed,
-            heavyAttackHeld: kDown, // Track held state for charging
+            heavyAttackHeld: kDown || xDown, // Track held state for charging
             dodge: dodgePressed,
-            dodgeHeld: lDown, // Track L key held for running
-            recovery: this.shiftKey.isDown,
+            dodgeHeld: lDown || zDown, // Track dodge held for running
+            recovery: shiftDown || vDown, // Support both Shift and V for recovery
             aimUp: up,
             aimDown: down,
             aimLeft: left,
