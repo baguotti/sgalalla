@@ -17,7 +17,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     preload(): void {
-        this.load.spritesheet('dude', 'assets/stork_00.png', { frameWidth: 176, frameHeight: 347 });
+        this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
     }
 
     create(): void {
