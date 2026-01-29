@@ -381,7 +381,7 @@ export class Player extends Phaser.GameObjects.Container {
             this.recoveryTimer = PhysicsConfig.RECOVERY_DURATION;
             this.isFastFalling = false;
 
-            this.bodyRect.setFillStyle(0xff9500);
+            this.sprite.setTint(0xffaa00);
         }
     }
 
@@ -650,6 +650,7 @@ export class Player extends Phaser.GameObjects.Container {
                 height
             );
         }
+        this.activeHitbox.setSize(width, height);
         this.activeHitbox.activate(x, y);
     }
 
@@ -803,7 +804,13 @@ export class Player extends Phaser.GameObjects.Container {
                 this.sprite.anims.play('left', true);
             }
         } else {
-            this.sprite.anims.play('turn', true);
+            // Idle - sideways (use directional frame)
+            if (this.facingDirection > 0) {
+                this.sprite.setFrame(5); // Right idle
+            } else {
+                this.sprite.setFrame(0); // Left idle
+            }
+            this.sprite.anims.stop();
         }
     }
 

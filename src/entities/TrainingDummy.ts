@@ -13,6 +13,7 @@ export class TrainingDummy extends Phaser.GameObjects.Container {
     // Combat properties (same interface as Player for DamageSystem compatibility)
     public damagePercent: number = 0;
     public isInvincible: boolean = false;
+    public isGrounded: boolean = true; // For damage logic compatibility
 
     // Hit stun
     private isHitStunned: boolean = false;

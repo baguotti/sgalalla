@@ -62,6 +62,21 @@ export class Hitbox {
         }
     }
 
+    setSize(width: number, height: number): void {
+        this.width = width;
+        this.height = height;
+
+        if (this.debugGraphics) {
+            this.debugGraphics.setSize(width, height);
+            // Updating size of rectangle geometry might not center it correctly if origin isn't handled
+            // But rectangle primitive usually draws from x,y minus origin.
+            // setSize updates the display size.
+            // Let's ensure visuals align.
+            // Actually, simply destroying and recreating debug graphics might be safer if size changes often?
+            // Or setSize is fine.
+        }
+    }
+
     getBounds(): Phaser.Geom.Rectangle {
         return new Phaser.Geom.Rectangle(
             this.x - this.width / 2,
