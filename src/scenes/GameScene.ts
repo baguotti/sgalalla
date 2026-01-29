@@ -59,9 +59,27 @@ export class GameScene extends Phaser.Scene {
     preload(): void {
         this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
 
+<<<<<<< HEAD
         // Preload Humanoid Spine Assets (Spineboy)
         (this.load as any).spineJson('humanoid-data', 'assets/spine/humanoid/spineboy-pro.json');
         (this.load as any).spineAtlas('humanoid-atlas', 'assets/spine/humanoid/spineboy-pma.atlas');
+=======
+        // Preload Chibi Knight Sprites
+        const states = ['idle', 'run', 'attack', 'hurt', 'die'];
+        states.forEach(state => {
+            const capitalizedState = state.charAt(0).toUpperCase() + state.slice(1);
+            for (let i = 0; i < 8; i++) {
+                const frameNum = i.toString().padStart(3, '0');
+                const key = `chibi_${state}_${i}`;
+                const path = `assets/chibi_knight/${state}/2D_KNIGHT__${capitalizedState}_${frameNum}.png`;
+                this.load.image(key, path);
+            }
+        });
+
+        // Jump special cases
+        this.load.image('chibi_jump_up', 'assets/chibi_knight/jump/2D_KNIGHT__Jump_Up_000.png');
+        this.load.image('chibi_fall_down', 'assets/chibi_knight/jump/2D_KNIGHT__Fall_Down_000.png');
+>>>>>>> e625d2b (added chici knight test sprites)
     }
 
     private p1Config: any;
@@ -104,6 +122,25 @@ export class GameScene extends Phaser.Scene {
             frameRate: 10,
             repeat: -1
         });
+
+        // Create Chibi Knight Animations
+        const states = ['idle', 'run', 'attack', 'hurt', 'die'];
+        states.forEach(state => {
+            const frames = [];
+            for (let i = 0; i < 8; i++) {
+                frames.push({ key: `chibi_${state}_${i}` });
+            }
+            this.anims.create({
+                key: `chibi_${state}`,
+                frames: frames,
+                frameRate: 12,
+                repeat: (state === 'idle' || state === 'run') ? -1 : 0
+            });
+        });
+
+        // Jump special cases (single frame animations)
+        this.anims.create({ key: 'chibi_jump_up', frames: [{ key: 'chibi_jump_up' }] });
+        this.anims.create({ key: 'chibi_fall_down', frames: [{ key: 'chibi_fall_down' }] });
 
         // Set background color
         this.cameras.main.setBackgroundColor('#1a1a2e');

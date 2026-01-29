@@ -63,12 +63,13 @@ export class Player extends Fighter {
         this.isAI = config.isAI || false;
         this.playerId = config.playerId || 0;
 
-        // Create player spine object (Humanoid Placeholder)
-        this.spine = (scene.add as any).spine(0, 0, 'humanoid-data', 'humanoid-atlas');
+        // Create player sprite (Phaser Dude)
+        this.sprite = scene.add.sprite(0, 0, 'dude');
 
-        // Humanoid (Spineboy) scaling and offset
-        this.spine.setScale(0.25);
-        this.spine.y = 30; // Feet position
+        // Auto-scale to fit hitbox height (60px)
+        const targetHeight = PhysicsConfig.PLAYER_HEIGHT;
+        const scale = targetHeight / this.sprite.height;
+        this.sprite.setScale(scale);
 
         this.add(this.spine);
 
@@ -213,26 +214,38 @@ export class Player extends Fighter {
     }
 
     private updateAnimation(): void {
-        if (!this.spine.animationState) return;
-
-        let animName = 'idle';
-        let loop = true;
-
         if (this.isHitStunned) {
-            animName = 'aim';
-            loop = false;
-        } else if (!this.isGrounded) {
-            animName = 'jump';
-            loop = false;
-        } else if (Math.abs(this.velocity.x) > 10) {
-            animName = 'run';
-            loop = true;
+            this.sprite.setFrame(4); // Turn frame as hit frame?
+            return;
         }
 
-        // Only set if different to avoid restarting animation every frame
-        const current = this.spine.animationState.getCurrent(0);
-        if (!current || current.animation.name !== animName) {
-            this.spine.animationState.setAnimation(0, animName, loop);
+        // Airborne
+        if (!this.isGrounded) {
+            if (this.velocity.y < 0) {
+                // Jumping
+                this.sprite.setFrame(1); // One leg up (Left)
+            } else {
+                // Falling
+                this.sprite.setFrame(6); // One leg up (Right)
+            }
+            return;
+        }
+
+        // Grounded
+        if (Math.abs(this.velocity.x) > 10) {
+            if (this.velocity.x > 0) {
+                this.sprite.anims.play('right', true);
+            } else {
+                this.sprite.anims.play('left', true);
+            }
+        } else {
+            // Idle - sideways (use directional frame)
+            if (this.facingDirection > 0) {
+                this.sprite.setFrame(5); // Right idle
+            } else {
+                this.sprite.setFrame(0); // Left idle
+            }
+            this.sprite.anims.stop();
         }
     }
 
