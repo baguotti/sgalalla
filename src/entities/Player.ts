@@ -20,8 +20,7 @@ export const PlayerState = {
 export type PlayerState = typeof PlayerState[keyof typeof PlayerState];
 
 export class Player extends Phaser.GameObjects.Container {
-    private bodyRect: Phaser.GameObjects.Rectangle;
-    private nose: Phaser.GameObjects.Rectangle;
+    private sprite: Phaser.GameObjects.Sprite;
     private velocity: Phaser.Math.Vector2;
     private acceleration: Phaser.Math.Vector2;
 
@@ -101,47 +100,14 @@ export class Player extends Phaser.GameObjects.Container {
 
         this.isAI = isAI;
 
-        // Create player body (main rectangle)
+        // Create player sprite (Phaser Dude)
+        this.sprite = scene.add.sprite(0, 0, 'dude');
+        this.sprite.setScale(1.25); // Scale to approx 40x60
+        this.add(this.sprite);
+
+        // Tint for AI distinction
         if (this.isAI) {
-            // AI Opponent Visuals (Red)
-            this.bodyRect = scene.add.rectangle(0, 0, PhysicsConfig.PLAYER_WIDTH, PhysicsConfig.PLAYER_HEIGHT, 0xe74c3c); // Red
-
-            // Add Nose (Dark Red)
-            this.nose = scene.add.rectangle(PhysicsConfig.PLAYER_WIDTH / 2, -10, 10, 10, 0xc0392b);
-            this.add(this.bodyRect);
-            this.add(this.nose);
-
-            // Add Face
-            const face = scene.add.graphics();
-            face.fillStyle(0x000000);
-            // Angry Eyes
-            face.fillCircle(-8, -10, 3);
-            face.fillCircle(8, -10, 3);
-            // Angry Eyebrows
-            face.lineStyle(2, 0x000000);
-            face.beginPath();
-            face.moveTo(-12, -14);
-            face.lineTo(-4, -10);
-            face.moveTo(4, -10);
-            face.lineTo(12, -14);
-            face.strokePath();
-            this.add(face);
-        } else {
-            // Player Visuals (Blue)
-            this.bodyRect = scene.add.rectangle(0, 0, PhysicsConfig.PLAYER_WIDTH, PhysicsConfig.PLAYER_HEIGHT, 0x4a90e2);
-            this.add(this.bodyRect);
-
-            // Add Nose
-            this.nose = scene.add.rectangle(PhysicsConfig.PLAYER_WIDTH / 2, -10, 10, 10, 0xffffff);
-            this.add(this.nose);
-
-            // Add Face
-            const face = scene.add.graphics();
-            face.fillStyle(0x000000);
-            face.fillCircle(-8, -10, 4);
-            face.fillCircle(8, -10, 4);
-            face.fillRect(-10, 5, 20, 3); // Neutral mouth
-            this.add(face);
+            this.sprite.setTint(0xff5555); // Reddish tint
         }
 
         // Create damage text
@@ -190,7 +156,7 @@ export class Player extends Phaser.GameObjects.Container {
             this.hitStunTimer -= delta;
             if (this.hitStunTimer <= 0) {
                 this.isHitStunned = false;
-                this.bodyRect.setFillStyle(0x4a90e2);
+                this.resetVisuals();
             }
             this.applyPhysics(deltaSeconds);
             return;
@@ -243,6 +209,9 @@ export class Player extends Phaser.GameObjects.Container {
         // Update facing direction
         this.updateFacing();
 
+        // Update animation
+        this.updateAnimation();
+
         // Update damage display
         this.updateDamageDisplay();
     }
@@ -259,7 +228,7 @@ export class Player extends Phaser.GameObjects.Container {
             this.recoveryTimer -= delta;
             if (this.recoveryTimer <= 0) {
                 this.isRecovering = false;
-                this.bodyRect.setFillStyle(0x4a90e2);
+                this.resetVisuals();
             }
         }
 
@@ -534,10 +503,14 @@ export class Player extends Phaser.GameObjects.Container {
         if (chargePercent >= 1) {
             // Full charge - flash rapidly
             const flash = Math.sin(this.scene.time.now / 50) > 0;
-            this.bodyRect.setFillStyle(flash ? 0xffff00 : 0x4a90e2);
+            if (flash) {
+                this.sprite.setTint(0xffff00);
+            } else {
+                this.resetVisuals();
+            }
         } else if (chargePercent > 0.5) {
             // Partial charge - tint slightly
-            this.bodyRect.setFillStyle(0x7ab0e2);
+            this.sprite.setTint(0x88ccff);
         }
     }
 
@@ -548,7 +521,7 @@ export class Player extends Phaser.GameObjects.Container {
             this.chargeGlow.clear();
         }
         // Reset body color
-        this.bodyRect.setFillStyle(0x4a90e2);
+        this.resetVisuals();
     }
 
     private startChargedAttack(attackKey: string, chargePercent: number): void {
@@ -582,7 +555,7 @@ export class Player extends Phaser.GameObjects.Container {
             this.hitTargets.clear();
 
             // Visual feedback
-            this.bodyRect.setFillStyle(0xe74c3c); // Red during attack
+            this.sprite.setTint(0xff0000); // Red during attack
         } catch (e) {
             console.warn('Unknown attack:', attackKey);
         }
@@ -603,7 +576,7 @@ export class Player extends Phaser.GameObjects.Container {
             console.warn('Ground pound attack not found');
         }
 
-        this.bodyRect.setFillStyle(0x9b59b6); // Purple for ground pound startup
+        this.sprite.setTint(0x9b59b6); // Purple for ground pound startup
     }
 
     private updateAttackState(delta: number): void {
@@ -617,7 +590,7 @@ export class Player extends Phaser.GameObjects.Container {
             this.groundPoundStartupTimer -= delta;
             this.velocity.set(0, 0); // Stay suspended
             if (this.groundPoundStartupTimer <= 0) {
-                this.bodyRect.setFillStyle(0xe74c3c); // Switch to attack color
+                this.sprite.setTint(0xff0000); // Switch to attack color
             }
             return;
         }
@@ -640,11 +613,11 @@ export class Player extends Phaser.GameObjects.Container {
 
         // Visual feedback based on phase
         if (this.currentAttack.phase === AttackPhase.STARTUP) {
-            this.bodyRect.setFillStyle(0xf39c12); // Orange during startup
+            this.sprite.setTint(0xf39c12); // Orange during startup
         } else if (this.currentAttack.phase === AttackPhase.ACTIVE) {
-            this.bodyRect.setFillStyle(0xe74c3c); // Red during active
+            this.sprite.setTint(0xff0000); // Red during active
         } else if (this.currentAttack.phase === AttackPhase.RECOVERY) {
-            this.bodyRect.setFillStyle(0x95a5a6); // Gray during recovery
+            this.sprite.setTint(0x888888); // Gray during recovery
         }
 
         if (attackComplete) {
@@ -691,7 +664,7 @@ export class Player extends Phaser.GameObjects.Container {
         this.isGroundPounding = false;
         this.currentAttack = null;
         this.deactivateHitbox();
-        this.bodyRect.setFillStyle(0x4a90e2);
+        this.resetVisuals();
 
         // Set cooldown (shorter for light attacks)
         this.attackCooldownTimer = 100;
@@ -733,8 +706,8 @@ export class Player extends Phaser.GameObjects.Container {
             }
 
             // Visual feedback - flash white
-            this.bodyRect.setFillStyle(0xffffff);
-            this.bodyRect.setAlpha(0.7);
+            this.sprite.setTint(0xffffff);
+            this.sprite.setAlpha(0.7);
         } else {
             // DIRECTIONAL DODGE - move in direction
             this.isSpotDodging = false;
@@ -759,8 +732,8 @@ export class Player extends Phaser.GameObjects.Container {
             }
 
             // Visual feedback
-            this.bodyRect.setFillStyle(0x3498db);
-            this.bodyRect.setAlpha(0.5);
+            this.sprite.setTint(0x8888ff);
+            this.sprite.setAlpha(0.5);
         }
     }
 
@@ -781,19 +754,56 @@ export class Player extends Phaser.GameObjects.Container {
         this.isDodging = false;
         this.isInvincible = false;
         this.dodgeCooldownTimer = PhysicsConfig.DODGE_COOLDOWN;
-        this.bodyRect.setFillStyle(0x4a90e2);
-        this.bodyRect.setAlpha(1);
+        this.resetVisuals();
+        this.sprite.setAlpha(1);
         this.isSpotDodging = false;
         // Running is now controlled by dodgeHeld in handleHorizontalMovement
+    }
+
+    private resetVisuals(): void {
+        this.sprite.setAlpha(1);
+        if (this.isAI) {
+            this.sprite.setTint(0xff5555);
+        } else {
+            this.sprite.clearTint();
+        }
     }
 
     private updateFacing(): void {
         if (this.velocity.x > 10) {
             this.facingDirection = 1;
-            this.nose.x = PhysicsConfig.PLAYER_WIDTH / 2;
         } else if (this.velocity.x < -10) {
             this.facingDirection = -1;
-            this.nose.x = -PhysicsConfig.PLAYER_WIDTH / 2;
+        }
+    }
+
+    private updateAnimation(): void {
+        if (this.isHitStunned) {
+            this.sprite.setFrame(4); // Turn frame as hit frame?
+            return;
+        }
+
+        // Airborne
+        if (!this.isGrounded) {
+            if (this.velocity.y < 0) {
+                // Jumping
+                this.sprite.setFrame(1); // One leg up (Left)
+            } else {
+                // Falling
+                this.sprite.setFrame(6); // One leg up (Right)
+            }
+            return;
+        }
+
+        // Grounded
+        if (Math.abs(this.velocity.x) > 10) {
+            if (this.velocity.x > 0) {
+                this.sprite.anims.play('right', true);
+            } else {
+                this.sprite.anims.play('left', true);
+            }
+        } else {
+            this.sprite.anims.play('turn', true);
         }
     }
 
@@ -921,7 +931,7 @@ export class Player extends Phaser.GameObjects.Container {
         this.deactivateHitbox();
 
         // Visual feedback
-        this.bodyRect.setFillStyle(0xffffff);
+        this.sprite.setTint(0xffffff);
     }
 
     // Platform collision handling
@@ -955,7 +965,7 @@ export class Player extends Phaser.GameObjects.Container {
                 }
 
                 if (!this.isAttacking && !this.isDodging && !this.isHitStunned) {
-                    this.bodyRect.setFillStyle(0x4a90e2);
+                    this.resetVisuals();
                 }
             }
         }
