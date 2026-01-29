@@ -1,4 +1,5 @@
-import Phaser from 'phaser';
+import 'phaser';
+import { SpinePlugin } from '@esotericsoftware/spine-phaser';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { LocalMultiplayerSetupScene } from './scenes/LocalMultiplayerSetupScene';
 import { GameScene } from './scenes/GameScene';
@@ -15,6 +16,11 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
+  plugins: {
+    scene: [
+      { key: 'spine.SpinePlugin', plugin: SpinePlugin, mapping: 'spine' }
+    ]
+  }
 };
 
 new Phaser.Game(config);

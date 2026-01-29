@@ -58,6 +58,10 @@ export class GameScene extends Phaser.Scene {
 
     preload(): void {
         this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
+
+        // Preload Spine Assets (Raptor Placeholder)
+        (this.load as any).spineJson('raptor-data', 'assets/spine/raptor/raptor-pro.json');
+        (this.load as any).spineAtlas('raptor-atlas', 'assets/spine/raptor/raptor-pma.atlas');
     }
 
     private p1Config: any;

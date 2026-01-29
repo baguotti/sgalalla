@@ -23,7 +23,7 @@ export const PlayerState = {
 export type PlayerState = typeof PlayerState[keyof typeof PlayerState];
 
 export class Player extends Fighter {
-    private sprite: Phaser.GameObjects.Sprite;
+    private spine: any; // Using any to avoid SpinePlugin type conflicts in some environments
     public physics: PlayerPhysics; // Public for debugging/GameScene access if needed
 
     // Combat system delegated to PlayerCombat
@@ -63,25 +63,25 @@ export class Player extends Fighter {
         this.isAI = config.isAI || false;
         this.playerId = config.playerId || 0;
 
-        // Create player sprite (Phaser Dude)
-        this.sprite = scene.add.sprite(0, 0, 'dude');
+        // Create player spine object (Raptor Placeholder)
+        this.spine = (scene.add as any).spine(0, 0, 'raptor-data', 'raptor-atlas');
 
-        // Auto-scale to fit hitbox height (60px)
-        const targetHeight = PhysicsConfig.PLAYER_HEIGHT;
-        const scale = targetHeight / this.sprite.height;
-        this.sprite.setScale(scale);
+        // Offset so the feet are at (0,0) in container coordinates
+        // Raptor is quite large, let's scale it down
+        this.spine.setScale(0.15);
+        this.spine.y = 30; // Move down inside container so feet align with physics bottom
 
-        this.add(this.sprite);
+        this.add(this.spine);
 
         // Visual distinction
         if (this.isAI) {
-            this.sprite.setTint(0xff5555); // Reddish tint for AI
+            this.spine.setTint(0xff5555); // Reddish tint for AI
         } else if (this.playerId === 1) {
-            this.sprite.setTint(0x55ff55); // Green tint for Player 2
+            this.spine.setTint(0x55ff55); // Green tint for Player 2
         }
 
         // Create damage text
-        this.damageText = scene.add.text(0, -40, '0%', {
+        this.damageText = scene.add.text(0, -50, '0%', {
             fontSize: '16px',
             color: '#ffffff',
             fontFamily: 'Arial',
@@ -100,14 +100,9 @@ export class Player extends Fighter {
         }
 
         // Setup input manager
-        // Default Logic: P0 gets keyboard unless explicitly disabled. P1+ gets no keyboard unless enabled.
         const defaultKeyboard = this.playerId === 0 && !this.isAI;
         const useKeyboard = config.useKeyboard !== undefined ? config.useKeyboard : defaultKeyboard;
-
         const gamepadIdx = config.gamepadIndex !== undefined ? config.gamepadIndex : (this.playerId === 0 ? null : this.playerId);
-
-        // Disable gamepad polling if we are using keyboard and no specific gamepad index is assigned
-        // This prevents "Auto-detect" (null index) from grabbing P1's controller for P2
         const enableGamepad = gamepadIdx !== null || !useKeyboard;
 
         this.inputManager = new InputManager(scene, {
@@ -140,8 +135,7 @@ export class Player extends Fighter {
         // Update Combat Component
         this.combat.update(delta);
 
-        // Handle input for combat if not stunned/disabled
-        // Logic handled inside combat.handleInput but we pass input state
+        // Handle input for combat
         this.combat.handleInput(this.currentInput);
 
         // Update Combat/Timers
@@ -167,49 +161,42 @@ export class Player extends Fighter {
     }
 
     private updateFacing(): void {
-        // Don't update facing during hit stun
-        if (this.isHitStunned) {
-            return;
-        }
+        if (this.isHitStunned) return;
 
-        // Don't update facing during attack startup/active, but allow during recovery
         if (this.isAttacking) {
             const currentAttack = this.getCurrentAttack();
             if (currentAttack && currentAttack.phase !== AttackPhase.RECOVERY) {
-                return; // Lock facing during STARTUP and ACTIVE only
+                return;
             }
         }
 
-        // Don't update facing during wall slide  
         if (this.physics.isWallSliding) {
             this.facingDirection = this.physics.wallDirection;
-            return;
-        }
-
-        // Update facing direction based on velocity
-        // Note: The sprite animations ('left' and 'right') handle the visual direction
-        if (this.velocity.x > 5) {
+        } else if (this.velocity.x > 5) {
             this.facingDirection = 1;
         } else if (this.velocity.x < -5) {
             this.facingDirection = -1;
         }
+
+        // Apply facing to spine object
+        this.spine.setScaleX(Math.abs(this.spine.scaleX) * this.facingDirection);
     }
 
     // Visual Helpers
     public setVisualTint(color: number): void {
-        this.sprite.setTint(color);
+        this.spine.setTint(color);
     }
 
     public resetVisuals(): void {
-        this.sprite.setAlpha(1);
+        this.spine.setAlpha(1);
         if (this.isAI) {
-            this.sprite.setTint(0xff5555);
+            this.spine.setTint(0xff5555);
         } else {
-            this.sprite.clearTint();
+            this.spine.clearTint();
         }
     }
 
-    // Delegated Methods for GameScene
+    // Delegated Methods
     public checkPlatformCollision(platform: Phaser.GameObjects.Rectangle, isSoft: boolean = false): void {
         this.physics.checkPlatformCollision(platform, isSoft);
     }
@@ -227,54 +214,35 @@ export class Player extends Fighter {
     }
 
     private updateAnimation(): void {
+        if (!this.spine.animationState) return;
+
+        let animName = 'idle';
+        let loop = true;
+
         if (this.isHitStunned) {
-            this.sprite.setFrame(4); // Turn frame as hit frame?
-            return;
+            animName = 'roar'; // Use roar as a reactive animation?
+            loop = false;
+        } else if (!this.isGrounded) {
+            animName = 'jump';
+            loop = false;
+        } else if (Math.abs(this.velocity.x) > 10) {
+            animName = 'walk';
+            loop = true;
         }
 
-        // Airborne
-        if (!this.isGrounded) {
-            if (this.velocity.y < 0) {
-                // Jumping
-                this.sprite.setFrame(1); // One leg up (Left)
-            } else {
-                // Falling
-                this.sprite.setFrame(6); // One leg up (Right)
-            }
-            return;
-        }
-
-        // Grounded
-        if (Math.abs(this.velocity.x) > 10) {
-            if (this.velocity.x > 0) {
-                this.sprite.anims.play('right', true);
-            } else {
-                this.sprite.anims.play('left', true);
-            }
-        } else {
-            // Idle - sideways (use directional frame)
-            if (this.facingDirection > 0) {
-                this.sprite.setFrame(5); // Right idle
-            } else {
-                this.sprite.setFrame(0); // Left idle
-            }
-            this.sprite.anims.stop();
+        // Only set if different to avoid restarting animation every frame
+        const current = this.spine.animationState.getCurrent(0);
+        if (!current || current.animation.name !== animName) {
+            this.spine.animationState.setAnimation(0, animName, loop);
         }
     }
 
     private updateDamageDisplay(): void {
         this.damageText.setText(`${Math.floor(this.damagePercent)}%`);
-
-        // Color based on damage
-        if (this.damagePercent < 50) {
-            this.damageText.setColor('#ffffff');
-        } else if (this.damagePercent < 100) {
-            this.damageText.setColor('#ffff00');
-        } else if (this.damagePercent < 150) {
-            this.damageText.setColor('#ff8800');
-        } else {
-            this.damageText.setColor('#ff0000');
-        }
+        if (this.damagePercent < 50) this.damageText.setColor('#ffffff');
+        else if (this.damagePercent < 100) this.damageText.setColor('#ffff00');
+        else if (this.damagePercent < 150) this.damageText.setColor('#ff8800');
+        else this.damageText.setColor('#ff0000');
     }
 
     setKnockback(x: number, y: number): void {
@@ -283,9 +251,7 @@ export class Player extends Fighter {
     }
 
     // Getters
-    getVelocity(): Phaser.Math.Vector2 {
-        return this.velocity;
-    }
+    getVelocity(): Phaser.Math.Vector2 { return this.velocity; }
 
     getState(): PlayerState {
         if (this.isHitStunned) return PlayerState.HIT_STUN;
@@ -298,20 +264,12 @@ export class Player extends Fighter {
         return PlayerState.AIRBORNE;
     }
 
-    getRecoveryAvailable(): boolean {
-        return this.physics.recoveryAvailable;
-    }
+    getRecoveryAvailable(): boolean { return this.physics.recoveryAvailable; }
+    getIsInvincible(): boolean { return this.isInvincible; }
+    getCurrentAttack(): Attack | null { return this.combat.currentAttack; }
 
-    getIsInvincible(): boolean {
-        return this.isInvincible;
-    }
-
-    getCurrentAttack(): Attack | null {
-        return this.combat.currentAttack;
-    }
-
-    public get spriteObject(): Phaser.GameObjects.Sprite {
-        return this.sprite;
+    public get spriteObject(): any {
+        return this.spine;
     }
 
     getBounds(): Phaser.Geom.Rectangle {
@@ -327,19 +285,14 @@ export class Player extends Fighter {
         return this.inputManager.isGamepadConnected();
     }
 
-    // Simple AI Implementation -> Delegated to PlayerAI
     private updateAI(delta: number): void {
         if (!this.ai) return;
         this.aiInput = this.ai.update(delta);
     }
 
-    // Inherited from Fighter, but we override to add specific logic or keep implementation
     public applyHitStun(): void {
         super.applyHitStun();
-
-        // Cancel any active states
         this.isAttacking = false;
-
         if (this.combat) {
             this.combat.isCharging = false;
             this.combat.isGroundPounding = false;
@@ -347,15 +300,11 @@ export class Player extends Fighter {
             this.combat.deactivateHitbox();
         }
         this.isDodging = false;
-
-        // Reset visuals (clears attack tints)
         this.resetVisuals();
-        // Flash white for hit feedback
-        this.sprite.setTintFill(0xffffff);
+        this.spine.setTintFill(0xffffff);
     }
 
     public respawn(): void {
-        // Reset state
         this.velocity.set(0, 0);
         this.physics.acceleration.set(0, 0);
         this.damagePercent = 0;
@@ -364,6 +313,7 @@ export class Player extends Fighter {
         this.resetVisuals();
         this.physics.resetOnGround();
     }
+
     public addToCameraIgnore(camera: Phaser.Cameras.Scene2D.Camera): void {
         camera.ignore(this);
         if (this.damageText) {
@@ -372,7 +322,7 @@ export class Player extends Fighter {
     }
 
     destroy(fromScene?: boolean): void {
-        this.inputManager.destroy();
+        if (this.inputManager) this.inputManager.destroy();
         super.destroy(fromScene);
     }
 }
