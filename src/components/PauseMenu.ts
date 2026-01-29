@@ -135,6 +135,19 @@ export class PauseMenu {
             itemText.setScrollFactor(0);
             itemText.setDepth(1001);
             itemText.setVisible(false);
+            itemText.setInteractive({ useHandCursor: true });
+
+            itemText.on('pointerover', () => {
+                this.mainSelectedIndex = index;
+                this.updateSelection();
+            });
+
+            itemText.on('pointerdown', () => {
+                this.mainSelectedIndex = index;
+                this.updateSelection();
+                this.selectOption();
+            });
+
             this.mainMenuItems.push(itemText);
         });
 
@@ -151,6 +164,12 @@ export class PauseMenu {
         resText.setScrollFactor(0);
         resText.setDepth(1001);
         resText.setVisible(false);
+        resText.setInteractive({ useHandCursor: true });
+        resText.on('pointerdown', () => {
+            this.settingsSelectedIndex = SettingsOption.RESOLUTION;
+            this.updateSelection();
+            this.cycleResolution(1);
+        });
         this.settingsMenuItems.push(resText);
 
         // 2. Fullscreen
@@ -163,6 +182,12 @@ export class PauseMenu {
         fsText.setScrollFactor(0);
         fsText.setDepth(1001);
         fsText.setVisible(false);
+        fsText.setInteractive({ useHandCursor: true });
+        fsText.on('pointerdown', () => {
+            this.settingsSelectedIndex = SettingsOption.FULLSCREEN;
+            this.updateSelection();
+            this.toggleFullscreen();
+        });
         this.settingsMenuItems.push(fsText);
 
         // 3. Zoom
@@ -175,6 +200,12 @@ export class PauseMenu {
         zoomText.setScrollFactor(0);
         zoomText.setDepth(1001);
         zoomText.setVisible(false);
+        zoomText.setInteractive({ useHandCursor: true });
+        zoomText.on('pointerdown', () => {
+            this.settingsSelectedIndex = SettingsOption.ZOOM;
+            this.updateSelection();
+            this.cycleZoom(1);
+        });
         this.settingsMenuItems.push(zoomText);
 
         // 4. Back
@@ -187,6 +218,11 @@ export class PauseMenu {
         backText.setScrollFactor(0);
         backText.setDepth(1001);
         backText.setVisible(false);
+        backText.setInteractive({ useHandCursor: true });
+        backText.on('pointerdown', () => {
+            this.menuState = 'MAIN';
+            this.showMainMenu();
+        });
         this.settingsMenuItems.push(backText);
 
 
@@ -450,7 +486,7 @@ export class PauseMenu {
                 this.scene.events.emit('pauseMenuRestart');
                 break;
             case MenuOption.EXIT:
-                console.log('Exit to menu - Not yet implemented');
+                this.scene.events.emit('pauseMenuExit');
                 break;
         }
     }

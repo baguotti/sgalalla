@@ -64,34 +64,73 @@ export class GamepadInput {
     private previousState: GamepadState;
     private gamepadIndex: number | null = null;
 
-    constructor() {
+    private gamepadConnectedListener: (e: GamepadEvent) => void;
+    private gamepadDisconnectedListener: (e: GamepadEvent) => void;
+
+    constructor(targetIndex: number | null = null) {
         this.previousState = this.createEmptyState();
 
-        // Listen for gamepad connections
-        window.addEventListener('gamepadconnected', (e) => {
-            console.log(`Gamepad connected: ${e.gamepad.id}`);
-            this.gamepadIndex = e.gamepad.index;
-        });
+        // If a specific index is requested, set it immediately
+        if (targetIndex !== null) {
+            this.gamepadIndex = targetIndex;
+            console.log(`GamepadInput initialized for fixed index: ${targetIndex}`);
+        }
 
-        window.addEventListener('gamepaddisconnected', (e) => {
+        // Define listeners
+        this.gamepadConnectedListener = (e: GamepadEvent) => {
+            // If we are looking for a specific index, ignore others
+            if (targetIndex !== null) {
+                if (e.gamepad.index === targetIndex) {
+                    console.log(`Target Gamepad connected: ${e.gamepad.id} (Index: ${targetIndex})`);
+                    this.gamepadIndex = targetIndex;
+                }
+                return;
+            }
+
+            // Legacy behavior: grab first available
+            console.log(`Gamepad connected: ${e.gamepad.id}`);
+            if (this.gamepadIndex === null) {
+                this.gamepadIndex = e.gamepad.index;
+            }
+        };
+
+        this.gamepadDisconnectedListener = (e: GamepadEvent) => {
             console.log(`Gamepad disconnected: ${e.gamepad.id}`);
             if (this.gamepadIndex === e.gamepad.index) {
-                this.gamepadIndex = null;
+                if (targetIndex === null) {
+                    this.gamepadIndex = null;
+                }
             }
-        });
+        };
+
+        // Add listeners
+        window.addEventListener('gamepadconnected', this.gamepadConnectedListener);
+        window.addEventListener('gamepaddisconnected', this.gamepadDisconnectedListener);
 
         // Check for already-connected gamepads
         const gamepads = navigator.getGamepads();
-        for (let i = 0; i < gamepads.length; i++) {
-            if (gamepads[i]) {
-                this.gamepadIndex = i;
-                console.log(`Found existing gamepad: ${gamepads[i]!.id}`);
-                break;
+        if (targetIndex !== null) {
+            if (gamepads[targetIndex]) {
+                this.gamepadIndex = targetIndex;
+                console.log(`Found existing target gamepad: ${gamepads[targetIndex]!.id}`);
+            }
+        } else {
+            for (let i = 0; i < gamepads.length; i++) {
+                if (gamepads[i]) {
+                    this.gamepadIndex = i;
+                    console.log(`Found existing gamepad: ${gamepads[i]!.id}`);
+                    break;
+                }
             }
         }
     }
 
-    private createEmptyState(): GamepadState {
+    public destroy(): void {
+        window.removeEventListener('gamepadconnected', this.gamepadConnectedListener);
+        window.removeEventListener('gamepaddisconnected', this.gamepadDisconnectedListener);
+    }
+
+    public createEmptyState(): GamepadState {
         return {
             moveX: 0,
             moveY: 0,

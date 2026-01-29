@@ -522,4 +522,22 @@ export class PlayerPhysics {
         this.wallTouchesExhausted = false;
         this.droppingThroughPlatform = null;
     }
+
+    public reset(): void {
+        if (this.player.body) {
+            this.player.body.velocity.x = 0;
+            this.player.body.velocity.y = 0;
+        }
+        this.acceleration.set(0, 0);
+        this.isGrounded = false;
+        this.jumpsRemaining = 2;
+        this.airActionCounter = 0;
+        this.isFastFalling = false;
+        this.isWallSliding = false;
+        this.wallTouchesExhausted = false;
+        this.droppingThroughPlatform = null;
+        this.recoveryAvailable = true;
+        this.dodgeTimer = 0;
+        this.dodgeCooldownTimer = 0;
+    }
 }

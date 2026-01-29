@@ -1,21 +1,17 @@
 import Phaser from 'phaser';
-import { Player } from '../entities/Player';
-import { TrainingDummy } from '../entities/TrainingDummy';
+import { Player, PlayerState } from '../entities/Player';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
 
 export class GameScene extends Phaser.Scene {
-    private player!: Player;
-    private trainingDummy: TrainingDummy | null = null;
-    private opponent: Player | null = null;
+    private player1!: Player;
+    private player2!: Player;
     private debugOverlay!: DebugOverlay;
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
     private background!: Phaser.GameObjects.Graphics;
     private walls: Phaser.GameObjects.Rectangle[] = [];
     private wallTexts: Phaser.GameObjects.Text[] = [];
-
-    private toggleKey!: Phaser.Input.Keyboard.Key;
 
     // Debug visibility
     private debugVisible: boolean = true;
@@ -64,6 +60,25 @@ export class GameScene extends Phaser.Scene {
         this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
     }
 
+    private p1Config: any;
+    private p2Config: any;
+
+    init(data: any): void {
+        this.p1Config = data.p1;
+        this.p2Config = data.p2;
+
+        // Fallback defaults if no data passed (e.g. direct load or reload)
+        if (!this.p1Config) {
+            this.p1Config = { playerId: 0, gamepadIndex: 0, useKeyboard: false };
+        }
+        if (!this.p2Config) {
+            this.p2Config = { playerId: 1, gamepadIndex: null, useKeyboard: true };
+        }
+
+        // Register shutdown handler
+        this.events.once('shutdown', this.shutdown, this);
+    }
+
     create(): void {
         // Create animations
         this.anims.create({
@@ -90,13 +105,26 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.setBackgroundColor('#1a1a2e');
 
         // Create stage platforms
+        // Create stage platforms
         this.createStage();
 
-        // Create player
-        this.player = new Player(this, 300, 200);
+        // Create Player 1 (Left Spawn)
+        this.player1 = new Player(this, 300, 200, {
+            playerId: 0,
+            gamepadIndex: this.p1Config.gamepadIndex,
+            useKeyboard: this.p1Config.useKeyboard
+        });
 
-        // Create training dummy
-        this.trainingDummy = new TrainingDummy(this, 500, 200);
+        // Create Player 2 (Right Spawn)
+        this.player2 = new Player(this, 980, 200, {
+            playerId: 1,
+            gamepadIndex: this.p2Config.gamepadIndex,
+            useKeyboard: this.p2Config.useKeyboard
+        });
+        // Ensure P2 faces left initially
+        // (Player class handles facing based on velocity, but visual start?)
+        this.player2.setState(PlayerState.AIRBORNE); // Just to ensure update runs
+
 
         // Setup cameras
         this.setupCameras();
@@ -113,7 +141,6 @@ export class GameScene extends Phaser.Scene {
         this.createKillCounter();
 
         // Toggle key
-        this.toggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
         this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F3);
         this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
@@ -124,6 +151,10 @@ export class GameScene extends Phaser.Scene {
         // Pause menu event listeners
         this.events.on('pauseMenuResume', () => this.togglePause());
         this.events.on('pauseMenuRestart', () => this.restartMatch());
+        this.events.on('pauseMenuExit', () => {
+            // Force a reload to ensure clean state and avoid memory leaks
+            window.location.reload();
+        });
     }
 
     private setupCameras(): void {
@@ -150,9 +181,9 @@ export class GameScene extends Phaser.Scene {
         if (this.wallTexts.length > 0) this.uiCamera.ignore(this.wallTexts);
 
         // Ignore entities (and their damage text)
-        if (this.player) this.player.addToCameraIgnore(this.uiCamera);
-        if (this.trainingDummy) this.trainingDummy.addToCameraIgnore(this.uiCamera);
-        if (this.opponent) this.opponent.addToCameraIgnore(this.uiCamera);
+        // Ignore entities (and their damage text)
+        if (this.player1) this.player1.addToCameraIgnore(this.uiCamera);
+        if (this.player2) this.player2.addToCameraIgnore(this.uiCamera);
     }
 
     /**
@@ -289,204 +320,101 @@ export class GameScene extends Phaser.Scene {
         // Handle Debug Toggle (F3)
         if (Phaser.Input.Keyboard.JustDown(this.debugToggleKey)) {
             this.debugVisible = !this.debugVisible;
-            // No visual indicator needed - the debug info itself shows/hides
         }
 
-        // Handle Toggle
-        if (Phaser.Input.Keyboard.JustDown(this.toggleKey)) {
-            if (this.trainingDummy) {
-                // Switch to Opponent
-                const x = this.trainingDummy.x;
-                const y = this.trainingDummy.y;
-                this.trainingDummy.destroy();
-                this.trainingDummy = null;
+        // Update players
+        if (this.player1) this.player1.update(delta);
+        if (this.player2) this.player2.update(delta);
 
-                this.opponent = new Player(this, x, y, true);
-                // Important: Exclude new opponent from UI camera
-                if (this.uiCamera) this.opponent.addToCameraIgnore(this.uiCamera);
-                // isAI handled in constructor now
-                // (Already handled in constructor based on isAI, but we set isAI after construction)
-                // Wait, constructor checks isAI. We need to set it BEFORE adding children?
-                // Actually Player constructor calls super() then adds visuals.
-                // We should pass isAI in constructor or have an init method.
-                // OR simpler: Just recreate visuals.
-                // For now, let's assume I need to pass it or set it.
-                // Hack: Set it then call a setup method? Or modify Player constructor?
-                // I modified Player constructor to check `this.isAI`.
-                // But `this.isAI` is false by default.
-                // Modify Player constructor to create visuals AFTER? Or pass config?
-                // Since I can't easily change constructor signature without breaking calls,
-                // I'll destroy the opponent and recreate with a flag? or just recreate visuals?
-                // Actually, I can just destroy the visuals in opponent and re-run visual setup? 
-                // OR simpler: make `isAI` false default, then I set it to true.
-                // But visuals are created in constructor.
-                // FIX: I will destroy the opponent created above? No.
-                // I should assume I need to edit Player constructor or add `initAI()` method.
-                // Let's add `configureAsAI()` to Player.ts?
-                // No, I'll just edit Player to check a static flag or pass a param. 
-                // Actually I can't easily change Player constructor now without breaking other things.
-
-                // Let's fix this properly: 
-                // I'll overwrite the visuals manually here for now, or assume I will fix Player later.
-                // Better: I will use a different approach. I'll just modify Player.ts to have a public `setAI()` method that rebuilds visuals.
-            } else if (this.opponent) {
-                // Switch to Dummy
-                const x = this.opponent.x;
-                const y = this.opponent.y;
-                this.opponent.destroy();
-                this.opponent = null;
-
-                this.trainingDummy = new TrainingDummy(this, x, y);
-                // Important: Exclude new dummy from UI camera
-                if (this.uiCamera) this.trainingDummy.addToCameraIgnore(this.uiCamera);
-            }
-        }
-
-        // Update player
-        this.player.update(delta);
-
-        // Update Camera
-        this.updateCamera();
-
-        // Update Entity (Dummy or Opponent)
-        if (this.trainingDummy) {
-            this.trainingDummy.update(delta);
-
-            // Check collisions FIRST to establish grounded state
-            // Check collisions with main platforms
-            for (const platform of this.platforms) {
-                this.trainingDummy.checkPlatformCollision(platform, false);
-            }
-            // Check collisions with soft platforms
-            for (const platform of this.softPlatforms) {
-                this.trainingDummy.checkPlatformCollision(platform, true);
-            }
-
-            // Wall collision for training dummy (using bounds)
-            this.trainingDummy.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
-
-            // Then check hits
-            this.player.checkHitAgainst(this.trainingDummy as any);
-        } else if (this.opponent) {
-            // Update opponent
-            this.opponent.update(delta);
-            this.opponent.physics.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
-
-            // Opponent Platform Collision
-            for (const platform of this.platforms) this.opponent.checkPlatformCollision(platform, false);
-            for (const platform of this.softPlatforms) this.opponent.checkPlatformCollision(platform, true);
-
-            // Hits
-            this.player.checkHitAgainst(this.opponent);
-            this.opponent.checkHitAgainst(this.player);
-
-            // Hits
-            this.player.checkHitAgainst(this.opponent);
-            this.opponent.checkHitAgainst(this.player);
-
-            // Respawn opponent if out of bounds
-            if (this.opponent.y > this.BLAST_ZONE_BOTTOM) {
-                this.respawnPlayer(this.opponent, false);
-            }
-        }
-
-        // Check Player Wall Collision
-        this.player.physics.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
-
-        // Player Platform Collision
+        // Platform Collisions
         for (const platform of this.platforms) {
-            this.player.checkPlatformCollision(platform, false);
+            if (this.player1) this.player1.checkPlatformCollision(platform, false);
+            if (this.player2) this.player2.checkPlatformCollision(platform, false);
         }
         for (const platform of this.softPlatforms) {
-            this.player.checkPlatformCollision(platform, true);
+            if (this.player1) this.player1.checkPlatformCollision(platform, true);
+            if (this.player2) this.player2.checkPlatformCollision(platform, true);
         }
 
-        // Check edge grab for player
-        // const platformData = [
-        //    ...this.platforms.map(p => ({ rect: p, isSoft: false })),
-        //    ...this.softPlatforms.map(p => ({ rect: p, isSoft: true }))
-        // ];
-        // this.player.physics.checkLedgeGrab(platformData); // Call if needed
+        // Environment Collisions (Walls)
+        if (this.player1) this.player1.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
+        if (this.player2) this.player2.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
+
+        // Combat Hit Checks
+        if (this.player1 && this.player2) {
+            this.player1.checkHitAgainst(this.player2);
+            this.player2.checkHitAgainst(this.player1);
+        }
 
         // Check Blast Zones
         this.checkBlastZones();
 
-        // Update debug overlay
-        const velocity = this.player.getVelocity();
-        const currentAttack = this.player.getCurrentAttack();
-        const attackInfo = currentAttack
-            ? `${currentAttack.data.type} ${currentAttack.data.direction} (${currentAttack.phase})`
-            : 'None';
+        // Camera Follow
+        this.updateCamera();
 
-        if (this.debugVisible) {
-            this.debugOverlay.update(
-                velocity.x,
-                velocity.y,
-                this.player.getState(),
-                this.player.getRecoveryAvailable(),
-                attackInfo,
-                this.player.isGamepadConnected()
-            );
-            this.debugOverlay.setVisible(true);
-            this.controlsHintText.setVisible(true);
-        } else {
-            this.debugOverlay.setVisible(false);
-            this.controlsHintText.setVisible(false);
+        // Update debug overlay (Showing P1 stats for now)
+        if (this.player1) {
+            const velocity = this.player1.getVelocity();
+            const currentAttack = this.player1.getCurrentAttack();
+            const attackInfo = currentAttack
+                ? `${currentAttack.data.type} ${currentAttack.data.direction} (${currentAttack.phase})`
+                : 'None';
+
+            if (this.debugVisible) {
+                this.debugOverlay.update(
+                    velocity.x,
+                    velocity.y,
+                    this.player1.getState(),
+                    this.player1.getRecoveryAvailable(),
+                    attackInfo,
+                    this.player1.isGamepadConnected()
+                );
+                this.debugOverlay.setVisible(true);
+                this.controlsHintText.setVisible(true);
+            } else {
+                this.debugOverlay.setVisible(false);
+                this.controlsHintText.setVisible(false);
+            }
         }
     }
 
     private checkBlastZones(): void {
-        // Check player
-        const playerBounds = this.player.getBounds();
-        if (playerBounds.left < this.BLAST_ZONE_LEFT ||
-            playerBounds.right > this.BLAST_ZONE_RIGHT ||
-            playerBounds.top < this.BLAST_ZONE_TOP ||
-            playerBounds.bottom > this.BLAST_ZONE_BOTTOM) {
+        const checkPlayer = (player: Player, isP1: boolean) => {
+            const bounds = player.getBounds();
+            if (bounds.left < this.BLAST_ZONE_LEFT ||
+                bounds.right > this.BLAST_ZONE_RIGHT ||
+                bounds.top < this.BLAST_ZONE_TOP ||
+                bounds.bottom > this.BLAST_ZONE_BOTTOM) {
 
-            // Player was eliminated - opponent gets a kill
-            if (this.opponent) {
-                this.opponentKills++;
+                // Player eliminated
+                this.respawnPlayer(player, isP1);
+
+                // Score update
+                if (isP1) {
+                    this.opponentKills++;
+                } else {
+                    this.playerKills++;
+                }
                 this.updateKillCounter();
             }
-            this.respawnPlayer(this.player, true);
-        }
+        };
 
-        // Check opponent
-        if (this.opponent) {
-            const opponentBounds = this.opponent.getBounds();
-            if (opponentBounds.left < this.BLAST_ZONE_LEFT ||
-                opponentBounds.right > this.BLAST_ZONE_RIGHT ||
-                opponentBounds.top < this.BLAST_ZONE_TOP ||
-                opponentBounds.bottom > this.BLAST_ZONE_BOTTOM) {
-
-                // Opponent was eliminated - player gets a kill
-                this.playerKills++;
-                this.updateKillCounter();
-                this.respawnPlayer(this.opponent, false);
-            }
-        }
-
-        // Check training dummy (no kill tracking, just respawn)
-        if (this.trainingDummy) {
-            const dummyBounds = this.trainingDummy.getBounds();
-            if (dummyBounds.left < this.BLAST_ZONE_LEFT ||
-                dummyBounds.right > this.BLAST_ZONE_RIGHT ||
-                dummyBounds.top < this.BLAST_ZONE_TOP ||
-                dummyBounds.bottom > this.BLAST_ZONE_BOTTOM) {
-
-                this.respawnPlayer(this.trainingDummy as any, false);
-            }
-        }
+        if (this.player1) checkPlayer(this.player1, true);
+        if (this.player2) checkPlayer(this.player2, false);
     }
 
-    private respawnPlayer(entity: Player | TrainingDummy, isPlayer: boolean): void {
+    private respawnPlayer(player: Player, isP1: boolean): void {
         // Respawn position
-        const spawnX = isPlayer ? 300 : 500;
+        // P1 defaults to left (300), P2 defaults to right (980)
+        const spawnX = isP1 ? 300 : 980;
         const spawnY = 200;
 
-        entity.x = spawnX;
-        entity.y = spawnY;
-        entity.damagePercent = 0;
+        // Reset physics and state
+        player.setPosition(spawnX, spawnY);
+        player.physics.reset();
+        player.setState(PlayerState.AIRBORNE);
+        player.setDamage(0);
+        player.resetVisuals();
 
         // Visual respawn effect (flash)
         const flash = this.add.graphics();
@@ -511,9 +439,8 @@ export class GameScene extends Phaser.Scene {
 
     private updateCamera(): void {
         const targets: Phaser.GameObjects.Components.Transform[] = [];
-        if (this.player) targets.push(this.player);
-        if (this.trainingDummy) targets.push(this.trainingDummy);
-        if (this.opponent) targets.push(this.opponent);
+        if (this.player1) targets.push(this.player1);
+        if (this.player2) targets.push(this.player2);
 
         if (targets.length === 0) return;
 
@@ -584,14 +511,11 @@ export class GameScene extends Phaser.Scene {
 
     private restartMatch(): void {
         // Reset player positions and damage
-        this.player.x = 300;
-        this.player.y = 200;
-        this.player.damagePercent = 0;
-
-        if (this.opponent) {
-            this.opponent.x = 500;
-            this.opponent.y = 200;
-            this.opponent.damagePercent = 0;
+        if (this.player1) {
+            this.respawnPlayer(this.player1, true);
+        }
+        if (this.player2) {
+            this.respawnPlayer(this.player2, false);
         }
 
         // Reset kill counts
@@ -602,5 +526,13 @@ export class GameScene extends Phaser.Scene {
         // Close pause menu
         this.isPaused = false;
         this.pauseMenu.hide();
+    }
+
+    // Clean up when scene is shut down (e.g. switching to menu)
+    shutdown(): void {
+        this.events.off('pauseMenuResume');
+        this.events.off('pauseMenuRestart');
+        this.events.off('pauseMenuExit');
+        this.input.keyboard?.removeAllKeys();
     }
 }

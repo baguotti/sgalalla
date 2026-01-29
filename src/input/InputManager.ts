@@ -32,12 +32,21 @@ export interface InputState {
     aimRight: boolean;
 
     // Input source
+    // Input source
     usingGamepad: boolean;
+}
+
+export interface PlayerInputConfig {
+    playerId: number;
+    useKeyboard: boolean;
+    gamepadIndex: number | null; // null = no gamepad, or auto-detect if P1? For specific P2, usually 1.
+    enableGamepad?: boolean; // Explicitly enable/disable gamepad support
 }
 
 export class InputManager {
     private scene: Phaser.Scene;
     private gamepadInput: GamepadInput;
+    private config: PlayerInputConfig;
 
     // Keyboard keys
     private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -69,10 +78,14 @@ export class InputManager {
     private xKeyWasPressed: boolean = false;
     private zKeyWasPressed: boolean = false;
 
-    constructor(scene: Phaser.Scene) {
+    constructor(scene: Phaser.Scene, config: PlayerInputConfig = { playerId: 0, useKeyboard: true, gamepadIndex: null, enableGamepad: true }) {
         this.scene = scene;
-        this.gamepadInput = new GamepadInput();
-        this.setupKeyboard();
+        this.config = { ...config, enableGamepad: config.enableGamepad !== undefined ? config.enableGamepad : true };
+        this.gamepadInput = new GamepadInput(config.gamepadIndex);
+
+        if (this.config.useKeyboard) {
+            this.setupKeyboard();
+        }
     }
 
     private setupKeyboard(): void {
@@ -104,8 +117,11 @@ export class InputManager {
      * Call this once per frame
      */
     poll(): InputState {
-        const gamepadState = this.gamepadInput.poll();
-        const keyboardState = this.pollKeyboard();
+        // Only poll gamepad if enabled
+        const gamepadState = this.config.enableGamepad ? this.gamepadInput.poll() : { ...this.gamepadInput.createEmptyState(), connected: false };
+
+        // Only poll keyboard if enabled for this player
+        const keyboardState = this.config.useKeyboard ? this.pollKeyboard() : this.createEmptyInputState();
 
         // If gamepad is connected and has input, prefer gamepad
         const usingGamepad = gamepadState.connected && this.hasGamepadInput(gamepadState);
@@ -115,6 +131,30 @@ export class InputManager {
         } else {
             return keyboardState;
         }
+    }
+
+    private createEmptyInputState(): InputState {
+        return {
+            moveLeft: false,
+            moveRight: false,
+            moveUp: false,
+            moveDown: false,
+            moveX: 0,
+            moveY: 0,
+            jump: false,
+            jumpHeld: false,
+            lightAttack: false,
+            heavyAttack: false,
+            heavyAttackHeld: false,
+            dodge: false,
+            dodgeHeld: false,
+            recovery: false,
+            aimUp: false,
+            aimDown: false,
+            aimLeft: false,
+            aimRight: false,
+            usingGamepad: false,
+        };
     }
 
     private hasGamepadInput(state: GamepadState): boolean {
@@ -132,6 +172,9 @@ export class InputManager {
     }
 
     private pollKeyboard(): InputState {
+        // Safety check if setupKeyboard wasn't called or failed
+        if (!this.cursors) return this.createEmptyInputState();
+
         const left = this.cursors.left.isDown || this.wasd.left.isDown;
         const right = this.cursors.right.isDown || this.wasd.right.isDown;
         const up = this.cursors.up.isDown || this.wasd.up.isDown;
@@ -222,5 +265,9 @@ export class InputManager {
 
     getGamepadId(): string | null {
         return this.gamepadInput.getGamepadId();
+    }
+
+    destroy(): void {
+        this.gamepadInput.destroy();
     }
 }

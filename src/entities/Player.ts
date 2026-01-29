@@ -54,10 +54,14 @@ export class Player extends Fighter {
     private ai: PlayerAI | null = null;
     private aiInput: any = {}; // Store AI generated input
 
-    constructor(scene: Phaser.Scene, x: number, y: number, isAI: boolean = false) {
+    // Player ID (0 = P1, 1 = P2, etc.)
+    public playerId: number = 0;
+
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean } = {}) {
         super(scene, x, y);
 
-        this.isAI = isAI;
+        this.isAI = config.isAI || false;
+        this.playerId = config.playerId || 0;
 
         // Create player sprite (Phaser Dude)
         this.sprite = scene.add.sprite(0, 0, 'dude');
@@ -69,9 +73,11 @@ export class Player extends Fighter {
 
         this.add(this.sprite);
 
-        // Tint for AI distinction
+        // Visual distinction
         if (this.isAI) {
-            this.sprite.setTint(0xff5555); // Reddish tint
+            this.sprite.setTint(0xff5555); // Reddish tint for AI
+        } else if (this.playerId === 1) {
+            this.sprite.setTint(0x55ff55); // Green tint for Player 2
         }
 
         // Create damage text
@@ -93,15 +99,30 @@ export class Player extends Fighter {
             this.ai = new PlayerAI(this, scene);
         }
 
-        // Setup input
-        this.setupInput();
+        // Setup input manager
+        // Default Logic: P0 gets keyboard unless explicitly disabled. P1+ gets no keyboard unless enabled.
+        const defaultKeyboard = this.playerId === 0 && !this.isAI;
+        const useKeyboard = config.useKeyboard !== undefined ? config.useKeyboard : defaultKeyboard;
+
+        const gamepadIdx = config.gamepadIndex !== undefined ? config.gamepadIndex : (this.playerId === 0 ? null : this.playerId);
+
+        // Disable gamepad polling if we are using keyboard and no specific gamepad index is assigned
+        // This prevents "Auto-detect" (null index) from grabbing P1's controller for P2
+        const enableGamepad = gamepadIdx !== null || !useKeyboard;
+
+        this.inputManager = new InputManager(scene, {
+            playerId: this.playerId,
+            useKeyboard: useKeyboard,
+            gamepadIndex: gamepadIdx,
+            enableGamepad: enableGamepad
+        });
 
         scene.add.existing(this);
     }
 
-    private setupInput(): void {
-        this.inputManager = new InputManager(this.scene);
-        this.currentInput = this.inputManager.poll();
+    public setDamage(percent: number): void {
+        this.damagePercent = percent;
+        this.updateDamageDisplay();
     }
 
     update(delta: number): void {
@@ -329,7 +350,6 @@ export class Player extends Fighter {
 
         // Reset visuals (clears attack tints)
         this.resetVisuals();
-
         // Flash white for hit feedback
         this.sprite.setTintFill(0xffffff);
     }
@@ -349,5 +369,10 @@ export class Player extends Fighter {
         if (this.damageText) {
             camera.ignore(this.damageText);
         }
+    }
+
+    destroy(fromScene?: boolean): void {
+        this.inputManager.destroy();
+        super.destroy(fromScene);
     }
 }
