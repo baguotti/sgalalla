@@ -44,6 +44,11 @@ export class PlayerCombat {
 
         if (this.player.isAttacking || this.isGroundPounding) {
             this.updateAttackState(delta);
+        } else if (this.player.physics.isRecovering) {
+            this.updateRecoveryHitbox();
+        } else {
+            // Ensure hitbox is visually removed when not in use
+            this.deactivateHitbox();
         }
     }
 
@@ -153,6 +158,15 @@ export class PlayerCombat {
         if (direction === AttackDirection.DOWN && isAerial) {
             this.clearChargeState();
             this.startGroundPound();
+            return;
+        }
+
+        // Special case: up/neutral + heavy in air = Recovery
+        if ((direction === AttackDirection.UP || direction === AttackDirection.NEUTRAL) && isAerial) {
+            this.clearChargeState();
+            // Start Recovery logic
+            this.hitTargets.clear(); // Reset hit tracking for the new move
+            this.player.physics.startRecovery();
             return;
         }
 
@@ -338,7 +352,7 @@ export class PlayerCombat {
     }
 
     public updateRecoveryHitbox(): void {
-        // Centered hitbox for recovery
+        // Centered hitbox for recovery - surrounds player (Player is 40x60)
         this.updateActiveHitbox(this.player.x, this.player.y, 60, 60);
     }
 

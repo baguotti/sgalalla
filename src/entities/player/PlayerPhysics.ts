@@ -121,19 +121,58 @@ export class PlayerPhysics {
         velocity.y += this.acceleration.y * deltaSeconds;
 
         // Apply friction
-        const friction = this.player.isAttacking ? 0.95 : PhysicsConfig.FRICTION;
+        let friction: number = PhysicsConfig.FRICTION;
+
+        // Dynamic Friction: Check momentum
+        const isHighSpeed = Math.abs(velocity.x) > PhysicsConfig.MAX_SPEED * 1.2;
+
+        if (this.isRunning || (isHighSpeed && this.player.isGrounded)) {
+            friction = PhysicsConfig.RUN_FRICTION; // Slidier when running or stopping from run
+        }
+
+        // BRAWLHALLA STYLE: Sig Charging stops momentum (Ground & Air)
+        if (this.player.combat.isCharging) {
+            friction = 0.2; // Massive friction to stop quickly
+            // Also counteract gravity to hang in air briefly (Gravity Cancel feel)
+            if (!this.player.isGrounded) {
+                velocity.y *= 0.5; // Slow down falling significantly
+            }
+        }
+        else if (this.player.isAttacking) {
+            friction = 0.95; // Slide slightly during active frames
+        }
+
+        velocity.x *= friction;
+
         velocity.x *= friction;
 
         // Clamp speed
-        velocity.x = Phaser.Math.Clamp(
-            velocity.x,
-            -PhysicsConfig.MAX_SPEED,
-            PhysicsConfig.MAX_SPEED
-        );
+        let maxSpeed = PhysicsConfig.MAX_SPEED;
+        if (this.isRunning) {
+            maxSpeed *= PhysicsConfig.RUN_SPEED_MULT;
+        }
+
+        // Only clamp if NOT dodging (dodging sets its own high velocity)
+        if (!this.player.isDodging) {
+            velocity.x = Phaser.Math.Clamp(
+                velocity.x,
+                -maxSpeed,
+                maxSpeed
+            );
+        }
 
         // Update Position
         this.player.x += velocity.x * deltaSeconds;
         this.player.y += velocity.y * deltaSeconds;
+
+        // Physics Update for Recovery State
+        if (this.isRecovering) {
+            this.recoveryTimer -= deltaSeconds * 1000;
+            if (this.recoveryTimer <= 0) {
+                this.isRecovering = false;
+                this.player.resetVisuals();
+            }
+        }
 
         // Floor collision (simplified fallback)
         if (this.player.y > 600 && velocity.y > 0) {
@@ -141,23 +180,41 @@ export class PlayerPhysics {
         }
     }
 
+    // Run State
+    public isRunning: boolean = false;
+
     private handleHorizontalMovement(input: InputState): void {
         if (this.isWallSliding) return;
         if (this.isDodging && this.isSpotDodging) return; // Spot dodge locks X
 
         // Calculate Move Force
         let moveForce = 0;
-        // Disable movement if dodging
+        // Disable movement if dodging (unless it's a directional dodge which carries momentum, implemented in startDodge)
         if (this.isDodging) return;
 
-        if (input.moveLeft) moveForce -= PhysicsConfig.MOVE_ACCEL;
-        if (input.moveRight) moveForce += PhysicsConfig.MOVE_ACCEL;
+        // Run Mechanic: Grounded + Moving + Dodge Held
+        const isMoving = input.moveLeft || input.moveRight;
+        this.isRunning = this.player.isGrounded && isMoving && input.dodgeHeld;
+
+        let accel = PhysicsConfig.MOVE_ACCEL;
+        if (this.isRunning) {
+            accel *= PhysicsConfig.RUN_ACCEL_MULT;
+        }
+
+        if (input.moveLeft) moveForce -= accel;
+        if (input.moveRight) moveForce += accel;
 
         this.acceleration.x += moveForce;
     }
 
     private handleJump(delta: number, input: InputState): void {
         if (this.isDodging) return; // No jumping while dodging
+
+        // Platform Drop: Down + Jump
+        if (input.moveDown && input.jump && this.currentPlatform) {
+            this.handlePlatformDrop();
+            return; // Skip normal jump
+        }
 
         // Jump Hold Logic
         if (input.jumpHeld) {
@@ -176,6 +233,20 @@ export class PlayerPhysics {
         if (!input.jumpHeld && this.player.velocity.y < 0 && this.player.velocity.y > PhysicsConfig.SHORT_HOP_FORCE) {
             this.player.velocity.y *= 0.5;
         }
+    }
+
+    private handlePlatformDrop(): void {
+        if (!this.currentPlatform) return;
+
+        // Initiate drop
+        this.droppingThroughPlatform = this.currentPlatform;
+        this.dropGraceTimer = PhysicsConfig.PLATFORM_DROP_GRACE_PERIOD;
+
+        // Physics updates to start falling
+        this.player.isGrounded = false;
+        this.currentPlatform = null;
+        this.player.y += 1; // Nudge down to ensure we are "in" the platform for the grace period check
+        this.player.velocity.y = 100; // Small downward push
     }
 
     public performJump(): void {
@@ -198,6 +269,26 @@ export class PlayerPhysics {
             this.jumpsRemaining--;
             this.airActionCounter++;
         }
+    }
+
+    public startRecovery(): void {
+        if (!this.recoveryAvailable) return;
+
+        this.isRecovering = true;
+        this.recoveryAvailable = false; // Consumed until grounded
+        this.recoveryTimer = PhysicsConfig.RECOVERY_DURATION;
+
+        this.player.velocity.y = PhysicsConfig.RECOVERY_FORCE_Y;
+        // Horizontal drift
+        const facing = this.player.getFacingDirection();
+        this.player.velocity.x = facing * PhysicsConfig.RECOVERY_FORCE_X;
+
+        // Reset state
+        this.isWallSliding = false;
+        this.isFastFalling = false;
+
+        // Visuals
+        this.player.setVisualTint(0x00ffff); // Cyan for recovery
     }
 
     private wallJump(): void {
@@ -232,8 +323,9 @@ export class PlayerPhysics {
 
         const hasDirectionalInput = input.moveLeft || input.moveRight;
 
-        // Spot Dodge conditions
-        const isSpotDodge = !hasDirectionalInput || (input.aimUp && !input.moveLeft && !input.moveRight);
+        // Spot Dodge conditions: No horizontal input, OR holding Up/Down without horizontal
+        // Brawlhalla: Neutral Dodge or Down Dodge = Spot Dodge
+        const isSpotDodge = !hasDirectionalInput || ((input.aimUp || input.aimDown) && !input.moveLeft && !input.moveRight);
 
         if (isSpotDodge) {
             // SPOT DODGE

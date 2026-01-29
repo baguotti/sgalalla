@@ -7,9 +7,10 @@ export const PhysicsConfig = {
   GRAVITY: 2500,
 
   // Movement - acceleration-based for responsive feel with slight slide
-  MOVE_ACCEL: 2000, // Faster acceleration
+  MOVE_ACCEL: 2400, // Faster acceleration
   FRICTION: 0.85, // Applied each frame (0.85 = 15% speed reduction per frame)
-  MAX_SPEED: 550, // Faster run speed
+  RUN_FRICTION: 0.93, // Less friction when running/stopping from run (slidier)
+  MAX_SPEED: 500, // Slightly reduced base speed (was 520)
   MAX_FALL_SPEED: 1000, // Maximum fall speed to prevent glitches
 
   // Jump mechanics
@@ -48,15 +49,15 @@ export const PhysicsConfig = {
   HEAVY_HITBOX_HEIGHT: 60,
 
   // Dodge/Dash - Brawlhalla style (fast and covers ground)
-  DODGE_DISTANCE: 280, // Distance traveled during dodge (increased for speed)
-  DODGE_DURATION: 200, // ms - shorter for snappier feel
-  DODGE_COOLDOWN: 600, // ms - slightly shorter cooldown
+  DODGE_DISTANCE: 150, // Reduced from 180 to slow down the burst
+  DODGE_DURATION: 180, // Increased from 160 for more readable timing
+  DODGE_COOLDOWN: 800, // Increased slightly to prevent spam
   DODGE_INVINCIBILITY: 150, // ms - invincibility frames
   SPOT_DODGE_DURATION: 300, // ms - spot dodge lasts slightly longer
 
   // Run mechanics (dodge kickstarts running)
-  RUN_SPEED_MULT: 2.0, // 2x faster than walking (significantly faster!)
-  RUN_ACCEL_MULT: 1.5, // Faster acceleration when running
+  RUN_SPEED_MULT: 2.25, // 2.25x faster (Fast but controllable)
+  RUN_ACCEL_MULT: 1.2, // Smoother acceleration (was 2.0) to fix abrupt transition
 
   // Damage system - Smash/Brawlhalla style (higher damage = further knockback)
   MAX_DAMAGE: 999, // Maximum damage percentage
