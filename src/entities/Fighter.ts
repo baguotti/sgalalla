@@ -5,6 +5,7 @@ import type { Damageable } from '../combat/DamageSystem';
 export abstract class Fighter extends Phaser.GameObjects.Container implements Damageable {
     public velocity: Phaser.Math.Vector2;
     public damagePercent: number = 0;
+    public lives: number = 3;
     public isGrounded: boolean = false;
 
     // Combat State

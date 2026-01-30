@@ -50,8 +50,8 @@ export class MainMenuScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Menu Items
-        const startY = 350;
-        const spacing = 60;
+        const startY = 500;
+        const spacing = 80; // Increased spacing for 1080p
 
         this.menuOptions.forEach((option, index) => {
             const text = this.add.text(width / 2, startY + (index * spacing), option.label, {
@@ -191,7 +191,7 @@ export class MainMenuScene extends Phaser.Scene {
                 this.scene.start('LocalMultiplayerSetupScene');
                 break;
             case MenuOption.SETTINGS:
-                console.log('Settings clicked');
+                this.scene.start('SettingsScene');
                 break;
             case MenuOption.ONLINE:
                 console.log('Online clicked');

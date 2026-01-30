@@ -6,7 +6,7 @@ import type { InputState } from '../input/InputManager';
 import { Fighter } from './Fighter';
 import { PlayerPhysics } from './player/PlayerPhysics';
 import { PlayerCombat } from './player/PlayerCombat';
-import { Attack, AttackPhase } from '../combat/Attack';
+import { Attack, AttackPhase, AttackType } from '../combat/Attack';
 import { PlayerAI } from './player/PlayerAI';
 
 export const PlayerState = {
@@ -23,7 +23,7 @@ export const PlayerState = {
 export type PlayerState = typeof PlayerState[keyof typeof PlayerState];
 
 export class Player extends Fighter {
-    private spine: any; // Using any to avoid SpinePlugin type conflicts in some environments
+    private sprite!: Phaser.GameObjects.Sprite;
     public physics: PlayerPhysics; // Public for debugging/GameScene access if needed
 
     // Combat system delegated to PlayerCombat
@@ -63,21 +63,22 @@ export class Player extends Fighter {
         this.isAI = config.isAI || false;
         this.playerId = config.playerId || 0;
 
-        // Create player sprite (Phaser Dude)
-        this.sprite = scene.add.sprite(0, 0, 'dude');
+        // Create player sprite (Chibi Knight)
+        // Create player sprite (Bloody Alchemist)
+        this.sprite = scene.add.sprite(0, 8, 'alchemist_idle_0');
 
-        // Auto-scale to fit hitbox height (60px)
+        // Auto-scale to fit hitbox height (90px)
         const targetHeight = PhysicsConfig.PLAYER_HEIGHT;
         const scale = targetHeight / this.sprite.height;
         this.sprite.setScale(scale);
 
-        this.add(this.spine);
+        this.add(this.sprite);
 
         // Visual distinction
         if (this.isAI) {
-            this.spine.setTint(0xff5555); // Reddish tint for AI
+            this.sprite.setTint(0xff5555); // Reddish tint for AI
         } else if (this.playerId === 1) {
-            this.spine.setTint(0x55ff55); // Green tint for Player 2
+            this.sprite.setTint(0x55ff55); // Green tint for Player 2
         }
 
         // Create damage text
@@ -179,20 +180,27 @@ export class Player extends Fighter {
         }
 
         // Apply facing to spine object
-        this.spine.setScaleX(Math.abs(this.spine.scaleX) * this.facingDirection);
+        // FlipX true means face LEFT (if original faces Right).
+        // If original faces RIGHT:
+        //   Facing 1 (Right): Flip false.
+        //   Facing -1 (Left): Flip true.
+        // User reported opposite, so trying < 0 to flip when facing LEFT.
+        this.sprite.setFlipX(this.facingDirection < 0);
     }
 
     // Visual Helpers
     public setVisualTint(color: number): void {
-        this.spine.setTint(color);
+        this.sprite.setTint(color);
     }
 
     public resetVisuals(): void {
-        this.spine.setAlpha(1);
+        this.sprite.setAlpha(1);
         if (this.isAI) {
-            this.spine.setTint(0xff5555);
+            this.sprite.setTint(0xff5555);
+        } else if (this.playerId === 1) {
+            this.sprite.setTint(0x55ff55);
         } else {
-            this.spine.clearTint();
+            this.sprite.clearTint();
         }
     }
 
@@ -215,7 +223,19 @@ export class Player extends Fighter {
 
     private updateAnimation(): void {
         if (this.isHitStunned) {
-            this.sprite.setFrame(4); // Turn frame as hit frame?
+            this.sprite.anims.play('alchemist_hurt', true);
+            return;
+        }
+
+        if (this.isAttacking) {
+            const currentAttack = this.getCurrentAttack();
+            // Loop attack animation if active, otherwise maybe specific frame?
+            // Use Kick for Heavy attacks
+            if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
+                this.sprite.anims.play('alchemist_kick', true);
+            } else {
+                this.sprite.anims.play('alchemist_attack', true);
+            }
             return;
         }
 
@@ -223,39 +243,38 @@ export class Player extends Fighter {
         if (!this.isGrounded) {
             if (this.velocity.y < 0) {
                 // Jumping
-                this.sprite.setFrame(1); // One leg up (Left)
+                this.sprite.anims.play('alchemist_jump', true);
             } else {
                 // Falling
-                this.sprite.setFrame(6); // One leg up (Right)
+                this.sprite.anims.play('alchemist_fall', true);
             }
             return;
         }
 
         // Grounded
         if (Math.abs(this.velocity.x) > 10) {
-            if (this.velocity.x > 0) {
-                this.sprite.anims.play('right', true);
-            } else {
-                this.sprite.anims.play('left', true);
-            }
+            this.sprite.anims.play('alchemist_run', true);
         } else {
-            // Idle - sideways (use directional frame)
-            if (this.facingDirection > 0) {
-                this.sprite.setFrame(5); // Right idle
-            } else {
-                this.sprite.setFrame(0); // Left idle
-            }
-            this.sprite.anims.stop();
+            this.sprite.anims.play('alchemist_idle', true);
         }
     }
 
     private updateDamageDisplay(): void {
-        this.damageText.setText(`${Math.floor(this.damagePercent)}%`);
-        if (this.damagePercent < 50) this.damageText.setColor('#ffffff');
-        else if (this.damagePercent < 100) this.damageText.setColor('#ffff00');
-        else if (this.damagePercent < 150) this.damageText.setColor('#ff8800');
-        else this.damageText.setColor('#ff0000');
+        const label = this.playerId === 0 ? 'P1' : 'P2';
+        this.damageText.setText(label);
+        // Color could be static or based on player ID
+        this.damageText.setColor(this.playerId === 0 ? '#3388ff' : '#00ff00');
     }
+
+    // Getters for HUD
+    public get damage(): number { return this.damagePercent; }
+    // Lives are public in Fighter, but let's add accessor if needed or just use property
+    // But GameScene expects .lives, which is on Fighter (superclass). So it should be fine if we fix the 'lives does not exist on Player' error by ensuring TS knows Player extends Fighter.
+    // However, the error 'Property lives does not exist on type Player' usually means it wasn't on Fighter when TS checked.
+    // I added it to Fighter just now. So it should be fine.
+    // But let's add explicit getters just in case or for cleaner API.
+    // actually, public lives on Fighter is enough.
+
 
     setKnockback(x: number, y: number): void {
         this.velocity.x = x;
@@ -281,7 +300,7 @@ export class Player extends Fighter {
     getCurrentAttack(): Attack | null { return this.combat.currentAttack; }
 
     public get spriteObject(): any {
-        return this.spine;
+        return this.sprite;
     }
 
     getBounds(): Phaser.Geom.Rectangle {
@@ -313,7 +332,9 @@ export class Player extends Fighter {
         }
         this.isDodging = false;
         this.resetVisuals();
-        this.spine.setTintFill(0xffffff);
+        this.resetVisuals();
+        // this.spine.setTintFill(0xffffff); // Flash white removed/handled differently
+
     }
 
     public respawn(): void {
