@@ -31,7 +31,7 @@ export class SettingsScene extends Phaser.Scene {
         // Settings Data (Visual only for now, matching defaults)
         const settings = [
             { label: 'Camera Zoom: CLOSE (Default)', value: 'zoom' },
-            { label: 'Resolution: 1920 x 1080 (Default)', value: 'res' },
+            { label: 'Resolution: 1920 x 1080 (Locked)', value: 'res_static' },
             { label: 'BACK', value: 'back' }
         ];
 
@@ -104,36 +104,35 @@ export class SettingsScene extends Phaser.Scene {
     }
 
     private selectOption(): void {
-        const selected = this.menuItems[this.selectedIndex].text;
+        // The menuItems array aligns with settings array indices.
+        // Let's use logic based on index.
 
-        if (selected === 'BACK') {
+        // Actually, let's fix the value retrieval.
+        // The text objects don't currently store the value.
+        // But map indices are stable.
+        const settings = [
+            { label: 'Camera Zoom: CLOSE (Default)', value: 'zoom' },
+            { label: 'Resolution: 1920 x 1080 (Locked)', value: 'res_static' },
+            { label: 'BACK', value: 'back' }
+        ];
+        const selectedValue = settings[this.selectedIndex].value;
+
+        console.log('SettingsScene: selectOption', selectedValue);
+
+        if (selectedValue === 'back') {
             this.goBack();
-        } else {
-            // Placeholder for changing settings
-            console.log('Setting selected:', selected);
+        } else if (selectedValue === 'zoom') {
+            // Placeholder for zoom toggle (implemented in PauseMenu, here it's just visual for now)
+            // If we want it to actually change global settings, we need a Global Config.
+            console.log('Zoom toggle requested');
+        } else if (selectedValue === 'res_static') {
+            // Do nothing
         }
     }
 
     private goBack(): void {
-        // If we came from Pause, we might need logic to return to GameScene (paused)?
-        // For now, simpler to just go to MainMenu if accessed from there.
-        // But if accessed from PauseMenu, we likely want to stop settings and resume/show pause.
-        // Let's assume for now we just switch back to MainMenu. 
-        // Wait, if we are in-game, we don't want to go to MainMenu.
-        // We can pass data to the scene or check which scene is sleeping?
-        // Actually, PauseMenu is an overlay in GameScene. 
-        // If we switch to SettingsScene *from* GameScene, GameScene will be paused/sleeping.
-
-        // Let's check if GameScene is running (paused)
-        const gameScene = this.scene.get('GameScene');
-        if (gameScene.scene.isSleeping() || gameScene.scene.isPaused()) {
-            this.scene.stop('SettingsScene');
-            this.scene.resume('GameScene'); // Resume game (which should still have PauseMenu open effectively? Or we need to re-open it?)
-            // Actually, usually Settings is an overlay too, but simpler as a separate scene.
-            // If we resume GameScene, we need to make sure PauseMenu is still showing.
-            // GameScene handles pause state.
-        } else {
-            this.scene.start('MainMenuScene');
-        }
+        this.input.keyboard?.removeAllKeys();
+        this.scene.stop();
+        this.scene.resume('MainMenuScene');
     }
 }

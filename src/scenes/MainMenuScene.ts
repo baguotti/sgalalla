@@ -190,8 +190,11 @@ export class MainMenuScene extends Phaser.Scene {
             case MenuOption.LOCAL_MULTIPLAYER:
                 this.scene.start('LocalMultiplayerSetupScene');
                 break;
+                break;
             case MenuOption.SETTINGS:
-                this.scene.start('SettingsScene');
+                this.input.keyboard?.resetKeys();
+                this.scene.pause();
+                this.scene.launch('SettingsScene');
                 break;
             case MenuOption.ONLINE:
                 console.log('Online clicked');
