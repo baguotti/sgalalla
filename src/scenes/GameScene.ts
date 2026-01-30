@@ -4,6 +4,7 @@ import { PlayerHUD } from '../ui/PlayerHUD';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
 
+
 export class GameScene extends Phaser.Scene {
     // private player1!: Player;
     // private player2!: Player;
@@ -95,6 +96,7 @@ export class GameScene extends Phaser.Scene {
                 // "0_Bloody_Alchemist_Idle_000.png"
                 const path = `assets/bloody_alchemist/${state.name}/0_Bloody_Alchemist_${state.name}_${frameNum}.png`;
                 this.load.image(key, path);
+                this.load.image('bomb', 'assets/bomb.png');
             }
         });
     }
@@ -173,7 +175,28 @@ export class GameScene extends Phaser.Scene {
         // Set background color
         this.cameras.main.setBackgroundColor('#1a1a2e');
 
-        // Create stage platforms
+
+
+        // Generate procedural Bomb texture since asset is missing
+        if (!this.textures.exists('bomb')) {
+            const graphics = this.make.graphics({ x: 0, y: 0 });
+            graphics.fillStyle(0x000000); // Black bomb
+            graphics.fillCircle(16, 16, 14); // Body
+            graphics.fillStyle(0xffffff); // Highlight
+            graphics.fillCircle(12, 12, 4);
+            // Fuse
+            graphics.lineStyle(2, 0x8B4513);
+            graphics.beginPath();
+            graphics.moveTo(16, 2);
+            graphics.lineTo(20, -5);
+            graphics.strokePath();
+            // Spark
+            graphics.fillStyle(0xffaa00);
+            graphics.fillCircle(20, -5, 2);
+
+            graphics.generateTexture('bomb', 32, 40);
+        }
+
         // Create stage platforms
         this.createStage();
 
@@ -221,6 +244,8 @@ export class GameScene extends Phaser.Scene {
         this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F3);
         this.trainingToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
         this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+
 
         // Create pause menu
         this.pauseMenu = new PauseMenu(this);
@@ -297,18 +322,18 @@ export class GameScene extends Phaser.Scene {
 
         // Main platform (centered, wide - Brawlhalla style)
         // At 1920x1080: center is x=960, place main platform lower at y=825 (550*1.5)
-        const mainPlatform = this.add.rectangle(960, 825, 1350, 45, 0x16213e); // 640->960, 550->825, 900->1350, 30->45
+        const mainPlatform = this.add.rectangle(960, 825, 1350, 45, 0x16213e);
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
 
         // Soft platform 1 (left, above main)
-        const softPlatform1 = this.add.rectangle(570, 600, 360, 24, 0x0f3460); // 380->570, 400->600, 240->360, 16->24
+        const softPlatform1 = this.add.rectangle(570, 600, 360, 24, 0x0f3460);
         softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform1.setAlpha(0.85);
         this.softPlatforms.push(softPlatform1);
 
         // Soft platform 2 (right, above main)
-        const softPlatform2 = this.add.rectangle(1350, 600, 360, 24, 0x0f3460); // 900->1350, 400->600
+        const softPlatform2 = this.add.rectangle(1350, 600, 360, 24, 0x0f3460);
         softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform2.setAlpha(0.85);
         this.softPlatforms.push(softPlatform2);
@@ -316,7 +341,7 @@ export class GameScene extends Phaser.Scene {
         // VISIBLE SIDE WALLS for wall mechanics testing
         this.walls = [];
         // Left wall
-        const leftWall = this.add.rectangle(this.WALL_LEFT_X, 540, this.WALL_THICKNESS, 1080, 0x2a3a4e); // 360->540, 720->1080
+        const leftWall = this.add.rectangle(this.WALL_LEFT_X, 540, this.WALL_THICKNESS, 1080, 0x2a3a4e);
         leftWall.setStrokeStyle(4, 0x4a6a8e);
         leftWall.setAlpha(0.6);
         leftWall.setDepth(-5);
@@ -330,8 +355,8 @@ export class GameScene extends Phaser.Scene {
         this.walls.push(rightWall);
 
         // Add wall indicators (text labels)
-        const leftWallText = this.add.text(this.WALL_LEFT_X - 12, 375, 'WALL', { // -8->-12, 250->375
-            fontSize: '18px', // 12->18
+        const leftWallText = this.add.text(this.WALL_LEFT_X - 12, 375, 'WALL', {
+            fontSize: '18px',
             color: '#8ab4f8',
             fontFamily: 'Arial',
             fontStyle: 'bold'
@@ -341,7 +366,7 @@ export class GameScene extends Phaser.Scene {
         leftWallText.setDepth(-4);
         this.wallTexts.push(leftWallText);
 
-        const rightWallText = this.add.text(this.WALL_RIGHT_X + 12, 525, 'WALL', { // +8->+12, 350->525
+        const rightWallText = this.add.text(this.WALL_RIGHT_X + 12, 525, 'WALL', {
             fontSize: '18px',
             color: '#8ab4f8',
             fontFamily: 'Arial',
@@ -363,11 +388,13 @@ export class GameScene extends Phaser.Scene {
             'Z / L - Dodge',
             'V / Shift - Recovery',
             '',
+            'NB: R to Spawn Bomb',
+            'Shift+R to Restart',
             'F3 - Toggle Debug | O - Toggle AI | T - Toggle Dummy/Opponent',
         ].join('\n');
 
-        this.controlsHintText = this.add.text(15, 750, controlsText, { // 10->15, 500->750
-            fontSize: '16px', // 10->16?
+        this.controlsHintText = this.add.text(15, 750, controlsText, {
+            fontSize: '16px',
             color: '#888888',
             fontFamily: 'Arial',
             lineSpacing: 1,
@@ -400,6 +427,9 @@ export class GameScene extends Phaser.Scene {
             this.playerHUDs.push(hud);
         });
     }
+
+
+
 
     update(_time: number, delta: number): void {
         // Handle Pause Toggle (ESC key or START button on gamepad)
@@ -513,14 +543,10 @@ export class GameScene extends Phaser.Scene {
 
         // Update HUDs
         this.playerHUDs.forEach((hud, index) => {
-            // Matching logic is brittle if players and HUDs align by index of *joined* players. 
-            // Logic in createHUDs iterates playerData, same as createPlayers (if sequential).
-            // Simpler: playerHUDs[i] corresponds to players[i] if created in same order.
             if (this.players[index]) {
                 hud.update(this.players[index].damage, this.players[index].lives);
             }
         });
-
     }
 
     private checkBlastZones(): void {
@@ -540,7 +566,6 @@ export class GameScene extends Phaser.Scene {
         };
 
         this.players.forEach(p => checkPlayer(p, p.playerId));
-
     }
 
     private respawnPlayer(player: Player, playerId: number): void {
@@ -553,7 +578,6 @@ export class GameScene extends Phaser.Scene {
         ];
         const spawn = spawnPoints[playerId] || { x: 960, y: 300 };
         const spawnX = spawn.x;
-
         const spawnY = 300;
 
         // Reset physics and state
@@ -566,7 +590,7 @@ export class GameScene extends Phaser.Scene {
         // Visual respawn effect (flash)
         const flash = this.add.graphics();
         flash.fillStyle(0xffffff, 0.8);
-        flash.fillCircle(spawnX, spawnY, 75); // 50->75
+        flash.fillCircle(spawnX, spawnY, 75);
         this.tweens.add({
             targets: flash,
             alpha: 0,
@@ -582,7 +606,6 @@ export class GameScene extends Phaser.Scene {
 
     private updateCamera(): void {
         const targets: Phaser.GameObjects.Components.Transform[] = [...this.players];
-
 
         if (targets.length === 0) return;
 
@@ -655,10 +678,8 @@ export class GameScene extends Phaser.Scene {
         // Reset player positions and damage
         this.players.forEach(p => this.respawnPlayer(p, p.playerId));
 
-
         // Reset kill counts
         this.players.forEach(p => p.lives = 3);
-
 
         // Close pause menu
         this.isPaused = false;
@@ -679,7 +700,7 @@ export class GameScene extends Phaser.Scene {
             isTrainingDummy: true
         };
 
-        // Check if already exists in data (shouldn't if check passed)
+        // Check if already exists in data
         if (!this.playerData.find(pd => pd.playerId === playerId)) {
             this.playerData.push(dummyData);
         }
