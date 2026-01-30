@@ -1,8 +1,8 @@
 import 'phaser';
 import { SpinePlugin } from '@esotericsoftware/spine-phaser';
 import { MainMenuScene } from './scenes/MainMenuScene';
+import { LobbyScene } from './scenes/LobbyScene';
 import { LocalMultiplayerSetupScene } from './scenes/LocalMultiplayerSetupScene';
-import { SettingsScene } from './scenes/SettingsScene';
 import { GameScene } from './scenes/GameScene';
 import './style.css';
 
@@ -12,7 +12,10 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 1080,
   parent: 'game-container',
   backgroundColor: '#1a1a2e',
-  scene: [MainMenuScene, LocalMultiplayerSetupScene, GameScene, SettingsScene],
+  dom: {
+    createContainer: true
+  },
+  scene: [MainMenuScene, LobbyScene, LocalMultiplayerSetupScene, GameScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

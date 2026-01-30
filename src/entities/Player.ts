@@ -53,11 +53,16 @@ export class Player extends Fighter {
     public isAI: boolean = false;
     private ai: PlayerAI | null = null;
     private aiInput: any = {}; // Store AI generated input
+    public isTrainingDummy: boolean = false; // Toggle for training mode
 
     // Player ID (0 = P1, 1 = P2, etc.)
     public playerId: number = 0;
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean } = {}) {
+    // Character Type
+    public character: 'alchemist' | 'dude' = 'alchemist';
+    private animPrefix: string = 'alchemist';
+
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'alchemist' | 'dude' } = {}) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
@@ -65,7 +70,17 @@ export class Player extends Fighter {
 
         // Create player sprite (Chibi Knight)
         // Create player sprite (Bloody Alchemist)
-        this.sprite = scene.add.sprite(0, 8, 'alchemist_idle_0');
+        this.character = config.character || 'alchemist';
+        this.animPrefix = this.character;
+
+        // Create player sprite
+        // Note: dude sprite is a spritesheet 'dude', allowing frame numbers. Alchemist uses texture keys.
+        // If dude, we use 'dude' key and set frame 4 (idle).
+        if (this.character === 'dude') {
+            this.sprite = scene.add.sprite(0, 0, 'dude', 4);
+        } else {
+            this.sprite = scene.add.sprite(0, 8, 'alchemist_idle_0');
+        }
 
         // Auto-scale to fit hitbox height (90px)
         const targetHeight = PhysicsConfig.PLAYER_HEIGHT;
@@ -124,8 +139,12 @@ export class Player extends Fighter {
     update(delta: number): void {
         // Get input
         if (this.isAI) {
-            this.updateAI(delta);
-            this.currentInput = this.aiInput;
+            if (this.isTrainingDummy) {
+                this.currentInput = this.inputManager.getEmptyInput();
+            } else {
+                this.updateAI(delta);
+                this.currentInput = this.aiInput;
+            }
         } else {
             this.currentInput = this.inputManager.poll();
         }
@@ -223,18 +242,16 @@ export class Player extends Fighter {
 
     private updateAnimation(): void {
         if (this.isHitStunned) {
-            this.sprite.anims.play('alchemist_hurt', true);
+            this.playAnim('hurt', true);
             return;
         }
 
         if (this.isAttacking) {
             const currentAttack = this.getCurrentAttack();
-            // Loop attack animation if active, otherwise maybe specific frame?
-            // Use Kick for Heavy attacks
             if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
-                this.sprite.anims.play('alchemist_kick', true);
+                this.playAnim('kick', true); // Mapping Heavy to Kick for Alchemist
             } else {
-                this.sprite.anims.play('alchemist_attack', true);
+                this.playAnim('attack', true);
             }
             return;
         }
@@ -242,21 +259,41 @@ export class Player extends Fighter {
         // Airborne
         if (!this.isGrounded) {
             if (this.velocity.y < 0) {
-                // Jumping
-                this.sprite.anims.play('alchemist_jump', true);
+                this.playAnim('jump', true);
             } else {
-                // Falling
-                this.sprite.anims.play('alchemist_fall', true);
+                this.playAnim('fall', true);
             }
             return;
         }
 
         // Grounded
         if (Math.abs(this.velocity.x) > 10) {
-            this.sprite.anims.play('alchemist_run', true);
+            this.playAnim('run', true);
         } else {
-            this.sprite.anims.play('alchemist_idle', true);
+            this.playAnim('idle', true);
         }
+    }
+
+    private playAnim(key: string, ignoreIfPlaying: boolean = true): void {
+        let fullKey = `${this.animPrefix}_${key}`;
+
+        // Map generic keys to specific "dude" keys if using dude
+        if (this.character === 'dude') {
+            // Dude has limited animations: left, right, turn (idle)
+            // Mapping:
+            // run -> right/left (based on facing? sprite is flipped so always play right?)
+            // idle -> turn
+            // jump/fall -> turn (no jump anim)
+            // attack/hurt -> turn (no anims)
+
+            switch (key) {
+                case 'run': fullKey = 'right'; break; // Sprite flipping handles direction
+                case 'idle': fullKey = 'turn'; break;
+                default: fullKey = 'turn'; break;
+            }
+        }
+
+        this.sprite.anims.play(fullKey, ignoreIfPlaying);
     }
 
     private updateDamageDisplay(): void {

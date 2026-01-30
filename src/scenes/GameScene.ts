@@ -5,8 +5,9 @@ import { DebugOverlay } from '../components/DebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
 
 export class GameScene extends Phaser.Scene {
-    private player1!: Player;
-    private player2!: Player;
+    // private player1!: Player;
+    // private player2!: Player;
+
     private debugOverlay!: DebugOverlay;
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
@@ -17,11 +18,13 @@ export class GameScene extends Phaser.Scene {
     // Debug visibility
     private debugVisible: boolean = false;
     private debugToggleKey!: Phaser.Input.Keyboard.Key;
+    private trainingToggleKey!: Phaser.Input.Keyboard.Key;
     private controlsHintText!: Phaser.GameObjects.Text;
 
     // Kill tracking
-    private player1HUD!: PlayerHUD;
-    private player2HUD!: PlayerHUD;
+    // private player1HUD!: PlayerHUD;
+    // private player2HUD!: PlayerHUD;
+
 
     // Wall configuration
     private readonly WALL_THICKNESS = 45; // 30 * 1.5
@@ -96,24 +99,25 @@ export class GameScene extends Phaser.Scene {
         });
     }
 
-    private p1Config: any;
-    private p2Config: any;
+    private players: Player[] = [];
+    private playerHUDs: PlayerHUD[] = [];
+    private playerData: any[] = [];
 
     init(data: any): void {
-        this.p1Config = data.p1;
-        this.p2Config = data.p2;
-
-        // Fallback defaults if no data passed (e.g. direct load or reload)
-        if (!this.p1Config) {
-            this.p1Config = { playerId: 0, gamepadIndex: 0, useKeyboard: false };
-        }
-        if (!this.p2Config) {
-            this.p2Config = { playerId: 1, gamepadIndex: null, useKeyboard: true };
+        if (data.playerData) {
+            this.playerData = data.playerData;
+        } else {
+            // Fallback defaults
+            this.playerData = [
+                { playerId: 0, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'alchemist' },
+                { playerId: 1, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'dude' }
+            ];
         }
 
         // Register shutdown handler
         this.events.once('shutdown', this.shutdown, this);
     }
+
 
     create(): void {
         // Create animations
@@ -173,22 +177,29 @@ export class GameScene extends Phaser.Scene {
         // Create stage platforms
         this.createStage();
 
-        // Create Player 1 (Left Spawn)
-        this.player1 = new Player(this, 450, 300, { // 300, 200 -> 450, 300
-            playerId: 0,
-            gamepadIndex: this.p1Config.gamepadIndex,
-            useKeyboard: this.p1Config.useKeyboard
-        });
+        // Create Players
+        this.players = [];
+        const spawnPoints = [
+            { x: 450, y: 300 },
+            { x: 1470, y: 300 },
+            { x: 960, y: 200 },
+            { x: 960, y: 400 }
+        ];
 
-        // Create Player 2 (Right Spawn)
-        this.player2 = new Player(this, 1470, 300, { // 980, 200 -> 1470, 300
-            playerId: 1,
-            gamepadIndex: this.p2Config.gamepadIndex,
-            useKeyboard: this.p2Config.useKeyboard
+        this.playerData.forEach(pData => {
+            if (!pData.joined) return;
+
+            const spawn = spawnPoints[pData.playerId] || { x: 960, y: 300 };
+
+            const player = new Player(this, spawn.x, spawn.y, {
+                playerId: pData.playerId,
+                gamepadIndex: pData.input.gamepadIndex,
+                useKeyboard: pData.input.type === 'KEYBOARD',
+                character: pData.character
+            });
+
+            this.players.push(player);
         });
-        // Ensure P2 faces left initially
-        // (Player class handles facing based on velocity, but visual start?)
-        this.player2.setState(PlayerState.AIRBORNE); // Just to ensure update runs
 
 
         // Setup cameras
@@ -205,8 +216,10 @@ export class GameScene extends Phaser.Scene {
         // Create HUDs
         this.createHUDs();
 
+
         // Toggle key
         this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F3);
+        this.trainingToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
         this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
         // Create pause menu
@@ -219,6 +232,22 @@ export class GameScene extends Phaser.Scene {
         this.events.on('pauseMenuExit', () => {
             // Force a reload to ensure clean state and avoid memory leaks
             window.location.reload();
+        });
+        this.events.on('spawnDummy', () => {
+            this.togglePause(); // Unpause
+            if (!this.players.find(p => p.playerId === 1)) {
+                this.spawnTrainingDummy();
+            }
+        });
+
+        // Handle Resume from other scenes (e.g. Settings)
+        this.events.on('resume', () => {
+            // If we were paused (likely, since we went to settings), show the menu again
+            if (this.isPaused) {
+                this.pauseMenu.show();
+                // Ensure keys are reset to avoid sticking
+                this.input.keyboard?.resetKeys();
+            }
         });
     }
 
@@ -245,10 +274,8 @@ export class GameScene extends Phaser.Scene {
         if (this.walls.length > 0) this.uiCamera.ignore(this.walls);
         if (this.wallTexts.length > 0) this.uiCamera.ignore(this.wallTexts);
 
-        // Ignore entities (and their damage text)
-        // Ignore entities (and their damage text)
-        if (this.player1) this.player1.addToCameraIgnore(this.uiCamera);
-        if (this.player2) this.player2.addToCameraIgnore(this.uiCamera);
+        // Ignore entities
+        this.players.forEach(p => p.addToCameraIgnore(this.uiCamera));
     }
 
     /**
@@ -352,12 +379,26 @@ export class GameScene extends Phaser.Scene {
     }
 
     private createHUDs(): void {
-        this.player1HUD = new PlayerHUD(this, 100, 50, true, 'Player 1'); // Top-left for P1
-        this.player2HUD = new PlayerHUD(this, this.scale.width - 100, 50, false, 'Player 2'); // Top-right for P2
+        this.playerHUDs = [];
+        this.playerData.forEach(pData => {
+            if (!pData.joined) return;
 
-        // Make HUDs ignore main camera zoom
-        this.player1HUD.addToCameraIgnore(this.cameras.main);
-        this.player2HUD.addToCameraIgnore(this.cameras.main);
+            // Layout: P1 TL, P2 TR, P3 BL, P4 BR
+            let x = 100;
+            let y = 50;
+            let isLeft = true;
+
+            switch (pData.playerId) {
+                case 0: x = 100; y = 50; isLeft = true; break;
+                case 1: x = this.scale.width - 100; y = 50; isLeft = false; break;
+                case 2: x = 100; y = this.scale.height - 50; isLeft = true; break;
+                case 3: x = this.scale.width - 100; y = this.scale.height - 50; isLeft = false; break;
+            }
+
+            const hud = new PlayerHUD(this, x, y, isLeft, `Player ${pData.playerId + 1}`);
+            hud.addToCameraIgnore(this.cameras.main);
+            this.playerHUDs.push(hud);
+        });
     }
 
     update(_time: number, delta: number): void {
@@ -375,34 +416,67 @@ export class GameScene extends Phaser.Scene {
             return;
         }
 
-        // Handle Debug Toggle (F3)
         if (Phaser.Input.Keyboard.JustDown(this.debugToggleKey)) {
             this.debugVisible = !this.debugVisible;
         }
 
+        // Handle Training Toggle (T)
+        if (Phaser.Input.Keyboard.JustDown(this.trainingToggleKey)) {
+            // Find P2
+            const p2 = this.players.find(p => p.playerId === 1);
+
+            if (p2) {
+                if (p2.isAI) {
+                    p2.isTrainingDummy = !p2.isTrainingDummy;
+
+                    // Show floating text feedback
+                    const text = this.add.text(p2.x, p2.y - 80, p2.isTrainingDummy ? 'DUMMY MODE' : 'AI ACTIVE', {
+                        fontSize: '24px',
+                        color: p2.isTrainingDummy ? '#ffff00' : '#ff0000',
+                        fontStyle: 'bold',
+                        stroke: '#000000',
+                        strokeThickness: 4
+                    }).setOrigin(0.5);
+
+                    this.tweens.add({
+                        targets: text,
+                        y: p2.y - 120,
+                        alpha: 0,
+                        duration: 1500,
+                        onComplete: () => text.destroy()
+                    });
+                }
+            } else {
+                this.spawnTrainingDummy();
+            }
+        }
+
         // Update players
-        if (this.player1) this.player1.update(delta);
-        if (this.player2) this.player2.update(delta);
+        this.players.forEach(p => p.update(delta));
+
 
         // Platform Collisions
         for (const platform of this.platforms) {
-            if (this.player1) this.player1.checkPlatformCollision(platform, false);
-            if (this.player2) this.player2.checkPlatformCollision(platform, false);
+            this.players.forEach(p => p.checkPlatformCollision(platform, false));
         }
         for (const platform of this.softPlatforms) {
-            if (this.player1) this.player1.checkPlatformCollision(platform, true);
-            if (this.player2) this.player2.checkPlatformCollision(platform, true);
+            this.players.forEach(p => p.checkPlatformCollision(platform, true));
         }
+
 
         // Environment Collisions (Walls)
-        if (this.player1) this.player1.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
-        if (this.player2) this.player2.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
+        this.players.forEach(p => p.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT));
+
 
         // Combat Hit Checks
-        if (this.player1 && this.player2) {
-            this.player1.checkHitAgainst(this.player2);
-            this.player2.checkHitAgainst(this.player1);
+        for (let i = 0; i < this.players.length; i++) {
+            for (let j = 0; j < this.players.length; j++) {
+                if (i !== j) {
+                    this.players[i].checkHitAgainst(this.players[j]);
+                }
+            }
         }
+
 
         // Check Blast Zones
         this.checkBlastZones();
@@ -411,9 +485,10 @@ export class GameScene extends Phaser.Scene {
         this.updateCamera();
 
         // Update debug overlay (Showing P1 stats for now)
-        if (this.player1) {
-            const velocity = this.player1.getVelocity();
-            const currentAttack = this.player1.getCurrentAttack();
+        if (this.players.length > 0) {
+            const displayPlayer = this.players[0]; // Always show first player
+            const velocity = displayPlayer.getVelocity();
+            const currentAttack = displayPlayer.getCurrentAttack();
             const attackInfo = currentAttack
                 ? `${currentAttack.data.type} ${currentAttack.data.direction} (${currentAttack.phase})`
                 : 'None';
@@ -422,10 +497,10 @@ export class GameScene extends Phaser.Scene {
                 this.debugOverlay.update(
                     velocity.x,
                     velocity.y,
-                    this.player1.getState(),
-                    this.player1.getRecoveryAvailable(),
+                    displayPlayer.getState(),
+                    displayPlayer.getRecoveryAvailable(),
                     attackInfo,
-                    this.player1.isGamepadConnected()
+                    displayPlayer.isGamepadConnected()
                 );
                 this.debugOverlay.setVisible(true);
                 this.controlsHintText.setVisible(true);
@@ -435,13 +510,21 @@ export class GameScene extends Phaser.Scene {
             }
         }
 
+
         // Update HUDs
-        if (this.player1) this.player1HUD.update(this.player1.damage, this.player1.lives);
-        if (this.player2) this.player2HUD.update(this.player2.damage, this.player2.lives);
+        this.playerHUDs.forEach((hud, index) => {
+            // Matching logic is brittle if players and HUDs align by index of *joined* players. 
+            // Logic in createHUDs iterates playerData, same as createPlayers (if sequential).
+            // Simpler: playerHUDs[i] corresponds to players[i] if created in same order.
+            if (this.players[index]) {
+                hud.update(this.players[index].damage, this.players[index].lives);
+            }
+        });
+
     }
 
     private checkBlastZones(): void {
-        const checkPlayer = (player: Player, isP1: boolean) => {
+        const checkPlayer = (player: Player, playerId: number) => {
             const bounds = player.getBounds();
             if (bounds.left < this.BLAST_ZONE_LEFT ||
                 bounds.right > this.BLAST_ZONE_RIGHT ||
@@ -449,25 +532,28 @@ export class GameScene extends Phaser.Scene {
                 bounds.bottom > this.BLAST_ZONE_BOTTOM) {
 
                 // Player eliminated
-                this.respawnPlayer(player, isP1);
+                this.respawnPlayer(player, playerId);
 
-                // Score update
-                if (isP1) {
-                    this.player1.lives = Math.max(0, this.player1.lives - 1);
-                } else {
-                    this.player2.lives = Math.max(0, this.player2.lives - 1);
-                }
+                // Score update (lives)
+                player.lives = Math.max(0, player.lives - 1);
             }
         };
 
-        if (this.player1) checkPlayer(this.player1, true);
-        if (this.player2) checkPlayer(this.player2, false);
+        this.players.forEach(p => checkPlayer(p, p.playerId));
+
     }
 
-    private respawnPlayer(player: Player, isP1: boolean): void {
+    private respawnPlayer(player: Player, playerId: number): void {
         // Respawn position
-        // P1 defaults to left (450), P2 defaults to right (1470)
-        const spawnX = isP1 ? 450 : 1470;
+        const spawnPoints = [
+            { x: 450, y: 300 },
+            { x: 1470, y: 300 },
+            { x: 960, y: 200 },
+            { x: 960, y: 400 }
+        ];
+        const spawn = spawnPoints[playerId] || { x: 960, y: 300 };
+        const spawnX = spawn.x;
+
         const spawnY = 300;
 
         // Reset physics and state
@@ -495,9 +581,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     private updateCamera(): void {
-        const targets: Phaser.GameObjects.Components.Transform[] = [];
-        if (this.player1) targets.push(this.player1);
-        if (this.player2) targets.push(this.player2);
+        const targets: Phaser.GameObjects.Components.Transform[] = [...this.players];
+
 
         if (targets.length === 0) return;
 
@@ -568,20 +653,79 @@ export class GameScene extends Phaser.Scene {
 
     private restartMatch(): void {
         // Reset player positions and damage
-        if (this.player1) {
-            this.respawnPlayer(this.player1, true);
-        }
-        if (this.player2) {
-            this.respawnPlayer(this.player2, false);
-        }
+        this.players.forEach(p => this.respawnPlayer(p, p.playerId));
+
 
         // Reset kill counts
-        if (this.player1) this.player1.lives = 3;
-        if (this.player2) this.player2.lives = 3;
+        this.players.forEach(p => p.lives = 3);
+
 
         // Close pause menu
         this.isPaused = false;
         this.pauseMenu.hide();
+    }
+
+    private spawnTrainingDummy(): void {
+        const playerId = 1; // Always P2 for now
+
+        // Data
+        const dummyData = {
+            playerId: playerId,
+            joined: true,
+            ready: true,
+            input: { type: 'KEYBOARD', gamepadIndex: null },
+            character: 'alchemist' as const, // Default to Alchemist
+            isAI: true,
+            isTrainingDummy: true
+        };
+
+        // Check if already exists in data (shouldn't if check passed)
+        if (!this.playerData.find(pd => pd.playerId === playerId)) {
+            this.playerData.push(dummyData);
+        }
+
+        // Spawn logic
+        const spawnX = 1470;
+        const spawnY = 300;
+
+        const player = new Player(this, spawnX, spawnY, {
+            playerId: playerId,
+            gamepadIndex: null,
+            useKeyboard: false,
+            character: 'alchemist',
+            isAI: true
+        });
+
+        player.isTrainingDummy = true;
+        this.players.push(player);
+        player.addToCameraIgnore(this.uiCamera);
+
+        // Create HUD
+        // Layout for P2 (TR)
+        const x = this.scale.width - 100;
+        const y = 50;
+        const isLeft = false;
+
+        const hud = new PlayerHUD(this, x, y, isLeft, `CPU (Dummy)`);
+        hud.addToCameraIgnore(this.cameras.main);
+        this.playerHUDs.push(hud);
+
+        // Feedback
+        const text = this.add.text(spawnX, spawnY - 80, 'DUMMY SPAWNED', {
+            fontSize: '24px',
+            color: '#ffff00',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+
+        this.tweens.add({
+            targets: text,
+            y: spawnY - 120,
+            alpha: 0,
+            duration: 1500,
+            onComplete: () => text.destroy()
+        });
     }
 
     // Clean up when scene is shut down (e.g. switching to menu)
@@ -589,6 +733,7 @@ export class GameScene extends Phaser.Scene {
         this.events.off('pauseMenuResume');
         this.events.off('pauseMenuRestart');
         this.events.off('pauseMenuExit');
+        this.events.off('spawnDummy');
         this.input.keyboard?.removeAllKeys();
     }
 }

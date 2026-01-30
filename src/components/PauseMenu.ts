@@ -3,66 +3,37 @@ import Phaser from 'phaser';
 const MenuOption = {
     RESUME: 0,
     CONTROLS: 1,
-    SETTINGS: 2,
     TRAINING: 3,
+    SPAWN_DUMMY: 6,
     RESTART: 4,
     EXIT: 5
 } as const;
 type MenuOption = typeof MenuOption[keyof typeof MenuOption];
-
-const SettingsOption = {
-    RESOLUTION: 0,
-    FULLSCREEN: 1,
-    ZOOM: 2,
-    BACK: 3
-} as const;
-type SettingsOption = typeof SettingsOption[keyof typeof SettingsOption];
-
-const Resolutions = [
-    { w: 960, h: 540, label: '960 x 540' },
-    { w: 1280, h: 720, label: '1280 x 720' },
-    { w: 1920, h: 1080, label: '1920 x 1080' }
-];
 
 export class PauseMenu {
     private scene: Phaser.Scene;
     private overlay!: Phaser.GameObjects.Graphics;
     private titleText!: Phaser.GameObjects.Text;
 
-    // Menu States
-    private menuState: 'MAIN' | 'SETTINGS' = 'MAIN';
-
     // UI Groups
     private mainMenuItems: Phaser.GameObjects.Text[] = [];
-    private settingsMenuItems: Phaser.GameObjects.Text[] = [];
 
     // Selection Trackers
     private mainSelectedIndex: number = 0;
-    private settingsSelectedIndex: number = 0;
-
-    // Settings State
-    private currentResolutionIndex: number = 1; // Default to middle (720p)
-    private isFullscreen: boolean = false;
-    private zoomLevels: ('CLOSE' | 'NORMAL' | 'WIDE')[] = ['CLOSE', 'NORMAL', 'WIDE'];
-    private currentZoomIndex: number = 0; // CLOSE index (Default)
 
     private visible: boolean = false;
 
     private menuOptions = [
         { label: 'Resume', value: MenuOption.RESUME },
         { label: 'Controls', value: MenuOption.CONTROLS },
-        { label: 'Settings', value: MenuOption.SETTINGS },
-        { label: 'Training', value: MenuOption.TRAINING },
+        { label: 'Training Options', value: MenuOption.TRAINING },
+        { label: 'Spawn Training Partner', value: MenuOption.SPAWN_DUMMY },
         { label: 'Restart Match', value: MenuOption.RESTART },
         { label: 'Exit to Menu', value: MenuOption.EXIT }
     ];
 
-    // Settings options managed dynamically due to text updates
-
     private upKey!: Phaser.Input.Keyboard.Key;
     private downKey!: Phaser.Input.Keyboard.Key;
-    private leftKey!: Phaser.Input.Keyboard.Key;
-    private rightKey!: Phaser.Input.Keyboard.Key;
     private enterKey!: Phaser.Input.Keyboard.Key;
     private escKey!: Phaser.Input.Keyboard.Key;
 
@@ -83,23 +54,10 @@ export class PauseMenu {
         this.scene = scene;
         this.createMenu();
         this.setupInput();
-
-        // Determine initial resolution index
-        const currentW = scene.scale.width;
-        // Find closest match or default
-        const idx = Resolutions.findIndex(r => r.w === currentW);
-        if (idx !== -1) {
-            this.currentResolutionIndex = idx;
-        } else {
-            // If not found, default to 720p (index 1) which is standard
-            this.currentResolutionIndex = 1;
-        }
-
-        this.isFullscreen = this.scene.scale.isFullscreen;
     }
 
     private createMenu(): void {
-        const centerX = 400; // This should be dynamic really, but kept for simplicity relative to base design
+        const centerX = 400; // Placeholder, updated in layout
 
         // Create semi-transparent overlay
         this.overlay = this.scene.add.graphics();
@@ -151,81 +109,6 @@ export class PauseMenu {
             this.mainMenuItems.push(itemText);
         });
 
-        // -- Settings Menu Items --
-        const settingsStartY = startY;
-
-        // 1. Resolution
-        const resText = this.scene.add.text(centerX, settingsStartY, `Resolution: ${Resolutions[this.currentResolutionIndex].label}`, {
-            fontSize: '32px',
-            color: '#ffffff',
-            fontFamily: 'Arial'
-        });
-        resText.setOrigin(0.5);
-        resText.setScrollFactor(0);
-        resText.setDepth(1001);
-        resText.setVisible(false);
-        resText.setInteractive({ useHandCursor: true });
-        resText.on('pointerdown', () => {
-            this.settingsSelectedIndex = SettingsOption.RESOLUTION;
-            this.updateSelection();
-            this.cycleResolution(1);
-        });
-        this.settingsMenuItems.push(resText);
-
-        // 2. Fullscreen
-        const fsText = this.scene.add.text(centerX, settingsStartY + spacing, `Fullscreen: ${this.isFullscreen ? 'ON' : 'OFF'}`, {
-            fontSize: '32px',
-            color: '#ffffff',
-            fontFamily: 'Arial'
-        });
-        fsText.setOrigin(0.5);
-        fsText.setScrollFactor(0);
-        fsText.setDepth(1001);
-        fsText.setVisible(false);
-        fsText.setInteractive({ useHandCursor: true });
-        fsText.on('pointerdown', () => {
-            this.settingsSelectedIndex = SettingsOption.FULLSCREEN;
-            this.updateSelection();
-            this.toggleFullscreen();
-        });
-        this.settingsMenuItems.push(fsText);
-
-        // 3. Zoom
-        const zoomText = this.scene.add.text(centerX, settingsStartY + spacing * 2, `Camera Zoom: NORMAL`, {
-            fontSize: '32px',
-            color: '#ffffff',
-            fontFamily: 'Arial'
-        });
-        zoomText.setOrigin(0.5);
-        zoomText.setScrollFactor(0);
-        zoomText.setDepth(1001);
-        zoomText.setVisible(false);
-        zoomText.setInteractive({ useHandCursor: true });
-        zoomText.on('pointerdown', () => {
-            this.settingsSelectedIndex = SettingsOption.ZOOM;
-            this.updateSelection();
-            this.cycleZoom(1);
-        });
-        this.settingsMenuItems.push(zoomText);
-
-        // 4. Back
-        const backText = this.scene.add.text(centerX, settingsStartY + spacing * 3, 'Back', {
-            fontSize: '32px',
-            color: '#ffffff',
-            fontFamily: 'Arial'
-        });
-        backText.setOrigin(0.5);
-        backText.setScrollFactor(0);
-        backText.setDepth(1001);
-        backText.setVisible(false);
-        backText.setInteractive({ useHandCursor: true });
-        backText.on('pointerdown', () => {
-            this.menuState = 'MAIN';
-            this.showMainMenu();
-        });
-        this.settingsMenuItems.push(backText);
-
-
         // Hint text
         this.hintText = this.scene.add.text(centerX, 550, '[ESC / START to Resume]', {
             fontSize: '18px',
@@ -251,37 +134,21 @@ export class PauseMenu {
         this.mainMenuItems.forEach((item, index) => {
             item.setPosition(centerX, startY + (index * spacing));
         });
-
-        this.settingsMenuItems.forEach((item, index) => {
-            if (index === SettingsOption.BACK) {
-                // Add extra spacing for Back button
-                item.setPosition(centerX, startY + ((this.settingsMenuItems.length - 1) * spacing) + (spacing));
-            } else {
-                item.setPosition(centerX, startY + (index * spacing));
-            }
-        });
     }
 
     private setupInput(): void {
         this.upKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
         this.downKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
-        this.leftKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
-        this.rightKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
         this.enterKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
         this.escKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     }
 
     show(): void {
         this.visible = true;
-        this.menuState = 'MAIN';
         this.mainSelectedIndex = 0;
 
         // Sync gamepad state to prevent immediate re-trigger
         this.syncGamepadState();
-
-        // Update fullscreen state in case it changed externally (F11 etc)
-        this.isFullscreen = this.scene.scale.isFullscreen;
-        this.settingsMenuItems[SettingsOption.FULLSCREEN].setText(`Fullscreen: ${this.isFullscreen ? 'ON' : 'OFF'}`);
 
         this.updateLayout();
 
@@ -289,7 +156,7 @@ export class PauseMenu {
         this.titleText.setVisible(true);
         this.hintText.setVisible(true);
 
-        this.showMainMenu();
+        this.mainMenuItems.forEach(item => item.setVisible(true));
         this.updateSelection();
     }
 
@@ -299,25 +166,6 @@ export class PauseMenu {
         this.titleText.setVisible(false);
         this.hintText.setVisible(false);
         this.mainMenuItems.forEach(item => item.setVisible(false));
-        this.settingsMenuItems.forEach(item => item.setVisible(false));
-    }
-
-    private showMainMenu(): void {
-        this.titleText.setText('PAUSED');
-        this.mainMenuItems.forEach(item => item.setVisible(true));
-        this.settingsMenuItems.forEach(item => item.setVisible(false));
-        this.updateHint('[ESC / B / START] Resume  [ENTER / A] Select');
-    }
-
-    private showSettingsMenu(): void {
-        this.titleText.setText('SETTINGS');
-        this.mainMenuItems.forEach(item => item.setVisible(false));
-        this.settingsMenuItems.forEach(item => item.setVisible(true));
-        this.updateHint('[LEFT/RIGHT / D-Pad] Change  [ENTER / A] Select  [ESC / B] Back');
-    }
-
-    private updateHint(text: string): void {
-        this.hintText.setText(text);
     }
 
     isVisible(): boolean {
@@ -326,15 +174,10 @@ export class PauseMenu {
 
     update(_delta: number): void {
         if (!this.visible) return;
-
-        if (this.menuState === 'MAIN') {
-            this.handleMainMenuInput();
-        } else {
-            this.handleSettingsInput();
-        }
+        this.handleInput();
     }
 
-    private handleMainMenuInput(): void {
+    private handleInput(): void {
         const gp = this.getGamepadInput();
 
         if (Phaser.Input.Keyboard.JustDown(this.upKey) || gp.upPressed) {
@@ -354,103 +197,9 @@ export class PauseMenu {
         }
     }
 
-    private handleSettingsInput(): void {
-        const gp = this.getGamepadInput();
-
-        // Navigation (Up/Down)
-        if (Phaser.Input.Keyboard.JustDown(this.upKey) || gp.upPressed) {
-            this.settingsSelectedIndex = (this.settingsSelectedIndex - 1 + this.settingsMenuItems.length) % this.settingsMenuItems.length;
-            this.updateSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.downKey) || gp.downPressed) {
-            this.settingsSelectedIndex = (this.settingsSelectedIndex + 1) % this.settingsMenuItems.length;
-            this.updateSelection();
-        }
-
-        // Modification (Left/Right)
-        // Modification (Left/Right)
-        if (this.settingsSelectedIndex === SettingsOption.RESOLUTION) {
-            if (Phaser.Input.Keyboard.JustDown(this.leftKey) || gp.leftPressed) {
-                this.cycleResolution(-1);
-            } else if (Phaser.Input.Keyboard.JustDown(this.rightKey) || gp.rightPressed) {
-                this.cycleResolution(1);
-            }
-        } else if (this.settingsSelectedIndex === SettingsOption.FULLSCREEN) {
-            if (Phaser.Input.Keyboard.JustDown(this.leftKey) || Phaser.Input.Keyboard.JustDown(this.rightKey) || gp.leftPressed || gp.rightPressed) {
-                this.toggleFullscreen();
-            }
-        } else if (this.settingsSelectedIndex === SettingsOption.ZOOM) {
-            if (Phaser.Input.Keyboard.JustDown(this.leftKey) || gp.leftPressed) {
-                this.cycleZoom(-1);
-            } else if (Phaser.Input.Keyboard.JustDown(this.rightKey) || gp.rightPressed) {
-                this.cycleZoom(1);
-            }
-        }
-
-        // Select / Back
-        if (Phaser.Input.Keyboard.JustDown(this.enterKey) || gp.aPressed) {
-            if (this.settingsSelectedIndex === SettingsOption.BACK) {
-                this.menuState = 'MAIN';
-                this.showMainMenu();
-            } else if (this.settingsSelectedIndex === SettingsOption.RESOLUTION) {
-                this.cycleResolution(1);
-            } else if (this.settingsSelectedIndex === SettingsOption.FULLSCREEN) {
-                this.toggleFullscreen();
-            } else if (this.settingsSelectedIndex === SettingsOption.ZOOM) {
-                this.cycleZoom(1);
-            }
-        }
-
-        if (Phaser.Input.Keyboard.JustDown(this.escKey) || gp.bPressed || gp.startPressed) {
-            this.menuState = 'MAIN';
-            this.showMainMenu();
-        }
-    }
-
-    private cycleResolution(dir: number): void {
-        this.currentResolutionIndex = (this.currentResolutionIndex + dir + Resolutions.length) % Resolutions.length;
-
-        const res = Resolutions[this.currentResolutionIndex];
-        // Resize game
-        this.scene.scale.resize(res.w, res.h);
-
-        // Update Text
-        this.settingsMenuItems[SettingsOption.RESOLUTION].setText(`Resolution: ${res.label}`);
-
-        // Re-center layout
-        this.updateLayout();
-    }
-
-    private toggleFullscreen(): void {
-        if (this.scene.scale.isFullscreen) {
-            this.scene.scale.stopFullscreen();
-            this.isFullscreen = false;
-        } else {
-            this.scene.scale.startFullscreen();
-            this.isFullscreen = true;
-        }
-        this.settingsMenuItems[SettingsOption.FULLSCREEN].setText(`Fullscreen: ${this.isFullscreen ? 'ON' : 'OFF'}`);
-    }
-
-    private cycleZoom(dir: number): void {
-        this.currentZoomIndex = (this.currentZoomIndex + dir + this.zoomLevels.length) % this.zoomLevels.length;
-        const level = this.zoomLevels[this.currentZoomIndex];
-
-        this.settingsMenuItems[SettingsOption.ZOOM].setText(`Camera Zoom: ${level}`);
-
-        // Update Scene
-        if ((this.scene as any).setZoomLevel) {
-            (this.scene as any).setZoomLevel(level);
-        }
-    }
-
-
-
     private updateSelection(): void {
-        const items = this.menuState === 'MAIN' ? this.mainMenuItems : this.settingsMenuItems;
-        const selected = this.menuState === 'MAIN' ? this.mainSelectedIndex : this.settingsSelectedIndex;
-
-        items.forEach((item, index) => {
-            if (index === selected) {
+        this.mainMenuItems.forEach((item, index) => {
+            if (index === this.mainSelectedIndex) {
                 item.setColor('#ffdd00');
                 item.setScale(1.1);
             } else {
@@ -473,14 +222,11 @@ export class PauseMenu {
             case MenuOption.CONTROLS:
                 console.log('Controls menu - Not yet implemented');
                 break;
-            case MenuOption.SETTINGS:
-                this.menuState = 'SETTINGS';
-                this.settingsSelectedIndex = 0;
-                this.showSettingsMenu();
-                this.updateSelection();
-                break;
             case MenuOption.TRAINING:
                 console.log('Training options - Not yet implemented');
+                break;
+            case MenuOption.SPAWN_DUMMY:
+                this.scene.events.emit('spawnDummy');
                 break;
             case MenuOption.RESTART:
                 this.scene.events.emit('pauseMenuRestart');
@@ -494,46 +240,30 @@ export class PauseMenu {
     private getGamepadInput() {
         const gamepads = navigator.getGamepads();
         let currentState = {
-            up: false,
-            down: false,
-            left: false,
-            right: false,
-            a: false,
-            b: false,
-            start: false
+            up: false, down: false, left: false, right: false,
+            a: false, b: false, start: false
         };
 
         for (let i = 0; i < gamepads.length; i++) {
             const gamepad = gamepads[i];
             if (gamepad) {
-                // D-pad
                 const dpadUp = gamepad.buttons[12]?.pressed || false;
                 const dpadDown = gamepad.buttons[13]?.pressed || false;
-                const dpadLeft = gamepad.buttons[14]?.pressed || false;
-                const dpadRight = gamepad.buttons[15]?.pressed || false;
-
-                // Left stick
-                const stickX = gamepad.axes[0] || 0;
+                const deadzone = 0.5;
                 const stickY = gamepad.axes[1] || 0;
-                const DEADZONE = 0.5;
 
-                currentState.up = dpadUp || stickY < -DEADZONE;
-                currentState.down = dpadDown || stickY > DEADZONE;
-                currentState.left = dpadLeft || stickX < -DEADZONE;
-                currentState.right = dpadRight || stickX > DEADZONE;
-                currentState.a = gamepad.buttons[0]?.pressed || false; // A button
-                currentState.b = gamepad.buttons[1]?.pressed || false; // B button
-                currentState.start = gamepad.buttons[9]?.pressed || false; // START button
+                currentState.up = dpadUp || stickY < -deadzone;
+                currentState.down = dpadDown || stickY > deadzone;
+                currentState.a = gamepad.buttons[0]?.pressed || false;
+                currentState.b = gamepad.buttons[1]?.pressed || false;
+                currentState.start = gamepad.buttons[9]?.pressed || false;
                 break;
             }
         }
 
-        // Detect rising edges (just pressed)
         const result = {
             upPressed: currentState.up && !this.previousGamepadState.up,
             downPressed: currentState.down && !this.previousGamepadState.down,
-            leftPressed: currentState.left && !this.previousGamepadState.left,
-            rightPressed: currentState.right && !this.previousGamepadState.right,
             aPressed: currentState.a && !this.previousGamepadState.a,
             bPressed: currentState.b && !this.previousGamepadState.b,
             startPressed: currentState.start && !this.previousGamepadState.start
@@ -546,36 +276,23 @@ export class PauseMenu {
     private syncGamepadState(): void {
         const gamepads = navigator.getGamepads();
         let currentState = {
-            up: false,
-            down: false,
-            left: false,
-            right: false,
-            a: false,
-            b: false,
-            start: false
+            up: false, down: false, left: false, right: false,
+            a: false, b: false, start: false
         };
 
         for (let i = 0; i < gamepads.length; i++) {
             const gamepad = gamepads[i];
             if (gamepad) {
-                // D-pad
                 const dpadUp = gamepad.buttons[12]?.pressed || false;
                 const dpadDown = gamepad.buttons[13]?.pressed || false;
-                const dpadLeft = gamepad.buttons[14]?.pressed || false;
-                const dpadRight = gamepad.buttons[15]?.pressed || false;
-
-                // Left stick
-                const stickX = gamepad.axes[0] || 0;
+                const deadzone = 0.5;
                 const stickY = gamepad.axes[1] || 0;
-                const DEADZONE = 0.5;
 
-                currentState.up = dpadUp || stickY < -DEADZONE;
-                currentState.down = dpadDown || stickY > DEADZONE;
-                currentState.left = dpadLeft || stickX < -DEADZONE;
-                currentState.right = dpadRight || stickX > DEADZONE;
-                currentState.a = gamepad.buttons[0]?.pressed || false; // A button
-                currentState.b = gamepad.buttons[1]?.pressed || false; // B button
-                currentState.start = gamepad.buttons[9]?.pressed || false; // START button
+                currentState.up = dpadUp || stickY < -deadzone;
+                currentState.down = dpadDown || stickY > deadzone;
+                currentState.a = gamepad.buttons[0]?.pressed || false;
+                currentState.b = gamepad.buttons[1]?.pressed || false;
+                currentState.start = gamepad.buttons[9]?.pressed || false;
                 break;
             }
         }
@@ -583,6 +300,6 @@ export class PauseMenu {
     }
 
     getElements(): Phaser.GameObjects.GameObject[] {
-        return [this.overlay, this.titleText, this.hintText, ...this.mainMenuItems, ...this.settingsMenuItems];
+        return [this.overlay, this.titleText, this.hintText, ...this.mainMenuItems];
     }
 }

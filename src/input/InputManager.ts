@@ -121,7 +121,7 @@ export class InputManager {
         const gamepadState = this.config.enableGamepad ? this.gamepadInput.poll() : { ...this.gamepadInput.createEmptyState(), connected: false };
 
         // Only poll keyboard if enabled for this player
-        const keyboardState = this.config.useKeyboard ? this.pollKeyboard() : this.createEmptyInputState();
+        const keyboardState = this.config.useKeyboard ? this.pollKeyboard() : this.getEmptyInput();
 
         // If gamepad is connected and has input, prefer gamepad
         const usingGamepad = gamepadState.connected && this.hasGamepadInput(gamepadState);
@@ -133,7 +133,7 @@ export class InputManager {
         }
     }
 
-    private createEmptyInputState(): InputState {
+    public getEmptyInput(): InputState {
         return {
             moveLeft: false,
             moveRight: false,
@@ -173,7 +173,7 @@ export class InputManager {
 
     private pollKeyboard(): InputState {
         // Safety check if setupKeyboard wasn't called or failed
-        if (!this.cursors) return this.createEmptyInputState();
+        if (!this.cursors) return this.getEmptyInput();
 
         const left = this.cursors.left.isDown || this.wasd.left.isDown;
         const right = this.cursors.right.isDown || this.wasd.right.isDown;

@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 
 const MenuOption = {
     LOCAL_MULTIPLAYER: 0,
-    SETTINGS: 1,
     ONLINE: 2,
     EXIT: 3
 } as const;
@@ -14,7 +13,6 @@ export class MainMenuScene extends Phaser.Scene {
 
     private menuOptions = [
         { label: 'LOCAL MULTIPLAYER', value: MenuOption.LOCAL_MULTIPLAYER },
-        { label: 'SETTINGS', value: MenuOption.SETTINGS },
         { label: 'ONLINE (Coming Soon)', value: MenuOption.ONLINE },
         { label: 'EXIT', value: MenuOption.EXIT }
     ];
@@ -188,13 +186,7 @@ export class MainMenuScene extends Phaser.Scene {
 
         switch (option) {
             case MenuOption.LOCAL_MULTIPLAYER:
-                this.scene.start('LocalMultiplayerSetupScene');
-                break;
-                break;
-            case MenuOption.SETTINGS:
-                this.input.keyboard?.resetKeys();
-                this.scene.pause();
-                this.scene.launch('SettingsScene');
+                this.scene.start('LobbyScene');
                 break;
             case MenuOption.ONLINE:
                 console.log('Online clicked');
