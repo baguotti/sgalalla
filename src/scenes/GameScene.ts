@@ -116,7 +116,7 @@ export class GameScene extends Phaser.Scene {
             // Fallback defaults
             this.playerData = [
                 { playerId: 0, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok' },
-                { playerId: 1, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok' }
+                { playerId: 1, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok', isAI: true, isTrainingDummy: true }
             ];
         }
 
@@ -253,7 +253,7 @@ export class GameScene extends Phaser.Scene {
         });
         this.events.on('spawnDummy', () => {
             this.togglePause(); // Unpause
-            if (!this.players.find(p => p.playerId === 1)) {
+            if (this.players.length < 4) {
                 this.spawnTrainingDummy();
             }
         });
@@ -444,17 +444,21 @@ export class GameScene extends Phaser.Scene {
 
         // Handle Training Toggle (T)
         if (Phaser.Input.Keyboard.JustDown(this.trainingToggleKey)) {
-            // Find P2
-            const p2 = this.players.find(p => p.playerId === 1);
+            // Find all AI players
+            const aiPlayers = this.players.filter(p => p.isAI);
 
-            if (p2) {
-                if (p2.isAI) {
-                    p2.isTrainingDummy = !p2.isTrainingDummy;
+            if (aiPlayers.length > 0) {
+                // Determine target state based on the first AI (sync them all)
+                // If first one is dummy, ALL become active. If first is active, ALL become dummy.
+                const targetIsDummy = !aiPlayers[0].isTrainingDummy;
 
-                    // Show floating text feedback
-                    const text = this.add.text(p2.x, p2.y - 80, p2.isTrainingDummy ? 'DUMMY MODE' : 'AI ACTIVE', {
+                aiPlayers.forEach(p => {
+                    p.isTrainingDummy = targetIsDummy;
+
+                    // Show floating text feedback for each
+                    const text = this.add.text(p.x, p.y - 80, p.isTrainingDummy ? 'DUMMY MODE' : 'AI ACTIVE', {
                         fontSize: '24px',
-                        color: p2.isTrainingDummy ? '#ffff00' : '#ff0000',
+                        color: p.isTrainingDummy ? '#ffff00' : '#ff0000',
                         fontStyle: 'bold',
                         stroke: '#000000',
                         strokeThickness: 4
@@ -462,13 +466,14 @@ export class GameScene extends Phaser.Scene {
 
                     this.tweens.add({
                         targets: text,
-                        y: p2.y - 120,
+                        y: p.y - 120,
                         alpha: 0,
                         duration: 1500,
                         onComplete: () => text.destroy()
                     });
-                }
+                });
             } else {
+                // If no AI exists (e.g. 1v1 human match, or just P1), spawn a dummy
                 this.spawnTrainingDummy();
             }
         }
@@ -522,7 +527,8 @@ export class GameScene extends Phaser.Scene {
                     displayPlayer.getState(),
                     displayPlayer.getRecoveryAvailable(),
                     attackInfo,
-                    displayPlayer.isGamepadConnected()
+                    displayPlayer.isGamepadConnected(),
+                    displayPlayer.damage // Pass damage
                 );
                 this.debugOverlay.setVisible(true);
                 this.controlsHintText.setVisible(true);
@@ -688,7 +694,23 @@ export class GameScene extends Phaser.Scene {
     }
 
     private spawnTrainingDummy(): void {
-        const playerId = 1; // Always P2 for now
+        const maxPlayers = 4;
+
+        // Find first available player ID
+        let availableId = -1;
+        for (let i = 0; i < maxPlayers; i++) {
+            if (!this.players.find(p => p.playerId === i)) {
+                availableId = i;
+                break;
+            }
+        }
+
+        if (availableId === -1) {
+            console.log('Max players reached, cannot spawn dummy.');
+            return;
+        }
+
+        const playerId = availableId;
 
         // Data
         const dummyData = {
@@ -696,7 +718,7 @@ export class GameScene extends Phaser.Scene {
             joined: true,
             ready: true,
             input: { type: 'KEYBOARD', gamepadIndex: null },
-            character: 'fok' as const, // Default to Fok
+            character: 'fok' as const,
             isAI: true,
             isTrainingDummy: true
         };
@@ -707,8 +729,16 @@ export class GameScene extends Phaser.Scene {
         }
 
         // Spawn logic
-        const spawnX = 1470;
-        const spawnY = 300;
+        const spawnPoints = [
+            { x: 450, y: 300 },
+            { x: 1470, y: 300 },
+            { x: 960, y: 200 },
+            { x: 960, y: 400 }
+        ];
+
+        const spawn = spawnPoints[playerId] || { x: 1470, y: 300 };
+        const spawnX = spawn.x;
+        const spawnY = spawn.y;
 
         const player = new Player(this, spawnX, spawnY, {
             playerId: playerId,
@@ -723,17 +753,27 @@ export class GameScene extends Phaser.Scene {
         player.addToCameraIgnore(this.uiCamera);
 
         // Create HUD
-        // Layout for P2 (TR)
-        const x = this.scale.width - 100;
-        const y = 50;
-        const isLeft = false;
+        // Layout logic
+        let x = 100;
+        let y = 50;
+        let isLeft = true;
 
-        const hud = new PlayerHUD(this, x, y, isLeft, `CPU (Dummy)`);
+        switch (playerId) {
+            case 0: x = 100; y = 50; isLeft = true; break;
+            case 1: x = this.scale.width - 100; y = 50; isLeft = false; break;
+            case 2: x = 100; y = this.scale.height - 50; isLeft = true; break;
+            case 3: x = this.scale.width - 100; y = this.scale.height - 50; isLeft = false; break;
+        }
+
+        const hud = new PlayerHUD(this, x, y, isLeft, `CPU ${playerId + 1} (Dummy)`);
         hud.addToCameraIgnore(this.cameras.main);
+
+        // Ensure we don't duplicate HUD if re-spawning (though player array check prevents this)
+        // Just push new logic
         this.playerHUDs.push(hud);
 
         // Feedback
-        const text = this.add.text(spawnX, spawnY - 80, 'DUMMY SPAWNED', {
+        const text = this.add.text(spawnX, spawnY - 80, `P${playerId + 1} DUMMY`, {
             fontSize: '24px',
             color: '#ffff00',
             fontStyle: 'bold',

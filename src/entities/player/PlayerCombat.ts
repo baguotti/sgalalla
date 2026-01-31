@@ -37,10 +37,16 @@ export class PlayerCombat {
         this.scene = scene;
     }
 
+    // Debug Damage Text
+    private debugDamageText: Phaser.GameObjects.Text | null = null;
+
     public setDebug(visible: boolean): void {
         this.showDebugHitboxes = visible;
         if (this.activeHitbox) {
             this.activeHitbox.setDebug(visible);
+        }
+        if (this.debugDamageText) {
+            this.debugDamageText.setVisible(visible && !!this.currentAttack);
         }
     }
 
@@ -425,11 +431,38 @@ export class PlayerCombat {
         }
         this.activeHitbox.setSize(width, height);
         this.activeHitbox.activate(x, y);
+
+        // Update Debug Damage Text
+        if (this.showDebugHitboxes) {
+            if (!this.debugDamageText) {
+                this.debugDamageText = this.scene.add.text(x, y, '', {
+                    fontSize: '14px',
+                    color: '#ff0000',
+                    backgroundColor: '#ffffff',
+                    padding: { x: 2, y: 2 }
+                });
+                this.debugDamageText.setDepth(100);
+            }
+
+            let damage = 0;
+            if (this.currentAttack) {
+                damage = this.currentAttack.data.damage;
+            } else if (this.player.physics.isRecovering) {
+                damage = 8; // Hardcoded recovery damage
+            }
+
+            this.debugDamageText.setText(`${damage}`);
+            this.debugDamageText.setPosition(x, y - height / 2 - 20); // Place above hitbox
+            this.debugDamageText.setVisible(true);
+        }
     }
 
     public deactivateHitbox(): void {
         if (this.activeHitbox) {
             this.activeHitbox.deactivate();
+        }
+        if (this.debugDamageText) {
+            this.debugDamageText.setVisible(false);
         }
     }
 

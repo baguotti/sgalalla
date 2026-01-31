@@ -37,11 +37,11 @@ export class DamageSystem {
         const normalizedX = length > 0 ? dx / length : 1;
         const normalizedY = length > 0 ? dy / length : 0;
 
-        const upwardBias = -0.3;
+        // Removed upwardBias to allow pure horizontal knockback
 
         return new Phaser.Math.Vector2(
             normalizedX * knockbackForce,
-            (normalizedY + upwardBias) * knockbackForce
+            normalizedY * knockbackForce
         );
     }
 

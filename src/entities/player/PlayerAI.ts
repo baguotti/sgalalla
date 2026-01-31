@@ -30,13 +30,13 @@ export class PlayerAI {
     }
 
     public update(delta: number): InputState {
+        this.resetInput(); // Reset inputs every frame to avoid sticky keys
+
         this.findTarget();
 
         // Update reaction timer
         if (this.reactionTimer > 0) {
             this.reactionTimer -= delta;
-            // If reacting to something, we might delay state changes?
-            // For now, let's just run logic every frame but smooth inputs
         }
 
         this.updateState(delta);
@@ -46,49 +46,65 @@ export class PlayerAI {
     }
 
     private findTarget(): void {
-        // Simple 1v1 targeting logic for now
-        const players = this.scene.children.list.filter(c => c instanceof Player && c !== this.player && !(c as Player).isAI) as Player[];
-        if (players.length > 0) {
-            this.target = players[0];
-        }
+        // Find closest opponent (Human or other AI)
+        const players = this.scene.children.list.filter(c => c instanceof Player && c !== this.player) as Player[];
+
+        let closestDist = Infinity;
+        let closestTarget: Player | null = null;
+
+        players.forEach(p => {
+            // Ignore dead players if we had that state
+            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, p.x, p.y);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestTarget = p;
+            }
+        });
+
+        this.target = closestTarget;
     }
 
     private updateState(delta: number): void {
         this.stateTimer -= delta;
 
-        // HIGH PRIORITY: RECOVERY
+        // HIGH PRIORITY: RECOVERY (Survival is #1)
         // If off-stage and falling, force RECOVER state
-        const stageLeft = 100; // Approx stage bounds
-        const stageRight = 700;
-        const stageBottom = 600;
+        const stageLeft = 200;
+        const stageRight = 1720;
+        const stageBottom = 900;
 
+        // If below stage or far out
         if (this.player.y > stageBottom ||
-            (this.player.y > 480 && (this.player.x < stageLeft || this.player.x > stageRight))) {
+            (this.player.y > 600 && (this.player.x < stageLeft || this.player.x > stageRight))) {
+
             if (this.state !== 'RECOVER') {
                 this.enterState('RECOVER');
             }
             return;
         }
 
-        // If currently recovering but safe, switch to IDLE
-        if (this.state === 'RECOVER' && this.player.isGrounded && this.player.y < 500) {
-            this.enterState('IDLE');
+        // If recovering and back on safe ground, switch to IDLE/CHASE
+        if (this.state === 'RECOVER' && this.player.isGrounded && this.player.y < 800 && this.player.x > stageLeft && this.player.x < stageRight) {
+            this.enterState('CHASE');
+            return;
         }
 
         // HIGH PRIORITY: DEFENSE
-        // If target is attacking and close, chance to dodge
+        // If target is attacking and close, chance to dodge or jump
         if (this.target && this.target.isAttacking && this.state !== 'DEFEND' && this.state !== 'RECOVER') {
             const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.target.x, this.target.y);
-            if (dist < 150) {
-                // Reaction check
-                if (Math.random() < 0.1) { // 10% chance per frame to notice? fast!
+
+            // Reaction check (based on "difficulty" or randomness)
+            if (dist < 200 && this.reactionTimer <= 0) {
+                if (Math.random() < 0.2) { // 20% chance to react per check interval
                     this.enterState('DEFEND');
+                    this.reactionTimer = 500; // Cooldown on reaction
                     return;
                 }
             }
         }
 
-        // Timer based state switching for normal behaviors
+        // State Transition Logic
         if (this.stateTimer <= 0) {
             this.decideNextState();
         }
@@ -100,164 +116,174 @@ export class PlayerAI {
             return;
         }
 
-        const dist = Math.abs(this.target.x - this.player.x);
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.target.x, this.target.y);
+        const heightDiff = this.target.y - this.player.y; // + means target is below, - means target is above
 
         // Behavior logic
         if (this.state === 'DEFEND') {
-            // After defending, counter-attack or space
-            this.enterState(Math.random() > 0.5 ? 'ATTACK' : 'SPACING');
+            // After defending, counter-attack
+            this.enterState('ATTACK');
             return;
         }
 
-        if (dist > 300) {
+        if (dist > 400) {
             this.enterState('CHASE');
-        } else if (dist < 100) {
-            // Too close, attack or back off
-            this.enterState(Math.random() > 0.3 ? 'ATTACK' : 'SPACING');
+        } else if (dist < 80) {
+            // Very close
+            this.enterState('ATTACK');
         } else {
-            // Mid range: Mix of spacing and attacking
+            // Mid range: 80 - 400
             const rand = Math.random();
-            if (rand < 0.4) this.enterState('SPACING');
-            else if (rand < 0.8) this.enterState('CHASE');
-            else this.enterState('ATTACK');
+            if (rand < 0.6) this.enterState('CHASE'); // Aggressive!
+            else if (rand < 0.8) this.enterState('SPACING');
+            else this.enterState('ATTACK'); // Dash attack?
         }
     }
 
     private enterState(newState: typeof this.state): void {
         this.state = newState;
-        // Randomize duration for organic feel
-        this.stateTimer = 200 + Math.random() * 800;
+        // Randomize duration
+        this.stateTimer = 300 + Math.random() * 500;
 
-        // Reset sub-state inputs
-        this.resetInput();
-
-        // Initial setup for state
+        // State initialization
         if (newState === 'DEFEND') {
-            this.stateTimer = 200; // Short defend window
-            this.currentInput.dodge = true; // Instant dodge
-
-            // Directional dodge?
-            if (Math.random() > 0.5) {
-                // Spaced dodge away
-                this.currentInput.moveX = this.player.x < this.target!.x ? -1 : 1;
-            }
+            this.stateTimer = 200;
+        } else if (newState === 'ATTACK') {
+            this.stateTimer = 400; // Commit to attack for a bit
+        } else if (newState === 'RECOVER') {
+            this.stateTimer = 1000; // Try to recover for at least 1s
         }
     }
 
     private executeStateLogic(): void {
         if (!this.target && this.state !== 'RECOVER') return;
 
-        // Always face target if not recovering
+        // Always face target if not recovering or defending specially
         if (this.target && this.state !== 'RECOVER') {
-            if (this.target.x > this.player.x) {
-                this.currentInput.aimRight = true;
-                this.currentInput.aimLeft = false;
-            } else {
-                this.currentInput.aimLeft = true;
-                this.currentInput.aimRight = false;
-            }
+            const dx = this.target.x - this.player.x;
+            this.currentInput.moveX = dx > 0 ? 0.1 : -0.1; // Slight nudge to aim
+            // Explicit aim for attacks
+            this.currentInput.aimRight = dx > 0;
+            this.currentInput.aimLeft = dx < 0;
+
+            // Aim up/down
+            const dy = this.target.y - this.player.y;
+            this.currentInput.aimUp = dy < -50;
+            this.currentInput.aimDown = dy > 50;
         }
 
         switch (this.state) {
             case 'IDLE':
-                // Do nothing, maybe teabag?
+                // Just stand there or patrol?
+                // Random jump 
+                if (Math.random() < 0.01) this.currentInput.jump = true;
                 break;
 
             case 'CHASE':
                 if (!this.target) break;
                 // Run towards target
                 const dx = this.target.x - this.player.x;
-                this.currentInput.moveX = dx > 0 ? 1 : -1;
-                this.currentInput.moveRight = dx > 0;
-                this.currentInput.moveLeft = dx < 0;
+                const dy = this.target.y - this.player.y;
 
-                // Sprinting: Hold dodge while moving to run
-                if (Math.abs(dx) > 200) {
-                    this.currentInput.dodgeHeld = true; // Trigger run
+                this.currentInput.moveX = dx > 20 ? 1 : (dx < -20 ? -1 : 0);
+                this.currentInput.moveRight = dx > 20;
+                this.currentInput.moveLeft = dx < -20;
+
+                // Run enabled
+                this.currentInput.dodgeHeld = true;
+
+                // Jump if target is above or we hit a wall
+                if (dy < -100 && this.player.isGrounded) {
+                    this.currentInput.jump = true;
+                    this.currentInput.jumpHeld = true;
                 }
 
-                // Jump obstacles
-                if (this.player.isGrounded && this.player.velocity.x === 0 && Math.abs(dx) > 50) {
+                // Platforms/Gaps: If grounded and moving but velocity is 0, jump (stuck logic)
+                if (this.player.isGrounded && this.currentInput.moveX !== 0 && Math.abs(this.player.velocity.x) < 1) {
                     this.currentInput.jump = true;
                 }
                 break;
 
             case 'SPACING':
                 if (!this.target) break;
-                // Try to stay just outside attack range (~150px)
-                const idealDist = 180;
-                const dist = Math.abs(this.target.x - this.player.x);
-
-                if (dist < idealDist - 50) {
-                    // Retreat
+                // Try to hover around 150-200 dist
+                const distSpacing = Math.abs(this.target.x - this.player.x);
+                if (distSpacing < 150) {
+                    // Back off
                     const retreatDir = this.player.x < this.target.x ? -1 : 1;
                     this.currentInput.moveX = retreatDir;
                     this.currentInput.moveLeft = retreatDir === -1;
                     this.currentInput.moveRight = retreatDir === 1;
-                } else if (dist > idealDist + 50) {
-                    // Approach slowly
-                    const approachDir = this.player.x < this.target.x ? 1 : -1;
-                    this.currentInput.moveX = approachDir;
-                    this.currentInput.moveLeft = approachDir === -1;
-                    this.currentInput.moveRight = approachDir === 1;
+                } else {
+                    // Shimmy
+                    this.currentInput.moveX = 0;
                 }
-                // Else stand still and wait
+                break;
+
+            case 'DEFEND':
+                this.currentInput.dodge = true;
+                // Choose direction
+                this.currentInput.moveX = Math.random() > 0.5 ? 1 : -1;
                 break;
 
             case 'ATTACK':
                 if (!this.target) break;
 
-                // Move into range if needed
-                const atkDist = Math.abs(this.target.x - this.player.x);
-                if (atkDist > 80) {
-                    const dir = this.target.x - this.player.x > 0 ? 1 : -1;
-                    this.currentInput.moveX = dir;
-                    this.currentInput.moveRight = dir === 1;
-                    this.currentInput.moveLeft = dir === -1;
+                // Stop moving to attack stability (unless aerial)
+                if (this.player.isGrounded) {
+                    this.currentInput.moveX = 0;
                 } else {
-                    // In range, attack!
-                    // Random mix of light/heavy and aerials
-                    this.currentInput.moveX = 0; // Stop to attack ground
+                    // Drift towards target in air
+                    const airDx = this.target.x - this.player.x;
+                    this.currentInput.moveX = airDx > 0 ? 1 : -1;
+                }
 
-                    if (Math.random() > 0.7) {
-                        this.currentInput.heavyAttack = true;
-                        // Aim?
-                        if (Math.random() > 0.5) this.currentInput.aimUp = true; // Neutral/Recovery
+                // Choose attack based on position
+                const distY = this.target.y - this.player.y;
+
+                if (distY < -80) { // Target above
+                    this.currentInput.aimUp = true;
+                    this.currentInput.lightAttack = true; // Up Light
+                } else if (distY > 80 && !this.player.isGrounded) { // Target below
+                    this.currentInput.aimDown = true;
+                    this.currentInput.heavyAttack = true; // Ground pound!
+                } else {
+                    // Neutral / Side
+                    if (Math.random() > 0.4) {
+                        this.currentInput.lightAttack = true; // Side Light
+                        // Ensure aim is correct
+                        this.currentInput.aimRight = this.target.x > this.player.x;
+                        this.currentInput.aimLeft = !this.currentInput.aimRight;
                     } else {
-                        this.currentInput.lightAttack = true;
-                        // Side light usually
-                        if (Math.random() > 0.3) this.currentInput.aimRight = this.target.x > this.player.x;
+                        this.currentInput.heavyAttack = true; // Side Heavy
+                        this.currentInput.aimRight = this.target.x > this.player.x;
+                        this.currentInput.aimLeft = !this.currentInput.aimRight;
                     }
                 }
                 break;
 
             case 'RECOVER':
-                // navigate to center stage (x = 400, y = 200)
-                const targetX = 400;
-                const targetY = 200;
+                // navigate to center stage (x = 960, y = 300)
+                const centerX = 960;
+                const recDx = centerX - this.player.x;
 
-                const recDx = targetX - this.player.x;
-                const recDy = targetY - this.player.y; // Negative means target is ABOVE
-
-                // Horizontal movement
                 this.currentInput.moveX = recDx > 0 ? 1 : -1;
                 this.currentInput.moveRight = recDx > 0;
                 this.currentInput.moveLeft = recDx < 0;
 
                 // Vertical Recovery
-                if (this.player.y > 500 || recDy < -100) {
-                    // Need height
+                // If we have jumps, use them periodically
+                if (this.player.velocity.y > 0) { // Falling
                     if (this.player.physics.jumpsRemaining > 0) {
-                        this.currentInput.jump = true;
-                        this.currentInput.jumpHeld = true;
-                    } else if (this.player.getRecoveryAvailable()) {
-                        // Use Recovery Move
-                        this.currentInput.aimUp = true;
-                        this.currentInput.heavyAttack = true;
+                        // Don't burn all jumps instantly, wait for peak fall
+                        if (Math.random() < 0.1) this.currentInput.jump = true;
                     } else {
-                        // Panic dodge up?
-                        this.currentInput.aimUp = true;
-                        this.currentInput.dodge = true;
+                        // Use Recovery (Up Special)
+                        // Only if we really need it
+                        if (this.player.y > 600) {
+                            this.currentInput.aimUp = true;
+                            this.currentInput.heavyAttack = true; // Recovery
+                        }
                     }
                 }
                 break;

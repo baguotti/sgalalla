@@ -333,7 +333,7 @@ export class Player extends Fighter {
     }
 
     private updateDamageDisplay(): void {
-        const label = this.playerId === 0 ? 'P1' : 'P2';
+        const label = `P${this.playerId + 1}`;
         this.damageText.setText(label);
         // Color could be static or based on player ID
         this.damageText.setColor(this.playerId === 0 ? '#3388ff' : '#00ff00');

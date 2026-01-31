@@ -33,35 +33,35 @@ export const PhysicsConfig = {
   PLATFORM_DROP_GRACE_PERIOD: 200, // ms - unchanged
 
   // Attack system
-  LIGHT_ATTACK_DAMAGE: 4, // unchanged
-  HEAVY_ATTACK_DAMAGE: 9, // unchanged
-  LIGHT_ATTACK_KNOCKBACK: 450, // 300 * 1.5
-  HEAVY_ATTACK_KNOCKBACK: 900, // 600 * 1.5
-  LIGHT_ATTACK_DURATION: 200, // ms - unchanged
-  HEAVY_ATTACK_DURATION: 400, // ms - unchanged
-  LIGHT_ATTACK_COOLDOWN: 300, // ms - unchanged
-  HEAVY_ATTACK_COOLDOWN: 600, // ms - unchanged
+  LIGHT_ATTACK_DAMAGE: 4,
+  HEAVY_ATTACK_DAMAGE: 9,
+  LIGHT_ATTACK_KNOCKBACK: 700, // Increased from 450
+  HEAVY_ATTACK_KNOCKBACK: 1200, // Increased from 900
+  LIGHT_ATTACK_DURATION: 200,
+  HEAVY_ATTACK_DURATION: 400,
+  LIGHT_ATTACK_COOLDOWN: 300,
+  HEAVY_ATTACK_COOLDOWN: 600,
 
   // Hitbox sizes
-  LIGHT_HITBOX_WIDTH: 60, // Reduced from 90 (was 60 * 1.5)
-  LIGHT_HITBOX_HEIGHT: 40, // Reduced from 60 (was 40 * 1.5)
-  HEAVY_HITBOX_WIDTH: 80, // Reduced from 120 (was 80 * 1.5)
-  HEAVY_HITBOX_HEIGHT: 60, // Reduced from 90 (was 60 * 1.5)
+  LIGHT_HITBOX_WIDTH: 60,
+  LIGHT_HITBOX_HEIGHT: 40,
+  HEAVY_HITBOX_WIDTH: 80,
+  HEAVY_HITBOX_HEIGHT: 60,
 
-  // Dodge/Dash - Brawlhalla style (fast and covers ground)
-  DODGE_DISTANCE: 225, // 150 * 1.5
-  DODGE_DURATION: 180, // ms - unchanged
-  DODGE_COOLDOWN: 800, // ms - unchanged
-  DODGE_INVINCIBILITY: 150, // ms - unchanged
-  SPOT_DODGE_DURATION: 300, // ms - unchanged
+  // Dodge/Dash - Brawlhalla style
+  DODGE_DISTANCE: 225,
+  DODGE_DURATION: 180,
+  DODGE_COOLDOWN: 800,
+  DODGE_INVINCIBILITY: 150,
+  SPOT_DODGE_DURATION: 300,
 
-  // Run mechanics (dodge kickstarts running)
-  RUN_SPEED_MULT: 2.25, // unchanged
-  RUN_ACCEL_MULT: 1.2, // unchanged
+  // Run mechanics
+  RUN_SPEED_MULT: 2.25,
+  RUN_ACCEL_MULT: 1.2,
 
-  // Damage system - Smash/Brawlhalla style (higher damage = further knockback)
-  MAX_DAMAGE: 999, // unchanged
-  KNOCKBACK_SCALING: 0.012, // unchanged? Actually, knockback distance is scaled internally by force. Scaling factor might need adjustment if force is scaled.
+  // Damage system
+  MAX_DAMAGE: 999,
+  KNOCKBACK_SCALING: 0.015, // Increased scaling slightly (was 0.012)
   // Wait, if KNOCKBACK_SCALING converts damage% to velocity force, and we want higher velocity force for larger screen...
   // We already scaled LIGHT_ATTACK_KNOCKBACK base force.
   // Formula is usually Base + (Damage * Scaling). Both result in velocity.
@@ -69,23 +69,22 @@ export const PhysicsConfig = {
   // If we want 1.5x force for same damage, we should scale this too?
   // Let's assume yes: 0.012 * 1.5 = 0.018? No, let's keep it and see. The base knockback is scaled.
 
-  HIT_STUN_DURATION: 300, // ms - unchanged
+  HIT_STUN_DURATION: 300,
 
   // Ledge detection
-  LEDGE_SNAP_DISTANCE: 15, // 10 * 1.5
+  LEDGE_SNAP_DISTANCE: 15,
 
   // Player dimensions
-  PLAYER_WIDTH: 60, // 40 * 1.5
-  PLAYER_HEIGHT: 90, // 60 * 1.5
-  NOSE_SIZE: 12, // 8 * 1.5
+  PLAYER_WIDTH: 60,
+  PLAYER_HEIGHT: 90,
+  NOSE_SIZE: 12,
 
-  // Attack frame timing (in ms)
-  // Light attacks - fast startup, short active, quick recovery
+  // Attack frame timing
   LIGHT_STARTUP_FRAMES: 50,    // 3 frames at 60fps
   LIGHT_ACTIVE_FRAMES: 100,    // 6 frames - hitbox active
   LIGHT_RECOVERY_FRAMES: 50,   // Reduced for snappy feel (was 100)
 
-  // Heavy attacks - reduced startup for more responsive feel
+  // Heavy attacks
   HEAVY_STARTUP_FRAMES: 80,    // ~5 frames (reduced from 150ms/9 frames)
   HEAVY_ACTIVE_FRAMES: 150,    // 9 frames
   HEAVY_RECOVERY_FRAMES: 200,  // 12 frames
@@ -94,7 +93,7 @@ export const PhysicsConfig = {
   GROUND_POUND_STARTUP: 200,   // ms
   GROUND_POUND_SPEED: 1800,    // 1200 * 1.5
   GROUND_POUND_DAMAGE: 8,      // unchanged
-  GROUND_POUND_KNOCKBACK: 1350, // 900 * 1.5
+  GROUND_POUND_KNOCKBACK: 1050, // Reduced from 1350 (now comparable to heavy)
 
   // Directional attack hitbox offsets
   SIDE_ATTACK_OFFSET_X: 75,    // 50 * 1.5
