@@ -61,7 +61,7 @@ export const PhysicsConfig = {
 
   // Damage system
   MAX_DAMAGE: 999,
-  KNOCKBACK_SCALING: 0.015, // Increased scaling slightly (was 0.012)
+  KNOCKBACK_SCALING: 0.02, // Increased from 0.015 for stronger high-damage scaling
   // Wait, if KNOCKBACK_SCALING converts damage% to velocity force, and we want higher velocity force for larger screen...
   // We already scaled LIGHT_ATTACK_KNOCKBACK base force.
   // Formula is usually Base + (Damage * Scaling). Both result in velocity.

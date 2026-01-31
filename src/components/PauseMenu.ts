@@ -26,7 +26,7 @@ export class PauseMenu {
     private menuOptions = [
         { label: 'Resume', value: MenuOption.RESUME },
         { label: 'Controls', value: MenuOption.CONTROLS },
-        { label: 'Training Options', value: MenuOption.TRAINING },
+        // Training Options removed
         { label: 'Spawn Training Partner', value: MenuOption.SPAWN_DUMMY },
         { label: 'Restart Match', value: MenuOption.RESTART },
         { label: 'Exit to Menu', value: MenuOption.EXIT }
@@ -49,10 +49,12 @@ export class PauseMenu {
     };
 
     private hintText!: Phaser.GameObjects.Text;
+    private controlsContainer!: Phaser.GameObjects.Container;
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
         this.createMenu();
+        this.createControlsPage();
         this.setupInput();
     }
 
@@ -61,8 +63,8 @@ export class PauseMenu {
 
         // Create semi-transparent overlay
         this.overlay = this.scene.add.graphics();
-        this.overlay.fillStyle(0x000000, 0.85);
-        this.overlay.fillRect(0, 0, 3000, 3000); // Oversized to cover resize
+        this.overlay.fillStyle(0x000000, 0.90); // Slightly darker for legibility
+        this.overlay.fillRect(0, 0, 3000, 3000);
         this.overlay.setScrollFactor(0);
         this.overlay.setDepth(1000);
         this.overlay.setVisible(false);
@@ -121,12 +123,100 @@ export class PauseMenu {
         this.hintText.setVisible(false);
     }
 
+    private createControlsPage(): void {
+        this.controlsContainer = this.scene.add.container(0, 0);
+        this.controlsContainer.setScrollFactor(0);
+        this.controlsContainer.setDepth(1001);
+        this.controlsContainer.setVisible(false);
+
+        const centerX = this.scene.scale.width / 2;
+        const centerY = this.scene.scale.height / 2;
+
+        // -- Layout Configuration --
+        const col1X = -300; // Relative to center
+        const col2X = 100;
+        const headerY = -150;
+        const contentY = -100;
+
+        // == COL 1: INPUTS ==
+        const inputsHeader = this.scene.add.text(col1X, headerY, 'INPUTS', {
+            fontSize: '28px',
+            color: '#8ab4f8', // Pastel Blue
+            fontStyle: 'bold',
+            fontFamily: 'Arial'
+        });
+
+        const inputsText = [
+            'ACTION       | KEYBOARD | GAMEPAD',
+            '-------------+----------+--------',
+            'Move         | WASD/Arr | Stick/Pad',
+            'Jump         | Space/Up | A (Cross)',
+            'Light Attack | C / J    | X (Square)',
+            'Heavy Attack | X / K    | B (Circle)',
+            'Dodge        | Z / L    | Triggers',
+            'Recov/Heavy  | V / Shift| Y (Tri)',
+            '',
+            'Debug        | Q        | Select',
+            'Toggle AI    | O        | -',
+            'Spawn Dummy  | T        | -'
+        ].join('\n');
+
+        const inputsContent = this.scene.add.text(col1X, contentY, inputsText, {
+            fontSize: '18px',
+            color: '#cccccc',
+            fontFamily: 'monospace',
+            lineSpacing: 8
+        });
+
+        // == COL 2: MOVESET GUIDE ==
+        const movesetHeader = this.scene.add.text(col2X, headerY, 'MOVESET GUIDE', {
+            fontSize: '28px',
+            color: '#f28b82', // Pastel Red
+            fontStyle: 'bold',
+            fontFamily: 'Arial'
+        });
+
+        const movesetText = [
+            'LIGHT ATTACKS (Quick)',
+            '• NLight: Standing Light (Neutral)',
+            '• SLight: Moving Forward + Light',
+            '• DLight: Hold Down + Light',
+            '• Air Light: Jump + Light',
+            '',
+            'HEAVY ATTACKS (Signatures)',
+            '• NSig: Neutral Heavy (Anti-Air)',
+            '• SSig: Side Heavy (Kill Move)',
+            '• DSig: Down Heavy (Area Control)',
+            '',
+            'SPECIAL AIR',
+            '• Recovery: Air + Up + Heavy',
+            '• Ground Pound: Air + Down + Heavy'
+        ].join('\n');
+
+        const movesetContent = this.scene.add.text(col2X, contentY, movesetText, {
+            fontSize: '18px',
+            color: '#eeeeee',
+            fontFamily: 'Arial', // Readable font for text
+            lineSpacing: 6
+        });
+
+        // Add to container
+        this.controlsContainer.add([inputsHeader, inputsContent, movesetHeader, movesetContent]);
+
+        // Use a relative positioning trick for container when screen resizes? 
+        // For now, assume fixed center relative.
+        this.controlsContainer.setPosition(centerX, centerY);
+    }
+
     private updateLayout(): void {
         const centerX = this.scene.scale.width / 2;
         const centerY = this.scene.scale.height / 2;
 
-        this.titleText.setPosition(centerX, centerY - 200);
+        this.titleText.setPosition(centerX, centerY - 250);
         this.hintText.setPosition(centerX, this.scene.scale.height - 50);
+
+        // Position controls container center
+        this.controlsContainer.setPosition(centerX, centerY);
 
         const startY = centerY - 100;
         const spacing = 50;
@@ -143,8 +233,12 @@ export class PauseMenu {
         this.escKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     }
 
+    // State
+    private menuState: 'MAIN' | 'CONTROLS' = 'MAIN';
+
     show(): void {
         this.visible = true;
+        this.menuState = 'MAIN'; // Reset to main menu
         this.mainSelectedIndex = 0;
 
         // Sync gamepad state to prevent immediate re-trigger
@@ -153,19 +247,14 @@ export class PauseMenu {
         this.updateLayout();
 
         this.overlay.setVisible(true);
-        this.titleText.setVisible(true);
-        this.hintText.setVisible(true);
-
-        this.mainMenuItems.forEach(item => item.setVisible(true));
-        this.updateSelection();
+        this.showMainMenu();
     }
 
     hide(): void {
         this.visible = false;
         this.overlay.setVisible(false);
-        this.titleText.setVisible(false);
-        this.hintText.setVisible(false);
-        this.mainMenuItems.forEach(item => item.setVisible(false));
+        this.hideMainMenu();
+        this.hideControlsMenu();
     }
 
     isVisible(): boolean {
@@ -177,23 +266,66 @@ export class PauseMenu {
         this.handleInput();
     }
 
+    private showMainMenu(): void {
+        this.titleText.setText('PAUSED');
+        this.titleText.setVisible(true);
+        this.hintText.setText('[ESC / START to Resume]');
+        this.hintText.setVisible(true);
+        this.controlsContainer.setVisible(false);
+        this.mainMenuItems.forEach(item => item.setVisible(true));
+        this.updateSelection();
+    }
+
+    private hideMainMenu(): void {
+        this.titleText.setVisible(false);
+        this.hintText.setVisible(false);
+        this.mainMenuItems.forEach(item => item.setVisible(false));
+    }
+
+    private showControlsMenu(): void {
+        this.titleText.setText('CONTROLS');
+        this.titleText.setVisible(true);
+
+        // Center controls container
+        this.controlsContainer.setPosition(this.scene.scale.width / 2, this.scene.scale.height / 2);
+        this.controlsContainer.setVisible(true);
+
+        this.hintText.setText('[ESC / B to Back]');
+        this.hintText.setVisible(true);
+
+        this.mainMenuItems.forEach(item => item.setVisible(false));
+    }
+
+    private hideControlsMenu(): void {
+        this.controlsContainer.setVisible(false);
+    }
+
     private handleInput(): void {
         const gp = this.getGamepadInput();
 
-        if (Phaser.Input.Keyboard.JustDown(this.upKey) || gp.upPressed) {
-            this.mainSelectedIndex = (this.mainSelectedIndex - 1 + this.menuOptions.length) % this.menuOptions.length;
-            this.updateSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.downKey) || gp.downPressed) {
-            this.mainSelectedIndex = (this.mainSelectedIndex + 1) % this.menuOptions.length;
-            this.updateSelection();
-        }
+        if (this.menuState === 'MAIN') {
+            if (Phaser.Input.Keyboard.JustDown(this.upKey) || gp.upPressed) {
+                this.mainSelectedIndex = (this.mainSelectedIndex - 1 + this.menuOptions.length) % this.menuOptions.length;
+                this.updateSelection();
+            } else if (Phaser.Input.Keyboard.JustDown(this.downKey) || gp.downPressed) {
+                this.mainSelectedIndex = (this.mainSelectedIndex + 1) % this.menuOptions.length;
+                this.updateSelection();
+            }
 
-        if (Phaser.Input.Keyboard.JustDown(this.enterKey) || gp.aPressed) {
-            this.selectOption();
-        }
+            if (Phaser.Input.Keyboard.JustDown(this.enterKey) || gp.aPressed) {
+                this.selectOption();
+            }
 
-        if (Phaser.Input.Keyboard.JustDown(this.escKey) || gp.bPressed || gp.startPressed) {
-            this.executeOption(MenuOption.RESUME);
+            if (Phaser.Input.Keyboard.JustDown(this.escKey) || gp.bPressed || gp.startPressed) {
+                this.executeOption(MenuOption.RESUME);
+            }
+        } else if (this.menuState === 'CONTROLS') {
+            // Back to Main Menu
+            if (Phaser.Input.Keyboard.JustDown(this.escKey) || gp.bPressed || gp.aPressed || gp.startPressed) {
+                this.menuState = 'MAIN';
+                this.hideControlsMenu();
+                this.showMainMenu();
+            }
         }
     }
 
@@ -220,10 +352,8 @@ export class PauseMenu {
                 this.scene.events.emit('pauseMenuResume');
                 break;
             case MenuOption.CONTROLS:
-                console.log('Controls menu - Not yet implemented');
-                break;
-            case MenuOption.TRAINING:
-                console.log('Training options - Not yet implemented');
+                this.menuState = 'CONTROLS';
+                this.showControlsMenu();
                 break;
             case MenuOption.SPAWN_DUMMY:
                 this.scene.events.emit('spawnDummy');
@@ -300,6 +430,6 @@ export class PauseMenu {
     }
 
     getElements(): Phaser.GameObjects.GameObject[] {
-        return [this.overlay, this.titleText, this.hintText, ...this.mainMenuItems];
+        return [this.overlay, this.titleText, this.hintText, this.controlsContainer, ...this.mainMenuItems];
     }
 }

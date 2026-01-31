@@ -48,7 +48,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.LIGHT,
         direction: AttackDirection.NEUTRAL,
         isAerial: false,
-        damage: 2,
+        damage: 6, // Base damage tripled (Flurry)
         knockback: 90, // Reduced from 100
         knockbackAngle: 90,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
@@ -95,7 +95,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.LIGHT,
         direction: AttackDirection.UP,
         isAerial: false,
-        damage: 2,
+        damage: 6, // Base damage tripled (Flurry)
         knockback: 90, // Reduced from 100
         knockbackAngle: 90,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
@@ -114,7 +114,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.LIGHT,
         direction: AttackDirection.NEUTRAL,
         isAerial: true,
-        damage: 2, // Flurry
+        damage: 6, // Base damage tripled (Flurry)
         knockback: 90, // Flurry
         knockbackAngle: 90,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,

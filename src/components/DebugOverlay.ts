@@ -82,13 +82,12 @@ export class DebugOverlay {
         state: string,
         recoveryAvailable: boolean,
         attackInfo: string = 'None',
-        gamepadConnected: boolean = false,
-        damage: number = 0 // New parameter
+        gamepadConnected: boolean = false
     ): void {
         this.velocityText.setText(
             `Vel: X=${velocityX.toFixed(0)} Y=${velocityY.toFixed(0)}`
         );
-        this.stateText.setText(`State: ${state} | DMG: ${damage}%`); // Combine with state or add new line? Combining for compactness.
+        this.stateText.setText(`State: ${state}`);
         this.fpsText.setText(`FPS: ${Math.round(this.scene.game.loop.actualFps)}`);
         this.recoveryText.setText(`Recovery: ${recoveryAvailable ? 'Ready' : 'Used'}`);
         this.attackText.setText(`Attack: ${attackInfo}`);
@@ -114,5 +113,14 @@ export class DebugOverlay {
             this.attackText,
             this.gamepadText
         ]);
+    }
+
+    destroy(): void {
+        this.velocityText.destroy();
+        this.stateText.destroy();
+        this.fpsText.destroy();
+        this.recoveryText.destroy();
+        this.attackText.destroy();
+        this.gamepadText.destroy();
     }
 }

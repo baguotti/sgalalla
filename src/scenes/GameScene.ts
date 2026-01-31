@@ -481,21 +481,8 @@ export class GameScene extends Phaser.Scene {
                     p.isTrainingDummy = targetIsDummy;
 
                     // Show floating text feedback for each
-                    const text = this.add.text(p.x, p.y - 80, p.isTrainingDummy ? 'DUMMY MODE' : 'AI ACTIVE', {
-                        fontSize: '24px',
-                        color: p.isTrainingDummy ? '#ffff00' : '#ff0000',
-                        fontStyle: 'bold',
-                        stroke: '#000000',
-                        strokeThickness: 4
-                    }).setOrigin(0.5);
-
-                    this.tweens.add({
-                        targets: text,
-                        y: p.y - 120,
-                        alpha: 0,
-                        duration: 1500,
-                        onComplete: () => text.destroy()
-                    });
+                    p.isTrainingDummy = targetIsDummy;
+                    // No floaty text needed, debug overlay shows state
                 });
             } else {
                 // If no AI exists (e.g. 1v1 human match, or just P1), spawn a dummy
@@ -552,8 +539,7 @@ export class GameScene extends Phaser.Scene {
                     displayPlayer.getState(),
                     displayPlayer.getRecoveryAvailable(),
                     attackInfo,
-                    displayPlayer.isGamepadConnected(),
-                    displayPlayer.damage // Pass damage
+                    displayPlayer.isGamepadConnected()
                 );
                 this.debugOverlay.setVisible(true);
                 this.controlsHintText.setVisible(true);
@@ -792,6 +778,7 @@ export class GameScene extends Phaser.Scene {
         player.isTrainingDummy = true;
 
         // Set Color
+        // Set Color
         const color = this.PLAYER_COLORS[playerId] || 0xffffff;
         player.visualColor = color;
         player.resetVisuals(); // Apply color
@@ -819,22 +806,7 @@ export class GameScene extends Phaser.Scene {
         // Just push new logic
         this.playerHUDs.push(hud);
 
-        // Feedback
-        const text = this.add.text(spawnX, spawnY - 80, `P${playerId + 1} DUMMY`, {
-            fontSize: '24px',
-            color: '#ffff00',
-            fontStyle: 'bold',
-            stroke: '#000000',
-            strokeThickness: 4
-        }).setOrigin(0.5);
 
-        this.tweens.add({
-            targets: text,
-            y: spawnY - 120,
-            alpha: 0,
-            duration: 1500,
-            onComplete: () => text.destroy()
-        });
     }
 
     // Clean up when scene is shut down (e.g. switching to menu)
@@ -855,5 +827,9 @@ export class GameScene extends Phaser.Scene {
 
         // Destroy players
         this.players.forEach(p => p.destroy());
+
+        if (this.debugOverlay) {
+            this.debugOverlay.destroy();
+        }
     }
 }

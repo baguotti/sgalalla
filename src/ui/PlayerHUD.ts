@@ -84,15 +84,43 @@ export class PlayerHUD {
         this.stocksText.setText(stocks.toString());
 
         // Color code damage
+        // Color code damage (Gradient)
+        let colorObj: Phaser.Types.Display.ColorObject;
+
         if (damage < 50) {
-            this.damageText.setColor('#ffffff'); // White
+            // White to Vivid Yellow (0-50)
+            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
+                new Phaser.Display.Color(255, 255, 255),
+                new Phaser.Display.Color(255, 255, 80), // Vivid Yellow
+                50,
+                damage
+            );
         } else if (damage < 100) {
-            this.damageText.setColor('#ffff00'); // Yellow
+            // Vivid Yellow to Vivid Orange (50-100)
+            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
+                new Phaser.Display.Color(255, 255, 80),
+                new Phaser.Display.Color(255, 160, 80), // Vivid Orange
+                50,
+                damage - 50
+            );
         } else if (damage < 150) {
-            this.damageText.setColor('#ff8800'); // Orange
+            // Vivid Orange to Vivid Red (100-150)
+            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
+                new Phaser.Display.Color(255, 160, 80),
+                new Phaser.Display.Color(255, 80, 80), // Vivid Red
+                50,
+                damage - 100
+            );
         } else {
-            this.damageText.setColor('#ff0000'); // Red
+            // Cap at Vivid Red
+            colorObj = { r: 255, g: 80, b: 80, a: 255 };
         }
+
+        const colorHex = '#' +
+            ((1 << 24) + (colorObj.r << 16) + (colorObj.g << 8) + colorObj.b)
+                .toString(16).slice(1);
+
+        this.damageText.setColor(colorHex);
     }
 
     destroy(): void {

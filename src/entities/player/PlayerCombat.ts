@@ -29,7 +29,6 @@ export class PlayerCombat {
     public isCharging: boolean = false;
     public chargeTime: number = 0;
     public chargeDirection: AttackDirection = AttackDirection.NEUTRAL;
-    private chargeGlow: Phaser.GameObjects.Graphics | null = null;
     private showDebugHitboxes: boolean = false;
 
     constructor(player: Player, scene: Phaser.Scene) {
@@ -136,10 +135,7 @@ export class PlayerCombat {
             this.chargeDirection = direction;
 
             // Create charge glow effect
-            if (!this.chargeGlow) {
-                this.chargeGlow = this.scene.add.graphics();
-                this.player.add(this.chargeGlow);
-            }
+            // Removed charge glow
             return;
         }
 
@@ -227,7 +223,7 @@ export class PlayerCombat {
         // Accumulate charge time
         this.chargeTime += delta;
 
-        // Auto-release if max charge exceeded (Brawlhalla style limit)
+        // Auto-release if max charge exceeded
         if (this.chargeTime >= PhysicsConfig.CHARGE_MAX_TIME) {
             this.executeChargedAttack();
             return;
@@ -235,66 +231,23 @@ export class PlayerCombat {
 
         const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
 
-        // Update visual glow effect
-        if (this.chargeGlow) {
-            this.chargeGlow.clear();
+        // Subtle Shake Effect
+        // Intensity increases with charge, max 1.5 pixels
+        const maxShake = 1.5;
+        const intensity = chargePercent * maxShake;
 
-            // Pulsing glow that intensifies with charge
-            const pulseSpeed = 5 + chargePercent * 10; // Faster pulse at higher charge
-            const pulse = 0.5 + Math.sin(this.scene.time.now / 100 * pulseSpeed) * 0.5;
-            const glowIntensity = 0.3 + chargePercent * 0.7;
-            const alpha = glowIntensity * pulse;
+        const offsetX = (Math.random() - 0.5) * 2 * intensity;
+        const offsetY = (Math.random() - 0.5) * 2 * intensity;
 
-            // Color shifts from yellow to orange to red as charge builds
-            let color: number;
-            if (chargePercent < 0.5) {
-                color = 0xffff00; // Yellow
-            } else if (chargePercent < 0.8) {
-                color = 0xff8800; // Orange
-            } else {
-                color = 0xff0000; // Red at max charge
-            }
-
-            // Draw glow ring around player
-            const radius = 35 + chargePercent * 15;
-            this.chargeGlow.lineStyle(3 + chargePercent * 4, color, alpha);
-            this.chargeGlow.strokeCircle(0, 0, radius);
-
-            // At full charge, add extra particles/sparkles
-            if (chargePercent >= 1) {
-                const sparkleAngle = (this.scene.time.now * 0.01) % (Math.PI * 2);
-                for (let i = 0; i < 4; i++) {
-                    const angle = sparkleAngle + (i * Math.PI / 2);
-                    const sparkleX = Math.cos(angle) * (radius + 10);
-                    const sparkleY = Math.sin(angle) * (radius + 10);
-                    this.chargeGlow.fillStyle(0xffffff, alpha);
-                    this.chargeGlow.fillCircle(sparkleX, sparkleY, 4);
-                }
-            }
-        }
-
-        // Flash body color based on charge
-        if (chargePercent >= 1) {
-            // Full charge - flash rapidly
-            const flash = Math.sin(this.scene.time.now / 50) > 0;
-            if (flash) {
-                this.player.setVisualTint(0xffff00);
-            } else {
-                this.player.resetVisuals();
-            }
-        } else if (chargePercent > 0.5) {
-            // Partial charge - tint slightly
-            this.player.setVisualTint(0x88ccff);
-        }
+        this.player.setVisualOffset(offsetX, offsetY);
     }
+
+
 
     private clearChargeState(): void {
         this.isCharging = false;
         this.chargeTime = 0;
-        if (this.chargeGlow) {
-            this.chargeGlow.clear();
-        }
-        // Reset body color
+        // Reset body color and offset
         this.player.resetVisuals();
     }
 
@@ -313,8 +266,6 @@ export class PlayerCombat {
         } catch (e) {
             console.warn('Ground pound attack not found');
         }
-
-        // this.player.setVisualTint(0x9b59b6); // Purple for ground pound startup
     }
 
     private updateAttackState(delta: number): void {
@@ -556,23 +507,6 @@ export class PlayerCombat {
         }
 
         // Visual Effects for Down Air (Spike)
-        if (direction === AttackDirection.DOWN && isAerial) {
-            // Visual Spike Effect
-            const effect = this.scene.add.graphics();
-            effect.fillStyle(0xffffff, 0.8);
-            effect.fillTriangle(
-                target.x, target.y - 20,
-                target.x - 20, target.y - 60,
-                target.x + 20, target.y - 60
-            );
-
-            // Animate out
-            this.scene.tweens.add({
-                targets: effect,
-                alpha: 0,
-                duration: 200,
-                onComplete: () => effect.destroy()
-            });
-        }
+        // Removed down arrow visual
     }
 }

@@ -118,6 +118,17 @@ export class Player extends Fighter {
         this.damageText.setOrigin(0.5);
         this.add(this.damageText);
 
+        // Create Name Tag (Player Indicator)
+        this.nameTag = scene.add.text(0, -75, `P${this.playerId + 1}`, {
+            fontSize: '18px',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        });
+        this.nameTag.setOrigin(0.5);
+        this.add(this.nameTag);
+
         // Initialize Components
         this.physics = new PlayerPhysics(this);
         this.combat = new PlayerCombat(this, scene);
@@ -236,6 +247,7 @@ export class Player extends Fighter {
 
     // Visual Helpers
     public visualColor: number = 0xffffff;
+    public nameTag: Phaser.GameObjects.Text;
 
     public setVisualTint(color: number): void {
         this.sprite.setTint(color);
@@ -243,7 +255,73 @@ export class Player extends Fighter {
 
     public resetVisuals(): void {
         this.sprite.setAlpha(1);
-        this.sprite.setTint(this.visualColor);
+        // Do NOT tint the body with player color (User request)
+        // Only use tint if we are flashing damage
+        this.sprite.clearTint();
+
+        // Update Name Tag Color
+        if (this.nameTag) {
+            const colorHex = '#' + this.visualColor.toString(16).padStart(6, '0');
+            this.nameTag.setColor(colorHex);
+        }
+
+        this.sprite.setPosition(0, 0);
+    }
+
+    public setVisualOffset(x: number, y: number): void {
+        this.sprite.setPosition(x, y);
+    }
+
+    public flashDamageColor(damage: number): void {
+        let colorObj: Phaser.Types.Display.ColorObject;
+
+        if (damage < 50) {
+            // White to Pastel Yellow (0-50)
+            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
+                new Phaser.Display.Color(255, 255, 255),
+                new Phaser.Display.Color(255, 245, 150), // 0xfff596
+                50,
+                damage
+            );
+        } else if (damage < 100) {
+            // Pastel Yellow to Pastel Orange (50-100)
+            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
+                new Phaser.Display.Color(255, 245, 150),
+                new Phaser.Display.Color(255, 200, 150), // 0xffc896
+                50,
+                damage - 50
+            );
+        } else if (damage < 150) {
+            // Pastel Orange to Pastel Red (100-150)
+            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
+                new Phaser.Display.Color(255, 200, 150),
+                new Phaser.Display.Color(255, 150, 150), // 0xff9696
+                50,
+                damage - 100
+            );
+        } else {
+            // Cap at Pastel Red
+            const r = 255;
+            const g = 150;
+            const b = 150;
+            colorObj = {
+                r, g, b, a: 255,
+                color: Phaser.Display.Color.GetColor(r, g, b)
+            };
+        }
+
+        const color = Phaser.Display.Color.GetColor(colorObj.r, colorObj.g, colorObj.b);
+
+        // Tint (multiplicative)
+        this.sprite.setTint(color);
+        this.sprite.setAlpha(1);
+
+        // Restore after short duration
+        this.scene.time.delayedCall(150, () => {
+            // Only reset if we are not flashing for other reasons (like charge)
+            // But charge stops on hit.
+            this.resetVisuals();
+        });
     }
 
     // Delegated Methods
@@ -404,9 +482,9 @@ export class Player extends Fighter {
         }
         this.isDodging = false;
         this.resetVisuals();
-        this.resetVisuals();
-        // this.spine.setTintFill(0xffffff); // Flash white removed/handled differently
 
+        // Trigger subtle damage flash
+        this.flashDamageColor(this.damagePercent);
     }
 
     public respawn(): void {
