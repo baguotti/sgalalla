@@ -160,7 +160,6 @@ export class PlayerCombat {
         const isGrounded = this.player.isGrounded;
 
         if (input.aimUp && !input.aimDown) {
-            if (isGrounded) return AttackDirection.NEUTRAL;
             return AttackDirection.UP;
         }
 

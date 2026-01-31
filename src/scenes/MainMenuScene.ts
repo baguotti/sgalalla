@@ -70,7 +70,7 @@ export class MainMenuScene extends Phaser.Scene {
         } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
             this.changeSelection(1);
         } else if (Phaser.Input.Keyboard.JustDown(this.startKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-            this.selectOption();
+            this.selectOption('KEYBOARD');
         }
 
         this.handleGamepad();
@@ -116,7 +116,7 @@ export class MainMenuScene extends Phaser.Scene {
 
         // A Button (0) or Start (9) to select
         if ((pad.buttons[0].pressed || pad.buttons[9].pressed) && !this.previousButtons['btnA']) {
-            this.selectOption();
+            this.selectOption('GAMEPAD', pad.index);
             this.previousButtons['btnA'] = true;
         } else if (!pad.buttons[0].pressed && !pad.buttons[9].pressed) {
             this.previousButtons['btnA'] = false;
@@ -140,8 +140,8 @@ export class MainMenuScene extends Phaser.Scene {
         });
     }
 
-    private selectOption(): void {
+    private selectOption(inputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD', gamepadIndex: number | null = null): void {
         const mode = this.menuOptions[this.selectedIndex].mode;
-        this.scene.start('LobbyScene', { mode: mode });
+        this.scene.start('LobbyScene', { mode: mode, inputType: inputType, gamepadIndex: gamepadIndex });
     }
 }

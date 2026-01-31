@@ -60,39 +60,46 @@ export class GameScene extends Phaser.Scene {
     }
 
     preload(): void {
-        // Preload Bloody Alchemist Sprites
-        const alchemistStates = [
-            { name: 'Idle', key: 'idle', frames: 19 },
-            { name: 'Running', key: 'run', frames: 12 }, // Swapped to Running
-            { name: 'Jump Start', key: 'jump_start', frames: 6 },
-            { name: 'Jump Loop', key: 'jump', frames: 6 },
-            { name: 'Falling Down', key: 'fall', frames: 6 },
-            { name: 'Hurt', key: 'hurt', frames: 12 },
-            { name: 'Throwing', key: 'attack', frames: 12 },
-            { name: 'Kicking', key: 'kick', frames: 12 },
-            { name: 'Sliding', key: 'slide', frames: 6 },
-            { name: 'AttackLight', key: 'attack_light', frames: 2 },
-            { name: 'AttackHeavy', key: 'attack_heavy', frames: 1 },
-            { name: 'Charging', key: 'charging', frames: 8 }
-        ];
+        this.loadCharacterAssets();
+    }
 
-        alchemistStates.forEach(state => {
-            // Check how many frames exist. For safety in this environment without checking exact counts for all, 
-            // I'll try to load a reasonable number or use a try-catch pattern if possible, 
-            // but Phaser load doesn't try-catch file existence easily.
-            // Based on ls output: Idle has 18 (00-17), run has 12 (00-11).
-            // Let's rely on the lists.
-            // Jump Loop: ls showed 000-002... wait let me check counts if I can.
-            // I'll assume 6 for now for others or check with ls commands if needed.
-            // Actually, let's load what I know.
-            let frameCount = state.frames;
-            if (state.name === 'Jump Loop') frameCount = 6;
+    private loadCharacterAssets(): void {
+        // --- Fok ---
+        const fokAssets: Array<{
+            key: string;
+            folder: string;
+            count: number;
+            prefix: string; // File prefix e.g. "0_Fok_Idle_"
+            type?: string;
+            filename?: string;
+        }> = [
+                { key: 'idle', folder: 'Idle', count: 19, prefix: '0_Fok_Idle_' },
+                { key: 'run', folder: 'Running', count: 12, prefix: '0_Fok_Running_' },
+                { key: 'charging', folder: 'Charging', count: 8, prefix: '0_Fok_Charging_' },
+                { key: 'attack_light', folder: 'AttackLight', count: 1, prefix: '0_Fok_AttackLight_', type: 'manual', filename: '0_Fok_AttackLight_001.png' },
+                { key: 'attack_heavy', folder: 'AttackHeavy', count: 1, prefix: '0_Fok_AttackHeavy_' }, // Verified 000
+                { key: 'attack_up', folder: 'Attack_Up', count: 1, prefix: '0_Fok_AttackUp_', type: 'manual', filename: '0_Fok_AttackUp_001.png' },
+                { key: 'fall', folder: 'Falling Down', count: 1, prefix: '0_Fok_Falling Down_', type: 'manual', filename: '0_Fok_Falling_001.png' },
+                { key: 'ground_pound', folder: 'Ground Pound', count: 1, prefix: '0_Fok_Gpound_', type: 'manual', filename: '0_Fok_Gpound_001.png' },
+                { key: 'hurt', folder: 'Hurt', count: 1, prefix: '0_Fok_Hurt_', type: 'manual', filename: '0_Fok_Hurt_001.png' },
+                { key: 'jump_start', folder: 'Jump Start', count: 6, prefix: '0_Fok_Jump Start_' }, // Assuming verified
+                { key: 'jump', folder: 'Jump Loop', count: 1, prefix: '0_Fok_Jump_', type: 'manual', filename: '0_Fok_Jump_000.png' },
+                { key: 'slide', folder: 'Sliding', count: 1, prefix: '0_Fok_Sliding_', type: 'manual', filename: '0_Fok_Sliding_000.png' },
+                { key: 'attack', folder: 'Throwing', count: 12, prefix: '0_Fok_Throwing_' }, // Assuming verification
+                { key: 'attack', folder: 'Throwing', count: 12, prefix: '0_Fok_Throwing_' }, // Assuming verification
+            ];
 
-            for (let i = 0; i < frameCount; i++) {
-                const frameNum = i.toString().padStart(3, '0');
-                const key = `alchemist_${state.key}_${i}`;
-                // "0_Bloody_Alchemist_Idle_000.png"
-                const path = `assets/bloody_alchemist/${state.name}/0_Bloody_Alchemist_${state.name}_${frameNum}.png`;
+        fokAssets.forEach(asset => {
+            for (let i = 0; i < asset.count; i++) {
+                let filename = '';
+                if (asset.type === 'manual' && asset.filename) {
+                    filename = asset.filename;
+                } else {
+                    const num = i.toString().padStart(3, '0');
+                    filename = `${asset.prefix}${num}.png`;
+                }
+                const key = `fok_${asset.key}_${i}`;
+                const path = `assets/fok/${asset.folder}/${filename}`;
                 this.load.image(key, path);
             }
         });
@@ -108,8 +115,8 @@ export class GameScene extends Phaser.Scene {
         } else {
             // Fallback defaults
             this.playerData = [
-                { playerId: 0, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'alchemist' },
-                { playerId: 1, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'dude' }
+                { playerId: 0, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok' },
+                { playerId: 1, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok' }
             ];
         }
 
@@ -119,45 +126,63 @@ export class GameScene extends Phaser.Scene {
 
 
     create(): void {
-        // Create Bloody Alchemist Animations
-        const alchemistAnims = [
+        // --- Fok Animations ---
+        const fokAnims = [
             { key: 'idle', count: 19, loop: true },
-            { key: 'run', count: 12, loop: true }, // Running (12 frames)
+            { key: 'run', count: 12, loop: true },
             { key: 'jump_start', count: 6, loop: false },
-            { key: 'jump', count: 6, loop: true },
-            { key: 'fall', count: 6, loop: true },
-            { key: 'hurt', count: 12, loop: false },
+            { key: 'jump', count: 1, loop: true },
+            { key: 'fall', count: 1, loop: true },
+            { key: 'hurt', count: 1, loop: false },
+            { key: 'ground_pound', count: 1, loop: true },
             { key: 'attack', count: 12, loop: false },
-            { key: 'kick', count: 12, loop: false },
-            { key: 'slide', count: 6, loop: true },
+            { key: 'attack', count: 12, loop: false },
+            { key: 'slide', count: 1, loop: true },
+            { key: 'dodge', count: 1, loop: false }, // Using same frame logic as slide, mapped later or just created here if frames valid
             { key: 'charging', count: 8, loop: true },
-            { key: 'attack_heavy', count: 1, loop: false }
+            { key: 'attack_light', count: 1, loop: false },
+            { key: 'attack_up', count: 1, loop: false }
         ];
 
-        alchemistAnims.forEach(anim => {
+        fokAnims.forEach(anim => {
             const frames = [];
             for (let i = 0; i < anim.count; i++) {
-                frames.push({ key: `alchemist_${anim.key}_${i}` });
+                frames.push({ key: `fok_${anim.key}_${i}` });
             }
 
             this.anims.create({
-                key: `alchemist_${anim.key}`,
+                key: `fok_${anim.key}`,
                 frames: frames,
                 frameRate: anim.key === 'run' ? 20 : 15,
                 repeat: anim.loop ? -1 : 0
             });
         });
 
-        // Manual creation for alternating Light Attacks
+        // Fok Light Attack (Single Frame 001)
         this.anims.create({
-            key: 'alchemist_attack_light_0',
-            frames: [{ key: 'alchemist_attack_light_0' }],
-            frameRate: 1,
+            key: 'fok_attack_light_0', // Keeping variants for Player.ts compatibility, but mapping to same frame
+            frames: [{ key: `fok_attack_light_0` }],
+            frameRate: 10,
             repeat: 0
         });
+        // Map dodge explicitly to slide frame if asset not loaded as 'dodge'
         this.anims.create({
-            key: 'alchemist_attack_light_1',
-            frames: [{ key: 'alchemist_attack_light_1' }],
+            key: 'fok_dodge',
+            frames: [{ key: `fok_slide_0` }],
+            frameRate: 10,
+            repeat: 0
+        });
+
+        this.anims.create({
+            key: 'fok_attack_light_1',
+            frames: [{ key: `fok_attack_light_0` }],
+            frameRate: 10,
+            repeat: 0
+        });
+        // Also map 'heavy' to something so it doesn't crash
+        this.anims.create({
+            key: 'fok_attack_heavy',
+            frames: [{ key: `fok_attack_heavy_0` }],
             frameRate: 1,
             repeat: 0
         });
@@ -671,7 +696,7 @@ export class GameScene extends Phaser.Scene {
             joined: true,
             ready: true,
             input: { type: 'KEYBOARD', gamepadIndex: null },
-            character: 'alchemist' as const, // Default to Alchemist
+            character: 'fok' as const, // Default to Fok
             isAI: true,
             isTrainingDummy: true
         };
@@ -689,7 +714,7 @@ export class GameScene extends Phaser.Scene {
             playerId: playerId,
             gamepadIndex: null,
             useKeyboard: false,
-            character: 'alchemist',
+            character: 'fok',
             isAI: true
         });
 

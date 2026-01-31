@@ -6,7 +6,7 @@ import type { InputState } from '../input/InputManager';
 import { Fighter } from './Fighter';
 import { PlayerPhysics } from './player/PlayerPhysics';
 import { PlayerCombat } from './player/PlayerCombat';
-import { Attack, AttackPhase, AttackType } from '../combat/Attack';
+import { Attack, AttackPhase, AttackType, AttackDirection } from '../combat/Attack';
 import { PlayerAI } from './player/PlayerAI';
 
 export const PlayerState = {
@@ -59,7 +59,8 @@ export class Player extends Fighter {
     public playerId: number = 0;
 
     // Character Type
-    public character: 'alchemist' = 'alchemist';
+    // Character Type
+    public character: 'fok' = 'fok';
     private animPrefix: string = 'alchemist';
     private debugRect!: Phaser.GameObjects.Rectangle;
     private showDebugHitboxes: boolean = false;
@@ -75,7 +76,7 @@ export class Player extends Fighter {
         }
     }
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'alchemist' } = {}) {
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok' } = {}) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
@@ -83,16 +84,17 @@ export class Player extends Fighter {
 
         // Create player sprite (Chibi Knight)
         // Create player sprite (Bloody Alchemist)
-        this.character = config.character || 'alchemist';
+        // Create player sprite (Fok)
+        this.character = config.character || 'fok';
         this.animPrefix = this.character;
 
         // Create player sprite
-        this.sprite = scene.add.sprite(0, 5, 'alchemist_idle_0'); // Reset offset for smaller scale
+        this.sprite = scene.add.sprite(0, 5, 'fok_idle_0'); // Reset offset for smaller scale
 
         // Auto-scale to fit hitbox height (90px)
         const targetHeight = PhysicsConfig.PLAYER_HEIGHT;
-        // User requested "smaller again/like before"
-        // Previous logic: 90 / 256 * 1.5 = 0.527
+
+        // Base size is 256 for both characters (User confirmed)
         const scale = (targetHeight / 256) * 1.5;
         this.sprite.setScale(scale);
 
@@ -168,6 +170,9 @@ export class Player extends Fighter {
         // Update Physics Component
         this.physics.update(delta, this.currentInput);
 
+        // Update Facing (Run after physics/velocity update, but before combat locks state)
+        this.updateFacing();
+
         // Update Combat Component
         this.combat.update(delta);
 
@@ -178,7 +183,6 @@ export class Player extends Fighter {
         this.updateTimers(delta);
 
         // Visuals
-        this.updateFacing();
         this.updateAnimation();
         this.updateDamageDisplay();
     }
@@ -199,6 +203,13 @@ export class Player extends Fighter {
     private updateFacing(): void {
         if (this.isHitStunned) return;
 
+        // Special case: Ground Pound sprite is inverted (faces LEFT?)
+        // So we invert the flip logic: Flip if facing Right (1), Don't flip if facing Left (-1)
+        if (this.combat.isGroundPounding) {
+            this.sprite.setFlipX(this.facingDirection > 0);
+            return;
+        }
+
         if (this.isAttacking) {
             const currentAttack = this.getCurrentAttack();
             if (currentAttack && currentAttack.phase !== AttackPhase.RECOVERY) {
@@ -207,7 +218,7 @@ export class Player extends Fighter {
         }
 
         if (this.physics.isWallSliding) {
-            this.facingDirection = this.physics.wallDirection;
+            this.facingDirection = -this.physics.wallDirection; // Look away from wall
         } else if (this.velocity.x > 5) {
             this.facingDirection = 1;
         } else if (this.velocity.x < -5) {
@@ -267,10 +278,18 @@ export class Player extends Fighter {
             return;
         }
 
+        if (this.combat.isGroundPounding) {
+            this.playAnim('ground_pound', true);
+            return;
+        }
+
         if (this.isAttacking) {
             const currentAttack = this.getCurrentAttack();
             if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
                 this.playAnim('attack_heavy', true); // Use dedicated heavy attack frame
+            } else if (currentAttack && currentAttack.data.direction === AttackDirection.UP) {
+                // Check if it's the up attack (light)
+                this.playAnim('attack_up', true);
             } else {
                 this.playAnim(`attack_light_${this.lightAttackVariant}`, true); // Use alternating single-frame light attack
             }

@@ -86,6 +86,21 @@ export const AttackRegistry: Record<string, AttackData> = {
         hitboxOffsetX: 30,
         hitboxOffsetY: 20,
     },
+    'light_up_grounded': {
+        type: AttackType.LIGHT,
+        direction: AttackDirection.UP,
+        isAerial: false,
+        damage: 4,
+        knockback: 320,
+        knockbackAngle: 85, // Upwards
+        startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
+        activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
+        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES,
+        hitboxWidth: 40,
+        hitboxHeight: 60, // Taller hitbox
+        hitboxOffsetX: 0,
+        hitboxOffsetY: -30, // Above player
+    },
 
     // ========== AERIAL LIGHT ATTACKS ==========
     'light_neutral_aerial': {

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-export type CharacterType = 'alchemist';
+export type CharacterType = 'fok';
 
 export interface PlayerSelection {
     playerId: number;
@@ -19,14 +19,16 @@ export class LobbyScene extends Phaser.Scene {
     private slots: PlayerSelection[] = [];
     private maxPlayers = 4;
     private mode: 'versus' | 'training' = 'versus';
+    private initialInputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD';
+    private initialGamepadIndex: number | null = null;
 
     // UI Elements
     private slotContainers: Phaser.GameObjects.Container[] = [];
     private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character Data
-    private characters: CharacterType[] = ['alchemist'];
-    private charLabels: string[] = ['Bloody Alchemist'];
+    private characters: CharacterType[] = ['fok'];
+    private charLabels: string[] = ['Fok'];
 
     // Input debounce & Safety
     private lastInputTime: Map<number, number> = new Map();
@@ -50,8 +52,10 @@ export class LobbyScene extends Phaser.Scene {
         super({ key: 'LobbyScene' });
     }
 
-    init(data: { mode: 'versus' | 'training' }): void {
+    init(data: { mode: 'versus' | 'training', inputType?: 'KEYBOARD' | 'GAMEPAD', gamepadIndex?: number | null }): void {
         this.mode = data.mode || 'versus';
+        this.initialInputType = data.inputType || 'KEYBOARD';
+        this.initialGamepadIndex = data.gamepadIndex !== undefined ? data.gamepadIndex : null;
     }
 
     create(): void {
@@ -79,7 +83,7 @@ export class LobbyScene extends Phaser.Scene {
             joined: false,
             ready: false,
             input: { type: 'KEYBOARD', gamepadIndex: null },
-            character: 'alchemist'
+            character: 'fok'
         }));
 
         this.createSlotUI();
@@ -119,8 +123,8 @@ export class LobbyScene extends Phaser.Scene {
         // Auto-join P1 (if keyboard)
         const p1 = this.slots[0];
         p1.joined = true;
-        p1.input.type = 'KEYBOARD';
-        p1.input.gamepadIndex = null;
+        p1.input.type = this.initialInputType;
+        p1.input.gamepadIndex = this.initialGamepadIndex;
         // P1 not ready yet
 
         // Auto-join P2 as Dummy
@@ -130,7 +134,7 @@ export class LobbyScene extends Phaser.Scene {
         p2.isAI = true;
         p2.isTrainingDummy = true;
         p2.ready = true; // Dummy is always ready
-        p2.character = 'alchemist';
+        p2.character = 'fok';
     }
 
     private createSlotUI(): void {
@@ -236,7 +240,7 @@ export class LobbyScene extends Phaser.Scene {
             slot.joined = true;
             slot.input.type = type;
             slot.input.gamepadIndex = index;
-            slot.character = 'alchemist';
+            slot.character = 'fok';
 
             // Prevent immediate "Ready" input in the same frame
             // Set input time to now so the debounce check in handlePlayerInput fails
