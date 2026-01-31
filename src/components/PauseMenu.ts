@@ -6,6 +6,7 @@ const MenuOption = {
     TRAINING: 3,
     SPAWN_DUMMY: 6,
     RESTART: 4,
+    LOBBY: 7,
     EXIT: 5
 } as const;
 type MenuOption = typeof MenuOption[keyof typeof MenuOption];
@@ -29,6 +30,7 @@ export class PauseMenu {
         // Training Options removed
         { label: 'Spawn Training Partner', value: MenuOption.SPAWN_DUMMY },
         { label: 'Restart Match', value: MenuOption.RESTART },
+        { label: 'Return to Lobby', value: MenuOption.LOBBY },
         { label: 'Exit to Menu', value: MenuOption.EXIT }
     ];
 
@@ -360,6 +362,9 @@ export class PauseMenu {
                 break;
             case MenuOption.RESTART:
                 this.scene.events.emit('pauseMenuRestart');
+                break;
+            case MenuOption.LOBBY:
+                this.scene.events.emit('pauseMenuLobby');
                 break;
             case MenuOption.EXIT:
                 this.scene.events.emit('pauseMenuExit');

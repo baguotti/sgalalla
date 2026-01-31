@@ -43,7 +43,7 @@ export class Player extends Fighter {
     public getFacingDirection(): number { return this.facingDirection; }
 
     // Damage display
-    private damageText: Phaser.GameObjects.Text;
+
 
     // Unified input system (keyboard + gamepad)
     private inputManager!: InputManager;
@@ -107,19 +107,19 @@ export class Player extends Fighter {
             this.sprite.setTint(0x55ff55); // Green tint for Player 2
         }
 
-        // Create damage text
-        this.damageText = scene.add.text(0, -50, '0%', {
-            fontSize: '16px',
-            color: '#ffffff',
-            fontFamily: 'Arial',
-            stroke: '#000000',
-            strokeThickness: 3,
-        });
-        this.damageText.setOrigin(0.5);
-        this.add(this.damageText);
+
 
         // Create Name Tag (Player Indicator)
-        this.nameTag = scene.add.text(0, -75, `P${this.playerId + 1}`, {
+        // Logic: specific name for human (FOK), CPU N for AI
+        let displayName = '';
+        if (this.isAI) {
+            displayName = `CPU ${this.playerId + 1}`;
+        } else {
+            // Use character name in uppercase
+            displayName = this.character.toUpperCase();
+        }
+
+        this.nameTag = scene.add.text(0, -60, displayName, {
             fontSize: '18px',
             fontFamily: 'Arial',
             fontStyle: 'bold',
@@ -360,7 +360,13 @@ export class Player extends Fighter {
         if (this.isAttacking) {
             const currentAttack = this.getCurrentAttack();
             if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
-                this.playAnim('attack_heavy', true); // Use dedicated heavy attack frame
+                if (currentAttack.data.direction === AttackDirection.DOWN) {
+                    this.playAnim('attack_down', true);
+                } else if (currentAttack.data.direction === AttackDirection.SIDE) {
+                    this.playAnim('attack_side', true);
+                } else {
+                    this.playAnim('attack_heavy', true);
+                }
             } else if (currentAttack && currentAttack.data.direction === AttackDirection.UP) {
                 // Check if it's the up attack (light)
                 this.playAnim('attack_up', true);
@@ -404,16 +410,18 @@ export class Player extends Fighter {
     private playAnim(key: string, ignoreIfPlaying: boolean = true): void {
         let fullKey = `${this.animPrefix}_${key}`;
         this.sprite.anims.play(fullKey, ignoreIfPlaying);
+
+        // Apply custom offsets for misaligned sprites
+        if (key === 'attack_side') {
+            this.sprite.x = 35;
+        } else {
+            this.sprite.x = 0;
+        }
     }
 
     private updateDamageDisplay(): void {
-        const label = `P${this.playerId + 1}`;
-        this.damageText.setText(label);
-
-        // Match player color
-        // Convert number color to hex string
-        const colorHex = '#' + this.visualColor.toString(16).padStart(6, '0');
-        this.damageText.setColor(colorHex);
+        // Damage display removed from player sprite (User request)
+        // Only PlayerHUD shows damage now.
     }
 
     // Getters for HUD
@@ -499,9 +507,7 @@ export class Player extends Fighter {
 
     public addToCameraIgnore(camera: Phaser.Cameras.Scene2D.Camera): void {
         camera.ignore(this);
-        if (this.damageText) {
-            camera.ignore(this.damageText);
-        }
+
     }
 
     destroy(fromScene?: boolean): void {

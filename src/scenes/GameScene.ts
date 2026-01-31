@@ -87,20 +87,24 @@ export class GameScene extends Phaser.Scene {
                 { key: 'slide', folder: 'Sliding', count: 1, prefix: '0_Fok_Sliding_', type: 'manual', filename: '0_Fok_Sliding_000.png' },
                 { key: 'attack', folder: 'Throwing', count: 12, prefix: '0_Fok_Throwing_' }, // Assuming verification
                 { key: 'attack', folder: 'Throwing', count: 12, prefix: '0_Fok_Throwing_' }, // Assuming verification
+                { key: 'attack_down', folder: 'Down_Sig', count: 1, prefix: '0_Fok_DownSig_', type: 'manual', filename: '0_Fok_DownSig_001.png' },
+                { key: 'attack_side', folder: 'Side_Sig', count: 1, prefix: '0_Fok_SideSig_', type: 'manual', filename: '0_Fok_SideSig_001.png' }
             ];
 
         fokAssets.forEach(asset => {
-            for (let i = 0; i < asset.count; i++) {
-                let filename = '';
-                if (asset.type === 'manual' && asset.filename) {
-                    filename = asset.filename;
-                } else {
+            // Check for manual single-file assets
+            if (asset.type === 'manual' && asset.filename) {
+                const path = `assets/fok/${asset.folder}/${asset.filename}`;
+                this.load.image(`fok_${asset.key}_0`, path);
+            } else {
+                // Numbered sequence loading
+                for (let i = 0; i < asset.count; i++) {
                     const num = i.toString().padStart(3, '0');
-                    filename = `${asset.prefix}${num}.png`;
+                    const filename = `${asset.prefix}${num}.png`;
+                    const key = `fok_${asset.key}_${i}`;
+                    const path = `assets/fok/${asset.folder}/${filename}`;
+                    this.load.image(key, path);
                 }
-                const key = `fok_${asset.key}_${i}`;
-                const path = `assets/fok/${asset.folder}/${filename}`;
-                this.load.image(key, path);
             }
         });
     }
@@ -126,158 +130,198 @@ export class GameScene extends Phaser.Scene {
 
 
     create(): void {
-        // --- Fok Animations ---
-        const fokAnims = [
-            { key: 'idle', count: 19, loop: true },
-            { key: 'run', count: 12, loop: true },
-            { key: 'jump_start', count: 6, loop: false },
-            { key: 'jump', count: 1, loop: true },
-            { key: 'fall', count: 1, loop: true },
-            { key: 'hurt', count: 1, loop: false },
-            { key: 'ground_pound', count: 1, loop: true },
-            { key: 'attack', count: 12, loop: false },
-            { key: 'attack', count: 12, loop: false },
-            { key: 'slide', count: 1, loop: true },
-            { key: 'dodge', count: 1, loop: false }, // Using same frame logic as slide, mapped later or just created here if frames valid
-            { key: 'charging', count: 8, loop: true },
-            { key: 'attack_light', count: 1, loop: false },
-            { key: 'attack_up', count: 1, loop: false }
-        ];
+        try {
+            console.log("GameScene.create started");
+            const { width, height } = this.scale;
 
-        fokAnims.forEach(anim => {
-            const frames = [];
-            for (let i = 0; i < anim.count; i++) {
-                frames.push({ key: `fok_${anim.key}_${i}` });
-            }
+            // --- Physics Setup ---
+            this.matter.world.setBounds(0, 0, width, height);
+            this.matter.world.setGravity(0, 1);
+
+            // --- Error Handler (Visual) ---
+            // (Error text is created dynamically in catch block if needed)
+            this.matter.world.setBounds(0, 0, width, height);
+
+            // --- Fok Animations ---
+            const fokAnims = [
+                { key: 'idle', count: 19, loop: true },
+                { key: 'run', count: 12, loop: true },
+                { key: 'jump_start', count: 6, loop: false },
+                { key: 'jump', count: 1, loop: true },
+                { key: 'fall', count: 1, loop: true },
+                { key: 'hurt', count: 1, loop: false },
+                { key: 'ground_pound', count: 1, loop: true },
+                { key: 'attack', count: 12, loop: false },
+                { key: 'slide', count: 1, loop: true },
+                { key: 'dodge', count: 1, loop: false },
+                { key: 'charging', count: 8, loop: true },
+                { key: 'attack_light', count: 1, loop: false },
+                { key: 'attack_up', count: 1, loop: false },
+                { key: 'attack_down', count: 1, loop: false, type: 'manual', filename: '0_Fok_DownSig_001.png', folder: 'Down_Sig', prefix: '0_Fok_DownSig_' },
+                { key: 'attack_side', count: 1, loop: false, type: 'manual', filename: '0_Fok_SideSig_001.png', folder: 'Side_Sig', prefix: '0_Fok_SideSig_' }
+            ];
+
+            fokAnims.forEach(anim => {
+                const frames = [];
+                for (let i = 0; i < anim.count; i++) {
+                    frames.push({ key: `fok_${anim.key}_${i}` });
+                }
+
+                this.anims.create({
+                    key: `fok_${anim.key}`,
+                    frames: frames,
+                    frameRate: anim.key === 'run' ? 20 : 15,
+                    repeat: anim.loop ? -1 : 0
+                });
+            });
+
+            // Fok Light Attack (Single Frame 001)
+            this.anims.create({
+                key: 'fok_attack_light_0',
+                frames: [{ key: `fok_attack_light_0` }],
+                frameRate: 10,
+                repeat: 0
+            });
+            // Map dodge explicitly
+            this.anims.create({
+                key: 'fok_dodge',
+                frames: [{ key: `fok_slide_0` }],
+                frameRate: 10,
+                repeat: 0
+            });
 
             this.anims.create({
-                key: `fok_${anim.key}`,
-                frames: frames,
-                frameRate: anim.key === 'run' ? 20 : 15,
-                repeat: anim.loop ? -1 : 0
+                key: 'fok_attack_light_1',
+                frames: [{ key: `fok_attack_light_0` }],
+                frameRate: 10,
+                repeat: 0
             });
-        });
-
-        // Fok Light Attack (Single Frame 001)
-        this.anims.create({
-            key: 'fok_attack_light_0', // Keeping variants for Player.ts compatibility, but mapping to same frame
-            frames: [{ key: `fok_attack_light_0` }],
-            frameRate: 10,
-            repeat: 0
-        });
-        // Map dodge explicitly to slide frame if asset not loaded as 'dodge'
-        this.anims.create({
-            key: 'fok_dodge',
-            frames: [{ key: `fok_slide_0` }],
-            frameRate: 10,
-            repeat: 0
-        });
-
-        this.anims.create({
-            key: 'fok_attack_light_1',
-            frames: [{ key: `fok_attack_light_0` }],
-            frameRate: 10,
-            repeat: 0
-        });
-        // Also map 'heavy' to something so it doesn't crash
-        this.anims.create({
-            key: 'fok_attack_heavy',
-            frames: [{ key: `fok_attack_heavy_0` }],
-            frameRate: 1,
-            repeat: 0
-        });
-
-        // Create Fok Animations
-        // Set background color
-        this.cameras.main.setBackgroundColor('#1a1a2e');
-
-        // Create stage platforms
-        // Create stage platforms
-        this.createStage();
-
-        // Create Players
-        this.players = [];
-        const spawnPoints = [
-            { x: 450, y: 300 },
-            { x: 1470, y: 300 },
-            { x: 960, y: 200 },
-            { x: 960, y: 400 }
-        ];
-
-        this.playerData.forEach(pData => {
-            if (!pData.joined) return;
-
-            const spawn = spawnPoints[pData.playerId] || { x: 960, y: 300 };
-
-            const player = new Player(this, spawn.x, spawn.y, {
-                playerId: pData.playerId,
-                gamepadIndex: pData.input.gamepadIndex,
-                useKeyboard: pData.input.type === 'KEYBOARD',
-                character: pData.character
+            // Heavy attack mapping
+            this.anims.create({
+                key: 'fok_attack_heavy',
+                frames: [{ key: `fok_attack_heavy_0` }],
+                frameRate: 1,
+                repeat: 0
             });
 
-            // Set Color
-            const color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
-
-            // Only tint AI skins
-            if (pData.isAI) {
-                player.visualColor = color;
-            } else {
-                player.visualColor = 0xffffff;
-            }
-            player.resetVisuals();
-
-            this.players.push(player);
-        });
+            // Down Sig (Heavy Down)
+            this.anims.create({
+                key: 'fok_attack_down',
+                frames: [{ key: `fok_attack_down_0` }],
+                frameRate: 10,
+                repeat: 0
+            });
 
 
-        // Setup cameras
-        this.setupCameras();
+            // Set background color
+            this.cameras.main.setBackgroundColor('#1a1a2e');
 
-        // Create debug overlay
-        this.debugOverlay = new DebugOverlay(this);
-        // Make debug overlay ignore main camera (only render on UI camera)
-        this.debugOverlay.setCameraIgnore(this.cameras.main);
+            // Create stage platforms
+            this.createStage();
 
-        // Add controls hint
-        this.createControlsHint();
+            // Create Players
+            this.players = [];
+            const spawnPoints = [
+                { x: 450, y: 300 },
+                { x: 1470, y: 300 },
+                { x: 960, y: 200 },
+                { x: 960, y: 400 }
+            ];
 
-        // Create HUDs
-        this.createHUDs();
+            this.playerData.forEach(pData => {
+                if (!pData.joined) return;
+
+                const spawn = spawnPoints[pData.playerId] || { x: 960, y: 300 };
+
+                console.log(`Creating player ${pData.playerId}...`);
+                const player = new Player(this, spawn.x, spawn.y, {
+                    playerId: pData.playerId,
+                    gamepadIndex: pData.input.gamepadIndex,
+                    useKeyboard: pData.input.type === 'KEYBOARD',
+                    character: pData.character
+                });
+                console.log(`Player ${pData.playerId} created.`);
+
+                // Set Color
+                const color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
+
+                // Only tint AI skins
+                if (pData.isAI) {
+                    player.visualColor = color;
+                } else {
+                    player.visualColor = 0xffffff;
+                }
+                player.resetVisuals();
+
+                this.players.push(player);
+                console.log(`Player ${pData.playerId} pushed to array.`);
+            });
 
 
-        // Toggle key
-        this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q); // Changed from F3 to Q
-        this.trainingToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
-        this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+            // Setup cameras
+            this.setupCameras();
 
-        // Create pause menu
-        this.pauseMenu = new PauseMenu(this);
-        this.cameras.main.ignore(this.pauseMenu.getElements());
+            // Create debug overlay
+            this.debugOverlay = new DebugOverlay(this);
+            this.debugOverlay.setCameraIgnore(this.cameras.main);
 
-        // Pause menu event listeners
-        this.events.on('pauseMenuResume', () => this.togglePause());
-        this.events.on('pauseMenuRestart', () => this.restartMatch());
-        this.events.on('pauseMenuExit', () => {
-            // Force a reload to ensure clean state and avoid memory leaks
-            window.location.reload();
-        });
-        this.events.on('spawnDummy', () => {
-            this.togglePause(); // Unpause
-            if (this.players.length < 4) {
-                this.spawnTrainingDummy();
-            }
-        });
+            // Add controls hint
+            this.createControlsHint();
 
-        // Handle Resume from other scenes (e.g. Settings)
-        this.events.on('resume', () => {
-            // If we were paused (likely, since we went to settings), show the menu again
-            if (this.isPaused) {
-                this.pauseMenu.show();
-                // Ensure keys are reset to avoid sticking
-                this.input.keyboard?.resetKeys();
-            }
-        });
+            // Create HUDs
+            this.createHUDs();
+
+            // Toggle key
+            this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+            this.trainingToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
+            this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+            // Create pause menu
+            this.pauseMenu = new PauseMenu(this);
+            this.cameras.main.ignore(this.pauseMenu.getElements());
+
+            // Pause menu event listeners
+            this.events.on('pauseMenuResume', () => this.togglePause());
+            this.events.on('pauseMenuRestart', () => this.restartMatch());
+            this.events.on('pauseMenuLobby', () => {
+                console.log("PauseMenu: Returning to Lobby...");
+                this.time.delayedCall(10, () => {
+                    try {
+                        console.log("Switching to LobbyScene");
+                        // Pass current player data back to lobby to preserve connections
+                        this.scene.start('LobbyScene', {
+                            mode: 'versus', // Defaulting to versus for now
+                            slots: this.playerData
+                        });
+                    } catch (e) {
+                        console.error("Failed to start LobbyScene:", e);
+                    }
+                });
+            });
+            this.events.on('pauseMenuExit', () => {
+                window.location.reload();
+            });
+            this.events.on('spawnDummy', () => {
+                this.togglePause(); // Unpause
+                if (this.players.length < 4) {
+                    this.spawnTrainingDummy();
+                }
+            });
+
+            // Handle Resume from other scenes
+            this.events.on('resume', () => {
+                if (this.isPaused) {
+                    this.pauseMenu.show();
+                    this.input.keyboard?.resetKeys();
+                }
+            });
+            console.log("GameScene.create completed successfully");
+
+        } catch (e: any) {
+            console.error("CRITICAL ERROR in GameScene.create:", e);
+            const errT = this.add.text(this.scale.width / 2, this.scale.height / 2, "CRASH: " + e?.message || String(e), { fontSize: '32px', color: '#ff0000', backgroundColor: '#000' });
+            errT.setOrigin(0.5).setDepth(9999);
+        }
     }
 
     private setupCameras(): void {
@@ -326,7 +370,8 @@ export class GameScene extends Phaser.Scene {
 
         // Main platform (centered, wide - Brawlhalla style)
         // At 1920x1080: center is x=960, place main platform lower at y=825 (550*1.5)
-        const mainPlatform = this.add.rectangle(960, 825, 1350, 45, 0x16213e); // 640->960, 550->825, 900->1350, 30->45
+        // Made lighter (0x2c3e50) to be visible against background
+        const mainPlatform = this.add.rectangle(960, 825, 1350, 45, 0x2c3e50); // 640->960, 550->825, 900->1350, 30->45
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
 
@@ -434,13 +479,28 @@ export class GameScene extends Phaser.Scene {
             }
 
             const color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
-            const hud = new PlayerHUD(this, x, y, isLeft, `Player ${pData.playerId + 1}`, color);
+
+            let displayName = '';
+            if (pData.isAI) {
+                displayName = `CPU ${pData.playerId + 1}`;
+            } else {
+                displayName = (pData.character || 'fok').toUpperCase();
+            }
+
+            const hud = new PlayerHUD(this, x, y, isLeft, displayName, color);
             hud.addToCameraIgnore(this.cameras.main);
             this.playerHUDs.push(hud);
         });
     }
 
+    private debugUpdateCounter = 0;
+
     update(_time: number, delta: number): void {
+        this.debugUpdateCounter++;
+        if (this.debugUpdateCounter % 60 === 0) {
+            console.log(`GameScene.update running. Frame: ${this.debugUpdateCounter}`);
+        }
+
         // Handle Pause Toggle (ESC key or START button on gamepad)
         const pauseKeyPressed = Phaser.Input.Keyboard.JustDown(this.pauseKey);
         const gamepadPausePressed = this.checkGamepadPause();
@@ -727,6 +787,8 @@ export class GameScene extends Phaser.Scene {
         this.pauseMenu.hide();
     }
 
+
+
     private spawnTrainingDummy(): void {
         const maxPlayers = 4;
 
@@ -799,7 +861,7 @@ export class GameScene extends Phaser.Scene {
             case 3: x = this.scale.width - 120; y = this.scale.height - 80; isLeft = false; break;
         }
 
-        const hud = new PlayerHUD(this, x, y, isLeft, `CPU ${playerId + 1} (Dummy)`, color);
+        const hud = new PlayerHUD(this, x, y, isLeft, `CPU ${playerId + 1}`, color);
         hud.addToCameraIgnore(this.cameras.main);
 
         // Ensure we don't duplicate HUD if re-spawning (though player array check prevents this)
@@ -812,16 +874,27 @@ export class GameScene extends Phaser.Scene {
     // Clean up when scene is shut down (e.g. switching to menu)
     // Clean up when scene is shut down (e.g. switching to menu)
     shutdown(): void {
-        // Stop all physics and input
-        if (this.matter && this.matter.world) {
-            this.matter.world.shutdown();
+        console.log("GameScene.shutdown started");
+        try {
+            // Stop all physics and input
+            if (this.matter && this.matter.world) {
+                this.matter.world.shutdown();
+            }
+        } catch (e) {
+            console.warn("Error shutting down physics:", e);
         }
-        this.input.keyboard?.removeAllKeys();
-        this.input.keyboard?.resetKeys();
+
+        try {
+            this.input.keyboard?.removeAllKeys();
+            this.input.keyboard?.resetKeys();
+        } catch (e) {
+            console.warn("Error clearing input keys:", e);
+        }
 
         // Kill event listeners
         this.events.off('pauseMenuResume');
         this.events.off('pauseMenuRestart');
+        this.events.off('pauseMenuLobby');
         this.events.off('pauseMenuExit');
         this.events.off('spawnDummy');
 

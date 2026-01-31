@@ -159,8 +159,6 @@ export class PlayerCombat {
         // Grounded UP = NEUTRAL (for NLight)
         // Aerial UP = UP (for Recovery/Nair)
 
-        const isGrounded = this.player.isGrounded;
-
         if (input.aimUp && !input.aimDown) {
             return AttackDirection.UP;
         }
@@ -361,11 +359,44 @@ export class PlayerCombat {
     private updateHitbox(): void {
         if (!this.currentAttack) return;
 
-        const offset = this.currentAttack.getHitboxOffset();
+        let offset = this.currentAttack.getHitboxOffset();
+        let width = this.currentAttack.data.hitboxWidth;
+        let height = this.currentAttack.data.hitboxHeight;
+
+        // Custom Overrides
+        // Down Sig: Center Bottom
+        if (this.currentAttack.data.type === AttackType.HEAVY &&
+            this.currentAttack.data.direction === AttackDirection.DOWN) {
+
+            // Position at bottom of player collision box
+            // Player Y is center, so add half height
+            // We want the CENTER of the hitbox to be at the BOTTOM of the player
+            offset.x = 0;
+            offset.y = PhysicsConfig.PLAYER_HEIGHT / 2;
+
+            // Adjust dimensions: Wider and Less Tall
+            width = 110;
+            height = 30;
+        }
+
+        // Neutral/Up Sig: Center Top, Flat and Wide
+        if (this.currentAttack.data.type === AttackType.HEAVY &&
+            (this.currentAttack.data.direction === AttackDirection.UP ||
+                this.currentAttack.data.direction === AttackDirection.NEUTRAL)) {
+
+            // Position at top of player collision box
+            offset.x = 0;
+            offset.y = -PhysicsConfig.PLAYER_HEIGHT / 2;
+
+            // Adjust dimensions: Wider and Flat (but slightly taller than DownSig)
+            width = 110;
+            height = 34;
+        }
+
         const hitboxX = this.player.x + offset.x;
         const hitboxY = this.player.y + offset.y;
 
-        this.updateActiveHitbox(hitboxX, hitboxY, this.currentAttack.data.hitboxWidth, this.currentAttack.data.hitboxHeight);
+        this.updateActiveHitbox(hitboxX, hitboxY, width, height);
     }
 
     public updateRecoveryHitbox(): void {
