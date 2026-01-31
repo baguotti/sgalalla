@@ -59,10 +59,23 @@ export class Player extends Fighter {
     public playerId: number = 0;
 
     // Character Type
-    public character: 'alchemist' | 'dude' = 'alchemist';
+    public character: 'alchemist' = 'alchemist';
     private animPrefix: string = 'alchemist';
+    private debugRect!: Phaser.GameObjects.Rectangle;
+    private showDebugHitboxes: boolean = false;
+    public lightAttackVariant: number = 0;
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'alchemist' | 'dude' } = {}) {
+    public setDebug(visible: boolean): void {
+        this.showDebugHitboxes = visible;
+        if (this.debugRect) {
+            this.debugRect.setVisible(visible);
+        }
+        if (this.combat) {
+            this.combat.setDebug(visible);
+        }
+    }
+
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'alchemist' } = {}) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
@@ -74,17 +87,13 @@ export class Player extends Fighter {
         this.animPrefix = this.character;
 
         // Create player sprite
-        // Note: dude sprite is a spritesheet 'dude', allowing frame numbers. Alchemist uses texture keys.
-        // If dude, we use 'dude' key and set frame 4 (idle).
-        if (this.character === 'dude') {
-            this.sprite = scene.add.sprite(0, 0, 'dude', 4);
-        } else {
-            this.sprite = scene.add.sprite(0, 8, 'alchemist_idle_0');
-        }
+        this.sprite = scene.add.sprite(0, 5, 'alchemist_idle_0'); // Reset offset for smaller scale
 
         // Auto-scale to fit hitbox height (90px)
         const targetHeight = PhysicsConfig.PLAYER_HEIGHT;
-        const scale = targetHeight / this.sprite.height;
+        // User requested "smaller again/like before"
+        // Previous logic: 90 / 256 * 1.5 = 0.527
+        const scale = (targetHeight / 256) * 1.5;
         this.sprite.setScale(scale);
 
         this.add(this.sprite);
@@ -114,6 +123,13 @@ export class Player extends Fighter {
         if (this.isAI) {
             this.ai = new PlayerAI(this, scene);
         }
+
+        // Create Debug Hitbox (Hidden by default)
+        this.debugRect = scene.add.rectangle(0, 0, this.width, this.height);
+        this.debugRect.setStrokeStyle(2, 0x00ff00);
+        this.debugRect.setFillStyle(0x00ff00, 0.2);
+        this.debugRect.setVisible(false);
+        this.add(this.debugRect);
 
         // Setup input manager
         const defaultKeyboard = this.playerId === 0 && !this.isAI;
@@ -198,7 +214,7 @@ export class Player extends Fighter {
             this.facingDirection = -1;
         }
 
-        // Apply facing to spine object
+        // Apply facing to sprite
         // FlipX true means face LEFT (if original faces Right).
         // If original faces RIGHT:
         //   Facing 1 (Right): Flip false.
@@ -246,19 +262,37 @@ export class Player extends Fighter {
             return;
         }
 
+        if (this.combat.isCharging) {
+            this.playAnim('charging', true);
+            return;
+        }
+
         if (this.isAttacking) {
             const currentAttack = this.getCurrentAttack();
             if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
-                this.playAnim('kick', true); // Mapping Heavy to Kick for Alchemist
+                this.playAnim('attack_heavy', true); // Use dedicated heavy attack frame
             } else {
-                this.playAnim('attack', true);
+                this.playAnim(`attack_light_${this.lightAttackVariant}`, true); // Use alternating single-frame light attack
             }
+            return;
+        }
+
+        // Airborne
+        if (this.isDodging) {
+            this.playAnim('slide', true);
             return;
         }
 
         // Airborne
         if (!this.isGrounded) {
             if (this.velocity.y < 0) {
+                // If moving up fast, use jump start, else loop?
+                // Simplification: mapped 'jump' to 'Jump Loop' in GameScene.
+                // To support jump start properly, we'd need a trigger.
+                // For now, let's play 'jump' (Jump Loop).
+                // User asked for "jump start, jump loop" mapping.
+                // If I just mapped 'jump' key to 'Jump Loop', I'm missing Jump Start.
+                // I can map 'jump_start' if velocity.y is lower than threshold?
                 this.playAnim('jump', true);
             } else {
                 this.playAnim('fall', true);
@@ -276,23 +310,6 @@ export class Player extends Fighter {
 
     private playAnim(key: string, ignoreIfPlaying: boolean = true): void {
         let fullKey = `${this.animPrefix}_${key}`;
-
-        // Map generic keys to specific "dude" keys if using dude
-        if (this.character === 'dude') {
-            // Dude has limited animations: left, right, turn (idle)
-            // Mapping:
-            // run -> right/left (based on facing? sprite is flipped so always play right?)
-            // idle -> turn
-            // jump/fall -> turn (no jump anim)
-            // attack/hurt -> turn (no anims)
-
-            switch (key) {
-                case 'run': fullKey = 'right'; break; // Sprite flipping handles direction
-                case 'idle': fullKey = 'turn'; break;
-                default: fullKey = 'turn'; break;
-            }
-        }
-
         this.sprite.anims.play(fullKey, ignoreIfPlaying);
     }
 

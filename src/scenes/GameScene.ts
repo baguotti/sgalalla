@@ -60,21 +60,20 @@ export class GameScene extends Phaser.Scene {
     }
 
     preload(): void {
-        this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
-
-        // Preload Humanoid Spine Assets (Spineboy)
-        (this.load as any).spineJson('humanoid-data', 'assets/spine/humanoid/spineboy-pro.json');
-        (this.load as any).spineAtlas('humanoid-atlas', 'assets/spine/humanoid/spineboy-pma.atlas');
-
         // Preload Bloody Alchemist Sprites
         const alchemistStates = [
-            { name: 'Idle', key: 'idle', frames: 18 },
-            { name: 'Running', key: 'run', frames: 12 },
+            { name: 'Idle', key: 'idle', frames: 19 },
+            { name: 'Running', key: 'run', frames: 12 }, // Swapped to Running
+            { name: 'Jump Start', key: 'jump_start', frames: 6 },
             { name: 'Jump Loop', key: 'jump', frames: 6 },
             { name: 'Falling Down', key: 'fall', frames: 6 },
             { name: 'Hurt', key: 'hurt', frames: 12 },
-            { name: 'Slashing', key: 'attack', frames: 12 },
-            { name: 'Kicking', key: 'kick', frames: 12 }
+            { name: 'Throwing', key: 'attack', frames: 12 },
+            { name: 'Kicking', key: 'kick', frames: 12 },
+            { name: 'Sliding', key: 'slide', frames: 6 },
+            { name: 'AttackLight', key: 'attack_light', frames: 2 },
+            { name: 'AttackHeavy', key: 'attack_heavy', frames: 1 },
+            { name: 'Charging', key: 'charging', frames: 8 }
         ];
 
         alchemistStates.forEach(state => {
@@ -120,56 +119,50 @@ export class GameScene extends Phaser.Scene {
 
 
     create(): void {
-        // Create animations
-        this.anims.create({
-            key: 'left',
-            frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
-            frameRate: 10,
-            repeat: -1
-        });
-
-        this.anims.create({
-            key: 'turn',
-            frames: [{ key: 'dude', frame: 4 }],
-            frameRate: 20
-        });
-
-        this.anims.create({
-            key: 'right',
-            frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }),
-            frameRate: 10,
-            repeat: -1
-        });
-
         // Create Bloody Alchemist Animations
         const alchemistAnims = [
-            { key: 'idle', count: 18, loop: true },
-            { key: 'run', count: 12, loop: true },
+            { key: 'idle', count: 19, loop: true },
+            { key: 'run', count: 12, loop: true }, // Running (12 frames)
+            { key: 'jump_start', count: 6, loop: false },
             { key: 'jump', count: 6, loop: true },
             { key: 'fall', count: 6, loop: true },
             { key: 'hurt', count: 12, loop: false },
             { key: 'attack', count: 12, loop: false },
-            { key: 'kick', count: 12, loop: false }
+            { key: 'kick', count: 12, loop: false },
+            { key: 'slide', count: 6, loop: true },
+            { key: 'charging', count: 8, loop: true },
+            { key: 'attack_heavy', count: 1, loop: false }
         ];
 
         alchemistAnims.forEach(anim => {
             const frames = [];
             for (let i = 0; i < anim.count; i++) {
-                // Check if texture exists to avoid warnings/errors if count is wrong?
-                // Phaser doesn't easily let us check texture existence in loop without overhead.
-                // We will assume counts are roughly correct or limit them.
-                // Run had 12. Idle 18.
-                // I'll be safe with upper bounds or fix if they glitch.
                 frames.push({ key: `alchemist_${anim.key}_${i}` });
             }
+
             this.anims.create({
                 key: `alchemist_${anim.key}`,
                 frames: frames,
-                frameRate: 15, // Smooth animation
+                frameRate: anim.key === 'run' ? 20 : 15,
                 repeat: anim.loop ? -1 : 0
             });
         });
 
+        // Manual creation for alternating Light Attacks
+        this.anims.create({
+            key: 'alchemist_attack_light_0',
+            frames: [{ key: 'alchemist_attack_light_0' }],
+            frameRate: 1,
+            repeat: 0
+        });
+        this.anims.create({
+            key: 'alchemist_attack_light_1',
+            frames: [{ key: 'alchemist_attack_light_1' }],
+            frameRate: 1,
+            repeat: 0
+        });
+
+        // Create Fok Animations
         // Set background color
         this.cameras.main.setBackgroundColor('#1a1a2e');
 
@@ -418,6 +411,10 @@ export class GameScene extends Phaser.Scene {
 
         if (Phaser.Input.Keyboard.JustDown(this.debugToggleKey)) {
             this.debugVisible = !this.debugVisible;
+            // Update Debug Overlay
+            this.debugOverlay.setVisible(this.debugVisible);
+            // Update Players
+            this.players.forEach(p => p.setDebug(this.debugVisible));
         }
 
         // Handle Training Toggle (T)
@@ -729,11 +726,22 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Clean up when scene is shut down (e.g. switching to menu)
+    // Clean up when scene is shut down (e.g. switching to menu)
     shutdown(): void {
+        // Stop all physics and input
+        if (this.matter && this.matter.world) {
+            this.matter.world.shutdown();
+        }
+        this.input.keyboard?.removeAllKeys();
+        this.input.keyboard?.resetKeys();
+
+        // Kill event listeners
         this.events.off('pauseMenuResume');
         this.events.off('pauseMenuRestart');
         this.events.off('pauseMenuExit');
         this.events.off('spawnDummy');
-        this.input.keyboard?.removeAllKeys();
+
+        // Destroy players
+        this.players.forEach(p => p.destroy());
     }
 }

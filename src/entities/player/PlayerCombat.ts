@@ -30,10 +30,18 @@ export class PlayerCombat {
     public chargeTime: number = 0;
     public chargeDirection: AttackDirection = AttackDirection.NEUTRAL;
     private chargeGlow: Phaser.GameObjects.Graphics | null = null;
+    private showDebugHitboxes: boolean = false;
 
     constructor(player: Player, scene: Phaser.Scene) {
         this.player = player;
         this.scene = scene;
+    }
+
+    public setDebug(visible: boolean): void {
+        this.showDebugHitboxes = visible;
+        if (this.activeHitbox) {
+            this.activeHitbox.setDebug(visible);
+        }
     }
 
     public update(delta: number): void {
@@ -170,7 +178,12 @@ export class PlayerCombat {
             this.hitTargets.clear();
 
             // Visual feedback
-            this.player.setVisualTint(0xff0000); // Red during attack
+            // this.player.setVisualTint(0xff0000); // Removed red tint
+
+            // Alternate light attack animation
+            if (this.currentAttack.data.type === AttackType.LIGHT) {
+                this.player.lightAttackVariant = (this.player.lightAttackVariant + 1) % 2;
+            }
         } catch (e) {
             console.warn('Unknown attack:', attackKey);
         }
@@ -296,7 +309,7 @@ export class PlayerCombat {
             console.warn('Ground pound attack not found');
         }
 
-        this.player.setVisualTint(0x9b59b6); // Purple for ground pound startup
+        // this.player.setVisualTint(0x9b59b6); // Purple for ground pound startup
     }
 
     private updateAttackState(delta: number): void {
@@ -310,7 +323,7 @@ export class PlayerCombat {
             this.groundPoundStartupTimer -= delta;
             this.player.velocity.set(0, 0); // Stay suspended
             if (this.groundPoundStartupTimer <= 0) {
-                this.player.setVisualTint(0xff0000); // Switch to attack color
+                // this.player.setVisualTint(0xff0000); // Switch to attack color
             }
             return;
         }
@@ -340,6 +353,7 @@ export class PlayerCombat {
         }
 
         // Visual feedback based on phase
+        /*
         if (this.currentAttack.phase === AttackPhase.STARTUP) {
             this.player.setVisualTint(0xf39c12); // Orange during startup
         } else if (this.currentAttack.phase === AttackPhase.ACTIVE) {
@@ -347,6 +361,7 @@ export class PlayerCombat {
         } else if (this.currentAttack.phase === AttackPhase.RECOVERY) {
             this.player.setVisualTint(0x888888); // Gray during recovery
         }
+        */
 
         if (attackComplete) {
             this.endAttack();
@@ -406,6 +421,8 @@ export class PlayerCombat {
                 width,
                 height
             );
+            // Sync current debug state
+            this.activeHitbox.setDebug(this.showDebugHitboxes);
         }
         this.activeHitbox.setSize(width, height);
         this.activeHitbox.activate(x, y);

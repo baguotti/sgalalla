@@ -43,10 +43,10 @@ export const PhysicsConfig = {
   HEAVY_ATTACK_COOLDOWN: 600, // ms - unchanged
 
   // Hitbox sizes
-  LIGHT_HITBOX_WIDTH: 90, // 60 * 1.5
-  LIGHT_HITBOX_HEIGHT: 60, // 40 * 1.5
-  HEAVY_HITBOX_WIDTH: 120, // 80 * 1.5
-  HEAVY_HITBOX_HEIGHT: 90, // 60 * 1.5
+  LIGHT_HITBOX_WIDTH: 60, // Reduced from 90 (was 60 * 1.5)
+  LIGHT_HITBOX_HEIGHT: 40, // Reduced from 60 (was 40 * 1.5)
+  HEAVY_HITBOX_WIDTH: 80, // Reduced from 120 (was 80 * 1.5)
+  HEAVY_HITBOX_HEIGHT: 60, // Reduced from 90 (was 60 * 1.5)
 
   // Dodge/Dash - Brawlhalla style (fast and covers ground)
   DODGE_DISTANCE: 225, // 150 * 1.5

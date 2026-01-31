@@ -1,199 +1,147 @@
 import Phaser from 'phaser';
 
-const MenuOption = {
-    LOCAL_MULTIPLAYER: 0,
-    ONLINE: 2,
-    EXIT: 3
-} as const;
-type MenuOption = typeof MenuOption[keyof typeof MenuOption];
-
 export class MainMenuScene extends Phaser.Scene {
-    private menuItems: Phaser.GameObjects.Text[] = [];
-    private selectedIndex: number = 0;
-
-    private menuOptions = [
-        { label: 'LOCAL MULTIPLAYER', value: MenuOption.LOCAL_MULTIPLAYER },
-        { label: 'ONLINE (Coming Soon)', value: MenuOption.ONLINE },
-        { label: 'EXIT', value: MenuOption.EXIT }
-    ];
-
+    private startKey!: Phaser.Input.Keyboard.Key;
     private upKey!: Phaser.Input.Keyboard.Key;
     private downKey!: Phaser.Input.Keyboard.Key;
     private enterKey!: Phaser.Input.Keyboard.Key;
+
+    private canInput: boolean = false;
+    private selectedIndex: number = 0;
+    private menuOptions = [
+        { label: 'LOCAL VERSUS', mode: 'versus' },
+        { label: 'TRAINING', mode: 'training' }
+    ];
+    private menuTexts: Phaser.GameObjects.Text[] = [];
 
     constructor() {
         super({ key: 'MainMenuScene' });
     }
 
+    private debugText!: Phaser.GameObjects.Text;
+
     create(): void {
         const { width, height } = this.scale;
 
-        // Background
-        this.add.rectangle(0, 0, width, height, 0x1a1a2e).setOrigin(0);
-
-        // Title
-        this.add.text(width / 2, 150, 'SGALALLA', {
-            fontSize: '84px',
-            color: '#ffffff',
-            fontFamily: 'Arial',
-            fontStyle: 'bold',
-            stroke: '#000000',
-            strokeThickness: 6
-        }).setOrigin(0.5);
-
-        // Subtitle/Version
-        this.add.text(width / 2, 220, 'Pre-Alpha Build', {
-            fontSize: '20px',
-            color: '#8ab4f8'
+        // Visuals
+        this.add.rectangle(0, 0, width, height, 0x1a1a1a).setOrigin(0);
+        this.add.text(width / 2, 200, 'SGALALLA', {
+            fontSize: '120px', fontFamily: 'Impact', color: '#ffffff'
         }).setOrigin(0.5);
 
         // Menu Items
         const startY = 500;
-        const spacing = 80; // Increased spacing for 1080p
-
-        this.menuOptions.forEach((option, index) => {
-            const text = this.add.text(width / 2, startY + (index * spacing), option.label, {
-                fontSize: '32px',
-                color: '#ffffff',
-                fontFamily: 'Arial',
-                fontStyle: 'bold'
-            }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-            text.on('pointerover', () => {
-                this.selectedIndex = index;
-                this.updateSelection();
-            });
-
-            text.on('pointerdown', () => {
-                this.selectedIndex = index;
-                this.updateSelection();
-                this.selectOption();
-            });
-
-            this.menuItems.push(text);
+        this.menuOptions.forEach((opt, index) => {
+            const text = this.add.text(width / 2, startY + (index * 100), opt.label, {
+                fontSize: '48px', fontFamily: 'Arial', color: '#888888'
+            }).setOrigin(0.5);
+            this.menuTexts.push(text);
         });
-
-        // Input
-        this.upKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
-        this.downKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
-        this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
 
         this.updateSelection();
 
-        // Hint
-        this.add.text(width / 2, height - 50, '[UP/DOWN] Navigate  [ENTER] Select  [GAMEPAD] Supported', {
-            fontSize: '16px',
-            color: '#666666'
-        }).setOrigin(0.5);
+        // DEBUG: Gamepad Status
+        this.debugText = this.add.text(10, 10, 'Gamepad: ???', { fontSize: '16px', color: '#00ff00' });
+
+        this.input.gamepad?.on('connected', (pad: Phaser.Input.Gamepad.Gamepad) => {
+            console.log('Gamepad connected:', pad.id);
+            this.debugText.setText(`Gamepad Connected: ${pad.id}`);
+        });
+
+        // Input Safety (Prevent ghost clicks)
+        this.time.delayedCall(500, () => {
+            this.canInput = true;
+            this.startKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+            this.upKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
+            this.downKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
+            this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+        });
     }
 
     update(): void {
-        this.handleInput();
-    }
-
-    // Gamepad state tracking
-    private previousGamepadState = {
-        up: false,
-        down: false,
-        left: false,
-        right: false,
-        a: false,
-        b: false,
-        start: false
-    };
-
-    private handleInput(): void {
-        const gp = this.getGamepadInput();
-
-        // Keyboard or Gamepad Up
-        if (Phaser.Input.Keyboard.JustDown(this.upKey) || gp.upPressed) {
-            this.moveSelection(-1);
+        if (this.input.gamepad) {
+            this.debugText.setText(`pads: ${this.input.gamepad.total}`);
         }
-        // Keyboard or Gamepad Down
-        else if (Phaser.Input.Keyboard.JustDown(this.downKey) || gp.downPressed) {
-            this.moveSelection(1);
-        }
-        // Keyboard Enter or Gamepad A
-        else if (Phaser.Input.Keyboard.JustDown(this.enterKey) || gp.aPressed) {
+
+        if (!this.canInput) return;
+
+        if (Phaser.Input.Keyboard.JustDown(this.upKey)) {
+            this.changeSelection(-1);
+        } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
+            this.changeSelection(1);
+        } else if (Phaser.Input.Keyboard.JustDown(this.startKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
             this.selectOption();
         }
+
+        this.handleGamepad();
     }
 
-    private getGamepadInput() {
-        const gamepads = navigator.getGamepads();
-        let currentState = {
-            up: false,
-            down: false,
-            left: false,
-            right: false,
-            a: false,
-            b: false,
-            start: false
-        };
+    private previousAxis: { [index: number]: number } = {};
+    private previousButtons: { [key: string]: boolean } = {};
 
-        for (let i = 0; i < gamepads.length; i++) {
-            const gamepad = gamepads[i];
-            if (gamepad) {
-                // D-pad
-                const dpadUp = gamepad.buttons[12]?.pressed || false;
-                const dpadDown = gamepad.buttons[13]?.pressed || false;
+    private handleGamepad(): void {
+        if (!this.input.gamepad?.total) return;
 
-                // Left stick
-                const stickY = gamepad.axes[1] || 0;
-                const DEADZONE = 0.5;
+        const pad = this.input.gamepad.getPad(0);
+        if (!pad) return;
 
-                currentState.up = dpadUp || stickY < -DEADZONE;
-                currentState.down = dpadDown || stickY > DEADZONE;
-                currentState.a = gamepad.buttons[0]?.pressed || false; // A button
-                currentState.b = gamepad.buttons[1]?.pressed || false; // B button
-                currentState.start = gamepad.buttons[9]?.pressed || false; // START button
-                break;
-            }
+        const axisY = pad.axes[1].getValue();
+
+        // Debounce stick
+        if (this.previousAxis[pad.index] === undefined) this.previousAxis[pad.index] = 0;
+        const prevAxis = this.previousAxis[pad.index];
+
+        if (axisY < -0.5 && prevAxis >= -0.5) {
+            this.changeSelection(-1);
+        } else if (axisY > 0.5 && prevAxis <= 0.5) {
+            this.changeSelection(1);
         }
 
-        // Detect rising edges (just pressed)
-        const result = {
-            upPressed: currentState.up && !this.previousGamepadState.up,
-            downPressed: currentState.down && !this.previousGamepadState.down,
-            aPressed: currentState.a && !this.previousGamepadState.a,
-            bPressed: currentState.b && !this.previousGamepadState.b,
-            startPressed: currentState.start && !this.previousGamepadState.start
-        };
+        // D-Pad support
+        if (pad.buttons[12].pressed && !this.previousButtons['dpadUp']) {
+            this.changeSelection(-1);
+            this.previousButtons['dpadUp'] = true;
+        } else if (!pad.buttons[12].pressed) {
+            this.previousButtons['dpadUp'] = false;
+        }
 
-        this.previousGamepadState = currentState;
-        return result;
+        if (pad.buttons[13].pressed && !this.previousButtons['dpadDown']) {
+            this.changeSelection(1);
+            this.previousButtons['dpadDown'] = true;
+        } else if (!pad.buttons[13].pressed) {
+            this.previousButtons['dpadDown'] = false;
+        }
+
+        this.previousAxis[pad.index] = axisY;
+
+        // A Button (0) or Start (9) to select
+        if ((pad.buttons[0].pressed || pad.buttons[9].pressed) && !this.previousButtons['btnA']) {
+            this.selectOption();
+            this.previousButtons['btnA'] = true;
+        } else if (!pad.buttons[0].pressed && !pad.buttons[9].pressed) {
+            this.previousButtons['btnA'] = false;
+        }
     }
 
-    private moveSelection(dir: number): void {
+    private changeSelection(dir: number): void {
         this.selectedIndex = (this.selectedIndex + dir + this.menuOptions.length) % this.menuOptions.length;
         this.updateSelection();
     }
 
     private updateSelection(): void {
-        this.menuItems.forEach((item, index) => {
+        this.menuTexts.forEach((text, index) => {
             if (index === this.selectedIndex) {
-                item.setColor('#ffdd00');
-                item.setScale(1.1);
+                text.setColor('#ffffff');
+                text.setFontSize(64);
             } else {
-                item.setColor('#ffffff');
-                item.setScale(1.0);
+                text.setColor('#888888');
+                text.setFontSize(48);
             }
         });
     }
 
     private selectOption(): void {
-        const option = this.menuOptions[this.selectedIndex].value;
-
-        switch (option) {
-            case MenuOption.LOCAL_MULTIPLAYER:
-                this.scene.start('LobbyScene');
-                break;
-            case MenuOption.ONLINE:
-                console.log('Online clicked');
-                break;
-            case MenuOption.EXIT:
-                console.log('Exit clicked');
-                break;
-        }
+        const mode = this.menuOptions[this.selectedIndex].mode;
+        this.scene.start('LobbyScene', { mode: mode });
     }
 }
