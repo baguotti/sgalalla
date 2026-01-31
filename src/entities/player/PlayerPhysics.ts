@@ -146,7 +146,16 @@ export class PlayerPhysics {
                 friction = 0.75; // Higher friction during recovery to prevent sliding
             } else {
                 friction = 0.95; // Slide slightly during startup/active frames
+
+                // Aerial Stall for Flurry Attacks
+                if (!this.player.isGrounded && currentAttack?.data.shouldStallInAir) {
+                    velocity.y *= 0.6; // Strong gravity dampening (like charging)
+                    velocity.x *= 0.9; // Extra horizontal friction
+                }
             }
+        }
+        else if (this.player.isHitStunned) {
+            friction = 0.95; // Low friction during hitstun to allow long knockback travel
         }
 
         velocity.x *= friction;
@@ -160,7 +169,8 @@ export class PlayerPhysics {
         }
 
         // Only clamp if NOT dodging (dodging sets its own high velocity)
-        if (!this.player.isDodging) {
+        // AND not in hitstun (knockback should exceed max speed)
+        if (!this.player.isDodging && !this.player.isHitStunned) {
             velocity.x = Phaser.Math.Clamp(
                 velocity.x,
                 -maxSpeed,

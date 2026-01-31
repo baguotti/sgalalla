@@ -89,7 +89,7 @@ export class Player extends Fighter {
         this.animPrefix = this.character;
 
         // Create player sprite
-        this.sprite = scene.add.sprite(0, 5, 'fok_idle_0'); // Reset offset for smaller scale
+        this.sprite = scene.add.sprite(0, 0, 'fok_idle_0'); // Adjusted offset (0) to ground sprite
 
         // Auto-scale to fit hitbox height (90px)
         const targetHeight = PhysicsConfig.PLAYER_HEIGHT;
@@ -108,7 +108,7 @@ export class Player extends Fighter {
         }
 
         // Create damage text
-        this.damageText = scene.add.text(0, -60, '0%', {
+        this.damageText = scene.add.text(0, -50, '0%', {
             fontSize: '16px',
             color: '#ffffff',
             fontFamily: 'Arial',
@@ -235,19 +235,15 @@ export class Player extends Fighter {
     }
 
     // Visual Helpers
+    public visualColor: number = 0xffffff;
+
     public setVisualTint(color: number): void {
         this.sprite.setTint(color);
     }
 
     public resetVisuals(): void {
         this.sprite.setAlpha(1);
-        if (this.isAI) {
-            this.sprite.setTint(0xff5555);
-        } else if (this.playerId === 1) {
-            this.sprite.setTint(0x55ff55);
-        } else {
-            this.sprite.clearTint();
-        }
+        this.sprite.setTint(this.visualColor);
     }
 
     // Delegated Methods
@@ -335,8 +331,11 @@ export class Player extends Fighter {
     private updateDamageDisplay(): void {
         const label = `P${this.playerId + 1}`;
         this.damageText.setText(label);
-        // Color could be static or based on player ID
-        this.damageText.setColor(this.playerId === 0 ? '#3388ff' : '#00ff00');
+
+        // Match player color
+        // Convert number color to hex string
+        const colorHex = '#' + this.visualColor.toString(16).padStart(6, '0');
+        this.damageText.setColor(colorHex);
     }
 
     // Getters for HUD

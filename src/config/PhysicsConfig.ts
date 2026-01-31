@@ -76,7 +76,7 @@ export const PhysicsConfig = {
 
   // Player dimensions
   PLAYER_WIDTH: 60,
-  PLAYER_HEIGHT: 90,
+  PLAYER_HEIGHT: 85, // Reduced from 94 to be shorter
   NOSE_SIZE: 12,
 
   // Attack frame timing

@@ -216,6 +216,17 @@ export class GameScene extends Phaser.Scene {
                 character: pData.character
             });
 
+            // Set Color
+            const color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
+
+            // Only tint AI skins
+            if (pData.isAI) {
+                player.visualColor = color;
+            } else {
+                player.visualColor = 0xffffff;
+            }
+            player.resetVisuals();
+
             this.players.push(player);
         });
 
@@ -236,7 +247,7 @@ export class GameScene extends Phaser.Scene {
 
 
         // Toggle key
-        this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F3);
+        this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q); // Changed from F3 to Q
         this.trainingToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
         this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
@@ -373,21 +384,21 @@ export class GameScene extends Phaser.Scene {
 
     private createControlsHint(): void {
         const controlsText = [
-            'Keyboard Controls:',
-            'Arrow Keys / WASD - Move',
-            '↑ Arrow / Space - Jump',
-            'C / J - Light Attack',
-            'X / K - Heavy Attack',
-            'Z / L - Dodge',
-            'V / Shift - Recovery',
+            'Keyboard / Joypad Controls:',
+            'Move: Arrows/WASD | Stick/D-pad',
+            'Jump: Space/↑    | A (Cross)',
+            'Light: C / J     | X (Square)',
+            'Heavy: X / K     | B / Y (Circle/Tri)',
+            'Dodge: Z / L     | Triggers (LT/RT)',
+            'Recov: V / Shift | Up + Heavy',
             '',
-            'F3 - Toggle Debug | O - Toggle AI | T - Toggle Dummy/Opponent',
+            'Debug: Q / Select | AI: O | Dummy: T',
         ].join('\n');
 
         this.controlsHintText = this.add.text(15, 750, controlsText, { // 10->15, 500->750
             fontSize: '16px', // 10->16?
             color: '#888888',
-            fontFamily: 'Arial',
+            fontFamily: 'monospace', // Monospace for alignment
             lineSpacing: 1,
         });
         this.controlsHintText.setScrollFactor(0);
@@ -396,24 +407,34 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.ignore(this.controlsHintText);
     }
 
+    // Player Config
+    private readonly PLAYER_COLORS = [
+        0x8ab4f8, // P1: Pastel Blue
+        0xf28b82, // P2: Pastel Red
+        0xccff90, // P3: Pastel Green
+        0xfdd663  // P4: Pastel Yellow
+    ];
+
     private createHUDs(): void {
         this.playerHUDs = [];
         this.playerData.forEach(pData => {
             if (!pData.joined) return;
 
             // Layout: P1 TL, P2 TR, P3 BL, P4 BR
-            let x = 100;
-            let y = 50;
+            // Increased margins from edge
+            let x = 120;
+            let y = 80;
             let isLeft = true;
 
             switch (pData.playerId) {
-                case 0: x = 100; y = 50; isLeft = true; break;
-                case 1: x = this.scale.width - 100; y = 50; isLeft = false; break;
-                case 2: x = 100; y = this.scale.height - 50; isLeft = true; break;
-                case 3: x = this.scale.width - 100; y = this.scale.height - 50; isLeft = false; break;
+                case 0: x = 120; y = 80; isLeft = true; break;
+                case 1: x = this.scale.width - 120; y = 80; isLeft = false; break;
+                case 2: x = 120; y = this.scale.height - 80; isLeft = true; break;
+                case 3: x = this.scale.width - 120; y = this.scale.height - 80; isLeft = false; break;
             }
 
-            const hud = new PlayerHUD(this, x, y, isLeft, `Player ${pData.playerId + 1}`);
+            const color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
+            const hud = new PlayerHUD(this, x, y, isLeft, `Player ${pData.playerId + 1}`, color);
             hud.addToCameraIgnore(this.cameras.main);
             this.playerHUDs.push(hud);
         });
@@ -434,7 +455,11 @@ export class GameScene extends Phaser.Scene {
             return;
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.debugToggleKey)) {
+        // Check for Debug Toggle (Q key or SELECT button on gamepad)
+        const qKeyPressed = Phaser.Input.Keyboard.JustDown(this.debugToggleKey);
+        const gamepadSelectPressed = this.checkGamepadSelect();
+
+        if (qKeyPressed || gamepadSelectPressed) {
             this.debugVisible = !this.debugVisible;
             // Update Debug Overlay
             this.debugOverlay.setVisible(this.debugVisible);
@@ -648,6 +673,29 @@ export class GameScene extends Phaser.Scene {
         );
     }
 
+    private previousSelectPressed: boolean = false;
+
+    private checkGamepadSelect(): boolean {
+        // Check if gamepad SELECT/BACK button was just pressed
+        const gamepads = navigator.getGamepads();
+        let currentSelectPressed = false;
+
+        for (let i = 0; i < gamepads.length; i++) {
+            const gamepad = gamepads[i];
+            if (gamepad) {
+                // Button 8 is usually SELECT/BACK/VIEW on standard gamepads (Xbox/PlayStation)
+                currentSelectPressed = gamepad.buttons[8]?.pressed || false;
+                break; // Only check first connected gamepad
+            }
+        }
+
+        // Detect rising edge (was not pressed, now is pressed)
+        const justPressed = currentSelectPressed && !this.previousSelectPressed;
+        this.previousSelectPressed = currentSelectPressed;
+
+        return justPressed;
+    }
+
     private previousStartPressed: boolean = false;
 
     private checkGamepadPause(): boolean {
@@ -729,16 +777,9 @@ export class GameScene extends Phaser.Scene {
         }
 
         // Spawn logic
-        const spawnPoints = [
-            { x: 450, y: 300 },
-            { x: 1470, y: 300 },
-            { x: 960, y: 200 },
-            { x: 960, y: 400 }
-        ];
-
-        const spawn = spawnPoints[playerId] || { x: 1470, y: 300 };
-        const spawnX = spawn.x;
-        const spawnY = spawn.y;
+        // Center Spawn (with slight offset to avoid complete overlap if multiple spawn at once)
+        const spawnX = 960 + (playerId * 10);
+        const spawnY = 300;
 
         const player = new Player(this, spawnX, spawnY, {
             playerId: playerId,
@@ -749,23 +790,29 @@ export class GameScene extends Phaser.Scene {
         });
 
         player.isTrainingDummy = true;
+
+        // Set Color
+        const color = this.PLAYER_COLORS[playerId] || 0xffffff;
+        player.visualColor = color;
+        player.resetVisuals(); // Apply color
+
         this.players.push(player);
         player.addToCameraIgnore(this.uiCamera);
 
         // Create HUD
         // Layout logic
-        let x = 100;
-        let y = 50;
+        let x = 120;
+        let y = 80;
         let isLeft = true;
 
         switch (playerId) {
-            case 0: x = 100; y = 50; isLeft = true; break;
-            case 1: x = this.scale.width - 100; y = 50; isLeft = false; break;
-            case 2: x = 100; y = this.scale.height - 50; isLeft = true; break;
-            case 3: x = this.scale.width - 100; y = this.scale.height - 50; isLeft = false; break;
+            case 0: x = 120; y = 80; isLeft = true; break;
+            case 1: x = this.scale.width - 120; y = 80; isLeft = false; break;
+            case 2: x = 120; y = this.scale.height - 80; isLeft = true; break;
+            case 3: x = this.scale.width - 120; y = this.scale.height - 80; isLeft = false; break;
         }
 
-        const hud = new PlayerHUD(this, x, y, isLeft, `CPU ${playerId + 1} (Dummy)`);
+        const hud = new PlayerHUD(this, x, y, isLeft, `CPU ${playerId + 1} (Dummy)`, color);
         hud.addToCameraIgnore(this.cameras.main);
 
         // Ensure we don't duplicate HUD if re-spawning (though player array check prevents this)

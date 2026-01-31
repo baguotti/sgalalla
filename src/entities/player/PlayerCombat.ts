@@ -350,6 +350,11 @@ export class PlayerCombat {
         // Update attack phase
         const attackComplete = this.currentAttack.update(delta);
 
+        // Check for Multi-Hit Reset
+        if (this.currentAttack.shouldResetHits()) {
+            this.hitTargets.clear();
+        }
+
         // Handle hitbox
         if (this.currentAttack.isHitboxActive()) {
             this.updateHitbox();
