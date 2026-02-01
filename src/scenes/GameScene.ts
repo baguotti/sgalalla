@@ -422,6 +422,7 @@ export class GameScene extends Phaser.Scene {
         leftWall.setAlpha(0.6);
         leftWall.setDepth(-5);
         this.walls.push(leftWall);
+        this.matter.add.gameObject(leftWall, { isStatic: true });
 
         // Right wall
         const rightWall = this.add.rectangle(this.WALL_RIGHT_X, 540, this.WALL_THICKNESS, 1080, 0x2a3a4e);
@@ -429,6 +430,7 @@ export class GameScene extends Phaser.Scene {
         rightWall.setAlpha(0.6);
         rightWall.setDepth(-5);
         this.walls.push(rightWall);
+        this.matter.add.gameObject(rightWall, { isStatic: true });
 
         // Add wall indicators (text labels)
         const leftWallText = this.add.text(this.WALL_LEFT_X - 12, 375, 'WALL', { // -8->-12, 250->375

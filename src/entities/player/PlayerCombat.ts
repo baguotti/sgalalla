@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { Player } from '../Player';
 import { Fighter } from '../Fighter';
-import { Attack, AttackType, AttackDirection, AttackPhase } from '../../combat/Attack';
+import { Attack, AttackType, AttackDirection } from '../../combat/Attack';
 import { Hitbox } from '../../combat/Hitbox';
 import type { Damageable } from '../../combat/DamageSystem'; // Type import
 import { DamageSystem } from '../../combat/DamageSystem';
@@ -292,6 +292,20 @@ export class PlayerCombat {
     private updateThrowCharge(delta: number): void {
         this.throwChargeTime += delta;
         const maxChargeTime = 1000; // 1 second for max power
+        const overchargeTime = 2000; // 2 seconds to explode in hand
+
+        if (this.throwChargeTime >= overchargeTime) {
+            // Explode in hand!
+            if (this.player.heldItem) {
+                this.player.heldItem.explode();
+                this.player.heldItem = null;
+            }
+            this.isThrowCharging = false;
+            this.throwChargeTime = 0;
+            this.player.resetVisuals();
+            return;
+        }
+
         const chargePercent = Math.min(this.throwChargeTime / maxChargeTime, 1);
 
         // Visual shake for the bomb/char
@@ -302,23 +316,43 @@ export class PlayerCombat {
     }
 
     private executeThrow(input: InputState): void {
-        const direction = this.getInputDirection(input);
-
+        // 8-Directional Aiming
         let dirX = 0;
         let dirY = 0;
-        if (direction === AttackDirection.UP) dirY = -1;
-        else if (direction === AttackDirection.DOWN) dirY = 1;
-        else if (direction === AttackDirection.SIDE) dirX = this.player.getFacingDirection();
-        else dirX = this.player.getFacingDirection();
+
+        if (input.aimUp) dirY = -1;
+        if (input.aimDown) dirY = 1;
+        if (input.aimLeft) dirX = -1;
+        if (input.aimRight) dirX = 1;
+
+        // If no direction held, throw forward
+        if (dirX === 0 && dirY === 0) {
+            dirX = this.player.getFacingDirection();
+        }
+
+        // Normalize diagonals
+        if (dirX !== 0 && dirY !== 0) {
+            const mag = Math.sqrt(dirX * dirX + dirY * dirY);
+            dirX /= mag;
+            dirY /= mag;
+        }
 
         // Calculate power based on charge
         const maxChargeTime = 1000;
         const chargePercent = Math.min(this.throwChargeTime / maxChargeTime, 1);
 
-        // Base speed 15, Max speed 35 (approx)
-        const powerMultiplier = 15 + (chargePercent * 20);
+        // Base speed 18, Max speed 38
+        const powerMultiplier = 18 + (chargePercent * 20);
 
-        this.player.throwItem(dirX * powerMultiplier, dirY * powerMultiplier);
+        if (this.player.heldItem) {
+            const bomb = this.player.heldItem;
+            this.player.throwItem(dirX * powerMultiplier, dirY * powerMultiplier);
+            // Start the 3s fuse on the bomb
+            if (bomb.onThrown) {
+                bomb.onThrown(this.player);
+            }
+        }
+
         this.player.resetVisuals();
     }
 
@@ -549,8 +583,6 @@ export class PlayerCombat {
         let knockback = 0;
         let knockbackAngle = 45;
         let isHeavy = false;
-        let direction: AttackDirection = AttackDirection.NEUTRAL;
-        let isAerial = false;
 
         if (this.currentAttack) {
             const data = this.currentAttack.data;
@@ -558,16 +590,14 @@ export class PlayerCombat {
             knockback = data.knockback;
             knockbackAngle = data.knockbackAngle;
             isHeavy = data.type === AttackType.HEAVY;
-            direction = data.direction;
-            isAerial = data.isAerial;
+            isHeavy = data.type === AttackType.HEAVY;
         } else if (this.player.physics.isRecovering) {
             // Recovery Hit Data
             damage = 8;
             knockback = 500;
             knockbackAngle = 80; // Upwards
             isHeavy = false;
-            direction = AttackDirection.UP;
-            isAerial = true;
+            isHeavy = false;
         } else {
             return;
         }
