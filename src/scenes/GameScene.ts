@@ -701,6 +701,7 @@ export class GameScene extends Phaser.Scene {
         const flash = this.add.graphics();
         flash.fillStyle(0xffffff, 0.8);
         flash.fillCircle(spawnX, spawnY, 75); // 50->75
+        this.addToCameraIgnore(flash);
         this.tweens.add({
             targets: flash,
             alpha: 0,

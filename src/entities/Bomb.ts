@@ -79,6 +79,11 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         explosionGraphics.fillStyle(0xffff00, 1);
         explosionGraphics.fillCircle(this.x, this.y, visualRadius);
 
+        // Prevent ghosting in UI Camera
+        if ((this.scene as any).addToCameraIgnore) {
+            (this.scene as any).addToCameraIgnore(explosionGraphics);
+        }
+
         // Quick fade out
         this.scene.tweens.add({
             targets: explosionGraphics,
