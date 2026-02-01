@@ -29,6 +29,11 @@ export class PlayerCombat {
     public isCharging: boolean = false;
     public chargeTime: number = 0;
     public chargeDirection: AttackDirection = AttackDirection.NEUTRAL;
+
+    // Throw Charge System
+    public isThrowCharging: boolean = false;
+    public throwChargeTime: number = 0;
+
     private showDebugHitboxes: boolean = false;
 
     constructor(player: Player, scene: Phaser.Scene) {
@@ -54,6 +59,10 @@ export class PlayerCombat {
 
         if (this.isCharging) {
             this.updateChargeState(delta);
+        }
+
+        if (this.isThrowCharging) {
+            this.updateThrowCharge(delta);
         }
 
         if (this.player.isAttacking || this.isGroundPounding) {
@@ -100,22 +109,27 @@ export class PlayerCombat {
         // Use player.isDodging which is synced from Physics
         if (this.player.isDodging || this.player.isHitStunned || this.player.isAttacking) return;
 
+        // --- Throw Charge Handling ---
+        if (this.isThrowCharging) {
+            if (!input.lightAttackHeld) {
+                // Released - execute throw
+                this.executeThrow(input);
+                this.isThrowCharging = false;
+                this.throwChargeTime = 0;
+            }
+            return; // Stay in charge state
+        }
 
-        // Light attack - Grab / Throw / Attack
+        // --- Attack Blocker While Holding ---
+        // Character cannot attack while carrying a bomb
+        const isHolding = !!this.player.heldItem;
+
+        // Light attack - Grab / Start Throw Charge / Attack
         if (input.lightAttack) {
-            const direction = this.getInputDirection(input);
-
-            // 1. Throw Item if holding one
-            if (this.player.heldItem) {
-                // Determine throw direction vector
-                let dirX = 0;
-                let dirY = 0;
-                if (direction === AttackDirection.UP) dirY = -1;
-                else if (direction === AttackDirection.DOWN) dirY = 1;
-                else if (direction === AttackDirection.SIDE) dirX = this.player.getFacingDirection();
-                else dirX = this.player.getFacingDirection(); // Neutral throw forward
-
-                this.player.throwItem(dirX, dirY);
+            if (isHolding) {
+                // 1. Start Charge Throw
+                this.isThrowCharging = true;
+                this.throwChargeTime = 0;
                 return;
             }
 
@@ -125,12 +139,17 @@ export class PlayerCombat {
             }
 
             // 3. Normal Attack
+            const direction = this.getInputDirection(input);
             const isAerial = !this.player.isGrounded;
             const attackKey = Attack.getAttackKey(AttackType.LIGHT, direction, isAerial);
             this.startAttack(attackKey);
             return;
         }
 
+        // Prevent heavy attacks if holding item
+        if (isHolding && (input.heavyAttack || this.isCharging)) {
+            return;
+        }
 
         // Heavy attack - chargeable (except for aerial down = ground pound, and aerial up/neutral = recovery)
         if (input.heavyAttack && !this.isCharging) {
@@ -267,6 +286,39 @@ export class PlayerCombat {
         this.isCharging = false;
         this.chargeTime = 0;
         // Reset body color and offset
+        this.player.resetVisuals();
+    }
+
+    private updateThrowCharge(delta: number): void {
+        this.throwChargeTime += delta;
+        const maxChargeTime = 1000; // 1 second for max power
+        const chargePercent = Math.min(this.throwChargeTime / maxChargeTime, 1);
+
+        // Visual shake for the bomb/char
+        const intensity = chargePercent * 2;
+        const offsetX = (Math.random() - 0.5) * 2 * intensity;
+        const offsetY = (Math.random() - 0.5) * 2 * intensity;
+        this.player.setVisualOffset(offsetX, offsetY);
+    }
+
+    private executeThrow(input: InputState): void {
+        const direction = this.getInputDirection(input);
+
+        let dirX = 0;
+        let dirY = 0;
+        if (direction === AttackDirection.UP) dirY = -1;
+        else if (direction === AttackDirection.DOWN) dirY = 1;
+        else if (direction === AttackDirection.SIDE) dirX = this.player.getFacingDirection();
+        else dirX = this.player.getFacingDirection();
+
+        // Calculate power based on charge
+        const maxChargeTime = 1000;
+        const chargePercent = Math.min(this.throwChargeTime / maxChargeTime, 1);
+
+        // Base speed 15, Max speed 35 (approx)
+        const powerMultiplier = 15 + (chargePercent * 20);
+
+        this.player.throwItem(dirX * powerMultiplier, dirY * powerMultiplier);
         this.player.resetVisuals();
     }
 

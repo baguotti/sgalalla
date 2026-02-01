@@ -104,7 +104,7 @@ export class Player extends Fighter {
         item.setAngularVelocity(0);
     }
 
-    public throwItem(directionX: number, directionY: number): void {
+    public throwItem(velocityX: number, velocityY: number): void {
         if (!this.heldItem) return;
 
         const item = this.heldItem;
@@ -114,14 +114,7 @@ export class Player extends Fighter {
         item.setSensor(false);
         item.setIgnoreGravity(false);
 
-        // Throw velocity
-        const throwSpeed = 25;
-        // If direction is neutral, throw forward
-        if (directionX === 0 && directionY === 0) {
-            directionX = this.getFacingDirection();
-        }
-
-        item.setVelocity(directionX * throwSpeed, directionY * throwSpeed);
+        item.setVelocity(velocityX, velocityY);
         // Add some spin
         item.setAngularVelocity(0.2 * this.getFacingDirection());
 
@@ -131,8 +124,11 @@ export class Player extends Fighter {
 
     public updateHeldItemPosition(): void {
         if (this.heldItem) {
-            // Position above head or at hand
-            this.heldItem.setPosition(this.x, this.y - 40);
+            // Position in front of the character, towards the bottom
+            const offsetForward = 25 * this.getFacingDirection();
+            const offsetDown = 25; // Relative to center (Bottom is 45)
+
+            this.heldItem.setPosition(this.x + offsetForward, this.y + offsetDown);
             this.heldItem.setVelocity(0, 0); // Force stay
         }
     }
