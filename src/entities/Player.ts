@@ -66,6 +66,77 @@ export class Player extends Fighter {
     private showDebugHitboxes: boolean = false;
     public lightAttackVariant: number = 0;
 
+    // Item Holding
+    public heldItem: any | null = null; // Typing as any to avoid circular import issues with Bomb for now, or use interface
+
+    public checkItemPickup(): boolean {
+        // Access bombs from scene
+        const bombs = (this.scene as any).bombs;
+        if (!bombs || bombs.length === 0) return false;
+
+        const pickupRange = 60; // Interaction radius
+
+        // Find closest bomb
+        let closestBomb = null;
+        let minDist = pickupRange;
+
+        for (const bomb of bombs) {
+            const dist = Phaser.Math.Distance.Between(this.x, this.y, bomb.x, bomb.y);
+            if (dist < minDist) {
+                minDist = dist;
+                closestBomb = bomb;
+            }
+        }
+
+        if (closestBomb) {
+            this.pickupItem(closestBomb);
+            return true;
+        }
+        return false;
+    }
+
+    public pickupItem(item: any): void {
+        this.heldItem = item;
+        // Disable physics for the item while holding
+        item.setSensor(true);
+        item.setIgnoreGravity(true);
+        item.setVelocity(0, 0);
+        item.setAngularVelocity(0);
+    }
+
+    public throwItem(directionX: number, directionY: number): void {
+        if (!this.heldItem) return;
+
+        const item = this.heldItem;
+        this.heldItem = null;
+
+        // Re-enable physics
+        item.setSensor(false);
+        item.setIgnoreGravity(false);
+
+        // Throw velocity
+        const throwSpeed = 25;
+        // If direction is neutral, throw forward
+        if (directionX === 0 && directionY === 0) {
+            directionX = this.getFacingDirection();
+        }
+
+        item.setVelocity(directionX * throwSpeed, directionY * throwSpeed);
+        // Add some spin
+        item.setAngularVelocity(0.2 * this.getFacingDirection());
+
+        // Offset spawn slightly so it doesn't clip immediately (though sensor is off now.. wait, might need to re-enable sensor after a frame if we want it to hit player? No, usually ignore thrower).
+        // For now, simple throw.
+    }
+
+    public updateHeldItemPosition(): void {
+        if (this.heldItem) {
+            // Position above head or at hand
+            this.heldItem.setPosition(this.x, this.y - 40);
+            this.heldItem.setVelocity(0, 0); // Force stay
+        }
+    }
+
     public setDebug(visible: boolean): void {
         this.showDebugHitboxes = visible;
         if (this.debugRect) {
@@ -196,6 +267,7 @@ export class Player extends Fighter {
         // Visuals
         this.updateAnimation();
         this.updateDamageDisplay();
+        this.updateHeldItemPosition();
     }
 
     private updateTimers(delta: number): void {

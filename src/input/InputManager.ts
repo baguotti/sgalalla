@@ -19,6 +19,7 @@ export interface InputState {
     jump: boolean;
     jumpHeld: boolean;
     lightAttack: boolean;
+    lightAttackHeld: boolean; // For charge throws
     heavyAttack: boolean;
     heavyAttackHeld: boolean; // For charge attacks
     dodge: boolean;
@@ -144,6 +145,7 @@ export class InputManager {
             jump: false,
             jumpHeld: false,
             lightAttack: false,
+            lightAttackHeld: false,
             heavyAttack: false,
             heavyAttackHeld: false,
             dodge: false,
@@ -217,6 +219,7 @@ export class InputManager {
             jump: jumpPressed,
             jumpHeld: spaceDown || upArrowDown,
             lightAttack: lightPressed,
+            lightAttackHeld: jDown || cDown, // Track light attack held
             heavyAttack: heavyPressed,
             heavyAttackHeld: kDown || xDown, // Track held state for charging
             dodge: dodgePressed,
@@ -241,6 +244,7 @@ export class InputManager {
             jump: state.jump,
             jumpHeld: state.jumpHeld,
             lightAttack: state.lightAttack,
+            lightAttackHeld: state.lightAttackHeld, // Sync light attack held
             heavyAttack: state.heavyAttack,
             heavyAttackHeld: state.heavyAttackHeld, // Track B held for charging
             dodge: state.dodge,

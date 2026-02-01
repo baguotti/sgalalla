@@ -3,6 +3,7 @@ import { Player, PlayerState } from '../entities/Player';
 import { PlayerHUD } from '../ui/PlayerHUD';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
+import { Bomb } from '../entities/Bomb';
 
 export class GameScene extends Phaser.Scene {
     // private player1!: Player;
@@ -11,6 +12,7 @@ export class GameScene extends Phaser.Scene {
     private debugOverlay!: DebugOverlay;
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
+    public bombs: Bomb[] = [];
     private background!: Phaser.GameObjects.Graphics;
     private walls: Phaser.GameObjects.Rectangle[] = [];
     private wallTexts: Phaser.GameObjects.Text[] = [];
@@ -19,6 +21,8 @@ export class GameScene extends Phaser.Scene {
     private debugVisible: boolean = false;
     private debugToggleKey!: Phaser.Input.Keyboard.Key;
     private trainingToggleKey!: Phaser.Input.Keyboard.Key;
+    // Debug bomb spawn key
+    private spawnKey!: Phaser.Input.Keyboard.Key;
     private controlsHintText!: Phaser.GameObjects.Text;
 
     // Kill tracking
@@ -275,6 +279,8 @@ export class GameScene extends Phaser.Scene {
             this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
             this.trainingToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
             this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+            // Debug Spawn Key
+            this.spawnKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R);
 
             // Create pause menu
             this.pauseMenu = new PauseMenu(this);
@@ -321,6 +327,23 @@ export class GameScene extends Phaser.Scene {
             console.error("CRITICAL ERROR in GameScene.create:", e);
             const errT = this.add.text(this.scale.width / 2, this.scale.height / 2, "CRASH: " + e?.message || String(e), { fontSize: '32px', color: '#ff0000', backgroundColor: '#000' });
             errT.setOrigin(0.5).setDepth(9999);
+        }
+    }
+
+    private spawnBomb(): void {
+        console.log("spawnBomb called. isPaused:", this.isPaused);
+        if (this.isPaused) return;
+
+        const { width } = this.scale;
+
+        // Random X position within central area (500-1420) so it's likely visible
+        const padding = 500;
+        const x = Phaser.Math.Between(padding, width - padding);
+        const y = 0; // Top of screen (inside bounds)
+
+        const bomb = new Bomb(this, x, y);
+        if (this.uiCamera) {
+            this.uiCamera.ignore(bomb);
         }
     }
 
@@ -374,18 +397,22 @@ export class GameScene extends Phaser.Scene {
         const mainPlatform = this.add.rectangle(960, 825, 1350, 45, 0x2c3e50); // 640->960, 550->825, 900->1350, 30->45
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
+        // Add Matter body for Bomb collision
+        this.matter.add.gameObject(mainPlatform, { isStatic: true });
 
         // Soft platform 1 (left, above main)
         const softPlatform1 = this.add.rectangle(570, 600, 360, 24, 0x0f3460); // 380->570, 400->600, 240->360, 16->24
         softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform1.setAlpha(0.85);
         this.softPlatforms.push(softPlatform1);
+        this.matter.add.gameObject(softPlatform1, { isStatic: true });
 
         // Soft platform 2 (right, above main)
         const softPlatform2 = this.add.rectangle(1350, 600, 360, 24, 0x0f3460); // 900->1350, 400->600
         softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform2.setAlpha(0.85);
         this.softPlatforms.push(softPlatform2);
+        this.matter.add.gameObject(softPlatform2, { isStatic: true });
 
         // VISIBLE SIDE WALLS for wall mechanics testing
         this.walls = [];
@@ -548,6 +575,12 @@ export class GameScene extends Phaser.Scene {
                 // If no AI exists (e.g. 1v1 human match, or just P1), spawn a dummy
                 this.spawnTrainingDummy();
             }
+        }
+
+        // Handle Bomb Spawn (R)
+        if (Phaser.Input.Keyboard.JustDown(this.spawnKey)) {
+            console.log("R key pressed! Calling spawnBomb()...");
+            this.spawnBomb();
         }
 
         // Update players

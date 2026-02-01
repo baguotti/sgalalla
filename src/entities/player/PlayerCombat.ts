@@ -101,9 +101,30 @@ export class PlayerCombat {
         if (this.player.isDodging || this.player.isHitStunned || this.player.isAttacking) return;
 
 
-        // Light attack - instant activation
+        // Light attack - Grab / Throw / Attack
         if (input.lightAttack) {
             const direction = this.getInputDirection(input);
+
+            // 1. Throw Item if holding one
+            if (this.player.heldItem) {
+                // Determine throw direction vector
+                let dirX = 0;
+                let dirY = 0;
+                if (direction === AttackDirection.UP) dirY = -1;
+                else if (direction === AttackDirection.DOWN) dirY = 1;
+                else if (direction === AttackDirection.SIDE) dirX = this.player.getFacingDirection();
+                else dirX = this.player.getFacingDirection(); // Neutral throw forward
+
+                this.player.throwItem(dirX, dirY);
+                return;
+            }
+
+            // 2. Try to Pickup Item
+            if (this.player.checkItemPickup()) {
+                return; // Picked up item, skip attack
+            }
+
+            // 3. Normal Attack
             const isAerial = !this.player.isGrounded;
             const attackKey = Attack.getAttackKey(AttackType.LIGHT, direction, isAerial);
             this.startAttack(attackKey);
