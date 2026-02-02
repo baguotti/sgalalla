@@ -19,6 +19,7 @@ import type { FrameInput, GameSnapshot } from './StateSnapshot';
 export const NetMessageType = {
     INPUT: 'input',
     STATE_UPDATE: 'state_update',
+    POSITION_UPDATE: 'position_update', // Client sends its position to server
     PLAYER_JOINED: 'player_joined',
     PLAYER_LEFT: 'player_left',
     GAME_START: 'game_start',
@@ -198,6 +199,15 @@ class NetworkManager {
         };
 
         this.channel.emit(NetMessageType.INPUT, netInput, { reliable: false });
+    }
+
+    /**
+     * Send local player's actual position state to server
+     * Server will relay this to other clients
+     */
+    public sendState(state: NetPlayerState): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.POSITION_UPDATE, state, { reliable: false });
     }
 
     /**

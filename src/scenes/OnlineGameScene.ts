@@ -260,6 +260,19 @@ export class OnlineGameScene extends Phaser.Scene {
 
             // Blast zone check - respawn if player falls off
             this.checkBlastZone(this.localPlayer);
+
+            // Send local player's actual position to server for relay to other clients
+            this.networkManager.sendState({
+                playerId: this.localPlayerId,
+                x: this.localPlayer.x,
+                y: this.localPlayer.y,
+                velocityX: this.localPlayer.velocity.x,
+                velocityY: this.localPlayer.velocity.y,
+                facingDirection: this.localPlayer.getFacingDirection(),
+                isGrounded: this.localPlayer.isGrounded,
+                isAttacking: this.localPlayer.isAttacking,
+                damagePercent: 0
+            });
         }
 
         // Check all players for blast zones

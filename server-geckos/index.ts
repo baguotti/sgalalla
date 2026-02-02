@@ -81,19 +81,28 @@ io.onConnection((channel) => {
     // Notify player of their ID
     channel.emit(NetMessageType.PLAYER_JOINED, { playerId });
 
-    // Handle input from client
+    // Handle input from client (legacy - still accept inputs but don't use for physics)
     channel.on(NetMessageType.INPUT, (data: any) => {
         const player = room.players.get(channel.id!);
         if (!player) return;
+        // Input received - we no longer simulate based on this
+        // Client is authoritative and will send position updates
+    });
 
-        const input = data?.input;
-        if (input) {
-            // Simple velocity updates based on input
-            player.velocityX = input.moveX * 750; // MAX_SPEED
-            if (input.jump && player.isGrounded) {
-                player.velocityY = -1050; // JUMP_FORCE
-                player.isGrounded = false;
-            }
+    // Handle position update from client (client-authoritative)
+    channel.on('position_update', (data: any) => {
+        const player = room.players.get(channel.id!);
+        if (!player) return;
+
+        // Directly update player position from client
+        if (data) {
+            player.x = data.x ?? player.x;
+            player.y = data.y ?? player.y;
+            player.velocityX = data.velocityX ?? player.velocityX;
+            player.velocityY = data.velocityY ?? player.velocityY;
+            player.facingDirection = data.facingDirection ?? player.facingDirection;
+            player.isGrounded = data.isGrounded ?? player.isGrounded;
+            player.isAttacking = data.isAttacking ?? player.isAttacking;
         }
     });
 
@@ -127,41 +136,13 @@ setInterval(() => {
     rooms.forEach((room) => {
         room.frame++;
 
-        room.players.forEach((player) => {
-            // Apply gravity
-            if (!player.isGrounded) {
-                player.velocityY += GRAVITY * deltaSeconds;
-            }
-
-            // Apply friction when no horizontal input
-            if (Math.abs(player.velocityX) > 0) {
-                player.velocityX *= FRICTION;
-                if (Math.abs(player.velocityX) < 1) player.velocityX = 0;
-            }
-
-            // Update position
-            player.x += player.velocityX * deltaSeconds;
-            player.y += player.velocityY * deltaSeconds;
-
-            // Ground collision (main platform at Y=825)
-            const playerBottom = player.y + 42; // Half player height (85/2)
-            if (playerBottom >= PLATFORM_TOP_Y && player.velocityY >= 0) {
-                player.y = PLATFORM_TOP_Y - 42;
-                player.velocityY = 0;
-                player.isGrounded = true;
-            } else if (player.y < PLATFORM_TOP_Y - 42) {
-                player.isGrounded = false;
-            }
-
-            // Clamp horizontal position to walls
-            if (player.x < 172) player.x = 172;
-            if (player.x > 1747) player.x = 1747;
-        });
+        // NO SERVER PHYSICS - clients are authoritative
+        // Server just relays the positions received from clients
 
         // Build state snapshot
         const state = {
             frame: room.frame,
-            confirmedInputFrame: room.frame, // Server has processed all inputs up to this frame
+            confirmedInputFrame: room.frame,
             players: Array.from(room.players.values())
         };
 
