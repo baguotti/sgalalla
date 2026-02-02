@@ -267,8 +267,10 @@ export class Player extends Fighter {
         // Update Combat Component
         this.combat.update(delta);
 
-        // Handle input for combat
-        this.combat.handleInput(this.currentInput);
+        // Handle input for combat (only if we have input - remote players don't)
+        if (this.currentInput) {
+            this.combat.handleInput(this.currentInput);
+        }
 
         // Update Combat/Timers
         this.updateTimers(delta);
