@@ -111,6 +111,16 @@ io.onConnection((channel) => {
         channel.emit(NetMessageType.PONG, {});
     });
 
+    // Relay attack events to all clients
+    channel.on('attack_start', (data: any) => {
+        io.emit('attack_start', data);
+    });
+
+    // Relay hit events to all clients
+    channel.on('hit_event', (data: any) => {
+        io.emit('hit_event', data);
+    });
+
     // Handle disconnect
     channel.onDisconnect(() => {
         console.log(`[Server] Player ${playerId} disconnected`);

@@ -223,6 +223,11 @@ export class PlayerCombat {
             if (this.currentAttack.data.type === AttackType.LIGHT) {
                 this.player.lightAttackVariant = (this.player.lightAttackVariant + 1) % 2;
             }
+
+            // Trigger network callback
+            if (this.player.onAttack) {
+                this.player.onAttack(attackKey, facing);
+            }
         } catch (e) {
             console.warn('Unknown attack:', attackKey);
         }
@@ -638,6 +643,11 @@ export class PlayerCombat {
         // Screen Shake (Heavy Attacks)
         if (isHeavy) {
             this.scene.cameras.main.shake(100, 0.005);
+        }
+
+        // Trigger network callback
+        if (this.player.onHit) {
+            this.player.onHit(target, damage, knockbackVector.x, knockbackVector.y);
         }
 
         // Visual Effects for Down Air (Spike)

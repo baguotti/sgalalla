@@ -20,6 +20,8 @@ export const NetMessageType = {
     INPUT: 'input',
     STATE_UPDATE: 'state_update',
     POSITION_UPDATE: 'position_update', // Client sends its position to server
+    ATTACK_START: 'attack_start',       // Client started an attack
+    HIT_EVENT: 'hit_event',             // Attack hit confirmed
     PLAYER_JOINED: 'player_joined',
     PLAYER_LEFT: 'player_left',
     GAME_START: 'game_start',
@@ -55,10 +57,28 @@ export interface NetGameState {
     confirmedInputFrame?: number; // Last frame server has confirmed all inputs for
 }
 
+// Attack event for sync
+export interface NetAttackEvent {
+    playerId: number;
+    attackKey: string;     // e.g. 'light_neutral_grounded'
+    facingDirection: number;
+}
+
+// Hit event for damage sync
+export interface NetHitEvent {
+    attackerId: number;
+    victimId: number;
+    damage: number;
+    knockbackX: number;
+    knockbackY: number;
+}
+
 export type ConnectionCallback = (playerId: number) => void;
 export type StateUpdateCallback = (state: NetGameState) => void;
 export type DisconnectCallback = () => void;
 export type RollbackCallback = (targetFrame: number, confirmedState: NetGameState) => void;
+export type AttackCallback = (attack: NetAttackEvent) => void;
+export type HitCallback = (hit: NetHitEvent) => void;
 
 class NetworkManager {
     private static instance: NetworkManager | null = null;
@@ -83,6 +103,8 @@ class NetworkManager {
     private onStateUpdateCallback: StateUpdateCallback | null = null;
     private onDisconnectCallback: DisconnectCallback | null = null;
     private onRollbackCallback: RollbackCallback | null = null;
+    private onAttackCallback: AttackCallback | null = null;
+    private onHitCallback: HitCallback | null = null;
 
     // Latency tracking
     private lastPingTime: number = 0;
@@ -171,6 +193,24 @@ class NetworkManager {
         this.channel.on(NetMessageType.PONG, () => {
             this.latency = Date.now() - this.lastPingTime;
         });
+
+        // Attack events from other players
+        this.channel.on(NetMessageType.ATTACK_START, (data: Data) => {
+            const attack = data as NetAttackEvent;
+            // Only trigger callback for remote players (not our own attack echo)
+            if (attack.playerId !== this.localPlayerId) {
+                this.onAttackCallback?.(attack);
+            }
+        });
+
+        // Hit events (damage/knockback)
+        this.channel.on(NetMessageType.HIT_EVENT, (data: Data) => {
+            const hit = data as NetHitEvent;
+            // Only apply if we are the victim
+            if (hit.victimId === this.localPlayerId) {
+                this.onHitCallback?.(hit);
+            }
+        });
     }
 
     /**
@@ -208,6 +248,34 @@ class NetworkManager {
     public sendState(state: NetPlayerState): void {
         if (!this.connected || !this.channel) return;
         this.channel.emit(NetMessageType.POSITION_UPDATE, state, { reliable: false });
+    }
+
+    /**
+     * Send attack start event to server for relay to other clients
+     */
+    public sendAttack(attackKey: string, facingDirection: number): void {
+        if (!this.connected || !this.channel) return;
+        const attack: NetAttackEvent = {
+            playerId: this.localPlayerId,
+            attackKey,
+            facingDirection
+        };
+        this.channel.emit(NetMessageType.ATTACK_START, attack, { reliable: true });
+    }
+
+    /**
+     * Send hit event to server (attacker confirms hit)
+     */
+    public sendHit(victimId: number, damage: number, knockbackX: number, knockbackY: number): void {
+        if (!this.connected || !this.channel) return;
+        const hit: NetHitEvent = {
+            attackerId: this.localPlayerId,
+            victimId,
+            damage,
+            knockbackX,
+            knockbackY
+        };
+        this.channel.emit(NetMessageType.HIT_EVENT, hit, { reliable: true });
     }
 
     /**
@@ -278,6 +346,8 @@ class NetworkManager {
     public onStateUpdate(callback: StateUpdateCallback): void { this.onStateUpdateCallback = callback; }
     public onDisconnect(callback: DisconnectCallback): void { this.onDisconnectCallback = callback; }
     public onRollback(callback: RollbackCallback): void { this.onRollbackCallback = callback; }
+    public onAttack(callback: AttackCallback): void { this.onAttackCallback = callback; }
+    public onHit(callback: HitCallback): void { this.onHitCallback = callback; }
 }
 
 export default NetworkManager;

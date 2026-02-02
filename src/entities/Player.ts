@@ -595,6 +595,46 @@ export class Player extends Fighter {
 
     }
 
+    // ============ NETWORK HELPERS ============
+
+    public onAttack: ((attackKey: string, facingDirection: number) => void) | null = null;
+    public onHit: ((victim: Fighter, damage: number, knockbackX: number, knockbackY: number) => void) | null = null;
+
+    public playAttackAnimation(attackKey: string): void {
+        // e.g. 'light_neutral_grounded' -> 'attack_light_0'
+        // For now, simpler mapping or just pass the anim key directly if possible.
+        // The OnlineGameScene passes 'light_neutral_grounded'. We need to map it or play a generic one.
+        // Actually, let's just expose a way to play specific animation keys if we knew them.
+        // But better: use the attack logic to set state, but that might duplicate logic.
+        // Simplest: just play a generic attack animation based on type.
+
+        if (attackKey.includes('heavy')) {
+            this.playAnim('attack_heavy', true);
+        } else {
+            this.playAnim('attack_light_0', true);
+        }
+
+        // Also force facing update if needed
+    }
+
+    public takeDamage(amount: number): void {
+        this.damagePercent = Math.min(this.damagePercent + amount, PhysicsConfig.MAX_DAMAGE);
+        this.flashDamageColor(this.damagePercent);
+    }
+
+    public setVelocity(x: number, y: number): void {
+        this.velocity.set(x, y);
+    }
+
+    public playHurtAnimation(): void {
+        this.playAnim('hurt', true);
+        // Also maybe trigger hitstun visual
+        this.isHitStunned = true;
+        this.scene.time.delayedCall(200, () => {
+            this.isHitStunned = false;
+        });
+    }
+
     // ============ ROLLBACK NETCODE SUPPORT ============
 
     /**

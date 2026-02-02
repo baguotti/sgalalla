@@ -12,7 +12,7 @@
 import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import NetworkManager from '../network/NetworkManager';
-import type { NetGameState, NetPlayerState } from '../network/NetworkManager';
+import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '../network/NetworkManager';
 import { InputManager } from '../input/InputManager';
 import type { GameSnapshot, PlayerSnapshot } from '../network/StateSnapshot';
 
@@ -189,6 +189,8 @@ export class OnlineGameScene extends Phaser.Scene {
         // Setup network callbacks
         this.networkManager.onStateUpdate((state) => this.handleStateUpdate(state));
         this.networkManager.onDisconnect(() => this.handleDisconnect());
+        this.networkManager.onAttack((event) => this.handleAttackEvent(event));
+        this.networkManager.onHit((event) => this.handleHitEvent(event));
 
         // Try to connect
         this.showConnectionStatus('Connecting...');
@@ -324,16 +326,39 @@ export class OnlineGameScene extends Phaser.Scene {
         });
     }
 
-    /**
-     * For local player: NO correction from server.
-     * 
-     * The server has simplified physics (single jump, no walls, no detailed state).
-     * Client-side prediction is authoritative for the local player.
-     * Server state is only used for displaying remote players.
-     */
     private checkAndReconcile(_serverPlayerState: NetPlayerState, _serverFrame: number): void {
         // Intentionally empty - client is authoritative for local player
         // Server physics is too simplified to correct client state
+    }
+
+    /**
+     * Handle remote attack events - play animation on remote player
+     */
+    private handleAttackEvent(event: NetAttackEvent): void {
+        const player = this.players.get(event.playerId);
+        if (player) {
+            // Force attack animation on remote player
+            player.playAttackAnimation(event.attackKey);
+        }
+    }
+
+    /**
+     * Handle remote hit events - apply damage/knockback
+     */
+    private handleHitEvent(event: NetHitEvent): void {
+        // If we are the victim, apply damage/knockback
+        if (event.victimId === this.localPlayerId && this.localPlayer) {
+            // Apply damage
+            this.localPlayer.takeDamage(event.damage);
+
+            // Apply knockback
+            this.localPlayer.setVelocity(event.knockbackX, event.knockbackY);
+
+            // Play hurt animation
+            this.localPlayer.playHurtAnimation();
+
+            // Apply hitstop/stun if needed (simplified for now)
+        }
     }
 
     private interpolatePlayer(player: Player, netState: NetPlayerState): void {
@@ -377,6 +402,21 @@ export class OnlineGameScene extends Phaser.Scene {
             gamepadIndex: null,
             character: 'fok'
         });
+
+        // Network hooks for local player
+        if (isLocal) {
+            player.onAttack = (key, dir) => {
+                this.networkManager.sendAttack(key, dir);
+            };
+
+            player.onHit = (target, dmg, kx, ky) => {
+                // Determine victim ID
+                if (target instanceof Player) {
+                    this.networkManager.sendHit(target.playerId, dmg, kx, ky);
+                    console.log(`[OnlineGame] Hit remote player ${target.playerId} for ${dmg} dmg`);
+                }
+            };
+        }
 
         // Visual distinction for remote players
         if (!isLocal) {
