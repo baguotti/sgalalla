@@ -149,9 +149,9 @@ export class Player extends Fighter {
         this.isAI = config.isAI || false;
         this.playerId = config.playerId || 0;
 
-        // Create player sprite (Chibi Knight)
-        // Create player sprite (Bloody Alchemist)
-        // Create player sprite (Fok)
+        this.playerId = config.playerId || 0;
+
+        // Character Selection
         this.character = config.character || 'fok';
         this.animPrefix = this.character;
 
@@ -232,7 +232,7 @@ export class Player extends Fighter {
         this.updateDamageDisplay();
     }
 
-    update(delta: number): void {
+    public updatePhysics(delta: number): void {
         // Get input
         if (this.isAI) {
             if (this.isTrainingDummy) {
@@ -245,12 +245,14 @@ export class Player extends Fighter {
             this.currentInput = this.inputManager.poll();
         }
 
-        // Update Physics Component
+        // Update Physics Component (Resets isGrounded, Applies Gravity & Move)
         this.physics.update(delta, this.currentInput);
 
-        // Update Facing (Run after physics/velocity update, but before combat locks state)
+        // Update Facing (Run after physics/velocity update)
         this.updateFacing();
+    }
 
+    public updateLogic(delta: number): void {
         // Update Combat Component
         this.combat.update(delta);
 
@@ -260,10 +262,16 @@ export class Player extends Fighter {
         // Update Combat/Timers
         this.updateTimers(delta);
 
-        // Visuals
+        // Visuals (Now sees correct isGrounded state from Scene Collisions)
         this.updateAnimation();
         this.updateDamageDisplay();
         this.updateHeldItemPosition();
+    }
+
+    // Legacy update for safety (deprecate?)
+    update(delta: number): void {
+        this.updatePhysics(delta);
+        this.updateLogic(delta);
     }
 
     private updateTimers(delta: number): void {

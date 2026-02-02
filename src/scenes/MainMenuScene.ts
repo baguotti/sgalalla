@@ -9,8 +9,7 @@ export class MainMenuScene extends Phaser.Scene {
     private canInput: boolean = false;
     private selectedIndex: number = 0;
     private menuOptions = [
-        { label: 'LOCAL VERSUS', mode: 'versus' },
-        { label: 'TRAINING', mode: 'training' }
+        { label: 'LOCAL VERSUS', mode: 'versus' }
     ];
     private menuTexts: Phaser.GameObjects.Text[] = [];
 
@@ -142,6 +141,32 @@ export class MainMenuScene extends Phaser.Scene {
 
     private selectOption(inputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD', gamepadIndex: number | null = null): void {
         const mode = this.menuOptions[this.selectedIndex].mode;
-        this.scene.start('LobbyScene', { mode: mode, inputType: inputType, gamepadIndex: gamepadIndex });
+
+        // SKIP LOBBY - Direct Launch GameScene
+        // Default Config: P1 Human vs P2 CPU
+        const playerData = [
+            {
+                playerId: 0,
+                joined: true,
+                character: 'fok',
+                isAI: false,
+                input: {
+                    type: inputType,
+                    gamepadIndex: gamepadIndex
+                }
+            },
+            {
+                playerId: 1,
+                joined: true,
+                character: 'fok', // Default enemy
+                isAI: true, // CPU
+                input: {
+                    type: 'KEYBOARD',
+                    gamepadIndex: null
+                }
+            }
+        ];
+
+        this.scene.start('GameScene', { playerData: playerData });
     }
 }

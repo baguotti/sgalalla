@@ -240,6 +240,7 @@ export class GameScene extends Phaser.Scene {
                 console.log(`Creating player ${pData.playerId}...`);
                 const player = new Player(this, spawn.x, spawn.y, {
                     playerId: pData.playerId,
+                    isAI: pData.isAI,
                     gamepadIndex: pData.input.gamepadIndex,
                     useKeyboard: pData.input.type === 'KEYBOARD',
                     character: pData.character
@@ -585,17 +586,19 @@ export class GameScene extends Phaser.Scene {
             this.spawnBomb();
         }
 
-        // Update players
-        this.players.forEach(p => p.update(delta));
+        // 1. Update Physics (Move)
+        this.players.forEach(p => p.updatePhysics(delta));
 
-
-        // Platform Collisions
+        // 2. Resolve Collisions (Snap to Ground)
         for (const platform of this.platforms) {
             this.players.forEach(p => p.checkPlatformCollision(platform, false));
         }
         for (const platform of this.softPlatforms) {
             this.players.forEach(p => p.checkPlatformCollision(platform, true));
         }
+
+        // 3. Update Logic (Anim)
+        this.players.forEach(p => p.updateLogic(delta));
 
 
         // Environment Collisions (Walls)

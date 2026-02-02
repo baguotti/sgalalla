@@ -13,7 +13,7 @@ export class PlayerPhysics {
     public isFastFalling: boolean = false;
 
     // Jump State
-    public jumpsRemaining: number = 2;
+    public jumpsRemaining: number = 3; // Will be set by reset()
     public airActionCounter: number = 0;
     public jumpHoldTime: number = 0;
     public wasJumpHeld: boolean = false;
@@ -68,6 +68,7 @@ export class PlayerPhysics {
         }
 
         // 1. Reset Acceleration (Gravity is constant)
+        this.isGrounded = false; // Reset grounding at start of frame
         this.acceleration.set(0, PhysicsConfig.GRAVITY);
 
         // 2. Handle Mechanics
@@ -534,7 +535,7 @@ export class PlayerPhysics {
             this.player.isGrounded = true;
             this.isFastFalling = false;
             this.isRecovering = false;
-            this.jumpsRemaining = 2;
+            this.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
             this.recoveryAvailable = true;
             this.droppingThroughPlatform = null;
             this.airActionCounter = 0;
@@ -576,7 +577,7 @@ export class PlayerPhysics {
 
     public resetOnGround(): void {
         this.player.isGrounded = true;
-        this.jumpsRemaining = 2;
+        this.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
         this.airActionCounter = 0;
         this.isFastFalling = false;
         this.isWallSliding = false;
@@ -591,7 +592,7 @@ export class PlayerPhysics {
         }
         this.acceleration.set(0, 0);
         this.isGrounded = false;
-        this.jumpsRemaining = 2;
+        this.jumpsRemaining = PhysicsConfig.MAX_JUMPS;
         this.airActionCounter = 0;
         this.isFastFalling = false;
         this.isWallSliding = false;

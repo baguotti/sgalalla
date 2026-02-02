@@ -249,7 +249,7 @@ export class InputManager {
             heavyAttackHeld: state.heavyAttackHeld, // Track B held for charging
             dodge: state.dodge,
             dodgeHeld: state.dodgeHeld, // Track LT/RT held for running
-            recovery: state.heavyAttack && state.aimUp && !this.isGroundedCheck(), // Up + Heavy in air = recovery
+            recovery: state.heavyAttack && state.aimUp, // Map Up+Heavy to recovery signal. Logic handled by Player.
             aimUp: state.aimUp,
             aimDown: state.aimDown,
             aimLeft: state.aimLeft,
@@ -258,10 +258,7 @@ export class InputManager {
         };
     }
 
-    // This is a placeholder - the actual grounded check happens in Player
-    private isGroundedCheck(): boolean {
-        return false;
-    }
+
 
     isGamepadConnected(): boolean {
         return this.gamepadInput.isConnected();

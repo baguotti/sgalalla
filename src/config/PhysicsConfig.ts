@@ -18,6 +18,7 @@ export const PhysicsConfig = {
   SHORT_HOP_FORCE: -600, // -400 * 1.5
   JUMP_HOLD_THRESHOLD: 150, // ms - unchanged
   DOUBLE_JUMP_FORCE: -975, // -650 * 1.5
+  MAX_JUMPS: 3, // Enable Triple Jump
 
   // Fast-fall
   FAST_FALL_MULTIPLIER: 1.5, // 50% increase in fall speed (multiplier)
