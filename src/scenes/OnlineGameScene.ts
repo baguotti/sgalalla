@@ -273,13 +273,22 @@ export class OnlineGameScene extends Phaser.Scene {
                 facingDirection: this.localPlayer.getFacingDirection(),
                 isGrounded: this.localPlayer.isGrounded,
                 isAttacking: this.localPlayer.isAttacking,
-                damagePercent: 0
+                damagePercent: this.localPlayer.damagePercent
+            });
+
+            // Check local player attacks against all remote players
+            this.players.forEach((target) => {
+                if (target !== this.localPlayer) {
+                    this.localPlayer!.checkHitAgainst(target);
+                }
             });
         }
 
-        // Check all players for blast zones
+        // Update remote players (animations/logic, no physics)
         this.players.forEach((player) => {
             if (player !== this.localPlayer) {
+                // Update logic for animations (but not physics)
+                player.updateLogic(delta);
                 this.checkBlastZone(player);
             }
         });
@@ -369,6 +378,7 @@ export class OnlineGameScene extends Phaser.Scene {
         player.velocity.x = netState.velocityX;
         player.velocity.y = netState.velocityY;
         player.isGrounded = netState.isGrounded;
+        player.isAttacking = netState.isAttacking;
     }
 
     /**
