@@ -373,6 +373,7 @@ export class OnlineGameScene extends Phaser.Scene {
         player.velocity.y = netState.velocityY;
         player.isGrounded = netState.isGrounded;
         player.isAttacking = netState.isAttacking;
+        player.setFacingDirection(netState.facingDirection);
 
         // Debug: Log state changes
         if (netState.isAttacking) {

@@ -42,6 +42,12 @@ export class Player extends Fighter {
     // Facing direction
     private facingDirection: number = 1;
     public getFacingDirection(): number { return this.facingDirection; }
+    public setFacingDirection(dir: number): void {
+        this.facingDirection = dir;
+        if (this.sprite) {
+            this.sprite.setFlipX(dir < 0);
+        }
+    }
 
     // Damage display
 
