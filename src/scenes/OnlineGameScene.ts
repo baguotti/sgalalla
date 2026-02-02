@@ -269,6 +269,8 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private handleStateUpdate(state: NetGameState): void {
+        const serverFrame = state.frame;
+
         state.players.forEach((netPlayer: NetPlayerState) => {
             let player = this.players.get(netPlayer.playerId);
 
@@ -282,15 +284,48 @@ export class OnlineGameScene extends Phaser.Scene {
                 }
             }
 
-            // Skip local player prediction override (we predict locally)
-            if (netPlayer.playerId === this.localPlayerId) {
-                // TODO: Reconcile server state with local prediction
+            // For local player: check for divergence and reconcile if needed
+            if (netPlayer.playerId === this.localPlayerId && this.localPlayer) {
+                this.checkAndReconcile(netPlayer, serverFrame);
                 return;
             }
 
             // Interpolate remote players
             this.interpolatePlayer(player, netPlayer);
         });
+    }
+
+    /**
+     * Check if local prediction diverged from server state and reconcile if needed
+     */
+    private checkAndReconcile(serverPlayerState: NetPlayerState, serverFrame: number): void {
+        if (!this.localPlayer) return;
+
+        // Calculate position error
+        const posErrorX = Math.abs(this.localPlayer.x - serverPlayerState.x);
+        const posErrorY = Math.abs(this.localPlayer.y - serverPlayerState.y);
+        const posError = Math.sqrt(posErrorX * posErrorX + posErrorY * posErrorY);
+
+        // Threshold for triggering reconciliation (in pixels)
+        const RECONCILE_THRESHOLD = 10;
+
+        if (posError > RECONCILE_THRESHOLD) {
+            console.log(`[Rollback] Divergence detected! Error: ${posError.toFixed(1)}px at frame ${serverFrame}`);
+
+            // For now, do a simple snap correction
+            // Full rollback would: restore snapshot, replay inputs from serverFrame to localFrame
+            this.localPlayer.x = serverPlayerState.x;
+            this.localPlayer.y = serverPlayerState.y;
+            this.localPlayer.velocity.x = serverPlayerState.velocityX;
+            this.localPlayer.velocity.y = serverPlayerState.velocityY;
+            this.localPlayer.isGrounded = serverPlayerState.isGrounded;
+
+            // TODO: Full re-simulation
+            // 1. Get snapshot at serverFrame from networkManager.getSnapshot(serverFrame)
+            // 2. Restore player state from snapshot
+            // 3. Replay inputs from serverFrame+1 to localFrame
+            // 4. Update sprite position
+        }
     }
 
     private interpolatePlayer(player: Player, netState: NetPlayerState): void {
