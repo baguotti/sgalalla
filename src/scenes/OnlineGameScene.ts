@@ -81,10 +81,8 @@ export class OnlineGameScene extends Phaser.Scene {
                 { key: 'fall', folder: 'Falling Down', count: 1, prefix: '0_Fok_Falling Down_', type: 'manual', filename: '0_Fok_Falling_001.png' },
                 { key: 'ground_pound', folder: 'Ground Pound', count: 1, prefix: '0_Fok_Gpound_', type: 'manual', filename: '0_Fok_Gpound_001.png' },
                 { key: 'hurt', folder: 'Hurt', count: 1, prefix: '0_Fok_Hurt_', type: 'manual', filename: '0_Fok_Hurt_001.png' },
-                { key: 'jump_start', folder: 'Jump Start', count: 6, prefix: '0_Fok_Jump Start_' },
                 { key: 'jump', folder: 'Jump Loop', count: 1, prefix: '0_Fok_Jump_', type: 'manual', filename: '0_Fok_Jump_000.png' },
                 { key: 'slide', folder: 'Sliding', count: 1, prefix: '0_Fok_Sliding_', type: 'manual', filename: '0_Fok_Sliding_000.png' },
-                { key: 'attack', folder: 'Throwing', count: 12, prefix: '0_Fok_Throwing_' },
                 { key: 'attack_down', folder: 'Down_Sig', count: 1, prefix: '0_Fok_DownSig_', type: 'manual', filename: '0_Fok_DownSig_001.png' },
                 { key: 'attack_side', folder: 'Side_Sig', count: 1, prefix: '0_Fok_SideSig_', type: 'manual', filename: '0_Fok_SideSig_001.png' }
             ];
@@ -109,12 +107,10 @@ export class OnlineGameScene extends Phaser.Scene {
         const fokAnims = [
             { key: 'idle', count: 19, loop: true },
             { key: 'run', count: 12, loop: true },
-            { key: 'jump_start', count: 6, loop: false },
             { key: 'jump', count: 1, loop: true },
             { key: 'fall', count: 1, loop: true },
             { key: 'hurt', count: 1, loop: false },
             { key: 'ground_pound', count: 1, loop: true },
-            { key: 'attack', count: 12, loop: false },
             { key: 'slide', count: 1, loop: true },
             { key: 'charging', count: 8, loop: true },
             { key: 'attack_light', count: 1, loop: false },
@@ -379,6 +375,11 @@ export class OnlineGameScene extends Phaser.Scene {
         player.velocity.y = netState.velocityY;
         player.isGrounded = netState.isGrounded;
         player.isAttacking = netState.isAttacking;
+
+        // Debug: Log state changes
+        if (netState.isAttacking) {
+            console.log(`[Remote] Player ${netState.playerId} isAttacking=${netState.isAttacking}`);
+        }
     }
 
     /**
