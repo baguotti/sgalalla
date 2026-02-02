@@ -64,42 +64,40 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private loadCharacterAssets(): void {
-        const fokAssets: Array<{
-            key: string;
-            folder: string;
-            count: number;
-            prefix: string;
-            type?: string;
-            filename?: string;
-        }> = [
-                { key: 'idle', folder: 'Idle', count: 19, prefix: '0_Fok_Idle_' },
-                { key: 'run', folder: 'Running', count: 12, prefix: '0_Fok_Running_' },
-                { key: 'charging', folder: 'Charging', count: 8, prefix: '0_Fok_Charging_' },
-                { key: 'attack_light', folder: 'AttackLight', count: 1, prefix: '0_Fok_AttackLight_', type: 'manual', filename: '0_Fok_AttackLight_001.png' },
-                { key: 'attack_heavy', folder: 'AttackHeavy', count: 1, prefix: '0_Fok_AttackHeavy_' },
-                { key: 'attack_up', folder: 'Attack_Up', count: 1, prefix: '0_Fok_AttackUp_', type: 'manual', filename: '0_Fok_AttackUp_001.png' },
-                { key: 'fall', folder: 'Falling Down', count: 1, prefix: '0_Fok_Falling Down_', type: 'manual', filename: '0_Fok_Falling_001.png' },
-                { key: 'ground_pound', folder: 'Ground Pound', count: 1, prefix: '0_Fok_Gpound_', type: 'manual', filename: '0_Fok_Gpound_001.png' },
-                { key: 'hurt', folder: 'Hurt', count: 1, prefix: '0_Fok_Hurt_', type: 'manual', filename: '0_Fok_Hurt_001.png' },
-                { key: 'jump', folder: 'Jump Loop', count: 1, prefix: '0_Fok_Jump_', type: 'manual', filename: '0_Fok_Jump_000.png' },
-                { key: 'slide', folder: 'Sliding', count: 1, prefix: '0_Fok_Sliding_', type: 'manual', filename: '0_Fok_Sliding_000.png' },
-                { key: 'attack_down', folder: 'Down_Sig', count: 1, prefix: '0_Fok_DownSig_', type: 'manual', filename: '0_Fok_DownSig_001.png' },
-                { key: 'attack_side', folder: 'Side_Sig', count: 1, prefix: '0_Fok_SideSig_', type: 'manual', filename: '0_Fok_SideSig_001.png' }
-            ];
+        // Multi-frame animations
+        const multiFrameAssets = [
+            { key: 'idle', folder: 'Idle', count: 19, prefix: '0_Fok_Idle_' },
+            { key: 'run', folder: 'Running', count: 12, prefix: '0_Fok_Running_' },
+            { key: 'charging', folder: 'Charging', count: 8, prefix: '0_Fok_Charging_' }
+        ];
 
-        fokAssets.forEach(asset => {
-            if (asset.type === 'manual' && asset.filename) {
-                const path = `assets/fok/${asset.folder}/${asset.filename}`;
-                this.load.image(`fok_${asset.key}_0`, path);
-            } else {
-                for (let i = 0; i < asset.count; i++) {
-                    const num = i.toString().padStart(3, '0');
-                    const filename = `${asset.prefix}${num}.png`;
-                    const key = `fok_${asset.key}_${i}`;
-                    const path = `assets/fok/${asset.folder}/${filename}`;
-                    this.load.image(key, path);
-                }
+        multiFrameAssets.forEach(asset => {
+            for (let i = 0; i < asset.count; i++) {
+                const num = i.toString().padStart(3, '0');
+                const key = `fok_${asset.key}_${i}`;
+                const path = `assets/fok/${asset.folder}/${asset.prefix}${num}.png`;
+                this.load.image(key, path);
             }
+        });
+
+        // Single-frame animations (exact filename)
+        const singleFrameAssets = [
+            { key: 'attack_light', folder: 'AttackLight', filename: '0_Fok_AttackLight_000.png' },
+            { key: 'attack_heavy', folder: 'AttackHeavy', filename: '0_Fok_AttackHeavy_000.png' },
+            { key: 'attack_up', folder: 'Attack_Up', filename: '0_Fok_AttackUp_001.png' },
+            { key: 'attack_down', folder: 'Down_Sig', filename: '0_Fok_DownSig_001.png' },
+            { key: 'attack_side', folder: 'Side_Sig', filename: '0_Fok_SideSig_001.png' },
+            { key: 'hurt', folder: 'Hurt', filename: '0_Fok_Hurt_001.png' },
+            { key: 'ground_pound', folder: 'Ground Pound', filename: '0_Fok_Gpound_001.png' },
+            { key: 'fall', folder: 'Falling Down', filename: '0_Fok_Falling_001.png' },
+            { key: 'jump', folder: 'Jump Loop', filename: '0_Fok_Jump_000.png' },
+            { key: 'slide', folder: 'Sliding', filename: '0_Fok_Sliding_000.png' }
+        ];
+
+        singleFrameAssets.forEach(asset => {
+            const key = `fok_${asset.key}_0`;
+            const path = `assets/fok/${asset.folder}/${asset.filename}`;
+            this.load.image(key, path);
         });
     }
 
