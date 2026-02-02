@@ -312,34 +312,15 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     /**
-     * Check if local prediction diverged from server state and reconcile if needed
+     * For local player: NO correction from server.
+     * 
+     * The server has simplified physics (single jump, no walls, no detailed state).
+     * Client-side prediction is authoritative for the local player.
+     * Server state is only used for displaying remote players.
      */
-    private checkAndReconcile(serverPlayerState: NetPlayerState, _serverFrame: number): void {
-        if (!this.localPlayer) return;
-
-        // Calculate position error
-        const posErrorX = Math.abs(this.localPlayer.x - serverPlayerState.x);
-        const posErrorY = Math.abs(this.localPlayer.y - serverPlayerState.y);
-        const posError = Math.sqrt(posErrorX * posErrorX + posErrorY * posErrorY);
-
-        // Use smooth correction instead of snap to prevent jitter
-        // Only correct if error is significant enough
-        const CORRECTION_THRESHOLD = 5; // Minimum error to start correcting
-        const SMOOTH_FACTOR = 0.1; // Gentle interpolation towards server state
-
-        if (posError > CORRECTION_THRESHOLD) {
-            // Smooth lerp correction instead of snap
-            this.localPlayer.x = Phaser.Math.Linear(this.localPlayer.x, serverPlayerState.x, SMOOTH_FACTOR);
-            this.localPlayer.y = Phaser.Math.Linear(this.localPlayer.y, serverPlayerState.y, SMOOTH_FACTOR);
-
-            // Only correct velocity if significantly different
-            const velError = Math.abs(this.localPlayer.velocity.x - serverPlayerState.velocityX) +
-                Math.abs(this.localPlayer.velocity.y - serverPlayerState.velocityY);
-            if (velError > 50) {
-                this.localPlayer.velocity.x = Phaser.Math.Linear(this.localPlayer.velocity.x, serverPlayerState.velocityX, 0.3);
-                this.localPlayer.velocity.y = Phaser.Math.Linear(this.localPlayer.velocity.y, serverPlayerState.velocityY, 0.3);
-            }
-        }
+    private checkAndReconcile(_serverPlayerState: NetPlayerState, _serverFrame: number): void {
+        // Intentionally empty - client is authoritative for local player
+        // Server physics is too simplified to correct client state
     }
 
     private interpolatePlayer(player: Player, netState: NetPlayerState): void {
