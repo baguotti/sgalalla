@@ -460,7 +460,8 @@ export class Player extends Fighter {
                 // Check if it's the up attack (light)
                 this.playAnim('attack_up', true);
             } else {
-                this.playAnim(`attack_light_${this.lightAttackVariant}`, true); // Use alternating single-frame light attack
+                // Default attack animation (local light attack or remote player)
+                this.playAnim('attack_light_0', true);
             }
             return;
         }
