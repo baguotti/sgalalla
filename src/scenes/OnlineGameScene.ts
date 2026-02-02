@@ -14,6 +14,7 @@ import { Player } from '../entities/Player';
 import NetworkManager from '../network/NetworkManager';
 import type { NetGameState, NetPlayerState } from '../network/NetworkManager';
 import { InputManager } from '../input/InputManager';
+import type { GameSnapshot, PlayerSnapshot } from '../network/StateSnapshot';
 
 export class OnlineGameScene extends Phaser.Scene {
     // Networking
@@ -35,6 +36,9 @@ export class OnlineGameScene extends Phaser.Scene {
     // UI
     private connectionStatusText!: Phaser.GameObjects.Text;
     private latencyText!: Phaser.GameObjects.Text;
+
+    // Rollback netcode
+    private localFrame: number = 0;
 
     // Wall configuration (matching GameScene)
     private readonly WALL_THICKNESS = 45;
@@ -220,9 +224,21 @@ export class OnlineGameScene extends Phaser.Scene {
     update(_time: number, delta: number): void {
         if (!this.isConnected) return;
 
+        this.localFrame++;
+
         // Poll and send local input
         const input = this.inputManager.poll();
         this.networkManager.sendInput(input);
+
+        // Save snapshot BEFORE applying input (for rollback)
+        if (this.localPlayer) {
+            const snapshot: GameSnapshot = {
+                frame: this.localFrame,
+                timestamp: Date.now(),
+                players: this.captureAllPlayerSnapshots()
+            };
+            this.networkManager.saveSnapshot(snapshot);
+        }
 
         // Update local player prediction (client-side)
         if (this.localPlayer) {
@@ -238,7 +254,18 @@ export class OnlineGameScene extends Phaser.Scene {
         }
 
         // Update latency display
-        this.latencyText?.setText(`Ping: ${this.networkManager.getLatency()}ms`);
+        this.latencyText?.setText(`Ping: ${this.networkManager.getLatency()}ms | Frame: ${this.localFrame}`);
+    }
+
+    /**
+     * Capture snapshots of all players for rollback
+     */
+    private captureAllPlayerSnapshots(): PlayerSnapshot[] {
+        const snapshots: PlayerSnapshot[] = [];
+        this.players.forEach((player) => {
+            snapshots.push(player.captureSnapshot());
+        });
+        return snapshots;
     }
 
     private handleStateUpdate(state: NetGameState): void {

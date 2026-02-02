@@ -161,6 +161,7 @@ setInterval(() => {
         // Build state snapshot
         const state = {
             frame: room.frame,
+            confirmedInputFrame: room.frame, // Server has processed all inputs up to this frame
             players: Array.from(room.players.values())
         };
 

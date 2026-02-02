@@ -8,6 +8,7 @@ import { PlayerPhysics } from './player/PlayerPhysics';
 import { PlayerCombat } from './player/PlayerCombat';
 import { Attack, AttackPhase, AttackType, AttackDirection } from '../combat/Attack';
 import { PlayerAI } from './player/PlayerAI';
+import type { PlayerSnapshot } from '../network/StateSnapshot';
 
 export const PlayerState = {
     GROUNDED: 'Grounded',
@@ -592,6 +593,57 @@ export class Player extends Fighter {
     public addToCameraIgnore(camera: Phaser.Cameras.Scene2D.Camera): void {
         camera.ignore(this);
 
+    }
+
+    // ============ ROLLBACK NETCODE SUPPORT ============
+
+    /**
+     * Capture the current player state for rollback
+     */
+    public captureSnapshot(): PlayerSnapshot {
+        // Derive state from flags
+        let state = 'idle';
+        if (this.isAttacking) state = 'attacking';
+        else if (this.isDodging) state = 'dodging';
+        else if (this.isHitStunned) state = 'hitstun';
+        else if (!this.physics.isGrounded) state = 'airborne';
+
+        return {
+            playerId: this.playerId,
+            x: this.x,
+            y: this.y,
+            velocityX: this.velocity.x,
+            velocityY: this.velocity.y,
+            isGrounded: this.physics.isGrounded,
+            jumpsRemaining: this.physics.jumpsRemaining,
+            facingDirection: this.facingDirection,
+            damagePercent: this.damagePercent,
+            playerState: state,
+            isAttacking: this.isAttacking,
+            isDodging: this.isDodging,
+            isInvincible: this.isInvincible
+        };
+    }
+
+    /**
+     * Restore player state from a snapshot (for rollback)
+     */
+    public restoreSnapshot(snapshot: PlayerSnapshot): void {
+        this.x = snapshot.x;
+        this.y = snapshot.y;
+        this.velocity.x = snapshot.velocityX;
+        this.velocity.y = snapshot.velocityY;
+        this.physics.isGrounded = snapshot.isGrounded;
+        this.physics.jumpsRemaining = snapshot.jumpsRemaining;
+        this.facingDirection = snapshot.facingDirection;
+        this.damagePercent = snapshot.damagePercent;
+        // playerState is derived, restore via flags
+        this.isAttacking = snapshot.isAttacking;
+        this.isDodging = snapshot.isDodging;
+        this.isInvincible = snapshot.isInvincible;
+
+        // Update sprite position to match
+        this.sprite.setPosition(this.x, this.y);
     }
 
     destroy(fromScene?: boolean): void {
