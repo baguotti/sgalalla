@@ -47,6 +47,12 @@ export class OnlineGameScene extends Phaser.Scene {
     private readonly PLAY_BOUND_LEFT = this.WALL_LEFT_X + this.WALL_THICKNESS / 2;
     private readonly PLAY_BOUND_RIGHT = this.WALL_RIGHT_X - this.WALL_THICKNESS / 2;
 
+    // Blast zone boundaries (matching GameScene)
+    private readonly BLAST_ZONE_LEFT = -300;
+    private readonly BLAST_ZONE_RIGHT = 2220;
+    private readonly BLAST_ZONE_TOP = -300;
+    private readonly BLAST_ZONE_BOTTOM = 1350;
+
     constructor() {
         super({ key: 'OnlineGameScene' });
         this.networkManager = NetworkManager.getInstance();
@@ -251,7 +257,17 @@ export class OnlineGameScene extends Phaser.Scene {
             this.localPlayer.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
 
             this.localPlayer.updateLogic(delta);
+
+            // Blast zone check - respawn if player falls off
+            this.checkBlastZone(this.localPlayer);
         }
+
+        // Check all players for blast zones
+        this.players.forEach((player) => {
+            if (player !== this.localPlayer) {
+                this.checkBlastZone(player);
+            }
+        });
 
         // Update latency display
         this.latencyText?.setText(`Ping: ${this.networkManager.getLatency()}ms | Frame: ${this.localFrame}`);
@@ -298,7 +314,7 @@ export class OnlineGameScene extends Phaser.Scene {
     /**
      * Check if local prediction diverged from server state and reconcile if needed
      */
-    private checkAndReconcile(serverPlayerState: NetPlayerState, serverFrame: number): void {
+    private checkAndReconcile(serverPlayerState: NetPlayerState, _serverFrame: number): void {
         if (!this.localPlayer) return;
 
         // Calculate position error
@@ -306,25 +322,23 @@ export class OnlineGameScene extends Phaser.Scene {
         const posErrorY = Math.abs(this.localPlayer.y - serverPlayerState.y);
         const posError = Math.sqrt(posErrorX * posErrorX + posErrorY * posErrorY);
 
-        // Threshold for triggering reconciliation (in pixels)
-        const RECONCILE_THRESHOLD = 10;
+        // Use smooth correction instead of snap to prevent jitter
+        // Only correct if error is significant enough
+        const CORRECTION_THRESHOLD = 5; // Minimum error to start correcting
+        const SMOOTH_FACTOR = 0.1; // Gentle interpolation towards server state
 
-        if (posError > RECONCILE_THRESHOLD) {
-            console.log(`[Rollback] Divergence detected! Error: ${posError.toFixed(1)}px at frame ${serverFrame}`);
+        if (posError > CORRECTION_THRESHOLD) {
+            // Smooth lerp correction instead of snap
+            this.localPlayer.x = Phaser.Math.Linear(this.localPlayer.x, serverPlayerState.x, SMOOTH_FACTOR);
+            this.localPlayer.y = Phaser.Math.Linear(this.localPlayer.y, serverPlayerState.y, SMOOTH_FACTOR);
 
-            // For now, do a simple snap correction
-            // Full rollback would: restore snapshot, replay inputs from serverFrame to localFrame
-            this.localPlayer.x = serverPlayerState.x;
-            this.localPlayer.y = serverPlayerState.y;
-            this.localPlayer.velocity.x = serverPlayerState.velocityX;
-            this.localPlayer.velocity.y = serverPlayerState.velocityY;
-            this.localPlayer.isGrounded = serverPlayerState.isGrounded;
-
-            // TODO: Full re-simulation
-            // 1. Get snapshot at serverFrame from networkManager.getSnapshot(serverFrame)
-            // 2. Restore player state from snapshot
-            // 3. Replay inputs from serverFrame+1 to localFrame
-            // 4. Update sprite position
+            // Only correct velocity if significantly different
+            const velError = Math.abs(this.localPlayer.velocity.x - serverPlayerState.velocityX) +
+                Math.abs(this.localPlayer.velocity.y - serverPlayerState.velocityY);
+            if (velError > 50) {
+                this.localPlayer.velocity.x = Phaser.Math.Linear(this.localPlayer.velocity.x, serverPlayerState.velocityX, 0.3);
+                this.localPlayer.velocity.y = Phaser.Math.Linear(this.localPlayer.velocity.y, serverPlayerState.velocityY, 0.3);
+            }
         }
     }
 
@@ -336,6 +350,27 @@ export class OnlineGameScene extends Phaser.Scene {
         player.velocity.x = netState.velocityX;
         player.velocity.y = netState.velocityY;
         player.isGrounded = netState.isGrounded;
+    }
+
+    /**
+     * Check if player is outside blast zones and respawn if so
+     */
+    private checkBlastZone(player: Player): void {
+        const inBlastZone =
+            player.x < this.BLAST_ZONE_LEFT ||
+            player.x > this.BLAST_ZONE_RIGHT ||
+            player.y < this.BLAST_ZONE_TOP ||
+            player.y > this.BLAST_ZONE_BOTTOM;
+
+        if (inBlastZone) {
+            // Respawn at center of stage
+            player.x = 960;
+            player.y = 700;
+            player.velocity.x = 0;
+            player.velocity.y = 0;
+            player.respawn();
+            console.log(`[OnlineGame] Player ${player.playerId} respawned from blast zone`);
+        }
     }
 
     private createPlayer(playerId: number, x: number, y: number): Player {
