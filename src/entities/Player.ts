@@ -49,6 +49,16 @@ export class Player extends Fighter {
     private inputManager!: InputManager;
     private currentInput!: InputState;
 
+    // Network input injection
+    public setInput(input: InputState): void {
+        this.currentInput = input;
+    }
+
+    // Sprite accessor for external tinting
+    public get spriteObject(): Phaser.GameObjects.Sprite {
+        return this.sprite;
+    }
+
     // AI Control
     public isAI: boolean = false;
     private ai: PlayerAI | null = null;
@@ -533,9 +543,7 @@ export class Player extends Fighter {
     getIsInvincible(): boolean { return this.isInvincible; }
     getCurrentAttack(): Attack | null { return this.combat.currentAttack; }
 
-    public get spriteObject(): any {
-        return this.sprite;
-    }
+
 
     getBounds(): Phaser.Geom.Rectangle {
         return new Phaser.Geom.Rectangle(

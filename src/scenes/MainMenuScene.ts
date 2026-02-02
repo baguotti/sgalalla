@@ -9,7 +9,8 @@ export class MainMenuScene extends Phaser.Scene {
     private canInput: boolean = false;
     private selectedIndex: number = 0;
     private menuOptions = [
-        { label: 'LOCAL VERSUS', mode: 'versus' }
+        { label: 'LOCAL VERSUS', mode: 'versus' },
+        { label: 'QUICK JOIN', mode: 'online' }
     ];
     private menuTexts: Phaser.GameObjects.Text[] = [];
 
@@ -142,7 +143,13 @@ export class MainMenuScene extends Phaser.Scene {
     private selectOption(inputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD', gamepadIndex: number | null = null): void {
         const mode = this.menuOptions[this.selectedIndex].mode;
 
-        // SKIP LOBBY - Direct Launch GameScene
+        // Handle Online Quick Join
+        if (mode === 'online') {
+            this.scene.start('OnlineGameScene');
+            return;
+        }
+
+        // SKIP LOBBY - Direct Launch GameScene for Local
         // Default Config: P1 Human vs P2 CPU
         const playerData = [
             {
