@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
+import { PhysicsConfig } from '@shared/physics/PhysicsConfig';
 import { Player } from '../Player';
 import { Fighter } from '../Fighter';
-import { Attack, AttackType, AttackDirection, AttackPhase } from '../../combat/Attack';
+import { Attack, AttackType, AttackDirection } from '../../combat/Attack';
 import { Hitbox } from '../../combat/Hitbox';
 import type { Damageable } from '../../combat/DamageSystem'; // Type import
 import { DamageSystem } from '../../combat/DamageSystem';
-import { PhysicsConfig } from '../../config/PhysicsConfig';
-import type { InputState } from '../../input/InputManager'; // Type import
+import type { InputState } from '@shared/input/InputState';
 
 export class PlayerCombat {
     private player: Player;
@@ -29,11 +29,29 @@ export class PlayerCombat {
     public isCharging: boolean = false;
     public chargeTime: number = 0;
     public chargeDirection: AttackDirection = AttackDirection.NEUTRAL;
-    private chargeGlow: Phaser.GameObjects.Graphics | null = null;
+
+    // Throw Charge System
+    public isThrowCharging: boolean = false;
+    public throwChargeTime: number = 0;
+
+    private showDebugHitboxes: boolean = false;
 
     constructor(player: Player, scene: Phaser.Scene) {
         this.player = player;
         this.scene = scene;
+    }
+
+    // Debug Damage Text
+    private debugDamageText: Phaser.GameObjects.Text | null = null;
+
+    public setDebug(visible: boolean): void {
+        this.showDebugHitboxes = visible;
+        if (this.activeHitbox) {
+            this.activeHitbox.setDebug(visible);
+        }
+        if (this.debugDamageText) {
+            this.debugDamageText.setVisible(visible && !!this.currentAttack);
+        }
     }
 
     public update(delta: number): void {
@@ -43,9 +61,13 @@ export class PlayerCombat {
             this.updateChargeState(delta);
         }
 
+        if (this.isThrowCharging) {
+            this.updateThrowCharge(delta);
+        }
+
         if (this.player.isAttacking || this.isGroundPounding) {
             this.updateAttackState(delta);
-        } else if (this.player.physics.isRecovering) {
+        } else if (this.player.playerState.isRecovering) {
             this.updateRecoveryHitbox();
         } else {
             // Ensure hitbox is visually removed when not in use
@@ -87,9 +109,36 @@ export class PlayerCombat {
         // Use player.isDodging which is synced from Physics
         if (this.player.isDodging || this.player.isHitStunned || this.player.isAttacking) return;
 
+        // --- Throw Charge Handling ---
+        if (this.isThrowCharging) {
+            if (!input.lightAttackHeld) {
+                // Released - execute throw
+                this.executeThrow(input);
+                this.isThrowCharging = false;
+                this.throwChargeTime = 0;
+            }
+            return; // Stay in charge state
+        }
 
-        // Light attack - instant activation
+        // --- Attack Blocker While Holding ---
+        // Character cannot attack while carrying a bomb
+        const isHolding = !!this.player.heldItem;
+
+        // Light attack - Grab / Start Throw Charge / Attack
         if (input.lightAttack) {
+            if (isHolding) {
+                // 1. Start Charge Throw
+                this.isThrowCharging = true;
+                this.throwChargeTime = 0;
+                return;
+            }
+
+            // 2. Try to Pickup Item
+            if (this.player.checkItemPickup()) {
+                return; // Picked up item, skip attack
+            }
+
+            // 3. Normal Attack
             const direction = this.getInputDirection(input);
             const isAerial = !this.player.isGrounded;
             const attackKey = Attack.getAttackKey(AttackType.LIGHT, direction, isAerial);
@@ -97,6 +146,10 @@ export class PlayerCombat {
             return;
         }
 
+        // Prevent heavy attacks if holding item
+        if (isHolding && (input.heavyAttack || this.isCharging)) {
+            return;
+        }
 
         // Heavy attack - chargeable (except for aerial down = ground pound, and aerial up/neutral = recovery)
         if (input.heavyAttack && !this.isCharging) {
@@ -112,7 +165,7 @@ export class PlayerCombat {
             // Special case: Up/Neutral + Heavy in air = Recovery (starts immediately, no charge)
             if ((direction === AttackDirection.UP || direction === AttackDirection.NEUTRAL) && isAerial) {
                 this.hitTargets.clear(); // Reset hit tracking for the new move
-                this.player.physics.startRecovery();
+                this.player.playerState.startRecovery();
                 return;
             }
 
@@ -122,10 +175,7 @@ export class PlayerCombat {
             this.chargeDirection = direction;
 
             // Create charge glow effect
-            if (!this.chargeGlow) {
-                this.chargeGlow = this.scene.add.graphics();
-                this.player.add(this.chargeGlow);
-            }
+            // Removed charge glow
             return;
         }
 
@@ -149,10 +199,7 @@ export class PlayerCombat {
         // Grounded UP = NEUTRAL (for NLight)
         // Aerial UP = UP (for Recovery/Nair)
 
-        const isGrounded = this.player.isGrounded;
-
         if (input.aimUp && !input.aimDown) {
-            if (isGrounded) return AttackDirection.NEUTRAL;
             return AttackDirection.UP;
         }
 
@@ -170,7 +217,12 @@ export class PlayerCombat {
             this.hitTargets.clear();
 
             // Visual feedback
-            this.player.setVisualTint(0xff0000); // Red during attack
+            // this.player.setVisualTint(0xff0000); // Removed red tint
+
+            // Alternate light attack animation
+            if (this.currentAttack.data.type === AttackType.LIGHT) {
+                this.player.lightAttackVariant = (this.player.lightAttackVariant + 1) % 2;
+            }
         } catch (e) {
             console.warn('Unknown attack:', attackKey);
         }
@@ -209,7 +261,7 @@ export class PlayerCombat {
         // Accumulate charge time
         this.chargeTime += delta;
 
-        // Auto-release if max charge exceeded (Brawlhalla style limit)
+        // Auto-release if max charge exceeded
         if (this.chargeTime >= PhysicsConfig.CHARGE_MAX_TIME) {
             this.executeChargedAttack();
             return;
@@ -217,66 +269,90 @@ export class PlayerCombat {
 
         const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
 
-        // Update visual glow effect
-        if (this.chargeGlow) {
-            this.chargeGlow.clear();
+        // Subtle Shake Effect
+        // Intensity increases with charge, max 1.5 pixels
+        const maxShake = 1.5;
+        const intensity = chargePercent * maxShake;
 
-            // Pulsing glow that intensifies with charge
-            const pulseSpeed = 5 + chargePercent * 10; // Faster pulse at higher charge
-            const pulse = 0.5 + Math.sin(this.scene.time.now / 100 * pulseSpeed) * 0.5;
-            const glowIntensity = 0.3 + chargePercent * 0.7;
-            const alpha = glowIntensity * pulse;
+        const offsetX = (Math.random() - 0.5) * 2 * intensity;
+        const offsetY = (Math.random() - 0.5) * 2 * intensity;
 
-            // Color shifts from yellow to orange to red as charge builds
-            let color: number;
-            if (chargePercent < 0.5) {
-                color = 0xffff00; // Yellow
-            } else if (chargePercent < 0.8) {
-                color = 0xff8800; // Orange
-            } else {
-                color = 0xff0000; // Red at max charge
-            }
-
-            // Draw glow ring around player
-            const radius = 35 + chargePercent * 15;
-            this.chargeGlow.lineStyle(3 + chargePercent * 4, color, alpha);
-            this.chargeGlow.strokeCircle(0, 0, radius);
-
-            // At full charge, add extra particles/sparkles
-            if (chargePercent >= 1) {
-                const sparkleAngle = (this.scene.time.now * 0.01) % (Math.PI * 2);
-                for (let i = 0; i < 4; i++) {
-                    const angle = sparkleAngle + (i * Math.PI / 2);
-                    const sparkleX = Math.cos(angle) * (radius + 10);
-                    const sparkleY = Math.sin(angle) * (radius + 10);
-                    this.chargeGlow.fillStyle(0xffffff, alpha);
-                    this.chargeGlow.fillCircle(sparkleX, sparkleY, 4);
-                }
-            }
-        }
-
-        // Flash body color based on charge
-        if (chargePercent >= 1) {
-            // Full charge - flash rapidly
-            const flash = Math.sin(this.scene.time.now / 50) > 0;
-            if (flash) {
-                this.player.setVisualTint(0xffff00);
-            } else {
-                this.player.resetVisuals();
-            }
-        } else if (chargePercent > 0.5) {
-            // Partial charge - tint slightly
-            this.player.setVisualTint(0x88ccff);
-        }
+        this.player.setVisualOffset(offsetX, offsetY);
     }
+
+
 
     private clearChargeState(): void {
         this.isCharging = false;
         this.chargeTime = 0;
-        if (this.chargeGlow) {
-            this.chargeGlow.clear();
+        // Reset body color and offset
+        this.player.resetVisuals();
+    }
+
+    private updateThrowCharge(delta: number): void {
+        this.throwChargeTime += delta;
+        const maxChargeTime = 1000; // 1 second for max power
+        const overchargeTime = 2000; // 2 seconds to explode in hand
+
+        if (this.throwChargeTime >= overchargeTime) {
+            // Explode in hand!
+            if (this.player.heldItem) {
+                this.player.heldItem.explode();
+                this.player.heldItem = null;
+            }
+            this.isThrowCharging = false;
+            this.throwChargeTime = 0;
+            this.player.resetVisuals();
+            return;
         }
-        // Reset body color
+
+        const chargePercent = Math.min(this.throwChargeTime / maxChargeTime, 1);
+
+        // Visual shake for the bomb/char
+        const intensity = chargePercent * 2;
+        const offsetX = (Math.random() - 0.5) * 2 * intensity;
+        const offsetY = (Math.random() - 0.5) * 2 * intensity;
+        this.player.setVisualOffset(offsetX, offsetY);
+    }
+
+    private executeThrow(input: InputState): void {
+        // 8-Directional Aiming
+        let dirX = 0;
+        let dirY = 0;
+
+        if (input.aimUp) dirY = -1;
+        if (input.aimDown) dirY = 1;
+        if (input.aimLeft) dirX = -1;
+        if (input.aimRight) dirX = 1;
+
+        // If no direction held, throw forward
+        if (dirX === 0 && dirY === 0) {
+            dirX = this.player.getFacingDirection();
+        }
+
+        // Normalize diagonals
+        if (dirX !== 0 && dirY !== 0) {
+            const mag = Math.sqrt(dirX * dirX + dirY * dirY);
+            dirX /= mag;
+            dirY /= mag;
+        }
+
+        // Calculate power based on charge
+        const maxChargeTime = 1000;
+        const chargePercent = Math.min(this.throwChargeTime / maxChargeTime, 1);
+
+        // Base speed 18, Max speed 38
+        const powerMultiplier = 18 + (chargePercent * 20);
+
+        if (this.player.heldItem) {
+            const bomb = this.player.heldItem;
+            this.player.throwItem(dirX * powerMultiplier, dirY * powerMultiplier);
+            // Start the 3s fuse on the bomb
+            if (bomb.onThrown) {
+                bomb.onThrown(this.player);
+            }
+        }
+
         this.player.resetVisuals();
     }
 
@@ -295,8 +371,6 @@ export class PlayerCombat {
         } catch (e) {
             console.warn('Ground pound attack not found');
         }
-
-        this.player.setVisualTint(0x9b59b6); // Purple for ground pound startup
     }
 
     private updateAttackState(delta: number): void {
@@ -310,7 +384,7 @@ export class PlayerCombat {
             this.groundPoundStartupTimer -= delta;
             this.player.velocity.set(0, 0); // Stay suspended
             if (this.groundPoundStartupTimer <= 0) {
-                this.player.setVisualTint(0xff0000); // Switch to attack color
+                // this.player.setVisualTint(0xff0000); // Switch to attack color
             }
             return;
         }
@@ -332,6 +406,11 @@ export class PlayerCombat {
         // Update attack phase
         const attackComplete = this.currentAttack.update(delta);
 
+        // Check for Multi-Hit Reset
+        if (this.currentAttack.shouldResetHits()) {
+            this.hitTargets.clear();
+        }
+
         // Handle hitbox
         if (this.currentAttack.isHitboxActive()) {
             this.updateHitbox();
@@ -340,6 +419,7 @@ export class PlayerCombat {
         }
 
         // Visual feedback based on phase
+        /*
         if (this.currentAttack.phase === AttackPhase.STARTUP) {
             this.player.setVisualTint(0xf39c12); // Orange during startup
         } else if (this.currentAttack.phase === AttackPhase.ACTIVE) {
@@ -347,6 +427,7 @@ export class PlayerCombat {
         } else if (this.currentAttack.phase === AttackPhase.RECOVERY) {
             this.player.setVisualTint(0x888888); // Gray during recovery
         }
+        */
 
         if (attackComplete) {
             this.endAttack();
@@ -385,11 +466,44 @@ export class PlayerCombat {
     private updateHitbox(): void {
         if (!this.currentAttack) return;
 
-        const offset = this.currentAttack.getHitboxOffset();
+        let offset = this.currentAttack.getHitboxOffset();
+        let width = this.currentAttack.data.hitboxWidth;
+        let height = this.currentAttack.data.hitboxHeight;
+
+        // Custom Overrides
+        // Down Sig: Center Bottom
+        if (this.currentAttack.data.type === AttackType.HEAVY &&
+            this.currentAttack.data.direction === AttackDirection.DOWN) {
+
+            // Position at bottom of player collision box
+            // Player Y is center, so add half height
+            // We want the CENTER of the hitbox to be at the BOTTOM of the player
+            offset.x = 0;
+            offset.y = PhysicsConfig.PLAYER_HEIGHT / 2;
+
+            // Adjust dimensions: Wider and Less Tall
+            width = 110;
+            height = 30;
+        }
+
+        // Neutral/Up Sig: Center Top, Flat and Wide
+        if (this.currentAttack.data.type === AttackType.HEAVY &&
+            (this.currentAttack.data.direction === AttackDirection.UP ||
+                this.currentAttack.data.direction === AttackDirection.NEUTRAL)) {
+
+            // Position at top of player collision box
+            offset.x = 0;
+            offset.y = -PhysicsConfig.PLAYER_HEIGHT / 2;
+
+            // Adjust dimensions: Wider and Flat (but slightly taller than DownSig)
+            width = 110;
+            height = 34;
+        }
+
         const hitboxX = this.player.x + offset.x;
         const hitboxY = this.player.y + offset.y;
 
-        this.updateActiveHitbox(hitboxX, hitboxY, this.currentAttack.data.hitboxWidth, this.currentAttack.data.hitboxHeight);
+        this.updateActiveHitbox(hitboxX, hitboxY, width, height);
     }
 
     public updateRecoveryHitbox(): void {
@@ -406,14 +520,43 @@ export class PlayerCombat {
                 width,
                 height
             );
+            // Sync current debug state
+            this.activeHitbox.setDebug(this.showDebugHitboxes);
         }
         this.activeHitbox.setSize(width, height);
         this.activeHitbox.activate(x, y);
+
+        // Update Debug Damage Text
+        if (this.showDebugHitboxes) {
+            if (!this.debugDamageText) {
+                this.debugDamageText = this.scene.add.text(x, y, '', {
+                    fontSize: '14px',
+                    color: '#ff0000',
+                    backgroundColor: '#ffffff',
+                    padding: { x: 2, y: 2 }
+                });
+                this.debugDamageText.setDepth(100);
+            }
+
+            let damage = 0;
+            if (this.currentAttack) {
+                damage = this.currentAttack.data.damage;
+            } else if (this.player.playerState.isRecovering) {
+                damage = 8; // Hardcoded recovery damage
+            }
+
+            this.debugDamageText.setText(`${damage}`);
+            this.debugDamageText.setPosition(x, y - height / 2 - 20); // Place above hitbox
+            this.debugDamageText.setVisible(true);
+        }
     }
 
     public deactivateHitbox(): void {
         if (this.activeHitbox) {
             this.activeHitbox.deactivate();
+        }
+        if (this.debugDamageText) {
+            this.debugDamageText.setVisible(false);
         }
     }
 
@@ -422,7 +565,7 @@ export class PlayerCombat {
         if (target.isInvincible) return; // Target is invincible
 
         // Need source data (Attack or Recovery)
-        if (!this.currentAttack && !this.player.physics.isRecovering) return;
+        if (!this.currentAttack && !this.player.playerState.isRecovering) return;
 
         // Use activeHitbox
         if (!this.activeHitbox || !this.activeHitbox.active) return;
@@ -440,8 +583,6 @@ export class PlayerCombat {
         let knockback = 0;
         let knockbackAngle = 45;
         let isHeavy = false;
-        let direction: AttackDirection = AttackDirection.NEUTRAL;
-        let isAerial = false;
 
         if (this.currentAttack) {
             const data = this.currentAttack.data;
@@ -449,16 +590,14 @@ export class PlayerCombat {
             knockback = data.knockback;
             knockbackAngle = data.knockbackAngle;
             isHeavy = data.type === AttackType.HEAVY;
-            direction = data.direction;
-            isAerial = data.isAerial;
-        } else if (this.player.physics.isRecovering) {
+            isHeavy = data.type === AttackType.HEAVY;
+        } else if (this.player.playerState.isRecovering) {
             // Recovery Hit Data
             damage = 8;
             knockback = 500;
             knockbackAngle = 80; // Upwards
             isHeavy = false;
-            direction = AttackDirection.UP;
-            isAerial = true;
+            isHeavy = false;
         } else {
             return;
         }
@@ -490,10 +629,9 @@ export class PlayerCombat {
         // Apply damage and knockback (also calls applyHitStun)
         DamageSystem.applyDamage(target, damage, knockbackVector);
 
-        // Reset air action counter on hit - Check if target is Player
         if (target instanceof Player) {
-            target.physics.airActionCounter = 0;
-            target.physics.wallTouchesExhausted = false;
+            target.playerState.airActionCounter = 0;
+            target.playerState.wallTouchesExhausted = false;
         }
 
         // Screen Shake (Heavy Attacks)
@@ -502,24 +640,7 @@ export class PlayerCombat {
         }
 
         // Visual Effects for Down Air (Spike)
-        if (direction === AttackDirection.DOWN && isAerial) {
-            // Visual Spike Effect
-            const effect = this.scene.add.graphics();
-            effect.fillStyle(0xffffff, 0.8);
-            effect.fillTriangle(
-                target.x, target.y - 20,
-                target.x - 20, target.y - 60,
-                target.x + 20, target.y - 60
-            );
-
-            // Animate out
-            this.scene.tweens.add({
-                targets: effect,
-                alpha: 0,
-                duration: 200,
-                onComplete: () => effect.destroy()
-            });
-        }
+        // Removed down arrow visual
     }
 
 

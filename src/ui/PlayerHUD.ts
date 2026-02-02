@@ -9,24 +9,22 @@ export class PlayerHUD {
     private nameText: Phaser.GameObjects.Text;
     private stockIcon: Phaser.GameObjects.Arc;
 
-    constructor(scene: Phaser.Scene, x: number, y: number, isP1: boolean, playerName: string) {
+    constructor(scene: Phaser.Scene, x: number, y: number, isLeft: boolean, playerName: string, color: number) {
         this.container = scene.add.container(x, y);
         this.container.setScrollFactor(0); // HUD stays fixed
         this.container.setDepth(100);
 
         // 1. Portrait Background (Circle)
         const bgCircle = scene.add.circle(0, 0, 50, 0x000000, 0.6);
-        bgCircle.setStrokeStyle(3, isP1 ? 0x3388ff : 0x00ff00);
+        bgCircle.setStrokeStyle(3, color);
         this.container.add(bgCircle);
 
         // 2. Portrait Sprite (Masked)
         // Use a frame from the atlas or just a raw sprite.
         // For now, scaling down the idle sprite to fit in circle.
-        this.portraitPixels = scene.add.sprite(0, 5, 'alchemist_idle_0');
+        this.portraitPixels = scene.add.sprite(0, 5, 'fok_idle_0'); // Updated to fok
         // Fit within 80x80 area (circle diam 100)
-        // Sprite is 900x900 natively!
-        // We want it roughly 80x80. Scale = 80/900 = 0.09.
-        // Wait, sprite is 256x256 now. Scale = 80/256 = 0.3.
+        // Sprite is 256x256 now. Scale = 80/256 = 0.3.
         const scale = 0.35;
         this.portraitPixels.setScale(scale);
 
@@ -38,14 +36,17 @@ export class PlayerHUD {
         this.portraitPixels.setMask(mask);
         this.container.add(this.portraitPixels);
 
-        const flip = isP1 ? 1 : -1;
+        const flip = isLeft ? 1 : -1;
+
+        // Convert 0xRRGGBB to '#RRGGBB'
+        const colorHexString = '#' + color.toString(16).padStart(6, '0');
 
         // 3. Name Tag
         this.nameText = scene.add.text(0, -60, playerName, {
             fontSize: '20px',
             fontFamily: 'Arial',
             fontStyle: 'bold',
-            color: '#ffffff',
+            color: colorHexString,
             stroke: '#000000',
             strokeThickness: 4
         }).setOrigin(0.5);
@@ -64,7 +65,7 @@ export class PlayerHUD {
 
         // 5. Stocks (Bottom Left for P1, Bottom Right for P2)
         // Icon
-        this.stockIcon = scene.add.circle(-35 * flip, 35, 12, isP1 ? 0x3388ff : 0x00ff00);
+        this.stockIcon = scene.add.circle(-35 * flip, 35, 12, color);
         this.stockIcon.setStrokeStyle(2, 0xffffff);
         this.container.add(this.stockIcon);
 
@@ -83,15 +84,43 @@ export class PlayerHUD {
         this.stocksText.setText(stocks.toString());
 
         // Color code damage
+        // Color code damage (Gradient)
+        let colorObj: Phaser.Types.Display.ColorObject;
+
         if (damage < 50) {
-            this.damageText.setColor('#ffffff'); // White
+            // White to Vivid Yellow (0-50)
+            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
+                new Phaser.Display.Color(255, 255, 255),
+                new Phaser.Display.Color(255, 255, 80), // Vivid Yellow
+                50,
+                damage
+            );
         } else if (damage < 100) {
-            this.damageText.setColor('#ffff00'); // Yellow
+            // Vivid Yellow to Vivid Orange (50-100)
+            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
+                new Phaser.Display.Color(255, 255, 80),
+                new Phaser.Display.Color(255, 160, 80), // Vivid Orange
+                50,
+                damage - 50
+            );
         } else if (damage < 150) {
-            this.damageText.setColor('#ff8800'); // Orange
+            // Vivid Orange to Vivid Red (100-150)
+            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
+                new Phaser.Display.Color(255, 160, 80),
+                new Phaser.Display.Color(255, 80, 80), // Vivid Red
+                50,
+                damage - 100
+            );
         } else {
-            this.damageText.setColor('#ff0000'); // Red
+            // Cap at Vivid Red
+            colorObj = { r: 255, g: 80, b: 80, a: 255 };
         }
+
+        const colorHex = '#' +
+            ((1 << 24) + (colorObj.r << 16) + (colorObj.g << 8) + colorObj.b)
+                .toString(16).slice(1);
+
+        this.damageText.setColor(colorHex);
     }
 
     destroy(): void {

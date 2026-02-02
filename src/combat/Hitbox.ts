@@ -8,6 +8,7 @@ export class Hitbox {
     height: number;
     active: boolean;
     debugGraphics?: Phaser.GameObjects.Rectangle;
+    private debugVisible: boolean = false;
 
     constructor(
         scene: Phaser.Scene,
@@ -22,6 +23,14 @@ export class Hitbox {
         this.width = width;
         this.height = height;
         this.active = false;
+    }
+
+    setDebug(visible: boolean): void {
+        this.debugVisible = visible;
+        if (this.debugGraphics) {
+            // Only show if active AND debug is enabled
+            this.debugGraphics.setVisible(this.active && visible);
+        }
     }
 
     activate(x: number, y: number): void {
@@ -46,10 +55,10 @@ export class Hitbox {
             if ((this.scene as any).addToCameraIgnore) {
                 (this.scene as any).addToCameraIgnore(this.debugGraphics);
             }
-        } else {
-            this.debugGraphics.setPosition(this.x, this.y);
-            this.debugGraphics.setVisible(true);
         }
+
+        this.debugGraphics.setPosition(this.x, this.y);
+        this.debugGraphics.setVisible(this.debugVisible);
     }
 
     deactivate(): void {

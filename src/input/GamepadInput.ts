@@ -19,6 +19,7 @@ export interface GamepadState {
     jump: boolean;
     jumpHeld: boolean;
     lightAttack: boolean;
+    lightAttackHeld: boolean; // For charge throws
     heavyAttack: boolean;
     heavyAttackHeld: boolean; // For charge attacks
     dodge: boolean;
@@ -137,6 +138,7 @@ export class GamepadInput {
             jump: false,
             jumpHeld: false,
             lightAttack: false,
+            lightAttackHeld: false,
             heavyAttack: false,
             heavyAttackHeld: false,
             dodge: false,
@@ -208,8 +210,9 @@ export class GamepadInput {
         state.jump = aPressed && !this.previousState.jumpHeld;
         state.jumpHeld = aPressed;
 
-        // Light Attack (X) - detect new press only
+        // Light Attack (X) - detect new press AND held state
         state.lightAttack = xPressed && !this.wasButtonPressed(XBOX_BUTTONS.X);
+        state.lightAttackHeld = xPressed; // Added held state support
 
         // Heavy Attack (B or Y) - detect new press only
         // User wants Y and B to be exactly the same: Heavy Attack

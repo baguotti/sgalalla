@@ -1,4 +1,4 @@
-import { PhysicsConfig } from '../config/PhysicsConfig';
+import { PhysicsConfig } from '@shared/physics/PhysicsConfig';
 
 export const AttackType = {
     LIGHT: 'light',
@@ -36,6 +36,9 @@ export interface AttackData {
     hitboxHeight: number;
     hitboxOffsetX: number;
     hitboxOffsetY: number;
+    isMultiHit?: boolean; // If true, can hit multiple times
+    hitInterval?: number; // Time between hits in ms (for multi-hit)
+    shouldStallInAir?: boolean; // If true, apply gravity dampening
 }
 
 // Attack data definitions for all attack types
@@ -45,28 +48,30 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.LIGHT,
         direction: AttackDirection.NEUTRAL,
         isAerial: false,
-        damage: 3, // Reduced
-        knockback: 300,
-        knockbackAngle: 45,
+        damage: 6, // Base damage tripled (Flurry)
+        knockback: 90, // Reduced from 100
+        knockbackAngle: 90,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
-        activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
+        activeDuration: 400,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES,
-        hitboxWidth: 40, // Tighter
+        hitboxWidth: 40,
         hitboxHeight: 40,
         hitboxOffsetX: 35,
         hitboxOffsetY: 0,
+        isMultiHit: true,
+        hitInterval: 100,
     },
     'light_side_grounded': {
         type: AttackType.LIGHT,
         direction: AttackDirection.SIDE,
         isAerial: false,
-        damage: 4, // Reduced
-        knockback: 350,
+        damage: 4,
+        knockback: 500, // Reduced from 550
         knockbackAngle: 30,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES,
-        hitboxWidth: 60, // Tighter
+        hitboxWidth: 60,
         hitboxHeight: 35,
         hitboxOffsetX: 40,
         hitboxOffsetY: 0,
@@ -75,16 +80,33 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.LIGHT,
         direction: AttackDirection.DOWN,
         isAerial: false,
-        damage: 4, // Reduced
-        knockback: 320,
+        damage: 4,
+        knockback: 470, // Reduced from 520
         knockbackAngle: 80,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES + 30,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES + 50,
-        hitboxWidth: 50, // Tighter
+        hitboxWidth: 50,
         hitboxHeight: 30,
         hitboxOffsetX: 30,
-        hitboxOffsetY: 20,
+        hitboxOffsetY: 35,
+    },
+    'light_up_grounded': {
+        type: AttackType.LIGHT,
+        direction: AttackDirection.UP,
+        isAerial: false,
+        damage: 6, // Base damage tripled (Flurry)
+        knockback: 90, // Reduced from 100
+        knockbackAngle: 90,
+        startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
+        activeDuration: 400,
+        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES,
+        hitboxWidth: 40,
+        hitboxHeight: 40,
+        hitboxOffsetX: 35,
+        hitboxOffsetY: 0,
+        isMultiHit: true,
+        hitInterval: 100,
     },
 
     // ========== AERIAL LIGHT ATTACKS ==========
@@ -92,28 +114,31 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.LIGHT,
         direction: AttackDirection.NEUTRAL,
         isAerial: true,
-        damage: 4, // Reduced
-        knockback: 220,
-        knockbackAngle: 45,
+        damage: 6, // Base damage tripled (Flurry)
+        knockback: 90, // Flurry
+        knockbackAngle: 90,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
-        activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES + 30,
+        activeDuration: 400, // Flurry
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES,
-        hitboxWidth: 45, // Tighter
-        hitboxHeight: 45,
+        hitboxWidth: 40,
+        hitboxHeight: 40,
         hitboxOffsetX: 30,
         hitboxOffsetY: 0,
+        isMultiHit: true,
+        hitInterval: 100,
+        shouldStallInAir: true,
     },
     'light_side_aerial': {
         type: AttackType.LIGHT,
         direction: AttackDirection.SIDE,
         isAerial: true,
-        damage: 5, // Reduced
-        knockback: 280,
+        damage: 5,
+        knockback: 430, // Reduced from 480
         knockbackAngle: 20,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES,
-        hitboxWidth: 55, // Tighter
+        hitboxWidth: 55,
         hitboxHeight: 40,
         hitboxOffsetX: 40,
         hitboxOffsetY: 0,
@@ -122,13 +147,13 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.LIGHT,
         direction: AttackDirection.DOWN,
         isAerial: true,
-        damage: 6, // Reduced
-        knockback: 350,
+        damage: 6,
+        knockback: 500, // Reduced from 550
         knockbackAngle: 270,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES + 50,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES + 80,
-        hitboxWidth: 40, // Tighter
+        hitboxWidth: 40,
         hitboxHeight: 50,
         hitboxOffsetX: 0,
         hitboxOffsetY: 45,
@@ -137,13 +162,13 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.LIGHT,
         direction: AttackDirection.UP,
         isAerial: true,
-        damage: 5, // Reduced
-        knockback: 300,
+        damage: 5,
+        knockback: 450,
         knockbackAngle: 90,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES,
-        hitboxWidth: 45, // Tighter
+        hitboxWidth: 45,
         hitboxHeight: 50,
         hitboxOffsetX: 0,
         hitboxOffsetY: -45,
@@ -154,14 +179,14 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.HEAVY,
         direction: AttackDirection.NEUTRAL,
         isAerial: false,
-        damage: 6, // Reduced strongly
-        knockback: 500,
+        damage: 6,
+        knockback: 600,
         knockbackAngle: 80,
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES,
-        hitboxWidth: 80, // Toned down from 90
-        hitboxHeight: 90, // Toned down from 110
+        hitboxWidth: 80,
+        hitboxHeight: 90,
         hitboxOffsetX: 20,
         hitboxOffsetY: -40,
     },
@@ -169,14 +194,14 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.HEAVY,
         direction: AttackDirection.SIDE,
         isAerial: false,
-        damage: 8, // Reduced strongly
-        knockback: 600,
-        knockbackAngle: 25,
+        damage: 8,
+        knockback: 800,
+        knockbackAngle: 4, // Changed from 5 to 4
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES + 50,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES + 100,
-        hitboxWidth: 100, // Toned down from 140
-        hitboxHeight: 70, // Toned down
+        hitboxWidth: 100,
+        hitboxHeight: 70,
         hitboxOffsetX: 60,
         hitboxOffsetY: 0,
     },
@@ -184,13 +209,13 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.HEAVY,
         direction: AttackDirection.DOWN,
         isAerial: false,
-        damage: 8, // Reduced strongly
-        knockback: 550,
+        damage: 8,
+        knockback: 600,
         knockbackAngle: 85,
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES + 30,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES + 80,
-        hitboxWidth: 100, // Toned down from 130
+        hitboxWidth: 100,
         hitboxHeight: 60,
         hitboxOffsetX: 40,
         hitboxOffsetY: 25,
@@ -200,13 +225,13 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.HEAVY,
         direction: AttackDirection.UP,
         isAerial: false,
-        damage: 6, // Reduced
-        knockback: 500,
+        damage: 6,
+        knockback: 580,
         knockbackAngle: 80,
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES,
-        hitboxWidth: 80, // Same as Neutral
+        hitboxWidth: 80,
         hitboxHeight: 90,
         hitboxOffsetX: 20,
         hitboxOffsetY: -40,
@@ -217,13 +242,13 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.HEAVY,
         direction: AttackDirection.NEUTRAL,
         isAerial: true,
-        damage: 6, // Reduced
-        knockback: 450,
+        damage: 6,
+        knockback: 550,
         knockbackAngle: 50,
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES,
-        hitboxWidth: 80, // Toned down from 100
+        hitboxWidth: 80,
         hitboxHeight: 80,
         hitboxOffsetX: 30,
         hitboxOffsetY: 0,
@@ -232,13 +257,13 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.HEAVY,
         direction: AttackDirection.SIDE,
         isAerial: true,
-        damage: 7, // Reduced
-        knockback: 550,
-        knockbackAngle: 15,
+        damage: 7,
+        knockback: 800,
+        knockbackAngle: 4, // Changed from 0 to 4
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES,
-        hitboxWidth: 90, // Toned down from 120
+        hitboxWidth: 90,
         hitboxHeight: 60,
         hitboxOffsetX: 40,
         hitboxOffsetY: 0,
@@ -248,13 +273,13 @@ export const AttackRegistry: Record<string, AttackData> = {
         direction: AttackDirection.DOWN,
         isAerial: true,
         damage: PhysicsConfig.GROUND_POUND_DAMAGE,
-        knockback: PhysicsConfig.GROUND_POUND_KNOCKBACK,
+        knockback: PhysicsConfig.GROUND_POUND_KNOCKBACK, // Uses new, lower value
         knockbackAngle: 270,
         startupDuration: PhysicsConfig.GROUND_POUND_STARTUP,
         activeDuration: 500,
         recoveryDuration: 150,
-        hitboxWidth: 80, // Toned down from 90
-        hitboxHeight: 90, // Toned down from 100
+        hitboxWidth: 80,
+        hitboxHeight: 90,
         hitboxOffsetX: 0,
         hitboxOffsetY: 40,
     },
@@ -262,13 +287,13 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.HEAVY,
         direction: AttackDirection.UP,
         isAerial: true,
-        damage: 8, // Reduced from 12
-        knockback: 500,
+        damage: 8,
+        knockback: 600, // Reduced from 900
         knockbackAngle: 90,
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES,
-        hitboxWidth: 70, // Toned down
+        hitboxWidth: 70,
         hitboxHeight: 70,
         hitboxOffsetX: 0,
         hitboxOffsetY: -40,
@@ -321,17 +346,29 @@ export class Attack {
         return `${type}_${direction}_${isAerial ? 'aerial' : 'grounded'}`;
     }
 
+    private nextHitTimer: number = 0;
+
     /**
      * Update attack phase, returns true when attack is complete
      */
     update(deltaMs: number): boolean {
         this.phaseTimer += deltaMs;
 
+        // Handle multi-hit reset timer
+        if (this.phase === AttackPhase.ACTIVE && this.data.isMultiHit && this.data.hitInterval) {
+            this.nextHitTimer += deltaMs;
+            // The actual reset is handled by the consumer (PlayerCombat) querying shouldResetHits()
+        }
+
         switch (this.phase) {
             case AttackPhase.STARTUP:
                 if (this.phaseTimer >= this.data.startupDuration) {
                     this.phase = AttackPhase.ACTIVE;
                     this.phaseTimer = 0;
+                    this.nextHitTimer = this.data.hitInterval || 0; // Trigger first hit immediately? No, hitTargets is cleared on start.
+                    // Actually, hitTargets is cleared at start of attack.
+                    // We need to clear it AGAIN after hitInterval.
+                    this.nextHitTimer = 0;
                 }
                 break;
             case AttackPhase.ACTIVE:
@@ -346,6 +383,21 @@ export class Attack {
                     return true; // Attack complete
                 }
                 break;
+        }
+        return false;
+    }
+
+    /**
+     * Check if hits should be reset for multi-hit attacks
+     */
+    shouldResetHits(): boolean {
+        if (this.phase !== AttackPhase.ACTIVE || !this.data.isMultiHit || !this.data.hitInterval) {
+            return false;
+        }
+
+        if (this.nextHitTimer >= this.data.hitInterval) {
+            this.nextHitTimer = 0;
+            return true;
         }
         return false;
     }

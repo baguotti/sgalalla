@@ -1,0 +1,31 @@
+# PROJECT CONTEXT: PHASE-COL-DESYNC
+Stack: Colyseus (Node), Phaser 3 (Web/Mobile), Shared TypeScript Logic.
+Architecture: Authoritative Server (20Hz/50ms), Client Prediction + Rollback Reconciliation (60Hz).
+Input: Sequence-buffered (ACK-based).
+
+# CORE ISSUE: VERTICAL DRIFT & FLOOR CLIPPING
+- Gravity: 3750 (Extreme).
+- Velocity: Up to 1500px/s.
+- Manifestation: [Local] Y:546 (Grounded) vs [Server] Y:564 (Falling).
+- Result: 172px+ desyncs/teleportation. Players clip floors at high speeds.
+
+# PHYSICS SPECIFICS:
+- Shared Logic: `shared/entities/PlayerState.ts` (AABB/Friction).
+- Collision: `checkPlatformCollision` (Vertical) + `checkWallCollision` (Horizontal).
+- Geometry: `PhysicsConfig.ts` uses Center-based coords (x,y). Logic corrected to use Edges (top/bottom) but drift persists.
+- Sync: All logic-driving vars (timers, flags) are in `GameState.ts` schema.
+
+# RECONCILIATION LOOP (Player.ts):
+1. Receive Server State (Seq X).
+2. If Local Seq X != Server State:
+   - Snap to Server Position + Flags.
+   - Replay inputs from Seq X+1 to Head.
+   - Call `playerState.update(16.6ms, input)` per step.
+
+# HYPOTHESIS:
+1. Frame timing mismatch (Server uses 0.05 step, Client re-sims with 0.016 step).
+2. Coordinate precision/rounding error during rollback.
+3. Race condition in Floor Flag reset vs Collision Check.
+
+# TASK:
+Analyze `PlayerState.ts` and `Player.ts` (reconcile) to find why the ground state diverges under high gravity. Ensure deterministic PARITY between server's single-step update and client's multi-step replay.

@@ -114,4 +114,13 @@ export class DebugOverlay {
             this.gamepadText
         ]);
     }
+
+    destroy(): void {
+        this.velocityText.destroy();
+        this.stateText.destroy();
+        this.fpsText.destroy();
+        this.recoveryText.destroy();
+        this.attackText.destroy();
+        this.gamepadText.destroy();
+    }
 }

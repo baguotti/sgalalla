@@ -9,12 +9,15 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/node": "^25.1.0",
     "typescript": "~5.9.3",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vite-tsconfig-paths": "^6.0.5"
   },
   "dependencies": {
-    "@esotericsoftware/spine-phaser": "^4.1.55",
-    "@esotericsoftware/spine-ts": "^4.2.13",
-    "phaser": "^3.90.0"
+    "@colyseus/schema": "^2.0.37",
+    "colyseus.js": "^0.15.28",
+    "phaser": "^3.90.0",
+    "tsconfig-paths": "^4.2.0"
   }
 }

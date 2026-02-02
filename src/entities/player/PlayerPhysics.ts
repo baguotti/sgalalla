@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { Player } from '../Player';
-import { PhysicsConfig } from '../../config/PhysicsConfig';
-import type { InputState } from '../../input/InputManager';
+import { PhysicsConfig } from '@shared/physics/PhysicsConfig';
+import type { InputState } from '@shared/input/InputState';
 import { AttackPhase } from '../../combat/Attack';
 
 export class PlayerPhysics {
@@ -118,7 +118,24 @@ export class PlayerPhysics {
         const velocity = this.player.velocity;
 
         // Apply acceleration
-        velocity.x += this.acceleration.x * deltaSeconds;
+        // Soft Cap check: Don't add acceleration if already exceeding max speed in that direction
+        let maxSpeedCheck = PhysicsConfig.MAX_SPEED;
+        if (this.isRunning) maxSpeedCheck *= PhysicsConfig.RUN_SPEED_MULT;
+
+        // If we are dodging, we ignore cap. If hitstunned, ignore cap.
+        if (!this.player.isDodging && !this.player.isHitStunned) {
+            const movingSameDir = Math.sign(this.acceleration.x) === Math.sign(velocity.x);
+            const overSpeed = Math.abs(velocity.x) > maxSpeedCheck;
+
+            if (movingSameDir && overSpeed) {
+                // Don't add acceleration, let friction reduce speed
+            } else {
+                velocity.x += this.acceleration.x * deltaSeconds;
+            }
+        } else {
+            velocity.x += this.acceleration.x * deltaSeconds;
+        }
+
         velocity.y += this.acceleration.y * deltaSeconds;
 
         // Apply friction
@@ -146,7 +163,16 @@ export class PlayerPhysics {
                 friction = 0.75; // Higher friction during recovery to prevent sliding
             } else {
                 friction = 0.95; // Slide slightly during startup/active frames
+
+                // Aerial Stall for Flurry Attacks
+                if (!this.player.isGrounded && currentAttack?.data.shouldStallInAir) {
+                    velocity.y *= 0.6; // Strong gravity dampening (like charging)
+                    velocity.x *= 0.9; // Extra horizontal friction
+                }
             }
+        }
+        else if (this.player.isHitStunned) {
+            friction = 0.95; // Low friction during hitstun to allow long knockback travel
         }
 
         velocity.x *= friction;
@@ -160,12 +186,47 @@ export class PlayerPhysics {
         }
 
         // Only clamp if NOT dodging (dodging sets its own high velocity)
-        if (!this.player.isDodging) {
-            velocity.x = Phaser.Math.Clamp(
-                velocity.x,
-                -maxSpeed,
-                maxSpeed
-            );
+        // AND not in hitstun (knockback should exceed max speed)
+        if (!this.player.isDodging && !this.player.isHitStunned) {
+            // Soft Cap: Allow momentum (e.g. from dash) to carry over.
+            // If we are over max speed, don't clamp hard, just let friction reduce it.
+            // But don't allow accelerating further past max speed.
+
+            if (Math.abs(velocity.x) > maxSpeed) {
+                // We are overspeeding (e.g. post-dash)
+                // If acceleration is trying to make us go faster in the same direction, cancel it
+                if (Math.sign(this.acceleration.x) === Math.sign(velocity.x) && this.acceleration.x !== 0) {
+                    // Reduce acceleration contribution to 0 for this frame to prevent infinite speed
+                    // But we already added acceleration up top. We should undo it or clamp velocity to previous value?
+                    // Simpler: Just clamp to previous frame's speed (effectively no acceleration) minus friction
+                    // Actually, friction has already been applied.
+                    // Let's just Clamp to the current speed? No, that locks it.
+
+                    // Correct approach: If overspeed, apply decay (friction is already applied). 
+                    // Just ensure we don't snap DOWN to maxSpeed. 
+                    // And ensure we don't go HIGHER than we currently are.
+
+                    // So... do nothing here? Friction (applied above) naturally reduces speed.
+                    // We just need to ensure we don't CLAMP.
+
+                    // However, we added 'acceleration' at line 121. If holding forward, acc is added.
+                    // We should probably NOT have added acceleration if overspeed. 
+                    // But changing order is risky.
+
+                    // Let's just Clamp to Max(current, maxSpeed) effectively?
+                    // No, simpler: 
+                    // If overspeed, we don't enforce maxSpeed cap.
+                    // But to prevent "run" input from maintaining the "dash" speed forever (balancing friction), we might need extra drag?
+                    // PlayerPhysicsConfig.RUN_FRICTION handles that.
+                }
+            } else {
+                // Normal case: Clamp to max speed
+                velocity.x = Phaser.Math.Clamp(
+                    velocity.x,
+                    -maxSpeed,
+                    maxSpeed
+                );
+            }
         }
 
         // Update Position

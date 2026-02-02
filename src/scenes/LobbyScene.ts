@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
+import { NetworkManager } from '../network/NetworkManager';
 
-export type CharacterType = 'alchemist' | 'dude';
+export type CharacterType = 'fok';
 
 export interface PlayerSelection {
     playerId: number;
@@ -13,60 +14,251 @@ export interface PlayerSelection {
     character: CharacterType;
     isAI?: boolean;
     isTrainingDummy?: boolean;
+    id?: string;
+    isRemote?: boolean;
 }
 
 export class LobbyScene extends Phaser.Scene {
     private slots: PlayerSelection[] = [];
     private maxPlayers = 4;
+    private mode: 'versus' | 'training' | 'online' = 'versus';
+    private initialInputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD';
+    private initialGamepadIndex: number | null = null;
 
     // UI Elements
     private slotContainers: Phaser.GameObjects.Container[] = [];
     private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character Data
-    private characters: CharacterType[] = ['alchemist', 'dude'];
-    private charLabels: string[] = ['Bloody Alchemist', 'Dude'];
+    private characters: CharacterType[] = ['fok'];
+    private charLabels: string[] = ['Fok'];
 
-    // Input debounce
+    // Input debounce & Safety
     private lastInputTime: Map<number, number> = new Map();
+    private joinTime: Map<number, number> = new Map(); // Track when player joined to prevent instant ready
+    private canInput: boolean = false;
+    private initData: any = null;
+    private sceneStartTime: number = 0;
+
+    // Frame inputs (capture once per update to avoid JustDown clearing)
+    private frameInputs = {
+        space: false,
+        enter: false
+    };
+
+    // Keys
+    private keys!: {
+        left: Phaser.Input.Keyboard.Key;
+        right: Phaser.Input.Keyboard.Key;
+        up: Phaser.Input.Keyboard.Key;
+        down: Phaser.Input.Keyboard.Key;
+        space: Phaser.Input.Keyboard.Key;
+        enter: Phaser.Input.Keyboard.Key;
+        w: Phaser.Input.Keyboard.Key;
+        a: Phaser.Input.Keyboard.Key;
+        s: Phaser.Input.Keyboard.Key;
+        d: Phaser.Input.Keyboard.Key;
+    };
 
     constructor() {
         super({ key: 'LobbyScene' });
     }
 
+    init(data: { mode?: 'versus' | 'training', inputType?: 'KEYBOARD' | 'GAMEPAD', gamepadIndex?: number | null, slots?: PlayerSelection[] } | null): void {
+        console.log('LobbyScene.init called');
+        const safeData = data || {};
+        this.initData = safeData;
+        this.mode = safeData.mode || 'versus';
+        this.initialInputType = safeData.inputType || 'KEYBOARD';
+        this.initialGamepadIndex = safeData.gamepadIndex !== undefined ? safeData.gamepadIndex : null;
+
+        // Reset state
+        this.lastInputTime.clear();
+        this.joinTime.clear();
+        this.canInput = true; // Enable immediately to debug freeze
+        this.frameInputs = { space: false, enter: false };
+        this.sceneStartTime = Date.now();
+    }
+
     create(): void {
+        console.log('LobbyScene.create called');
+        this.slotContainers = []; // CRITICAL: Reset container references on scene restart
+
         const { width, height } = this.scale;
 
         // Background
         this.add.rectangle(0, 0, width, height, 0x1a1a2e).setOrigin(0);
 
         // Title
-        this.add.text(width / 2, 80, 'CHARACTER SELECT', {
+        const titleText = this.mode === 'training' ? 'TRAINING MODE' : 'CHARACTER SELECT';
+        this.add.text(width / 2, 60, titleText, {
             fontSize: '48px',
             color: '#ffffff',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, 130, 'Join: [SPACE/ENTER] or [GAMEPAD A]  |  Ready: [SPACE/ENTER] or [GAMEPAD A]', {
+        // Instructions (Moved to bottom to avoid overlap with panels)
+        const instructions = this.add.text(width / 2, height - 50, 'Join: [SPACE/ENTER] or [GAMEPAD A]  |  Ready: [SPACE/ENTER] or [GAMEPAD A]', {
             fontSize: '20px',
             color: '#8ab4f8'
         }).setOrigin(0.5);
 
+        // Add "Alive" pulse
+        this.tweens.add({
+            targets: instructions,
+            alpha: 0.5,
+            duration: 800,
+            yoyo: true,
+            repeat: -1
+        });
+
         // Initialize Slots
-        this.slots = Array(4).fill(null).map((_, i) => ({
-            playerId: i,
-            joined: false,
-            ready: false,
-            input: { type: 'KEYBOARD', gamepadIndex: null },
-            character: 'alchemist'
-        }));
+        if (this.initData?.slots) {
+            // Deep copy to ensure fresh references but keep data
+            this.slots = JSON.parse(JSON.stringify(this.initData.slots));
+            // Reset ready status so they don't auto-start
+            this.slots.forEach(s => {
+                if (s.joined) s.ready = false;
+            });
+            console.log("Restored lobby state:", this.slots);
+        } else {
+            this.slots = Array(4).fill(null).map((_, i) => ({
+                playerId: i,
+                joined: false,
+                ready: false,
+                input: { type: 'KEYBOARD', gamepadIndex: null },
+                character: 'fok'
+            }));
+        }
 
         this.createSlotUI();
 
-        // Global Key Listeners for Keyboard Join
-        this.input.keyboard!.on('keydown-SPACE', () => this.handleKeyboardJoin());
-        this.input.keyboard!.on('keydown-ENTER', () => this.handleKeyboardJoin());
+        // Handle specific modes
+        if (this.mode === 'training') {
+            this.setupTrainingMode();
+        }
+
+        // Initialize Keys
+        this.keys = {
+            left: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),
+            right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
+            up: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP),
+            down: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN),
+            space: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
+            enter: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER),
+            w: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+            a: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+            s: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+            d: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D)
+        };
+
         this.backKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+        // Let's stick to update loop for consistency or add checks.
+
+        // Online Mode Initialization
+        if (this.mode === 'online') {
+            this.connectOnline();
+        }
+    }
+
+    private async connectOnline() {
+        // Show connecting status
+        const { width, height } = this.scale;
+        const loadingText = this.add.text(width / 2, height / 2, 'Connecting to Server...', { fontSize: '32px', color: '#ffff00' }).setOrigin(0.5);
+
+        try {
+            const network = NetworkManager.getInstance();
+            const room = await network.connect();
+
+            loadingText.destroy();
+
+            // Debug: Show Room ID
+            this.add.text(width - 10, 10, `Room: ${room.roomId}`, {
+                fontSize: '16px', color: '#888888'
+            }).setOrigin(1, 0);
+
+            // Setup Listeners
+            // 1. Player Joined/Left
+            const unregisterJoin = network.onPlayerJoined((sessionId, playerState) => {
+                console.log("Player Joined Lobby:", sessionId, "Slot:", playerState.slotIndex);
+
+                const slotIndex = playerState.slotIndex;
+                if (slotIndex >= 0 && slotIndex < this.slots.length) {
+                    const slot = this.slots[slotIndex];
+                    slot.joined = true;
+                    slot.id = sessionId;
+                    slot.ready = playerState.isReady;
+                    slot.character = playerState.character as CharacterType;
+                    slot.isRemote = (sessionId !== room.sessionId);
+
+                    this.updateUI();
+                }
+            });
+
+            const unregisterLeave = network.onPlayerLeft((sessionId) => {
+                console.log("Player Left Lobby:", sessionId);
+                const slot = this.slots.find(s => s.id === sessionId);
+                if (slot) {
+                    slot.joined = false;
+                    slot.id = undefined;
+                    slot.ready = false;
+                    slot.isRemote = false;
+                    this.updateUI();
+                }
+            });
+
+            // 3. Game Start
+            const unregisterStart = room.onMessage("start_game", (message) => {
+                console.log("Game Starting! Seed:", message.seed);
+
+                // --- CLEANUP BEFORE TRANSITION ---
+                unregisterJoin();
+                unregisterLeave();
+                unregisterStart();
+
+                this.scene.start('GameScene', {
+                    online: true,
+                    room: room,
+                    seed: message.seed,
+                    inputType: this.initialInputType,
+                    gamepadIndex: this.initialGamepadIndex,
+                    playerData: this.slots.filter(s => s.joined) // Pass joined slots
+                });
+            });
+
+            // Monitor remote changes
+            room.state.players.onChange((player, sessionId) => {
+                const slot = this.slots.find(s => s.id === sessionId);
+                if (slot) {
+                    slot.ready = player.isReady;
+                    slot.character = player.character as any;
+                    this.updateUI();
+                }
+            });
+
+
+        } catch (e: any) {
+            loadingText.setText('Connection Failed: ' + e.message).setColor('#ff0000');
+        }
+    }
+
+    private setupTrainingMode(): void {
+        // Auto-join P1 (if keyboard)
+        const p1 = this.slots[0];
+        p1.joined = true;
+        p1.input.type = this.initialInputType;
+        p1.input.gamepadIndex = this.initialGamepadIndex;
+        // P1 not ready yet
+
+        // Auto-join P2 as Dummy
+        const p2 = this.slots[1];
+        p2.joined = true;
+        p2.input.type = 'KEYBOARD'; // Placeholder
+        p2.isAI = true;
+        p2.isTrainingDummy = true;
+        p2.ready = true; // Dummy is always ready
+        p2.character = 'fok';
     }
 
     private createSlotUI(): void {
@@ -89,21 +281,21 @@ export class LobbyScene extends Phaser.Scene {
                 color: '#aaaaaa'
             }).setOrigin(0.5);
 
-            // State Text (Press to Join / Ready)
+            // State Text
             const stateText = this.add.text(0, 0, 'Press Button\nto Join', {
                 fontSize: '24px',
                 color: '#888888',
                 align: 'center'
             }).setOrigin(0.5);
 
-            // Character Name (Hidden until joined)
+            // Character Name
             const charText = this.add.text(0, 150, '', {
                 fontSize: '28px',
                 color: '#ffffff',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
 
-            // Selection Arrows (Hidden until joined)
+            // Selection Arrows
             const leftArrow = this.add.text(-100, 150, '<', { fontSize: '32px', color: '#ffdd00' }).setOrigin(0.5).setVisible(false);
             const rightArrow = this.add.text(100, 150, '>', { fontSize: '32px', color: '#ffdd00' }).setOrigin(0.5).setVisible(false);
 
@@ -118,45 +310,35 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     update(time: number, _delta: number): void {
+        if (!this.canInput) return;
+
+        // Capture inputs once per frame
+        this.frameInputs.space = Phaser.Input.Keyboard.JustDown(this.keys.space);
+        this.frameInputs.enter = Phaser.Input.Keyboard.JustDown(this.keys.enter);
+
         this.handleNewConnections();
+        this.handleKeyboardJoin(); // Poll for join if not event-based
         this.handlePlayerInput(time);
 
         if (Phaser.Input.Keyboard.JustDown(this.backKey)) {
             this.scene.start('MainMenuScene');
         }
 
-        // Toggle AI for Player 2 (Slot 1) with 'O' key
-        if (this.input.keyboard!.checkDown(this.input.keyboard!.addKey('O'), 500)) {
-            const p2Slot = this.slots[1];
-            if (p2Slot.joined) {
-                p2Slot.isAI = !p2Slot.isAI;
-                p2Slot.isTrainingDummy = p2Slot.isAI; // Default to dummy if AI enabled
-                // Auto-ready if AI?
-                // p2Slot.ready = p2Slot.isAI; 
-            } else {
-                // If not joined, join as AI
-                this.joinPlayer('KEYBOARD', null); // Join generic
-                // Force into slot 1 if possible or just checks last joined?
-                // joinPlayer finds first empty. If slot 0 taken, it takes slot 1.
-                // We should probably rely on manual join first.
-            }
-        }
-
         this.updateUI();
     }
 
     private handleNewConnections(): void {
+        if (this.mode === 'training') return; // No new joins in training mode
+
         const gamepads = navigator.getGamepads();
 
         for (let i = 0; i < gamepads.length; i++) {
             const gp = gamepads[i];
             if (!gp) continue;
 
-            // Check if this gamepad is already assigned
             const isAssigned = this.slots.some(s => s.joined && s.input.type === 'GAMEPAD' && s.input.gamepadIndex === gp.index);
 
             if (!isAssigned) {
-                // If any button pressed, join
                 const anyPressed = gp.buttons.some(b => b.pressed);
                 if (anyPressed) {
                     this.joinPlayer('GAMEPAD', gp.index);
@@ -166,58 +348,83 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private handleKeyboardJoin(): void {
-        const isAssigned = this.slots.some(s => s.joined && s.input.type === 'KEYBOARD');
-        if (!isAssigned) {
-            this.joinPlayer('KEYBOARD', null);
+        if (this.mode === 'online') return; // Server handles join
+        if (this.mode === 'training' && this.slots[0].joined) return;
+
+        // Check for join inputs using frame cache
+        const joinPressed = this.frameInputs.space || this.frameInputs.enter;
+
+        if (joinPressed) {
+            const isAssigned = this.slots.some(s => s.joined && s.input.type === 'KEYBOARD');
+            if (!isAssigned) {
+                this.joinPlayer('KEYBOARD', null);
+            }
         }
     }
 
     private joinPlayer(type: 'KEYBOARD' | 'GAMEPAD', index: number | null): void {
-        // Find first empty slot
         const slot = this.slots.find(s => !s.joined);
         if (slot) {
             slot.joined = true;
             slot.input.type = type;
             slot.input.gamepadIndex = index;
-            slot.character = 'alchemist'; // Default
+            slot.character = 'fok';
 
-            // Assign random color to panel
-            const colors = [0xff5555, 0x5555ff, 0x55ff55, 0xffff55];
-            const container = this.slotContainers[slot.playerId];
-            const panel = container.getData('panel') as Phaser.GameObjects.Rectangle;
-            panel.setFillStyle(0x444444);
-            panel.setStrokeStyle(4, colors[slot.playerId]);
+            // Prevent immediate "Ready" input in the same frame
+            // Set input time to now so the debounce check in handlePlayerInput fails
+            this.lastInputTime.set(slot.playerId, this.time.now);
+            this.joinTime.set(slot.playerId, this.time.now);
+            console.log(`Player ${slot.playerId + 1} joined via ${type}`);
         }
     }
 
     private handlePlayerInput(time: number): void {
         this.slots.forEach(slot => {
             if (!slot.joined) return;
+            if (slot.isAI) return; // Skip input for Dummy/AI
 
-            // Debounce
+            // Debounce for Hold inputs (arrows/stick), separate from Button press (Ready)
             const lastTime = this.lastInputTime.get(slot.playerId) || 0;
-            if (time - lastTime < 200) return; // 200ms debounce
+            const canHoldInput = time - lastTime > 200;
 
             let left = false;
             let right = false;
             let select = false;
 
-            // Poll Input
             if (slot.input.type === 'KEYBOARD') {
-                const cursors = this.input.keyboard!.createCursorKeys();
-                left = cursors.left.isDown || this.input.keyboard!.checkDown(this.input.keyboard!.addKey('A'));
-                right = cursors.right.isDown || this.input.keyboard!.checkDown(this.input.keyboard!.addKey('D'));
-                select = this.input.keyboard!.checkDown(this.input.keyboard!.addKey('SPACE')) || this.input.keyboard!.checkDown(this.input.keyboard!.addKey('ENTER'));
+                if (canHoldInput) {
+                    left = this.keys.left.isDown || this.keys.a.isDown;
+                    right = this.keys.right.isDown || this.keys.d.isDown;
+                }
+
+                // Use JustDown for Ready to prevent accidental double-tap from Join
+                // Also respect joinTime to prevent join keypress from triggering ready
+                // BUT do NOT use canHoldInput (nav debounce) so we don't block ready after moving
+                const joinedTime = this.joinTime.get(slot.playerId) || 0;
+                if (time - joinedTime > 200) {
+                    select = this.frameInputs.space || this.frameInputs.enter;
+                }
+
             } else if (slot.input.type === 'GAMEPAD' && slot.input.gamepadIndex !== null) {
                 const gp = navigator.getGamepads()[slot.input.gamepadIndex];
                 if (gp) {
-                    left = gp.axes[0] < -0.5 || gp.buttons[14]?.pressed;
-                    right = gp.axes[0] > 0.5 || gp.buttons[15]?.pressed;
-                    select = gp.buttons[0]?.pressed; // A
+                    if (canHoldInput) {
+                        left = gp.axes[0] < -0.5 || gp.buttons[14]?.pressed;
+                        right = gp.axes[0] > 0.5 || gp.buttons[15]?.pressed;
+                    }
+
+                    // Gamepad buttons don't have built-in JustDown, need manual tracking or simple debounce
+                    // Using the same 200ms debounce for now for buttons too if needed, 
+                    // but ideally we want explicit press. 
+                    // Let's rely on transient press since we check every frame. 
+                    // To avoid repeat, we can check if it WAS NOT pressed last frame.
+                    // But simplified: checking press with debounce is okay for now.
+                    if (canHoldInput) {
+                        select = gp.buttons[0]?.pressed; // A Button
+                    }
                 }
             }
 
-            // Logic
             let inputRegistered = false;
             if (!slot.ready) {
                 if (left) {
@@ -227,15 +434,26 @@ export class LobbyScene extends Phaser.Scene {
                     this.changeCharacter(slot, 1);
                     inputRegistered = true;
                 } else if (select) {
-                    slot.ready = true;
-                    inputRegistered = true;
-                    this.checkAllReady();
+                    // SAFETY: Prevent immediate ready if scene just started (prevent held button carryover)
+                    if (Date.now() - this.sceneStartTime > 500) {
+                        slot.ready = true;
+                        inputRegistered = true;
+
+                        if (this.mode === 'online') {
+                            NetworkManager.getInstance().send("ready", true);
+                        } else {
+                            this.checkAllReady();
+                        }
+                    }
                 }
             } else {
-                if (select) {
-                    // Toggle ready off if pressed again? Optionally.
-                    // For now, let's keep it locked.
-                }
+                // If ready, allow un-ready with Back/B?
+                // Not implemented yet, but good idea.
+                // For online, if we want to unready:
+                /* if (slot.ready && (frameInputs.back || ...)) {
+                     slot.ready = false;
+                     if (this.mode === 'online') NetworkManager.getInstance().send("ready", false);
+                } */
             }
 
             if (inputRegistered) {
@@ -248,26 +466,38 @@ export class LobbyScene extends Phaser.Scene {
         const idx = this.characters.indexOf(slot.character);
         const newIdx = (idx + dir + this.characters.length) % this.characters.length;
         slot.character = this.characters[newIdx];
+
+        if (this.mode === 'online') {
+            NetworkManager.getInstance().send("select_character", slot.character);
+        }
     }
 
     private checkAllReady(): void {
         const joinedSlots = this.slots.filter(s => s.joined);
         if (joinedSlots.length > 0 && joinedSlots.every(s => s.ready)) {
+            console.log('All players ready! Starting game...');
             // Start Game
             this.time.delayedCall(500, () => {
                 this.scene.start('GameScene', { playerData: joinedSlots });
             });
+        } else {
+            console.log('Not all players ready yet:', joinedSlots.map(s => `${s.playerId}: ${s.ready}`));
         }
     }
 
     private updateUI(): void {
         this.slots.forEach((slot, i) => {
             const container = this.slotContainers[i];
+            const panel = container.getData('panel') as Phaser.GameObjects.Rectangle;
             const stateText = container.getData('stateText') as Phaser.GameObjects.Text;
             const charText = container.getData('charText') as Phaser.GameObjects.Text;
             const arrows = container.getData('arrows') as Phaser.GameObjects.Text[];
 
             if (slot.joined) {
+                // Color panel based on ready
+                panel.setFillStyle(0x444444);
+                panel.setStrokeStyle(4, slot.ready ? 0x00ff00 : 0xffff00);
+
                 if (slot.ready) {
                     stateText.setText('READY!');
                     stateText.setColor('#00ff00');
@@ -280,24 +510,21 @@ export class LobbyScene extends Phaser.Scene {
                     arrows.forEach(a => a.setVisible(true));
                 }
 
-                // Update Character Label
                 const charIdx = this.characters.indexOf(slot.character);
                 charText.setText(this.charLabels[charIdx]);
                 charText.setVisible(true);
 
-                // AI Indicator override
-                if (slot.isAI) {
-                    stateText.setText(slot.isTrainingDummy ? 'TRAINING DUMMY' : 'CPU PLAYER');
+                if (slot.isTrainingDummy) {
+                    stateText.setText('TRAINING DUMMY');
                     stateText.setColor('#ff5555');
-                    stateText.setFontSize(28);
-                } else if (slot.ready) {
-                    stateText.setText('READY!');
-                    stateText.setColor('#00ff00');
-                    stateText.setFontSize(40);
-                } // ... rest handled by previous logic if not AI
-
+                    stateText.setFontSize(24);
+                    arrows.forEach(a => a.setVisible(false));
+                }
 
             } else {
+                panel.setFillStyle(0x222222);
+                panel.setStrokeStyle(4, 0x000000);
+
                 stateText.setText('Press Button\nto Join');
                 stateText.setColor('#888888');
                 stateText.setFontSize(24);

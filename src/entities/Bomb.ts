@@ -1,122 +1,176 @@
 import Phaser from 'phaser';
-import type { Player } from './Player'; // Type-only import to prevent circular dependency
-import { DamageSystem } from '../combat/DamageSystem';
 
-export class Bomb extends Phaser.GameObjects.Container {
-    public isHeld: boolean = false;
-    public isActive: boolean = false;
-    public owner: Player | null = null;
-
-    private damage: number = 0;
-
+export class Bomb extends Phaser.Physics.Matter.Sprite {
+    private isThrown: boolean = false;
+    private fuseTimer: number = 0;
+    private isExploded: boolean = false;
+    private thrower: any = null;
+    private graceTimer: number = 0;
     constructor(scene: Phaser.Scene, x: number, y: number) {
-        super(scene, x, y);
-        this.scene.add.existing(this);
+        // Create a temporary texture if it doesn't exist
+        const textureKey = 'bomb_v5';
+        const radius = 15;
+        const diameter = radius * 2;
 
-        this.setDepth(10);
-
-        // Visuals
-        if (this.scene.textures.exists('bomb')) {
-            const sprite = this.scene.add.image(0, 0, 'bomb');
-            sprite.setOrigin(0.5);
-            this.add(sprite);
-        } else {
-            // Fallback visual if texture missing
-            const circle = this.scene.add.circle(0, 0, 15, 0x333333);
-            circle.setStrokeStyle(2, 0xff0000);
-            this.add(circle);
-
-            // Fuse visual
-            const fuse = this.scene.add.rectangle(0, -15, 4, 8, 0x8b4513);
-            this.add(fuse);
+        if (!scene.textures.exists(textureKey)) {
+            const graphics = scene.make.graphics({ x: 0, y: 0 });
+            graphics.fillStyle(0x444444, 1); // Dark Grey
+            graphics.fillCircle(radius, radius, radius);
+            graphics.generateTexture(textureKey, diameter, diameter);
         }
 
-        // Physics
-        this.scene.matter.add.gameObject(this, {
-            shape: 'circle',
-            radius: 15,
-            restitution: 0.6,
-            frictionAir: 0.01,
-            label: 'bomb'
+        super(scene.matter.world, x, y, textureKey);
+
+        this.setCircle(radius);
+        this.setBounce(0.8); // Higher bounce for bouncing on surfaces
+        this.setFriction(0.005);
+        this.setDensity(0.01);
+
+        scene.add.existing(this);
+
+        // Register to scene (casted because we added 'bombs' recently)
+        const gameScene = scene as any;
+        if (gameScene.bombs) {
+            gameScene.bombs.push(this);
+        }
+
+        this.setDepth(100);
+
+        // Handle collisions
+        this.setOnCollide((data: Phaser.Types.Physics.Matter.MatterCollisionData) => {
+            this.handleCollision(data);
+        });
+    }
+
+    public onThrown(thrower: any): void {
+        this.isThrown = true;
+        this.fuseTimer = 3000; // 3 seconds
+        this.thrower = thrower;
+        this.graceTimer = 200; // 200ms grace for thrower
+    }
+
+    private handleCollision(data: Phaser.Types.Physics.Matter.MatterCollisionData): void {
+        if (this.isExploded) return;
+
+        // Check for collision with players
+        const bodyA = data.bodyA as any;
+        const bodyB = data.bodyB as any;
+
+        // Find the other object in the collision
+        const otherBody = (bodyA === this.body) ? bodyB : bodyA;
+        const gameObject = otherBody.gameObject;
+
+        // Explode on contact with any player (Fighter)
+        if (gameObject && gameObject.constructor && (gameObject as any).damagePercent !== undefined) {
+            // Ignore thrower during grace period
+            if (this.graceTimer <= 0 || gameObject !== this.thrower) {
+                this.explode();
+            }
+        }
+    }
+
+    public explode(): void {
+        if (this.isExploded) return;
+        this.isExploded = true;
+
+        // Visual effect: single small yellow circle
+        const visualRadius = 30;
+        const explosionGraphics = this.scene.add.graphics();
+        explosionGraphics.fillStyle(0xffff00, 1);
+        explosionGraphics.fillCircle(this.x, this.y, visualRadius);
+
+        // Prevent ghosting in UI Camera
+        if ((this.scene as any).addToCameraIgnore) {
+            (this.scene as any).addToCameraIgnore(explosionGraphics);
+        }
+
+        // Quick fade out
+        this.scene.tweens.add({
+            targets: explosionGraphics,
+            alpha: 0,
+            duration: 150,
+            onComplete: () => explosionGraphics.destroy()
         });
 
-        // Collision Handling
-        this.scene.matter.world.on('collisionstart', this.handleCollision, this);
-    }
+        // Damage nearby players (blast radius for logic remains 80 or similar)
+        const blastRadius = 80;
 
-    public setHeld(held: boolean): void {
-        this.isHeld = held;
-        const body = this.body as MatterJS.BodyType;
-        if (!body) return;
+        // Damage nearby players
+        const players = (this.scene as any).players as any[];
+        if (players) {
+            players.forEach(player => {
+                const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
+                if (dist < blastRadius) {
+                    const damage = 15;
+                    const knockbackForce = 12;
+                    const angle = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
 
-        if (held) {
-            this.scene.matter.body.setInertia(body, Infinity); // Stop rotation
-            (this.body as any).ignoreGravity = true;
-            this.setSensor(true);
-            this.isActive = false; // Cannot hit self while holding
-            this.scene.matter.body.setVelocity(body, { x: 0, y: 0 });
-        } else {
-            // Restore physics properties
-            (this.body as any).ignoreGravity = false;
+                    const knockback = new Phaser.Math.Vector2(
+                        Math.cos(angle) * knockbackForce,
+                        Math.sin(angle) * knockbackForce
+                    );
+
+                    if (player.setDamage && player.setKnockback) {
+                        player.setDamage(player.damagePercent + damage);
+                        player.setKnockback(knockback.x, knockback.y);
+                        player.applyHitStun();
+                    }
+                }
+            });
         }
-    }
 
-    public throw(velocity: Phaser.Math.Vector2, damage: number): void {
-        this.isActive = true;
-        this.damage = damage;
-        this.isHeld = false;
+        // Camera shake
+        this.scene.cameras.main.shake(150, 0.01);
 
-        // Reactivate physics
-        (this.body as any).ignoreGravity = false;
-        this.setSensor(false); // Enable collisions
-
-        // Apply throw velocity
-        const body = this.body as MatterJS.BodyType;
-        this.scene.matter.body.setVelocity(body, { x: velocity.x, y: velocity.y });
-
-        // Add spin
-        this.scene.matter.body.setAngularVelocity(body, velocity.x * 0.05);
-    }
-
-    private setSensor(isSensor: boolean): void {
-        const body = this.body as MatterJS.BodyType;
-        if (body) {
-            body.isSensor = isSensor;
-        }
-    }
-
-    private handleCollision(_event: Phaser.Physics.Matter.Events.CollisionStartEvent, bodyA: MatterJS.BodyType, bodyB: MatterJS.BodyType): void {
-        // Only process hits if active (thrown)
-        if (!this.isActive || !this.body) return;
-
-        // Check if collision involves this bomb
-        if (bodyA !== this.body && bodyB !== this.body) return;
-
-        const otherBody = bodyA === this.body ? bodyB : bodyA;
-        const otherGameObject = otherBody.gameObject;
-
-        // CRITICAL DECOUPLING: Duck typing check instead of 'instanceof Player'
-        // We check if it looks like a Player/Fighter (has 'applyHitStun' or name is Player)
-        if (otherGameObject && (otherGameObject.constructor.name === 'Player' || (otherGameObject as any).isFighter)) {
-
-            // Check self-hit via owner reference check
-            if (this.owner && otherGameObject === this.owner) {
-                return; // Don't hit yourself immediately
-            }
-
-            // Apply Damage
-            // We use 'as any' to bypass strict Type checks since we know it has damage methods if it passes above checks
-            DamageSystem.applyDamage(otherGameObject as any, this.damage, new Phaser.Math.Vector2(0, 0));
-
-            // Destroy bomb on impact
-            this.destroy();
-        }
+        // Destroy the bomb
+        this.destroy();
     }
 
     destroy(fromScene?: boolean): void {
+        // Remove from scene list before clearing scene reference
         if (this.scene) {
-            this.scene.matter.world.off('collisionstart', this.handleCollision, this);
+            const bombs = (this.scene as any).bombs as Bomb[];
+            if (bombs) {
+                const index = bombs.indexOf(this);
+                if (index > -1) {
+                    bombs.splice(index, 1);
+                }
+            }
         }
         super.destroy(fromScene);
+    }
+
+    preUpdate(time: number, delta: number) {
+        super.preUpdate(time, delta);
+
+        if (this.isExploded) return;
+
+        if (this.graceTimer > 0) {
+            this.graceTimer -= delta;
+        }
+
+        // Check contact with players if thrown
+        if (this.isThrown) {
+            const players = (this.scene as any).players as any[];
+            if (players) {
+                for (const player of players) {
+                    // Ignore thrower during grace
+                    if (this.graceTimer > 0 && player === this.thrower) continue;
+
+                    const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
+                    if (dist < 45) { // Contact threshold
+                        this.explode();
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (this.isThrown && !this.isExploded) {
+            this.fuseTimer -= delta;
+            if (this.fuseTimer <= 0) {
+                this.explode();
+            }
+        }
     }
 }

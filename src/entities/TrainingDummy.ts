@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PhysicsConfig } from '../config/PhysicsConfig';
+import { PhysicsConfig } from '@shared/physics/PhysicsConfig';
 import { Fighter } from './Fighter';
 
 /**

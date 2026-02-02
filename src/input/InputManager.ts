@@ -2,39 +2,9 @@ import Phaser from 'phaser';
 import { GamepadInput } from './GamepadInput';
 import type { GamepadState } from './GamepadInput';
 
-/**
- * Unified Input State
- * Combines keyboard and gamepad input into a single interface
- */
-export interface InputState {
-    // Movement
-    moveLeft: boolean;
-    moveRight: boolean;
-    moveUp: boolean;
-    moveDown: boolean;
-    moveX: number; // -1 to 1 for analog input
-    moveY: number; // -1 to 1 for analog input
+import type { InputState } from '@shared/input/InputState';
 
-    // Actions (single press detection)
-    jump: boolean;
-    jumpHeld: boolean;
-    lightAttack: boolean;
-    heavyAttack: boolean;
-    heavyAttackHeld: boolean; // For charge attacks
-    dodge: boolean;
-    dodgeHeld: boolean; // For running (dodge key held)
-    recovery: boolean;
-
-    // Directional input for attacks
-    aimUp: boolean;
-    aimDown: boolean;
-    aimLeft: boolean;
-    aimRight: boolean;
-
-    // Input source
-    // Input source
-    usingGamepad: boolean;
-}
+// Removed local InputState definition
 
 export interface PlayerInputConfig {
     playerId: number;
@@ -84,7 +54,10 @@ export class InputManager {
         this.gamepadInput = new GamepadInput(config.gamepadIndex);
 
         if (this.config.useKeyboard) {
+            console.log(`[Input] Setting up Keyboard for Player ${this.config.playerId}`);
             this.setupKeyboard();
+        } else {
+            console.log(`[Input] Keyboard DISABLED for Player ${this.config.playerId}`);
         }
     }
 
@@ -144,6 +117,7 @@ export class InputManager {
             jump: false,
             jumpHeld: false,
             lightAttack: false,
+            lightAttackHeld: false,
             heavyAttack: false,
             heavyAttackHeld: false,
             dodge: false,
@@ -207,7 +181,7 @@ export class InputManager {
         this.xKeyWasPressed = xDown;
         this.zKeyWasPressed = zDown;
 
-        return {
+        const state = {
             moveLeft: left,
             moveRight: right,
             moveUp: up,
@@ -217,6 +191,7 @@ export class InputManager {
             jump: jumpPressed,
             jumpHeld: spaceDown || upArrowDown,
             lightAttack: lightPressed,
+            lightAttackHeld: jDown || cDown, // Track light attack held
             heavyAttack: heavyPressed,
             heavyAttackHeld: kDown || xDown, // Track held state for charging
             dodge: dodgePressed,
@@ -228,6 +203,14 @@ export class InputManager {
             aimRight: right,
             usingGamepad: false,
         };
+
+        if (jumpPressed || lightPressed || heavyPressed || state.recovery || (left && Math.random() < 0.05)) {
+            // Throttled log for movement, immediate for actions
+            if (state.recovery) console.log("[InputManager] Recovery Key Detected!");
+            // console.log(`[Poll] Keyboard: L:${left} R:${right} J:${jumpPressed}`);
+        }
+
+        return state;
     }
 
     private gamepadToInputState(state: GamepadState): InputState {
@@ -241,22 +224,19 @@ export class InputManager {
             jump: state.jump,
             jumpHeld: state.jumpHeld,
             lightAttack: state.lightAttack,
+            lightAttackHeld: state.lightAttackHeld, // Sync light attack held
             heavyAttack: state.heavyAttack,
             heavyAttackHeld: state.heavyAttackHeld, // Track B held for charging
             dodge: state.dodge,
             dodgeHeld: state.dodgeHeld, // Track LT/RT held for running
-            recovery: state.heavyAttack && state.aimUp && !this.isGroundedCheck(), // Up + Heavy in air = recovery
+            // Recovery is triggered by Up + Heavy in air - Player.ts checks grounded state
+            recovery: state.heavyAttack && state.aimUp,
             aimUp: state.aimUp,
             aimDown: state.aimDown,
             aimLeft: state.aimLeft,
             aimRight: state.aimRight,
             usingGamepad: true,
         };
-    }
-
-    // This is a placeholder - the actual grounded check happens in Player
-    private isGroundedCheck(): boolean {
-        return false;
     }
 
     isGamepadConnected(): boolean {

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PhysicsConfig } from '../config/PhysicsConfig';
+import { PhysicsConfig } from '@shared/physics/PhysicsConfig';
 import type { Damageable } from '../combat/DamageSystem';
 
 export abstract class Fighter extends Phaser.GameObjects.Container implements Damageable {
