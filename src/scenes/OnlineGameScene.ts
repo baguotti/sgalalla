@@ -351,11 +351,12 @@ export class OnlineGameScene extends Phaser.Scene {
         player.velocity.y = netState.velocityY;
         player.isGrounded = netState.isGrounded;
         player.isAttacking = netState.isAttacking;
+        player.attackAnimationKey = netState.attackAnimationKey || '';
         player.setFacingDirection(netState.facingDirection);
 
         // Debug: Log state changes
         if (netState.isAttacking) {
-            console.log(`[Remote] Player ${netState.playerId} isAttacking=${netState.isAttacking}`);
+            console.log(`[Remote] Player ${netState.playerId} isAttacking=${netState.isAttacking}, animKey=${netState.attackAnimationKey}`);
         }
     }
 

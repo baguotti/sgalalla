@@ -34,6 +34,9 @@ export class Player extends Fighter {
 
     public combat: PlayerCombat;
 
+    // Animation key for current attack (used for remote player sync)
+    public attackAnimationKey: string = '';
+
     // Dodge system
     public isDodging: boolean = false; // Public for Physics access
 
@@ -455,23 +458,38 @@ export class Player extends Fighter {
         }
 
         if (this.isAttacking) {
+            // Remote players use synced attackAnimationKey
+            if (this.attackAnimationKey) {
+                this.playAnim(this.attackAnimationKey, true);
+                return;
+            }
+
+            // Local players determine animation from currentAttack
             const currentAttack = this.getCurrentAttack();
             if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
                 if (currentAttack.data.direction === AttackDirection.DOWN) {
+                    this.attackAnimationKey = 'attack_down';
                     this.playAnim('attack_down', true);
                 } else if (currentAttack.data.direction === AttackDirection.SIDE) {
+                    this.attackAnimationKey = 'attack_side';
                     this.playAnim('attack_side', true);
                 } else {
+                    this.attackAnimationKey = 'attack_heavy';
                     this.playAnim('attack_heavy', true);
                 }
             } else if (currentAttack && currentAttack.data.direction === AttackDirection.UP) {
                 // Check if it's the up attack (light)
+                this.attackAnimationKey = 'attack_up';
                 this.playAnim('attack_up', true);
             } else {
-                // Default attack animation (local light attack or remote player)
+                // Default attack animation (local light attack or fallback)
+                this.attackAnimationKey = 'attack_light_0';
                 this.playAnim('attack_light_0', true);
             }
             return;
+        } else {
+            // Clear attack animation key when not attacking
+            this.attackAnimationKey = '';
         }
 
         // Airborne
@@ -671,6 +689,7 @@ export class Player extends Fighter {
             damagePercent: this.damagePercent,
             playerState: state,
             isAttacking: this.isAttacking,
+            attackAnimationKey: this.attackAnimationKey,
             isDodging: this.isDodging,
             isInvincible: this.isInvincible
         };
