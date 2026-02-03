@@ -270,15 +270,17 @@ export class Player extends Fighter {
     }
 
     public updateLogic(delta: number): void {
-        // Update Combat Component
-        this.combat.update(delta);
-
-        // Handle input for combat (only if we have input - remote players don't)
+        // Remote players don't run combat logic (it's synced from network)
+        // Only local players run combat update/handleInput
         if (this.currentInput) {
+            // Update Combat Component
+            this.combat.update(delta);
+
+            // Handle input for combat
             this.combat.handleInput(this.currentInput);
         }
 
-        // Update Combat/Timers
+        // Update Combat/Timers (everyone needs this for cooldowns)
         this.updateTimers(delta);
 
         // Visuals (Now sees correct isGrounded state from Scene Collisions)
