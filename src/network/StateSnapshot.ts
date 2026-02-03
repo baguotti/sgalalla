@@ -22,7 +22,7 @@ export interface PlayerSnapshot {
     damagePercent: number;
     playerState: string; // 'idle', 'jumping', 'attacking', etc.
     isAttacking: boolean;
-    attackAnimationKey?: string;
+    animationKey?: string;
     isDodging: boolean;
     isInvincible: boolean;
 }

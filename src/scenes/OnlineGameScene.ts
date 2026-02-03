@@ -245,7 +245,7 @@ export class OnlineGameScene extends Phaser.Scene {
                 facingDirection: this.localPlayer.getFacingDirection(),
                 isGrounded: this.localPlayer.isGrounded,
                 isAttacking: this.localPlayer.isAttacking,
-                attackAnimationKey: this.localPlayer.attackAnimationKey,
+                animationKey: this.localPlayer.animationKey,
                 damagePercent: this.localPlayer.damagePercent
             });
 
@@ -352,12 +352,12 @@ export class OnlineGameScene extends Phaser.Scene {
         player.velocity.y = netState.velocityY;
         player.isGrounded = netState.isGrounded;
         player.isAttacking = netState.isAttacking;
-        player.attackAnimationKey = netState.attackAnimationKey || '';
+        player.animationKey = netState.animationKey || '';
         player.setFacingDirection(netState.facingDirection);
 
         // Debug: Log state changes
         if (netState.isAttacking) {
-            console.log(`[Remote] Player ${netState.playerId} isAttacking=${netState.isAttacking}, animKey=${netState.attackAnimationKey}`);
+            console.log(`[Remote] Player ${netState.playerId} isAttacking=${netState.isAttacking}, animKey=${netState.animationKey}`);
         }
     }
 

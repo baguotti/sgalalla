@@ -34,8 +34,8 @@ export class Player extends Fighter {
 
     public combat: PlayerCombat;
 
-    // Animation key for current attack (used for remote player sync)
-    public attackAnimationKey: string = '';
+    // Animation key for network sync (used so remote players play correct animation)
+    public animationKey: string = '';
 
     // Dodge system
     public isDodging: boolean = false; // Public for Physics access
@@ -442,58 +442,56 @@ export class Player extends Fighter {
     }
 
     private updateAnimation(): void {
+        // Remote players use synced animationKey directly (set from network)
+        // We detect remote players by checking if they have no current input
+        const isRemotePlayer = !this.currentInput;
+
+        if (isRemotePlayer && this.animationKey) {
+            this.playAnim(this.animationKey, true);
+            return;
+        }
+
+        // Local player: calculate animation from state and set animationKey for sync
         if (this.isHitStunned) {
+            this.animationKey = 'hurt';
             this.playAnim('hurt', true);
             return;
         }
 
         if (this.combat.isCharging) {
+            this.animationKey = 'charging';
             this.playAnim('charging', true);
             return;
         }
 
         if (this.combat.isGroundPounding) {
+            this.animationKey = 'ground_pound';
             this.playAnim('ground_pound', true);
             return;
         }
 
         if (this.isAttacking) {
-            // Remote players use synced attackAnimationKey
-            if (this.attackAnimationKey) {
-                this.playAnim(this.attackAnimationKey, true);
-                return;
-            }
-
-            // Local players determine animation from currentAttack
+            // Determine attack animation from currentAttack
             const currentAttack = this.getCurrentAttack();
             if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
                 if (currentAttack.data.direction === AttackDirection.DOWN) {
-                    this.attackAnimationKey = 'attack_down';
-                    this.playAnim('attack_down', true);
+                    this.animationKey = 'attack_down';
                 } else if (currentAttack.data.direction === AttackDirection.SIDE) {
-                    this.attackAnimationKey = 'attack_side';
-                    this.playAnim('attack_side', true);
+                    this.animationKey = 'attack_side';
                 } else {
-                    this.attackAnimationKey = 'attack_heavy';
-                    this.playAnim('attack_heavy', true);
+                    this.animationKey = 'attack_heavy';
                 }
             } else if (currentAttack && currentAttack.data.direction === AttackDirection.UP) {
-                // Check if it's the up attack (light)
-                this.attackAnimationKey = 'attack_up';
-                this.playAnim('attack_up', true);
+                this.animationKey = 'attack_up';
             } else {
-                // Default attack animation (local light attack or fallback)
-                this.attackAnimationKey = 'attack_light_0';
-                this.playAnim('attack_light_0', true);
+                this.animationKey = 'attack_light_0';
             }
+            this.playAnim(this.animationKey, true);
             return;
-        } else {
-            // Clear attack animation key when not attacking
-            this.attackAnimationKey = '';
         }
 
-        // Airborne
         if (this.isDodging) {
+            this.animationKey = 'slide';
             this.playAnim('slide', true);
             return;
         }
@@ -501,15 +499,10 @@ export class Player extends Fighter {
         // Airborne
         if (!this.isGrounded) {
             if (this.velocity.y < 0) {
-                // If moving up fast, use jump start, else loop?
-                // Simplification: mapped 'jump' to 'Jump Loop' in GameScene.
-                // To support jump start properly, we'd need a trigger.
-                // For now, let's play 'jump' (Jump Loop).
-                // User asked for "jump start, jump loop" mapping.
-                // If I just mapped 'jump' key to 'Jump Loop', I'm missing Jump Start.
-                // I can map 'jump_start' if velocity.y is lower than threshold?
+                this.animationKey = 'jump';
                 this.playAnim('jump', true);
             } else {
+                this.animationKey = 'fall';
                 this.playAnim('fall', true);
             }
             return;
@@ -517,8 +510,10 @@ export class Player extends Fighter {
 
         // Grounded
         if (Math.abs(this.velocity.x) > 10) {
+            this.animationKey = 'run';
             this.playAnim('run', true);
         } else {
+            this.animationKey = 'idle';
             this.playAnim('idle', true);
         }
     }
@@ -689,7 +684,7 @@ export class Player extends Fighter {
             damagePercent: this.damagePercent,
             playerState: state,
             isAttacking: this.isAttacking,
-            attackAnimationKey: this.attackAnimationKey,
+            animationKey: this.animationKey,
             isDodging: this.isDodging,
             isInvincible: this.isInvincible
         };

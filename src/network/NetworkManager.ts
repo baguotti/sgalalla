@@ -47,7 +47,7 @@ export interface NetPlayerState {
     facingDirection: number;
     isGrounded: boolean;
     isAttacking: boolean;
-    attackAnimationKey?: string; // e.g. 'attack_heavy', 'attack_up', 'attack_light_0'
+    animationKey?: string; // e.g. 'attack_heavy', 'attack_up', 'hurt', 'slide'
     damagePercent: number;
 }
 
