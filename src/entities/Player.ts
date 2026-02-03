@@ -651,6 +651,7 @@ export class Player extends Fighter {
     }
 
     public playHurtAnimation(): void {
+        this.animationKey = 'hurt';
         this.playAnim('hurt', true);
         // Also maybe trigger hitstun visual
         this.isHitStunned = true;
