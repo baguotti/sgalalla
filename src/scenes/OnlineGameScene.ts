@@ -236,7 +236,7 @@ export class OnlineGameScene extends Phaser.Scene {
             this.checkBlastZone(this.localPlayer);
 
             // Send local player's actual position to server for relay to other clients
-            this.networkManager.sendState({
+            const stateToSend = {
                 playerId: this.localPlayerId,
                 x: this.localPlayer.x,
                 y: this.localPlayer.y,
@@ -247,7 +247,11 @@ export class OnlineGameScene extends Phaser.Scene {
                 isAttacking: this.localPlayer.isAttacking,
                 animationKey: this.localPlayer.animationKey,
                 damagePercent: this.localPlayer.damagePercent
-            });
+            };
+            if (stateToSend.animationKey === 'hurt') {
+                console.log(`[SendState] Sending animationKey='hurt' to server`);
+            }
+            this.networkManager.sendState(stateToSend);
 
             // Check local player attacks against all remote players
             this.players.forEach((target) => {
@@ -328,8 +332,10 @@ export class OnlineGameScene extends Phaser.Scene {
      * Handle remote hit events - apply damage/knockback
      */
     private handleHitEvent(event: NetHitEvent): void {
+        console.log(`[OnlineGame] handleHitEvent: victim=${event.victimId}, localPlayer=${this.localPlayerId}`);
         // If we are the victim, apply damage/knockback
         if (event.victimId === this.localPlayerId && this.localPlayer) {
+            console.log(`[OnlineGame] Applying hit to local player - damage=${event.damage}`);
             // Apply damage
             this.localPlayer.takeDamage(event.damage);
 
@@ -356,8 +362,8 @@ export class OnlineGameScene extends Phaser.Scene {
         player.setFacingDirection(netState.facingDirection);
 
         // Debug: Log state changes
-        if (netState.isAttacking) {
-            console.log(`[Remote] Player ${netState.playerId} isAttacking=${netState.isAttacking}, animKey=${netState.animationKey}`);
+        if (netState.animationKey && netState.animationKey !== 'idle' && netState.animationKey !== 'run') {
+            console.log(`[Remote] Player ${netState.playerId} animationKey='${netState.animationKey}'`);
         }
     }
 

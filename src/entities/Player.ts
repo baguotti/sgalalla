@@ -651,13 +651,12 @@ export class Player extends Fighter {
     }
 
     public playHurtAnimation(): void {
+        console.log(`[Player ${this.playerId}] playHurtAnimation called, setting animationKey='hurt'`);
         this.animationKey = 'hurt';
         this.playAnim('hurt', true);
-        // Also maybe trigger hitstun visual
+        // Use hitStunTimer for proper timing (200ms = 0.2s * 1000)
         this.isHitStunned = true;
-        this.scene.time.delayedCall(200, () => {
-            this.isHitStunned = false;
-        });
+        this.hitStunTimer = 200; // Will be decremented in updateTimers
     }
 
     // ============ ROLLBACK NETCODE SUPPORT ============
