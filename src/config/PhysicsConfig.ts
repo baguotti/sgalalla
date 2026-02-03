@@ -43,11 +43,11 @@ export const PhysicsConfig = {
   LIGHT_ATTACK_COOLDOWN: 300,
   HEAVY_ATTACK_COOLDOWN: 600,
 
-  // Hitbox sizes
-  LIGHT_HITBOX_WIDTH: 60,
-  LIGHT_HITBOX_HEIGHT: 40,
-  HEAVY_HITBOX_WIDTH: 80,
-  HEAVY_HITBOX_HEIGHT: 60,
+  // Hitbox sizes (Doubled for 1:1 scale)
+  LIGHT_HITBOX_WIDTH: 120, // 60 * 2
+  LIGHT_HITBOX_HEIGHT: 80, // 40 * 2
+  HEAVY_HITBOX_WIDTH: 160, // 80 * 2
+  HEAVY_HITBOX_HEIGHT: 120, // 60 * 2
 
   // Dodge/Dash - Brawlhalla style
   DODGE_DISTANCE: 225,
@@ -62,62 +62,55 @@ export const PhysicsConfig = {
 
   // Damage system
   MAX_DAMAGE: 999,
-  KNOCKBACK_SCALING: 0.02, // Increased from 0.015 for stronger high-damage scaling
-  // Wait, if KNOCKBACK_SCALING converts damage% to velocity force, and we want higher velocity force for larger screen...
-  // We already scaled LIGHT_ATTACK_KNOCKBACK base force.
-  // Formula is usually Base + (Damage * Scaling). Both result in velocity.
-  // Since we want 1.5x velocity, we should verify logic. But for now, let's assume scaling factor works on percentage to force ratio.
-  // If we want 1.5x force for same damage, we should scale this too?
-  // Let's assume yes: 0.012 * 1.5 = 0.018? No, let's keep it and see. The base knockback is scaled.
-
+  KNOCKBACK_SCALING: 0.02,
   HIT_STUN_DURATION: 300,
 
   // Ledge detection
-  LEDGE_SNAP_DISTANCE: 15,
+  LEDGE_SNAP_DISTANCE: 30, // 15 * 2
 
-  // Player dimensions
-  PLAYER_WIDTH: 60,
-  PLAYER_HEIGHT: 85, // Reduced from 94 to be shorter
-  NOSE_SIZE: 12,
+  // Player dimensions (Doubled for 1:1 scale)
+  PLAYER_WIDTH: 120, // 60 * 2
+  PLAYER_HEIGHT: 170, // 85 * 2
+  NOSE_SIZE: 24, // 12 * 2
 
   // Attack frame timing
-  LIGHT_STARTUP_FRAMES: 50,    // 3 frames at 60fps
-  LIGHT_ACTIVE_FRAMES: 100,    // 6 frames - hitbox active
-  LIGHT_RECOVERY_FRAMES: 50,   // Reduced for snappy feel (was 100)
+  LIGHT_STARTUP_FRAMES: 50,
+  LIGHT_ACTIVE_FRAMES: 100,
+  LIGHT_RECOVERY_FRAMES: 50,
 
   // Heavy attacks
-  HEAVY_STARTUP_FRAMES: 80,    // ~5 frames (reduced from 150ms/9 frames)
-  HEAVY_ACTIVE_FRAMES: 150,    // 9 frames
-  HEAVY_RECOVERY_FRAMES: 200,  // 12 frames
+  HEAVY_STARTUP_FRAMES: 80,
+  HEAVY_ACTIVE_FRAMES: 150,
+  HEAVY_RECOVERY_FRAMES: 200,
 
-  // Ground pound (down + attack in air)
-  GROUND_POUND_STARTUP: 200,   // ms
-  GROUND_POUND_SPEED: 1800,    // 1200 * 1.5
-  GROUND_POUND_DAMAGE: 8,      // unchanged
-  GROUND_POUND_KNOCKBACK: 1050, // Reduced from 1350 (now comparable to heavy)
+  // Ground pound
+  GROUND_POUND_STARTUP: 200,
+  GROUND_POUND_SPEED: 1800,
+  GROUND_POUND_DAMAGE: 8,
+  GROUND_POUND_KNOCKBACK: 1050,
 
-  // Directional attack hitbox offsets
-  SIDE_ATTACK_OFFSET_X: 75,    // 50 * 1.5
-  UP_ATTACK_OFFSET_Y: -75,     // -50 * 1.5
-  DOWN_ATTACK_OFFSET_Y: 75,    // 50 * 1.5
+  // Directional attack hitbox offsets (Doubled)
+  SIDE_ATTACK_OFFSET_X: 150,    // 75 * 2
+  UP_ATTACK_OFFSET_Y: -150,     // -75 * 2
+  DOWN_ATTACK_OFFSET_Y: 150,    // 75 * 2
 
   // Chargeable heavy attacks
-  CHARGE_MAX_TIME: 1000,       // Max charge time in ms
-  CHARGE_DAMAGE_MULT: 2.0,     // 2x damage at full charge
-  CHARGE_KNOCKBACK_MULT: 1.8,  // 1.8x knockback at full charge
+  CHARGE_MAX_TIME: 1000,
+  CHARGE_DAMAGE_MULT: 2.0,
+  CHARGE_KNOCKBACK_MULT: 1.8,
 
-  // Wall mechanics - Brawlhalla style
-  WALL_SLIDE_SPEED: 225,       // 150 * 1.5
-  WALL_JUMP_FORCE_X: 900,      // 600 * 1.5
-  WALL_JUMP_FORCE_Y: -975,     // -650 * 1.5
-  WALL_FRICTION: 0.7,          // unchanged
+  // Wall mechanics
+  WALL_SLIDE_SPEED: 225,
+  WALL_JUMP_FORCE_X: 900,
+  WALL_JUMP_FORCE_Y: -975,
+  WALL_FRICTION: 0.7,
 
-  // Edge grab mechanics
-  EDGE_GRAB_HORIZONTAL_RANGE: 30, // 20 * 1.5
-  EDGE_GRAB_VERTICAL_RANGE: 45, // 30 * 1.5
-  LEDGE_HANG_OFFSET_X: 22.5, // 15 * 1.5
-  LEDGE_HANG_OFFSET_Y: 22.5, // 15 * 1.5
-  LEDGE_CLIMB_SPEED: -600, // -400 * 1.5
-  LEDGE_JUMP_X: 675, // 450 * 1.5
-  LEDGE_JUMP_Y: -900, // -600 * 1.5
+  // Edge grab mechanics (Doubled ranges/offsets)
+  EDGE_GRAB_HORIZONTAL_RANGE: 60, // 30 * 2
+  EDGE_GRAB_VERTICAL_RANGE: 90, // 45 * 2
+  LEDGE_HANG_OFFSET_X: 45, // 22.5 * 2
+  LEDGE_HANG_OFFSET_Y: 45, // 22.5 * 2
+  LEDGE_CLIMB_SPEED: -600,
+  LEDGE_JUMP_X: 675,
+  LEDGE_JUMP_Y: -900,
 } as const;

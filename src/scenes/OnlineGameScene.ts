@@ -363,10 +363,26 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private interpolatePlayer(player: Player, netState: NetPlayerState): void {
-        // Simple lerp interpolation (can be improved with buffer)
-        const lerpFactor = 0.3;
-        player.x = Phaser.Math.Linear(player.x, netState.x, lerpFactor);
-        player.y = Phaser.Math.Linear(player.y, netState.y, lerpFactor);
+        // Adaptive interpolation - smooth at high speeds, snappy at low speeds
+        const dx = Math.abs(player.x - netState.x);
+        const dy = Math.abs(player.y - netState.y);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Adaptive lerp: lower factor for large distances (smooth), higher for small (snappy)
+        // Range: 0.2 (far) to 0.6 (close)
+        const lerpFactor = Phaser.Math.Clamp(1 - (distance / 200), 0.2, 0.6);
+
+        // Snap threshold - if very close, just snap
+        const snapThreshold = 3;
+
+        if (distance < snapThreshold) {
+            player.x = netState.x;
+            player.y = netState.y;
+        } else {
+            player.x = Phaser.Math.Linear(player.x, netState.x, lerpFactor);
+            player.y = Phaser.Math.Linear(player.y, netState.y, lerpFactor);
+        }
+
         player.velocity.x = netState.velocityX;
         player.velocity.y = netState.velocityY;
         player.isGrounded = netState.isGrounded;

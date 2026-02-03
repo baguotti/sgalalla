@@ -144,9 +144,9 @@ export class MatchHUD {
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
 
-        // Create debug display in top-right corner
+        // Create debug display in top-center
         const { width } = scene.cameras.main;
-        this.debugContainer = scene.add.container(width - 120, 20);
+        this.debugContainer = scene.add.container(width / 2, 20);
         this.debugContainer.setScrollFactor(0);
         this.debugContainer.setDepth(100);
 

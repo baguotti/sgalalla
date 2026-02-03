@@ -181,8 +181,8 @@ export class Player extends Fighter {
         // Auto-scale to fit hitbox height (90px)
         const targetHeight = PhysicsConfig.PLAYER_HEIGHT;
 
-        // Base size is 256 for both characters (User confirmed)
-        const scale = (targetHeight / 256) * 1.5;
+        // Base size is 256 for both characters (User confirmed 1:1 scale)
+        const scale = 1;
         this.sprite.setScale(scale);
 
         this.add(this.sprite);
