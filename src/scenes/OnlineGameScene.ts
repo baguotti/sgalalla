@@ -245,6 +245,7 @@ export class OnlineGameScene extends Phaser.Scene {
                 facingDirection: this.localPlayer.getFacingDirection(),
                 isGrounded: this.localPlayer.isGrounded,
                 isAttacking: this.localPlayer.isAttacking,
+                attackAnimationKey: this.localPlayer.attackAnimationKey,
                 damagePercent: this.localPlayer.damagePercent
             });
 

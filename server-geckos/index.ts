@@ -25,6 +25,7 @@ interface PlayerState {
     facingDirection: number;
     isGrounded: boolean;
     isAttacking: boolean;
+    attackAnimationKey: string;
     damagePercent: number;
 }
 
@@ -73,6 +74,7 @@ io.onConnection((channel) => {
         facingDirection: playerId % 2 === 0 ? 1 : -1,
         isGrounded: true,
         isAttacking: false,
+        attackAnimationKey: '',
         damagePercent: 0
     };
 
@@ -103,6 +105,7 @@ io.onConnection((channel) => {
             player.facingDirection = data.facingDirection ?? player.facingDirection;
             player.isGrounded = data.isGrounded ?? player.isGrounded;
             player.isAttacking = data.isAttacking ?? player.isAttacking;
+            player.attackAnimationKey = data.attackAnimationKey ?? player.attackAnimationKey;
         }
     });
 
