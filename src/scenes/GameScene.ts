@@ -59,6 +59,10 @@ export class GameScene extends Phaser.Scene {
     private pauseMenu!: PauseMenu;
     private pauseKey!: Phaser.Input.Keyboard.Key;
 
+    // Game Over State
+    private isGameOver: boolean = false;
+    private gameOverText!: Phaser.GameObjects.Text;
+
     constructor() {
         super({ key: 'GameScene' });
     }
@@ -505,6 +509,17 @@ export class GameScene extends Phaser.Scene {
 
     update(_time: number, delta: number): void {
         this.debugUpdateCounter++;
+
+        // Stop updates if game over
+        if (this.isGameOver) {
+            // Allow restarting via SPACE or ESC
+            if (Phaser.Input.Keyboard.JustDown(this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)) ||
+                Phaser.Input.Keyboard.JustDown(this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC))) {
+                window.location.reload();
+            }
+            return;
+        }
+
         if (this.debugUpdateCounter % 60 === 0) {
             console.log(`GameScene.update running. Frame: ${this.debugUpdateCounter}`);
         }
@@ -640,22 +655,30 @@ export class GameScene extends Phaser.Scene {
 
     private checkBlastZones(): void {
         const checkPlayer = (player: Player, playerId: number) => {
+            // Skip checks if player is already dead/eliminated
+            if (!player.active) return; // Phaser active flag
+
             const bounds = player.getBounds();
             if (bounds.left < this.BLAST_ZONE_LEFT ||
                 bounds.right > this.BLAST_ZONE_RIGHT ||
                 bounds.top < this.BLAST_ZONE_TOP ||
                 bounds.bottom > this.BLAST_ZONE_BOTTOM) {
 
-                // Player eliminated
-                this.respawnPlayer(player, playerId);
-
                 // Score update (lives)
                 player.lives = Math.max(0, player.lives - 1);
+                console.log(`Player ${playerId} died. Lives remaining: ${player.lives}`);
+
+                if (player.lives > 0) {
+                    this.respawnPlayer(player, playerId);
+                } else {
+                    // Elimination
+                    this.killPlayer(player);
+                    this.checkGameOver();
+                }
             }
         };
 
         this.players.forEach(p => checkPlayer(p, p.playerId));
-
     }
 
     private respawnPlayer(player: Player, playerId: number): void {
@@ -921,5 +944,76 @@ export class GameScene extends Phaser.Scene {
         if (this.debugOverlay) {
             this.debugOverlay.destroy();
         }
+    }
+    private killPlayer(player: Player): void {
+        console.log(`Player ${player.playerId} ELIMINATED!`);
+        player.setActive(false);
+        player.setVisible(false);
+        player.setPosition(-9999, -9999); // Move away
+        // Disable body
+        if (player.body) {
+            this.matter.world.remove(player.body);
+        }
+
+        // Show "ELIMINATED" text briefly? (Optional)
+    }
+
+    private checkGameOver(): void {
+        // Count active players with lives > 0
+        const survivors = this.players.filter(p => p.lives > 0);
+
+        if (survivors.length <= 1) {
+            // Game Over!
+            const winner = survivors.length > 0 ? survivors[0] : null; // If 0 (everyone died same frame), draw or no winner
+            this.handleGameOver(winner ? winner.playerId : -1);
+        }
+    }
+
+    private handleGameOver(winnerId: number): void {
+        if (this.isGameOver) return;
+        this.isGameOver = true;
+        console.log("GAME OVER!");
+
+        const { width, height } = this.scale;
+
+        // Darken background
+        const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
+        overlay.setDepth(1000);
+        this.addToCameraIgnore(overlay); // UI Camera ignores it? NO, UI camera renders UI. Wait.
+        // If we want UI to render this, we must ensure it is visible to UI camera properly.
+        // Actually, main camera ignores UI. UI camera renders UI.
+        // If I just add to scene, Main Camera renders it by default.
+        // But wait, GameScene uses `uiCamera`.
+        // Objects for UI should be ignored by Main Camera.
+        this.cameras.main.ignore(overlay);
+
+        let winnerText = "GAME!";
+        if (winnerId >= 0) {
+            winnerText += `\nPLAYER ${winnerId + 1} WINS!`;
+        } else {
+            winnerText += "\nDRAW GAME!";
+        }
+
+        const text = this.add.text(width / 2, height / 2, winnerText, {
+            fontSize: '64px',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            color: '#ffffff',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 8
+        });
+        text.setOrigin(0.5);
+        text.setDepth(1001);
+        this.cameras.main.ignore(text); // Only UI camera sees it
+
+        const subText = this.add.text(width / 2, height / 2 + 100, "Press SPACE to Restart", {
+            fontSize: '32px',
+            fontFamily: 'Arial',
+            color: '#cccccc'
+        });
+        subText.setOrigin(0.5);
+        subText.setDepth(1001);
+        this.cameras.main.ignore(subText);
     }
 }

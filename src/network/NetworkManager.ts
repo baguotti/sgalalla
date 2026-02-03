@@ -27,7 +27,9 @@ export const NetMessageType = {
     GAME_START: 'game_start',
     PING: 'ping',
     PONG: 'pong',
-    INPUT_ACK: 'input_ack' // Server acknowledges input received
+    INPUT_ACK: 'input_ack', // Server acknowledges input received
+    REMATCH_VOTE: 'rematch_vote',
+    REMATCH_START: 'rematch_start'
 } as const;
 
 // Serialized input for network transmission
@@ -49,6 +51,7 @@ export interface NetPlayerState {
     isAttacking: boolean;
     animationKey?: string; // e.g. 'attack_heavy', 'attack_up', 'hurt', 'slide'
     damagePercent: number;
+    lives: number;
 }
 
 // Full game state snapshot from server
@@ -80,6 +83,7 @@ export type DisconnectCallback = () => void;
 export type RollbackCallback = (targetFrame: number, confirmedState: NetGameState) => void;
 export type AttackCallback = (attack: NetAttackEvent) => void;
 export type HitCallback = (hit: NetHitEvent) => void;
+export type RematchStartCallback = () => void;
 
 class NetworkManager {
     private static instance: NetworkManager | null = null;
@@ -106,6 +110,7 @@ class NetworkManager {
     private onRollbackCallback: RollbackCallback | null = null;
     private onAttackCallback: AttackCallback | null = null;
     private onHitCallback: HitCallback | null = null;
+    private onRematchStartCallback: RematchStartCallback | null = null;
 
     // Latency tracking
     private lastPingTime: number = 0;
@@ -211,6 +216,12 @@ class NetworkManager {
             if (hit.victimId === this.localPlayerId) {
                 this.onHitCallback?.(hit);
             }
+        });
+
+        // Rematch start event
+        this.channel.on(NetMessageType.REMATCH_START, () => {
+            console.log('[NetworkManager] Rematch starting!');
+            this.onRematchStartCallback?.();
         });
     }
 
@@ -349,6 +360,15 @@ class NetworkManager {
     public onRollback(callback: RollbackCallback): void { this.onRollbackCallback = callback; }
     public onAttack(callback: AttackCallback): void { this.onAttackCallback = callback; }
     public onHit(callback: HitCallback): void { this.onHitCallback = callback; }
+    public onRematchStart(callback: RematchStartCallback): void { this.onRematchStartCallback = callback; }
+
+    /**
+     * Send rematch vote to server
+     */
+    public sendRematchVote(): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.REMATCH_VOTE, { playerId: this.localPlayerId }, { reliable: true });
+    }
 }
 
 export default NetworkManager;

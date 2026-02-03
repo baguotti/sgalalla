@@ -13,7 +13,9 @@ const NetMessageType = {
     PLAYER_LEFT: 'player_left',
     GAME_START: 'game_start',
     PING: 'ping',
-    PONG: 'pong'
+    PONG: 'pong',
+    REMATCH_VOTE: 'rematch_vote',
+    REMATCH_START: 'rematch_start'
 } as const;
 
 interface PlayerState {
@@ -27,11 +29,13 @@ interface PlayerState {
     isAttacking: boolean;
     animationKey: string;
     damagePercent: number;
+    lives: number;
 }
 
 interface GameRoom {
     players: Map<string, PlayerState>;
     frame: number;
+    rematchVotes: Set<string>; // Track channel IDs that voted for rematch
 }
 
 const PORT = 9208;
@@ -55,7 +59,7 @@ io.onConnection((channel) => {
 
     // Create room if needed
     if (!rooms.has(roomId)) {
-        rooms.set(roomId, { players: new Map(), frame: 0 });
+        rooms.set(roomId, { players: new Map(), frame: 0, rematchVotes: new Set() });
     }
 
     const room = rooms.get(roomId)!;
@@ -75,7 +79,8 @@ io.onConnection((channel) => {
         isGrounded: true,
         isAttacking: false,
         animationKey: '',
-        damagePercent: 0
+        damagePercent: 0,
+        lives: 3
     };
 
     room.players.set(channel.id!, playerState);
@@ -106,6 +111,7 @@ io.onConnection((channel) => {
             player.isGrounded = data.isGrounded ?? player.isGrounded;
             player.isAttacking = data.isAttacking ?? player.isAttacking;
             player.animationKey = data.animationKey ?? player.animationKey;
+            player.lives = data.lives ?? player.lives;
         }
     });
 
@@ -128,9 +134,41 @@ io.onConnection((channel) => {
     channel.onDisconnect(() => {
         console.log(`[Server] Player ${playerId} disconnected`);
         room.players.delete(channel.id!);
+        room.rematchVotes.delete(channel.id!); // Clear their vote
 
         // Broadcast departure
         io.emit(NetMessageType.PLAYER_LEFT, { playerId });
+    });
+
+    // Handle rematch vote
+    channel.on(NetMessageType.REMATCH_VOTE, () => {
+        console.log(`[Server] Player ${playerId} voted for rematch`);
+        room.rematchVotes.add(channel.id!);
+
+        // Check if all players voted
+        if (room.rematchVotes.size >= room.players.size && room.players.size >= 2) {
+            console.log('[Server] All players voted for rematch! Starting new game.');
+
+            // Reset game state
+            const spawnPoints = [600, 1200];
+            let idx = 0;
+            room.players.forEach((playerState) => {
+                playerState.x = spawnPoints[idx % 2];
+                playerState.y = 780;
+                playerState.velocityX = 0;
+                playerState.velocityY = 0;
+                playerState.isGrounded = true;
+                playerState.isAttacking = false;
+                playerState.damagePercent = 0;
+                playerState.lives = 3;
+                idx++;
+            });
+            room.frame = 0;
+            room.rematchVotes.clear();
+
+            // Broadcast rematch start
+            io.emit(NetMessageType.REMATCH_START, {});
+        }
     });
 });
 

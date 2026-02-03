@@ -686,7 +686,8 @@ export class Player extends Fighter {
             isAttacking: this.isAttacking,
             animationKey: this.animationKey,
             isDodging: this.isDodging,
-            isInvincible: this.isInvincible
+            isInvincible: this.isInvincible,
+            lives: this.lives
         };
     }
 
@@ -706,6 +707,7 @@ export class Player extends Fighter {
         this.isAttacking = snapshot.isAttacking;
         this.isDodging = snapshot.isDodging;
         this.isInvincible = snapshot.isInvincible;
+        this.lives = snapshot.lives;
 
         // Update sprite position to match
         this.sprite.setPosition(this.x, this.y);

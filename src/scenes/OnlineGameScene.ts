@@ -10,7 +10,7 @@
  */
 
 import Phaser from 'phaser';
-import { Player } from '../entities/Player';
+import { Player, PlayerState } from '../entities/Player';
 import NetworkManager from '../network/NetworkManager';
 import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '../network/NetworkManager';
 import { InputManager } from '../input/InputManager';
@@ -56,15 +56,25 @@ export class OnlineGameScene extends Phaser.Scene {
     private readonly BLAST_ZONE_BOTTOM = 2000;
 
     // Camera Settings (matching GameScene)
-    private currentZoomLevel: 'CLOSE' | 'NORMAL' | 'WIDE' = 'NORMAL';
     // Camera Settings (matching GameScene)
+    private currentZoomLevel: 'CLOSE' | 'NORMAL' | 'WIDE' = 'NORMAL';
     private readonly ZOOM_SETTINGS = {
         CLOSE: { padX: 100, padY: 100, minZoom: 0.8, maxZoom: 1.5 },
         NORMAL: { padX: 375, padY: 300, minZoom: 0.6, maxZoom: 1.1 },
-        WIDE: { padX: 600, padY: 450, minZoom: 0.3, maxZoom: 0.8 } // Increased range (minZoom 0.3)
+        WIDE: { padX: 600, padY: 450, minZoom: 0.3, maxZoom: 0.8 }
     };
 
+    // UI Camera
     private uiCamera!: Phaser.Cameras.Scene2D.Camera;
+
+    // Game Over State
+    private isGameOver: boolean = false;
+    private gameOverContainer!: Phaser.GameObjects.Container;
+    private rematchButton!: Phaser.GameObjects.Text;
+    private leaveButton!: Phaser.GameObjects.Text;
+    private hasVotedRematch: boolean = false;
+    private selectedButtonIndex: number = 0; // 0 = Rematch, 1 = Leave
+    private menuButtons: Phaser.GameObjects.Text[] = [];
 
     constructor() {
         super({ key: 'OnlineGameScene' });
@@ -189,6 +199,7 @@ export class OnlineGameScene extends Phaser.Scene {
         this.networkManager.onDisconnect(() => this.handleDisconnect());
         this.networkManager.onAttack((event) => this.handleAttackEvent(event));
         this.networkManager.onHit((event) => this.handleHitEvent(event));
+        this.networkManager.onRematchStart(() => this.handleRematchStart());
 
         // Try to connect
         this.showConnectionStatus('Connecting...');
@@ -236,6 +247,13 @@ export class OnlineGameScene extends Phaser.Scene {
     update(_time: number, delta: number): void {
         if (!this.isConnected) return;
 
+        // Stop updates if game over
+        if (this.isGameOver) {
+            // Poll gamepad for menu navigation
+            this.pollGamepadForMenu();
+            return;
+        }
+
         this.localFrame++;
 
         // Poll and send local input
@@ -278,7 +296,8 @@ export class OnlineGameScene extends Phaser.Scene {
                 isGrounded: this.localPlayer.isGrounded,
                 isAttacking: this.localPlayer.isAttacking,
                 animationKey: this.localPlayer.animationKey,
-                damagePercent: this.localPlayer.damagePercent
+                damagePercent: this.localPlayer.damagePercent,
+                lives: this.localPlayer.lives
             };
             if (stateToSend.animationKey === 'hurt') {
                 console.log(`[SendState] Sending animationKey='hurt' to server`);
@@ -352,7 +371,15 @@ export class OnlineGameScene extends Phaser.Scene {
 
             // Interpolate remote players
             this.interpolatePlayer(player, netPlayer);
+
+            // Sync lives (only if server sends it)
+            if (typeof netPlayer.lives === 'number' && player.lives !== netPlayer.lives) {
+                player.lives = netPlayer.lives;
+            }
         });
+
+        // Check for Game Over after state updates
+        this.checkGameOver();
     }
 
     private checkAndReconcile(_serverPlayerState: NetPlayerState, _serverFrame: number): void {
@@ -430,21 +457,312 @@ export class OnlineGameScene extends Phaser.Scene {
      * Check if player is outside blast zones and respawn if so
      */
     private checkBlastZone(player: Player): void {
-        const inBlastZone =
-            player.x < this.BLAST_ZONE_LEFT ||
-            player.x > this.BLAST_ZONE_RIGHT ||
-            player.y < this.BLAST_ZONE_TOP ||
-            player.y > this.BLAST_ZONE_BOTTOM;
+        if (!player.active) return;
 
-        if (inBlastZone) {
-            // Respawn at center of stage
-            player.x = 960;
-            player.y = 700;
+        // ONLY Local player logic determines death for self (Client Authoritative)
+        const isLocal = player === this.localPlayer;
+        if (!isLocal) return;
+
+        // Check bounds
+        const bounds = player.getBounds();
+        if (bounds.left < this.BLAST_ZONE_LEFT ||
+            bounds.right > this.BLAST_ZONE_RIGHT ||
+            bounds.top < this.BLAST_ZONE_TOP ||
+            bounds.bottom > this.BLAST_ZONE_BOTTOM) {
+
+            // Score update (lives)
+            player.lives = Math.max(0, player.lives - 1);
+            console.log(`[Online] Local Player died. Lives: ${player.lives}`);
+
+            if (player.lives > 0) {
+                this.respawnPlayer(player);
+            } else {
+                this.killPlayer(player);
+                // We rely on the regular checkGameOver call to trigger the end
+            }
+        }
+    }
+
+    private respawnPlayer(player: Player): void {
+        // Respawn position
+        const spawnPoints = [
+            { x: 450, y: 300 },
+            { x: 1470, y: 300 },
+            { x: 960, y: 200 },
+            { x: 960, y: 400 }
+        ];
+        // Use local player ID for spawn point
+        const spawn = spawnPoints[this.localPlayerId] || { x: 960, y: 300 };
+
+        player.setPosition(spawn.x, 300);
+        player.physics.reset();
+        player.setState(PlayerState.AIRBORNE);
+        player.setDamage(0);
+        player.resetVisuals();
+
+        // Flash effect
+        const flash = this.add.graphics();
+        flash.fillStyle(0xffffff, 0.8);
+        flash.fillCircle(spawn.x, 300, 75);
+        if (this.uiCamera) this.uiCamera.ignore(flash);
+        this.tweens.add({
+            targets: flash,
+            alpha: 0,
+            scale: 2,
+            duration: 300,
+            onComplete: () => flash.destroy()
+        });
+    }
+
+    private killPlayer(player: Player): void {
+        console.log(`[Online] Player ${player.playerId} ELIMINATED!`);
+        player.setActive(false);
+        player.setVisible(false);
+        player.setPosition(-9999, -9999);
+        if (player.body) {
+            this.matter.world.remove(player.body);
+        }
+    }
+
+    private checkGameOver(): void {
+        if (this.isGameOver) return;
+
+        // Wait for setup (ensure we have >1 player or it is a test)
+        if (this.players.size < 2 && this.localFrame < 600) return; // Allow 10s for connections? Or just check if we ever had >1.
+        // Actually, if we are playing 1v1, we need 2 players.
+        // If opponent disconnects, player list size drops?
+        // NetworkManager player_left event? We haven't handled it in OnlineGameScene yet.
+        // Assuming players map retains leaving players?
+        // If opponent leaves, they should be eliminated?
+        // For now: Count survivors.
+
+        let survivorCount = 0;
+        let lastSurvivor: Player | null = null;
+
+        this.players.forEach(p => {
+            if (p.lives > 0) {
+                survivorCount++;
+                lastSurvivor = p;
+            }
+        });
+
+        // If game has started (we can use frame count or just if we have >= 2 players)
+        // Simple rule: If <= 1 survivor, Game Over.
+        if (survivorCount <= 1 && this.players.size >= 2) {
+            this.handleGameOver(lastSurvivor ? lastSurvivor.playerId : -1);
+        }
+    }
+
+    private handleGameOver(winnerId: number): void {
+        this.isGameOver = true;
+        this.hasVotedRematch = false;
+        console.log("GAME OVER! Winner:", winnerId);
+
+        const { width, height } = this.scale;
+
+        // Create container for game over UI
+        this.gameOverContainer = this.add.container(0, 0);
+        this.gameOverContainer.setDepth(2000);
+
+        // Darken background
+        const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
+        this.gameOverContainer.add(overlay);
+
+        let winnerText = "GAME!";
+        if (winnerId >= 0) {
+            winnerText += `\nPLAYER ${winnerId + 1} WINS!`;
+        } else {
+            winnerText += "\nGAME OVER";
+        }
+
+        const text = this.add.text(width / 2, height / 2 - 50, winnerText, {
+            fontSize: '64px',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            color: '#ffffff',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 8
+        }).setOrigin(0.5);
+        this.gameOverContainer.add(text);
+
+        // Rematch Button
+        this.rematchButton = this.add.text(width / 2 - 120, height / 2 + 80, 'REMATCH', {
+            fontSize: '32px',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            color: '#00ff00',
+            backgroundColor: '#333333',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        this.rematchButton.on('pointerdown', () => this.handleRematchVote());
+        this.rematchButton.on('pointerover', () => { this.selectedButtonIndex = 0; this.updateButtonSelection(); });
+        this.gameOverContainer.add(this.rematchButton);
+
+        // Leave Button
+        this.leaveButton = this.add.text(width / 2 + 120, height / 2 + 80, 'LEAVE', {
+            fontSize: '32px',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            color: '#ff4444',
+            backgroundColor: '#333333',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        this.leaveButton.on('pointerdown', () => this.handleLeave());
+        this.leaveButton.on('pointerover', () => { this.selectedButtonIndex = 1; this.updateButtonSelection(); });
+        this.gameOverContainer.add(this.leaveButton);
+
+        // Store buttons for navigation
+        this.menuButtons = [this.rematchButton, this.leaveButton];
+        this.selectedButtonIndex = 0;
+        this.updateButtonSelection();
+
+        // Setup keyboard/gamepad navigation
+        this.setupGameOverInput();
+
+        // Ignore container from main camera (UI camera only)
+        this.cameras.main.ignore(this.gameOverContainer);
+    }
+
+    private setupGameOverInput(): void {
+        // Keyboard navigation
+        this.input.keyboard?.on('keydown-LEFT', () => this.navigateMenu(-1));
+        this.input.keyboard?.on('keydown-RIGHT', () => this.navigateMenu(1));
+        this.input.keyboard?.on('keydown-A', () => this.navigateMenu(-1));
+        this.input.keyboard?.on('keydown-D', () => this.navigateMenu(1));
+        this.input.keyboard?.on('keydown-ENTER', () => this.confirmSelection());
+        this.input.keyboard?.on('keydown-SPACE', () => this.confirmSelection());
+
+        // Gamepad support (poll in update or use events)
+        // We'll poll gamepad in the isGameOver section of update()
+    }
+
+    private navigateMenu(direction: number): void {
+        if (!this.isGameOver || this.hasVotedRematch) return;
+        this.selectedButtonIndex = (this.selectedButtonIndex + direction + this.menuButtons.length) % this.menuButtons.length;
+        this.updateButtonSelection();
+    }
+
+    private updateButtonSelection(): void {
+        this.menuButtons.forEach((btn, idx) => {
+            if (idx === this.selectedButtonIndex) {
+                btn.setScale(1.1);
+                btn.setAlpha(1);
+                if (idx === 0 && !this.hasVotedRematch) {
+                    btn.setColor('#88ff88');
+                } else if (idx === 1) {
+                    btn.setColor('#ff8888');
+                }
+            } else {
+                btn.setScale(1);
+                btn.setAlpha(0.7);
+                if (idx === 0 && !this.hasVotedRematch) {
+                    btn.setColor('#00ff00');
+                } else if (idx === 1) {
+                    btn.setColor('#ff4444');
+                }
+            }
+        });
+    }
+
+    private confirmSelection(): void {
+        if (!this.isGameOver) return;
+        if (this.selectedButtonIndex === 0) {
+            this.handleRematchVote();
+        } else {
+            this.handleLeave();
+        }
+    }
+
+    private lastGamepadNavTime: number = 0;
+    private pollGamepadForMenu(): void {
+        const gamepads = navigator.getGamepads();
+        if (!gamepads) return;
+
+        const now = Date.now();
+        const NAV_COOLDOWN = 200; // ms between navigation inputs
+
+        for (const gamepad of gamepads) {
+            if (!gamepad) continue;
+
+            // D-pad or left stick for navigation
+            const leftStickX = gamepad.axes[0] || 0;
+            const dpadLeft = gamepad.buttons[14]?.pressed || false;
+            const dpadRight = gamepad.buttons[15]?.pressed || false;
+
+            if (now - this.lastGamepadNavTime > NAV_COOLDOWN) {
+                if (leftStickX < -0.5 || dpadLeft) {
+                    this.navigateMenu(-1);
+                    this.lastGamepadNavTime = now;
+                } else if (leftStickX > 0.5 || dpadRight) {
+                    this.navigateMenu(1);
+                    this.lastGamepadNavTime = now;
+                }
+            }
+
+            // A button (button 0) or Start (button 9) to confirm
+            const aButton = gamepad.buttons[0]?.pressed || false;
+            const startButton = gamepad.buttons[9]?.pressed || false;
+
+            if (aButton || startButton) {
+                if (now - this.lastGamepadNavTime > NAV_COOLDOWN) {
+                    this.confirmSelection();
+                    this.lastGamepadNavTime = now;
+                }
+            }
+        }
+    }
+
+    private handleRematchVote(): void {
+        if (this.hasVotedRematch) return;
+        this.hasVotedRematch = true;
+        console.log('[OnlineGame] Voting for rematch...');
+        this.networkManager.sendRematchVote();
+        this.rematchButton.setText('WAITING...');
+        this.rematchButton.setColor('#888888');
+        this.rematchButton.disableInteractive();
+    }
+
+    private handleLeave(): void {
+        console.log('[OnlineGame] Leaving match...');
+        this.networkManager.disconnect();
+        this.scene.start('MainMenuScene');
+    }
+
+    private handleRematchStart(): void {
+        console.log('[OnlineGame] Rematch starting! Resetting game...');
+
+        // Clear game over UI
+        if (this.gameOverContainer) {
+            this.gameOverContainer.destroy(true);
+        }
+
+        // Reset game state
+        this.isGameOver = false;
+        this.hasVotedRematch = false;
+        this.localFrame = 0;
+
+        // Reset all players
+        this.players.forEach((player, playerId) => {
+            player.setActive(true);
+            player.setVisible(true);
+            player.lives = 3;
+            player.setDamage(0);
             player.velocity.x = 0;
             player.velocity.y = 0;
-            player.respawn();
-            console.log(`[OnlineGame] Player ${player.playerId} respawned from blast zone`);
-        }
+
+            // Respawn position
+            const spawnPoints = [
+                { x: 600, y: 780 },
+                { x: 1200, y: 780 }
+            ];
+            const spawn = spawnPoints[playerId % 2] || spawnPoints[0];
+            player.setPosition(spawn.x, spawn.y);
+            player.physics.reset();
+            player.resetVisuals();
+        });
+
+        console.log('[OnlineGame] Rematch reset complete!');
     }
 
     private createPlayer(playerId: number, x: number, y: number): Player {

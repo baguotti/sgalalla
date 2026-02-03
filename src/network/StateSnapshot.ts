@@ -25,6 +25,7 @@ export interface PlayerSnapshot {
     animationKey?: string;
     isDodging: boolean;
     isInvincible: boolean;
+    lives: number;
 }
 
 // Full game state at a specific frame
