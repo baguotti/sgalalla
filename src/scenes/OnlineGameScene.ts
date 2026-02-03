@@ -15,6 +15,7 @@ import NetworkManager from '../network/NetworkManager';
 import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '../network/NetworkManager';
 import { InputManager } from '../input/InputManager';
 import type { GameSnapshot, PlayerSnapshot } from '../network/StateSnapshot';
+import { MatchHUD } from '../ui/PlayerHUD';
 
 export class OnlineGameScene extends Phaser.Scene {
     // Networking
@@ -36,6 +37,7 @@ export class OnlineGameScene extends Phaser.Scene {
     // UI
     private connectionStatusText!: Phaser.GameObjects.Text;
     private latencyText!: Phaser.GameObjects.Text;
+    private matchHUD!: MatchHUD;
 
     // Rollback netcode
     private localFrame: number = 0;
@@ -193,6 +195,9 @@ export class OnlineGameScene extends Phaser.Scene {
         this.createUI();
         this.setupEscapeKey();
 
+        // Create MatchHUD
+        this.matchHUD = new MatchHUD(this);
+
         // Start ping loop
         this.time.addEvent({
             delay: 1000,
@@ -272,6 +277,10 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Update latency display
         this.latencyText?.setText(`Ping: ${this.networkManager.getLatency()}ms | Frame: ${this.localFrame}`);
+
+        // Update MatchHUD
+        this.matchHUD.updatePlayers(this.players);
+        this.matchHUD.updateDebug(this.networkManager.getLatency(), this.game.loop.actualFps);
     }
 
     /**
@@ -299,6 +308,10 @@ export class OnlineGameScene extends Phaser.Scene {
                 if (netPlayer.playerId === this.localPlayerId) {
                     this.localPlayer = player;
                 }
+
+                // Add to HUD
+                const isLocal = netPlayer.playerId === this.localPlayerId;
+                this.matchHUD.addPlayer(netPlayer.playerId, `Player ${netPlayer.playerId + 1}`, isLocal);
             }
 
             // For local player: check for divergence and reconcile if needed

@@ -1,6 +1,10 @@
 import Phaser from 'phaser';
+import { Player } from '../entities/Player';
 
-export class PlayerHUD {
+/**
+ * HUD slot for a single player - displays portrait, damage, and stocks
+ */
+export class PlayerHudSlot {
     private container: Phaser.GameObjects.Container;
 
     private portraitPixels: Phaser.GameObjects.Sprite;
@@ -20,11 +24,7 @@ export class PlayerHUD {
         this.container.add(bgCircle);
 
         // 2. Portrait Sprite (Masked)
-        // Use a frame from the atlas or just a raw sprite.
-        // For now, scaling down the idle sprite to fit in circle.
-        this.portraitPixels = scene.add.sprite(0, 5, 'fok', '0_Fok_Idle_000.png'); // Updated to fok
-        // Fit within 80x80 area (circle diam 100)
-        // Sprite is 256x256 now. Scale = 80/256 = 0.3.
+        this.portraitPixels = scene.add.sprite(0, 5, 'fok', '0_Fok_Idle_000.png');
         const scale = 0.35;
         this.portraitPixels.setScale(scale);
 
@@ -64,7 +64,6 @@ export class PlayerHUD {
         this.container.add(this.damageText);
 
         // 5. Stocks (Bottom Left for P1, Bottom Right for P2)
-        // Icon
         this.stockIcon = scene.add.circle(-35 * flip, 35, 12, color);
         this.stockIcon.setStrokeStyle(2, 0xffffff);
         this.container.add(this.stockIcon);
@@ -83,37 +82,31 @@ export class PlayerHUD {
         this.damageText.setText(Math.floor(damage).toString());
         this.stocksText.setText(stocks.toString());
 
-        // Color code damage
         // Color code damage (Gradient)
         let colorObj: Phaser.Types.Display.ColorObject;
 
         if (damage < 50) {
-            // White to Vivid Yellow (0-50)
             colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
                 new Phaser.Display.Color(255, 255, 255),
-                new Phaser.Display.Color(255, 255, 80), // Vivid Yellow
+                new Phaser.Display.Color(255, 255, 80),
                 50,
                 damage
             );
         } else if (damage < 100) {
-            // Vivid Yellow to Vivid Orange (50-100)
             colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
                 new Phaser.Display.Color(255, 255, 80),
-                new Phaser.Display.Color(255, 160, 80), // Vivid Orange
+                new Phaser.Display.Color(255, 160, 80),
                 50,
                 damage - 50
             );
         } else if (damage < 150) {
-            // Vivid Orange to Vivid Red (100-150)
             colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
                 new Phaser.Display.Color(255, 160, 80),
-                new Phaser.Display.Color(255, 80, 80), // Vivid Red
+                new Phaser.Display.Color(255, 80, 80),
                 50,
                 damage - 100
             );
         } else {
-            // Cap at Vivid Red
-            // Cap at Vivid Red
             colorObj = { r: 255, g: 80, b: 80, a: 255, color: 0 };
         }
 
@@ -132,3 +125,142 @@ export class PlayerHUD {
         camera.ignore(this.container);
     }
 }
+
+// Player colors for HUD slots
+const PLAYER_COLORS = [0x4fc3f7, 0xff7043, 0x81c784, 0xba68c8]; // Light Blue, Orange, Green, Purple
+
+/**
+ * MatchHUD - Manages all player HUD slots + debug display
+ */
+export class MatchHUD {
+    private scene: Phaser.Scene;
+    private slots: Map<number, PlayerHudSlot> = new Map();
+
+    // Debug display
+    private debugContainer: Phaser.GameObjects.Container;
+    private pingText: Phaser.GameObjects.Text;
+    private fpsText: Phaser.GameObjects.Text;
+
+    constructor(scene: Phaser.Scene) {
+        this.scene = scene;
+
+        // Create debug display in top-right corner
+        const { width } = scene.cameras.main;
+        this.debugContainer = scene.add.container(width - 120, 20);
+        this.debugContainer.setScrollFactor(0);
+        this.debugContainer.setDepth(100);
+
+        // Background
+        const bg = scene.add.rectangle(0, 0, 100, 50, 0x000000, 0.6);
+        bg.setStrokeStyle(1, 0x444444);
+        this.debugContainer.add(bg);
+
+        // Ping text
+        this.pingText = scene.add.text(-40, -12, 'PING: --', {
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            color: '#00ff00'
+        });
+        this.debugContainer.add(this.pingText);
+
+        // FPS text
+        this.fpsText = scene.add.text(-40, 4, 'FPS: --', {
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            color: '#ffff00'
+        });
+        this.debugContainer.add(this.fpsText);
+    }
+
+    /**
+     * Add a player's HUD slot to the display
+     */
+    addPlayer(playerId: number, playerName: string, isLocalPlayer: boolean): void {
+        if (this.slots.has(playerId)) return;
+
+        // Calculate position based on slot index
+        const slotIndex = this.slots.size;
+        const positions = this.getSlotPositions();
+        const pos = positions[slotIndex % positions.length];
+
+        const color = PLAYER_COLORS[slotIndex % PLAYER_COLORS.length];
+        const displayName = isLocalPlayer ? `${playerName} (You)` : playerName;
+
+        const slot = new PlayerHudSlot(
+            this.scene,
+            pos.x,
+            pos.y,
+            pos.isLeft,
+            displayName,
+            color
+        );
+
+        this.slots.set(playerId, slot);
+    }
+
+    /**
+     * Get HUD slot positions for up to 4 players
+     */
+    private getSlotPositions(): { x: number, y: number, isLeft: boolean }[] {
+        const { width, height } = this.scene.cameras.main;
+        return [
+            { x: 100, y: 80, isLeft: true },       // Top-left (P1)
+            { x: width - 100, y: 80, isLeft: false }, // Top-right (P2)
+            { x: 100, y: height - 80, isLeft: true }, // Bottom-left (P3)
+            { x: width - 100, y: height - 80, isLeft: false } // Bottom-right (P4)
+        ];
+    }
+
+    /**
+     * Update all player HUD slots
+     */
+    updatePlayers(players: Map<number, Player>): void {
+        players.forEach((player, id) => {
+            const slot = this.slots.get(id);
+            if (slot) {
+                slot.update(player.damagePercent, player.lives);
+            }
+        });
+    }
+
+    /**
+     * Update debug display with network stats
+     */
+    updateDebug(ping: number, fps: number): void {
+        // Color ping based on quality
+        let pingColor = '#00ff00'; // Green (<50ms)
+        if (ping > 100) pingColor = '#ff0000'; // Red (>100ms)
+        else if (ping > 50) pingColor = '#ffff00'; // Yellow (50-100ms)
+
+        this.pingText.setText(`PING: ${ping}ms`);
+        this.pingText.setColor(pingColor);
+
+        // Color FPS based on performance
+        let fpsColor = '#00ff00'; // Green (>50fps)
+        if (fps < 30) fpsColor = '#ff0000'; // Red (<30fps)
+        else if (fps < 50) fpsColor = '#ffff00'; // Yellow (30-50fps)
+
+        this.fpsText.setText(`FPS: ${Math.round(fps)}`);
+        this.fpsText.setColor(fpsColor);
+    }
+
+    /**
+     * Remove a player's HUD slot
+     */
+    removePlayer(playerId: number): void {
+        const slot = this.slots.get(playerId);
+        if (slot) {
+            slot.destroy();
+            this.slots.delete(playerId);
+        }
+    }
+
+    destroy(): void {
+        this.slots.forEach(slot => slot.destroy());
+        this.slots.clear();
+        this.debugContainer.destroy();
+    }
+}
+
+// Re-export PlayerHudSlot as PlayerHUD for backwards compatibility with GameScene
+export { PlayerHudSlot as PlayerHUD };
