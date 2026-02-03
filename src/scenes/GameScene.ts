@@ -31,18 +31,18 @@ export class GameScene extends Phaser.Scene {
 
 
     // Wall configuration
-    private readonly WALL_THICKNESS = 45; // 30 * 1.5
-    private readonly WALL_LEFT_X = 150; // 100 * 1.5
-    private readonly WALL_RIGHT_X = 1770; // 1180 * 1.5
+    private readonly WALL_THICKNESS = 45;
+    private readonly WALL_LEFT_X = -200; // Moved way out
+    private readonly WALL_RIGHT_X = 2120; // 1920 + 200
     // Playable area bounds (inner edges of walls)
     private readonly PLAY_BOUND_LEFT = this.WALL_LEFT_X + this.WALL_THICKNESS / 2;
     private readonly PLAY_BOUND_RIGHT = this.WALL_RIGHT_X - this.WALL_THICKNESS / 2;
 
     // Blast zone boundaries
-    private readonly BLAST_ZONE_LEFT = -300; // -200 * 1.5
-    private readonly BLAST_ZONE_RIGHT = 2220; // 1480 * 1.5 (1920 + 300)
-    private readonly BLAST_ZONE_TOP = -300; // -200 * 1.5
-    private readonly BLAST_ZONE_BOTTOM = 1350; // 900 * 1.5
+    private readonly BLAST_ZONE_LEFT = -1000;
+    private readonly BLAST_ZONE_RIGHT = 3000;
+    private readonly BLAST_ZONE_TOP = -1000;
+    private readonly BLAST_ZONE_BOTTOM = 2000;
 
     private uiCamera!: Phaser.Cameras.Scene2D.Camera;
 
@@ -368,24 +368,24 @@ export class GameScene extends Phaser.Scene {
         this.background.fillRect(0, 0, this.scale.width, this.scale.height);
         this.background.setDepth(-10);
 
-        // Main platform (centered, wide - Brawlhalla style)
-        // At 1920x1080: center is x=960, place main platform lower at y=825 (550*1.5)
-        // Made lighter (0x2c3e50) to be visible against background
-        const mainPlatform = this.add.rectangle(960, 825, 1350, 45, 0x2c3e50); // 640->960, 550->825, 900->1350, 30->45
+        // Main platform (centered, wider - Brawlhaven style)
+        // Center: 960. Width 1800 (Fills most of screen). Y = 900 (Lower)
+        const mainPlatform = this.add.rectangle(960, 900, 1800, 60, 0x2c3e50);
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
         // Add Matter body for Bomb collision
         this.matter.add.gameObject(mainPlatform, { isStatic: true });
 
-        // Soft platform 1 (left, above main)
-        const softPlatform1 = this.add.rectangle(570, 600, 360, 24, 0x0f3460); // 380->570, 400->600, 240->360, 16->24
+        // Soft platform 1 (left, floating)
+        // Y delta ~280 (Jumpable). X offset ~500 from center
+        const softPlatform1 = this.add.rectangle(460, 620, 500, 30, 0x0f3460);
         softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform1.setAlpha(0.85);
         this.softPlatforms.push(softPlatform1);
         this.matter.add.gameObject(softPlatform1, { isStatic: true });
 
-        // Soft platform 2 (right, above main)
-        const softPlatform2 = this.add.rectangle(1350, 600, 360, 24, 0x0f3460); // 900->1350, 400->600
+        // Soft platform 2 (right, floating)
+        const softPlatform2 = this.add.rectangle(1460, 620, 500, 30, 0x0f3460);
         softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform2.setAlpha(0.85);
         this.softPlatforms.push(softPlatform2);

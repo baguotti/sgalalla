@@ -44,16 +44,16 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // Wall configuration (matching GameScene)
     private readonly WALL_THICKNESS = 45;
-    private readonly WALL_LEFT_X = 150;
-    private readonly WALL_RIGHT_X = 1770;
+    private readonly WALL_LEFT_X = -200; // Moved way out
+    private readonly WALL_RIGHT_X = 2120; // 1920 + 200
     private readonly PLAY_BOUND_LEFT = this.WALL_LEFT_X + this.WALL_THICKNESS / 2;
     private readonly PLAY_BOUND_RIGHT = this.WALL_RIGHT_X - this.WALL_THICKNESS / 2;
 
     // Blast zone boundaries (matching GameScene)
-    private readonly BLAST_ZONE_LEFT = -300;
-    private readonly BLAST_ZONE_RIGHT = 2220;
-    private readonly BLAST_ZONE_TOP = -300;
-    private readonly BLAST_ZONE_BOTTOM = 1350;
+    private readonly BLAST_ZONE_LEFT = -1000;
+    private readonly BLAST_ZONE_RIGHT = 3000;
+    private readonly BLAST_ZONE_TOP = -1000;
+    private readonly BLAST_ZONE_BOTTOM = 2000;
 
     constructor() {
         super({ key: 'OnlineGameScene' });
@@ -496,18 +496,21 @@ export class OnlineGameScene extends Phaser.Scene {
         rightWall.setAlpha(0.6);
         rightWall.setDepth(-5);
 
-        // Main platform (matching GameScene)
-        const mainPlatform = this.add.rectangle(960, 825, 1350, 45, 0x2c3e50);
+        // Main platform (centered, wider - Brawlhaven style)
+        // Center: 960. Width 1800. Y = 900
+        const mainPlatform = this.add.rectangle(960, 900, 1800, 60, 0x2c3e50);
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
 
-        // Soft platforms
-        const softPlatform1 = this.add.rectangle(570, 600, 360, 24, 0x0f3460);
+        // Soft platforms (floating)
+        // Left
+        const softPlatform1 = this.add.rectangle(460, 620, 500, 30, 0x0f3460);
         softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform1.setAlpha(0.85);
         this.softPlatforms.push(softPlatform1);
 
-        const softPlatform2 = this.add.rectangle(1350, 600, 360, 24, 0x0f3460);
+        // Right
+        const softPlatform2 = this.add.rectangle(1460, 620, 500, 30, 0x0f3460);
         softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform2.setAlpha(0.85);
         this.softPlatforms.push(softPlatform2);
