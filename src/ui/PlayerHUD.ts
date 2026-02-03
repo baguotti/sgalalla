@@ -30,6 +30,7 @@ export class PlayerHudSlot {
 
         // Mask
         const maskShape = scene.make.graphics({ x, y }, false);
+        maskShape.setScrollFactor(0); // Fix mask to screen
         maskShape.fillStyle(0xffffff);
         maskShape.fillCircle(0, 0, 48);
         const mask = maskShape.createGeometryMask();
@@ -172,6 +173,8 @@ export class MatchHUD {
         this.debugContainer.add(this.fpsText);
     }
 
+    private ignoredCameras: Phaser.Cameras.Scene2D.Camera[] = [];
+
     /**
      * Add a player's HUD slot to the display
      */
@@ -195,7 +198,24 @@ export class MatchHUD {
             color
         );
 
+        // Apply any existing camera ignores
+        this.ignoredCameras.forEach(cam => slot.addToCameraIgnore(cam));
+
         this.slots.set(playerId, slot);
+    }
+
+    // ... getSlotPositions ...
+
+    /**
+     * Exclude all HUD elements from a specific camera
+     * Also tracks this camera to exclude future slots
+     */
+    public addToCameraIgnore(camera: Phaser.Cameras.Scene2D.Camera): void {
+        if (!this.ignoredCameras.includes(camera)) {
+            this.ignoredCameras.push(camera);
+        }
+        camera.ignore(this.debugContainer);
+        this.slots.forEach(slot => slot.addToCameraIgnore(camera));
     }
 
     /**
@@ -257,10 +277,12 @@ export class MatchHUD {
 
     destroy(): void {
         this.slots.forEach(slot => slot.destroy());
-        this.slots.clear();
         this.debugContainer.destroy();
     }
+
+
 }
+
 
 // Re-export PlayerHudSlot as PlayerHUD for backwards compatibility with GameScene
 export { PlayerHudSlot as PlayerHUD };

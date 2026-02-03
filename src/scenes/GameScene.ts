@@ -51,7 +51,7 @@ export class GameScene extends Phaser.Scene {
     private readonly ZOOM_SETTINGS = {
         CLOSE: { padX: 100, padY: 100, minZoom: 0.8, maxZoom: 1.5 }, // Tightened padding for closer view
         NORMAL: { padX: 375, padY: 300, minZoom: 0.6, maxZoom: 1.1 },
-        WIDE: { padX: 600, padY: 450, minZoom: 0.4, maxZoom: 0.8 }
+        WIDE: { padX: 600, padY: 450, minZoom: 0.3, maxZoom: 0.8 }
     };
 
     // Pause menu
@@ -376,42 +376,44 @@ export class GameScene extends Phaser.Scene {
         // Add Matter body for Bomb collision
         this.matter.add.gameObject(mainPlatform, { isStatic: true });
 
-        // Soft platform 1 (left, floating)
-        // Y delta ~280 (Jumpable). X offset ~500 from center
-        const softPlatform1 = this.add.rectangle(460, 620, 500, 30, 0x0f3460);
+        // Soft platform 1 (left, floating HIGHER)
+        // Y 900 - 500 = 400px difference. Jump height ~280px. Needs double jump.
+        const softPlatform1 = this.add.rectangle(460, 500, 500, 30, 0x0f3460);
         softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform1.setAlpha(0.85);
         this.softPlatforms.push(softPlatform1);
         this.matter.add.gameObject(softPlatform1, { isStatic: true });
 
-        // Soft platform 2 (right, floating)
-        const softPlatform2 = this.add.rectangle(1460, 620, 500, 30, 0x0f3460);
+        // Soft platform 2 (right, floating HIGHER)
+        const softPlatform2 = this.add.rectangle(1460, 500, 500, 30, 0x0f3460);
         softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform2.setAlpha(0.85);
         this.softPlatforms.push(softPlatform2);
         this.matter.add.gameObject(softPlatform2, { isStatic: true });
 
-        // VISIBLE SIDE WALLS for wall mechanics testing
-        this.walls = [];
-        // Left wall
-        const leftWall = this.add.rectangle(this.WALL_LEFT_X, 540, this.WALL_THICKNESS, 1080, 0x2a3a4e); // 360->540, 720->1080
-        leftWall.setStrokeStyle(4, 0x4a6a8e);
-        leftWall.setAlpha(0.6);
-        leftWall.setDepth(-5);
-        this.walls.push(leftWall);
-        this.matter.add.gameObject(leftWall, { isStatic: true });
+        // Camera Zoom
+        this.cameras.main.setZoom(1);
+        this.cameras.main.centerOn(960, 540);
 
-        // Right wall
-        const rightWall = this.add.rectangle(this.WALL_RIGHT_X, 540, this.WALL_THICKNESS, 1080, 0x2a3a4e);
-        rightWall.setStrokeStyle(4, 0x4a6a8e);
-        rightWall.setAlpha(0.6);
-        rightWall.setDepth(-5);
-        this.walls.push(rightWall);
-        this.matter.add.gameObject(rightWall, { isStatic: true });
+        // VISIBLE SIDE WALLS
+        const wallColor = 0x2a3a4e;
+        const wallStroke = 0x4a6a8e;
+
+        // Left wall visual
+        const leftWallVisual = this.add.rectangle(this.WALL_LEFT_X, 540, this.WALL_THICKNESS, 1080, wallColor);
+        leftWallVisual.setStrokeStyle(4, wallStroke);
+        leftWallVisual.setAlpha(0.6);
+        leftWallVisual.setDepth(-5);
+
+        // Right wall visual
+        const rightWallVisual = this.add.rectangle(this.WALL_RIGHT_X, 540, this.WALL_THICKNESS, 1080, wallColor);
+        rightWallVisual.setStrokeStyle(4, wallStroke);
+        rightWallVisual.setAlpha(0.6);
+        rightWallVisual.setDepth(-5);
 
         // Add wall indicators (text labels)
-        const leftWallText = this.add.text(this.WALL_LEFT_X - 12, 375, 'WALL', { // -8->-12, 250->375
-            fontSize: '18px', // 12->18
+        const leftWallText = this.add.text(this.WALL_LEFT_X - 12, 375, 'WALL', {
+            fontSize: '18px',
             color: '#8ab4f8',
             fontFamily: 'Arial',
             fontStyle: 'bold'
@@ -421,7 +423,7 @@ export class GameScene extends Phaser.Scene {
         leftWallText.setDepth(-4);
         this.wallTexts.push(leftWallText);
 
-        const rightWallText = this.add.text(this.WALL_RIGHT_X + 12, 525, 'WALL', { // +8->+12, 350->525
+        const rightWallText = this.add.text(this.WALL_RIGHT_X + 12, 525, 'WALL', {
             fontSize: '18px',
             color: '#8ab4f8',
             fontFamily: 'Arial',

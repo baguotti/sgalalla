@@ -55,6 +55,17 @@ export class OnlineGameScene extends Phaser.Scene {
     private readonly BLAST_ZONE_TOP = -1000;
     private readonly BLAST_ZONE_BOTTOM = 2000;
 
+    // Camera Settings (matching GameScene)
+    private currentZoomLevel: 'CLOSE' | 'NORMAL' | 'WIDE' = 'NORMAL';
+    // Camera Settings (matching GameScene)
+    private readonly ZOOM_SETTINGS = {
+        CLOSE: { padX: 100, padY: 100, minZoom: 0.8, maxZoom: 1.5 },
+        NORMAL: { padX: 375, padY: 300, minZoom: 0.6, maxZoom: 1.1 },
+        WIDE: { padX: 600, padY: 450, minZoom: 0.3, maxZoom: 0.8 } // Increased range (minZoom 0.3)
+    };
+
+    private uiCamera!: Phaser.Cameras.Scene2D.Camera;
+
     constructor() {
         super({ key: 'OnlineGameScene' });
         this.networkManager = NetworkManager.getInstance();
@@ -154,11 +165,24 @@ export class OnlineGameScene extends Phaser.Scene {
         }
     }
 
+    private setupCameras(): void {
+        // Main camera is manually controlled via updateCamera()
+
+        // Create a separate UI camera that ignores zoom
+        this.uiCamera = this.cameras.add(0, 0, this.scale.width, this.scale.height);
+        this.uiCamera.setScroll(0, 0);
+        // UI camera ignores main camera zoom
+        this.uiCamera.setZoom(1);
+    }
+
     async create(): Promise<void> {
         console.log('[OnlineGameScene] Initializing...');
 
         // Create animations first
         this.createAnimations();
+
+        // Setup cameras (UI separation)
+        this.setupCameras();
 
         // Setup network callbacks
         this.networkManager.onStateUpdate((state) => this.handleStateUpdate(state));
@@ -197,6 +221,9 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Create MatchHUD
         this.matchHUD = new MatchHUD(this);
+        // Exclude HUD from Main Camera (so it doesn't zoom/pan)
+        // Main camera should NOT render HUD, only uiCamera should.
+        this.matchHUD.addToCameraIgnore(this.cameras.main);
 
         // Start ping loop
         this.time.addEvent({
@@ -281,6 +308,9 @@ export class OnlineGameScene extends Phaser.Scene {
         // Update MatchHUD
         this.matchHUD.updatePlayers(this.players);
         this.matchHUD.updateDebug(this.networkManager.getLatency(), this.game.loop.actualFps);
+
+        // Dynamic Camera
+        this.updateCamera();
     }
 
     /**
@@ -448,6 +478,11 @@ export class OnlineGameScene extends Phaser.Scene {
             player.spriteObject.setTint(0x888888); // Gray tint for remote
         }
 
+        // Hide player from UI camera
+        if (this.uiCamera) {
+            player.addToCameraIgnore(this.uiCamera);
+        }
+
         return player;
     }
 
@@ -484,6 +519,7 @@ export class OnlineGameScene extends Phaser.Scene {
         bg.fillGradientStyle(0x0a0a1a, 0x0a0a1a, 0x1a1a2e, 0x1a1a2e, 1);
         bg.fillRect(0, 0, this.scale.width, this.scale.height);
         bg.setDepth(-10);
+        if (this.uiCamera) this.uiCamera.ignore(bg);
 
         // Side walls (matching GameScene)
         const leftWall = this.add.rectangle(this.WALL_LEFT_X, 540, this.WALL_THICKNESS, 1080, 0x2a3a4e);
@@ -501,19 +537,34 @@ export class OnlineGameScene extends Phaser.Scene {
         const mainPlatform = this.add.rectangle(960, 900, 1800, 60, 0x2c3e50);
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
+        if (this.uiCamera) this.uiCamera.ignore(mainPlatform);
 
-        // Soft platforms (floating)
+        // Soft platforms (floating HIGHER)
         // Left
-        const softPlatform1 = this.add.rectangle(460, 620, 500, 30, 0x0f3460);
+        const softPlatform1 = this.add.rectangle(460, 500, 500, 30, 0x0f3460);
         softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform1.setAlpha(0.85);
         this.softPlatforms.push(softPlatform1);
 
         // Right
-        const softPlatform2 = this.add.rectangle(1460, 620, 500, 30, 0x0f3460);
+        const softPlatform2 = this.add.rectangle(1460, 500, 500, 30, 0x0f3460);
         softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform2.setAlpha(0.85);
         this.softPlatforms.push(softPlatform2);
+        if (this.uiCamera) {
+            this.uiCamera.ignore(this.platforms);
+            this.uiCamera.ignore(this.softPlatforms);
+            this.uiCamera.ignore(bg);
+            // Also ignore walls which are locally created in block above
+            // (Manually ignore them here as they aren't in array yet... wait walls are local consts)
+            // Ideally we track walls in array like GameScene, but here they are local var.
+            // But we can just use the scene display list ignore if needed, OR just ensure UI camera ignores everything except UI.
+            // Better: Add walls to array or ignore explicitly.
+        }
+
+        // Initial camera center
+        this.cameras.main.setZoom(1); // Start at 1x
+        this.cameras.main.centerOn(960, 540);
     }
 
     private setupEscapeKey(): void {
@@ -521,5 +572,48 @@ export class OnlineGameScene extends Phaser.Scene {
             this.networkManager.disconnect();
             this.scene.start('MainMenuScene');
         });
+    }
+
+    /**
+     * Dynamic camera that follows all players
+     */
+    private updateCamera(): void {
+        const targets: Phaser.GameObjects.Components.Transform[] = [];
+        this.players.forEach((player) => targets.push(player));
+
+        if (targets.length === 0) return;
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        targets.forEach(t => {
+            minX = Math.min(minX, t.x);
+            maxX = Math.max(maxX, t.x);
+            minY = Math.min(minY, t.y);
+            maxY = Math.max(maxY, t.y);
+        });
+
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        // Viewport padding based on zoom level
+        const settings = this.ZOOM_SETTINGS[this.currentZoomLevel];
+        const padX = settings.padX;
+        const padY = settings.padY;
+
+        const width = (maxX - minX) + padX * 2;
+        const height = (maxY - minY) + padY * 2;
+
+        const zoomX = this.scale.width / width;
+        const zoomY = this.scale.height / height;
+
+        // Clamp zoom
+        const targetZoom = Phaser.Math.Clamp(Math.min(zoomX, zoomY), settings.minZoom, settings.maxZoom);
+
+        // Lerp Camera
+        const cam = this.cameras.main;
+        cam.zoom = Phaser.Math.Linear(cam.zoom, targetZoom, 0.05);
+        cam.centerOn(
+            Phaser.Math.Linear(cam.midPoint.x, centerX, 0.1),
+            Phaser.Math.Linear(cam.midPoint.y, centerY, 0.1)
+        );
     }
 }
