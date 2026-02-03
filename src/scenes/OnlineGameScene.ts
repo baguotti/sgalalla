@@ -64,66 +64,50 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private loadCharacterAssets(): void {
-        // Multi-frame animations
-        const multiFrameAssets = [
-            { key: 'idle', folder: 'Idle', count: 19, prefix: '0_Fok_Idle_' },
-            { key: 'run', folder: 'Running', count: 12, prefix: '0_Fok_Running_' },
-            { key: 'charging', folder: 'Charging', count: 8, prefix: '0_Fok_Charging_' }
-        ];
-
-        multiFrameAssets.forEach(asset => {
-            for (let i = 0; i < asset.count; i++) {
-                const num = i.toString().padStart(3, '0');
-                const key = `fok_${asset.key}_${i}`;
-                const path = `assets/fok/${asset.folder}/${asset.prefix}${num}.png`;
-                this.load.image(key, path);
-            }
-        });
-
-        // Single-frame animations (exact filename)
-        const singleFrameAssets = [
-            { key: 'attack_light', folder: 'AttackLight', filename: '0_Fok_AttackLight_000.png' },
-            { key: 'attack_heavy', folder: 'AttackHeavy', filename: '0_Fok_AttackHeavy_000.png' },
-            { key: 'attack_up', folder: 'Attack_Up', filename: '0_Fok_AttackUp_001.png' },
-            { key: 'attack_down', folder: 'Down_Sig', filename: '0_Fok_DownSig_001.png' },
-            { key: 'attack_side', folder: 'Side_Sig', filename: '0_Fok_SideSig_001.png' },
-            { key: 'hurt', folder: 'Hurt', filename: '0_Fok_Hurt_001.png' },
-            { key: 'ground_pound', folder: 'Ground Pound', filename: '0_Fok_Gpound_001.png' },
-            { key: 'fall', folder: 'Falling Down', filename: '0_Fok_Falling_001.png' },
-            { key: 'jump', folder: 'Jump Loop', filename: '0_Fok_Jump_000.png' },
-            { key: 'slide', folder: 'Sliding', filename: '0_Fok_Sliding_000.png' }
-        ];
-
-        singleFrameAssets.forEach(asset => {
-            const key = `fok_${asset.key}_0`;
-            const path = `assets/fok/${asset.folder}/${asset.filename}`;
-            this.load.image(key, path);
-        });
+        this.load.atlas('fok', 'assets/fok/fok_sprites/fok.png', 'assets/fok/fok_sprites/fok.json');
     }
 
     private createAnimations(): void {
         const fokAnims = [
-            { key: 'idle', count: 19, loop: true },
-            { key: 'run', count: 12, loop: true },
-            { key: 'jump', count: 1, loop: true },
-            { key: 'fall', count: 1, loop: true },
-            { key: 'hurt', count: 1, loop: false },
-            { key: 'ground_pound', count: 1, loop: true },
-            { key: 'slide', count: 1, loop: true },
-            { key: 'charging', count: 8, loop: true },
-            { key: 'attack_light', count: 1, loop: false },
-            { key: 'attack_up', count: 1, loop: false },
-            { key: 'attack_down', count: 1, loop: false },
-            { key: 'attack_side', count: 1, loop: false }
+            { key: 'idle', prefix: '0_Fok_Idle_', count: 19, loop: true },
+            { key: 'run', prefix: '0_Fok_Running_', count: 12, loop: true },
+            { key: 'charging', prefix: '0_Fok_Charging_', count: 8, loop: true },
+            // Single frame animations (but defined as animations for consistency)
+            { key: 'attack_light', prefix: '0_Fok_AttackLight_', count: 1, suffix: '000', loop: false },
+            { key: 'attack_heavy', prefix: '0_Fok_AttackHeavy_', count: 1, suffix: '000', loop: false },
+            { key: 'attack_up', prefix: '0_Fok_AttackUp_', count: 1, suffix: '001', loop: false },
+            { key: 'attack_down', prefix: '0_Fok_DownSig_', count: 1, suffix: '001', loop: false },
+            { key: 'attack_side', prefix: '0_Fok_SideSig_', count: 1, suffix: '001', loop: false },
+            { key: 'hurt', prefix: '0_Fok_Hurt_', count: 1, suffix: '001', loop: false },
+            { key: 'ground_pound', prefix: '0_Fok_Gpound_', count: 1, suffix: '001', loop: false },
+            { key: 'fall', prefix: '0_Fok_Falling_', count: 1, suffix: '001', loop: false },
+            { key: 'jump', prefix: '0_Fok_Jump_', count: 1, suffix: '000', loop: false },
+            { key: 'slide', prefix: '0_Fok_Sliding_', count: 1, suffix: '000', loop: false }
         ];
 
         fokAnims.forEach(anim => {
             // Skip if already exists
             if (this.anims.exists(`fok_${anim.key}`)) return;
 
-            const frames = [];
-            for (let i = 0; i < anim.count; i++) {
-                frames.push({ key: `fok_${anim.key}_${i}` });
+            let frames;
+            if (anim.count === 1 && anim.suffix) {
+                // Manual single frame with specific suffix
+                frames = this.anims.generateFrameNames('fok', {
+                    prefix: anim.prefix,
+                    suffix: '.png',
+                    start: parseInt(anim.suffix),
+                    end: parseInt(anim.suffix),
+                    zeroPad: 3
+                });
+            } else {
+                // Sequence
+                frames = this.anims.generateFrameNames('fok', {
+                    prefix: anim.prefix,
+                    suffix: '.png',
+                    start: 0,
+                    end: anim.count - 1,
+                    zeroPad: 3
+                });
             }
 
             this.anims.create({
@@ -134,12 +118,11 @@ export class OnlineGameScene extends Phaser.Scene {
             });
         });
 
-        // Additional animation mappings (matching GameScene)
-        // Fok Light Attack variants (for directional attacks)
+        // Additional animation mappings
         if (!this.anims.exists('fok_attack_light_0')) {
             this.anims.create({
                 key: 'fok_attack_light_0',
-                frames: [{ key: 'fok_attack_light_0' }],
+                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_AttackLight_', suffix: '.png', start: 0, end: 0, zeroPad: 3 }),
                 frameRate: 10,
                 repeat: 0
             });
@@ -147,28 +130,25 @@ export class OnlineGameScene extends Phaser.Scene {
         if (!this.anims.exists('fok_attack_light_1')) {
             this.anims.create({
                 key: 'fok_attack_light_1',
-                frames: [{ key: 'fok_attack_light_0' }],
+                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_AttackLight_', suffix: '.png', start: 0, end: 0, zeroPad: 3 }),
                 frameRate: 10,
                 repeat: 0
             });
         }
-
-        // Dodge animation (uses slide frame)
         if (!this.anims.exists('fok_dodge')) {
             this.anims.create({
                 key: 'fok_dodge',
-                frames: [{ key: 'fok_slide_0' }],
+                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_Sliding_', suffix: '.png', start: 0, end: 0, zeroPad: 3 }),
                 frameRate: 10,
                 repeat: 0
             });
         }
-
-        // Heavy attack
-        if (!this.anims.exists('fok_attack_heavy')) {
+        if (!this.anims.exists('fok_jump_start')) {
+            // Fallback to jump loop if start doesn't exist
             this.anims.create({
-                key: 'fok_attack_heavy',
-                frames: [{ key: 'fok_attack_heavy_0' }],
-                frameRate: 1,
+                key: 'fok_jump_start',
+                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_Jump_', suffix: '.png', start: 0, end: 0, zeroPad: 3 }),
+                frameRate: 10,
                 repeat: 0
             });
         }

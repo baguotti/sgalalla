@@ -173,7 +173,7 @@ export class Player extends Fighter {
         this.animPrefix = this.character;
 
         // Create player sprite
-        this.sprite = scene.add.sprite(0, 0, 'fok_idle_0'); // Adjusted offset (0) to ground sprite
+        this.sprite = scene.add.sprite(0, 0, 'fok', '0_Fok_Idle_000.png'); // Adjusted offset (0) to ground sprite
 
         // Auto-scale to fit hitbox height (90px)
         const targetHeight = PhysicsConfig.PLAYER_HEIGHT;

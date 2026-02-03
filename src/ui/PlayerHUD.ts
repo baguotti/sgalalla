@@ -22,7 +22,7 @@ export class PlayerHUD {
         // 2. Portrait Sprite (Masked)
         // Use a frame from the atlas or just a raw sprite.
         // For now, scaling down the idle sprite to fit in circle.
-        this.portraitPixels = scene.add.sprite(0, 5, 'fok_idle_0'); // Updated to fok
+        this.portraitPixels = scene.add.sprite(0, 5, 'fok', '0_Fok_Idle_000.png'); // Updated to fok
         // Fit within 80x80 area (circle diam 100)
         // Sprite is 256x256 now. Scale = 80/256 = 0.3.
         const scale = 0.35;
@@ -113,7 +113,7 @@ export class PlayerHUD {
             );
         } else {
             // Cap at Vivid Red
-            colorObj = { r: 255, g: 80, b: 80, a: 255 };
+            colorObj = new Phaser.Display.Color(255, 80, 80);
         }
 
         const colorHex = '#' +
