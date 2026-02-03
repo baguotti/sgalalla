@@ -505,6 +505,16 @@ export class Player extends Fighter {
 
     private playAnim(key: string, ignoreIfPlaying: boolean = true): void {
         let fullKey = `${this.animPrefix}_${key}`;
+
+        // Debug: Check if animation exists
+        const animExists = this.scene.anims.exists(fullKey);
+        if (!animExists) {
+            console.warn(`[Player ${this.playerId}] Animation '${fullKey}' does not exist!`);
+            console.log(`[Player ${this.playerId}] Available animations:`, this.scene.anims.anims.entries.keys());
+        } else {
+            console.log(`[Player ${this.playerId}] Playing animation '${fullKey}'`);
+        }
+
         this.sprite.anims.play(fullKey, ignoreIfPlaying);
 
         // Apply custom offsets for misaligned sprites
