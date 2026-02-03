@@ -113,7 +113,8 @@ export class PlayerHUD {
             );
         } else {
             // Cap at Vivid Red
-            colorObj = new Phaser.Display.Color(255, 80, 80);
+            // Cap at Vivid Red
+            colorObj = { r: 255, g: 80, b: 80, a: 255, color: 0 };
         }
 
         const colorHex = '#' +

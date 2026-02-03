@@ -98,7 +98,6 @@ export class GameScene extends Phaser.Scene {
                 // Manual single frame with specific suffix
                 frames = this.anims.generateFrameNames('fok', {
                     prefix: anim.prefix,
-                    suffix: '.png',
                     start: parseInt(anim.suffix),
                     end: parseInt(anim.suffix),
                     zeroPad: 3
@@ -107,7 +106,6 @@ export class GameScene extends Phaser.Scene {
                 // Sequence
                 frames = this.anims.generateFrameNames('fok', {
                     prefix: anim.prefix,
-                    suffix: '.png',
                     start: 0,
                     end: anim.count - 1,
                     zeroPad: 3
@@ -126,7 +124,7 @@ export class GameScene extends Phaser.Scene {
         if (!this.anims.exists('fok_attack_light_0')) {
             this.anims.create({
                 key: 'fok_attack_light_0',
-                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_AttackLight_', suffix: '.png', start: 0, end: 0, zeroPad: 3 }),
+                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
                 frameRate: 10,
                 repeat: 0
             });
@@ -134,7 +132,7 @@ export class GameScene extends Phaser.Scene {
         if (!this.anims.exists('fok_attack_light_1')) {
             this.anims.create({
                 key: 'fok_attack_light_1',
-                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_AttackLight_', suffix: '.png', start: 0, end: 0, zeroPad: 3 }),
+                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
                 frameRate: 10,
                 repeat: 0
             });
@@ -142,7 +140,7 @@ export class GameScene extends Phaser.Scene {
         if (!this.anims.exists('fok_dodge')) {
             this.anims.create({
                 key: 'fok_dodge',
-                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_Sliding_', suffix: '.png', start: 0, end: 0, zeroPad: 3 }),
+                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_Sliding_', start: 0, end: 0, zeroPad: 3 }),
                 frameRate: 10,
                 repeat: 0
             });
@@ -151,7 +149,7 @@ export class GameScene extends Phaser.Scene {
             // Fallback to jump loop if start doesn't exist
             this.anims.create({
                 key: 'fok_jump_start',
-                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_Jump_', suffix: '.png', start: 0, end: 0, zeroPad: 3 }),
+                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_Jump_', start: 0, end: 0, zeroPad: 3 }),
                 frameRate: 10,
                 repeat: 0
             });
