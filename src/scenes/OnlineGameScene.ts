@@ -450,8 +450,9 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Sync Damage
         // Only update if changed to avoid unnecessary visual updates
+        // Sync Damage
+        // Only update if changed to avoid unnecessary visual updates
         if (player.damagePercent !== netState.damagePercent) {
-            console.log(`[Sync] Player ${player.playerId} damage sync: ${player.damagePercent} -> ${netState.damagePercent}`);
             player.setDamage(netState.damagePercent);
         }
 
