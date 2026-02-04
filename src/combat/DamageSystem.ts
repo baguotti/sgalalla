@@ -5,6 +5,7 @@ export interface Damageable {
     damagePercent: number;
     setKnockback(x: number, y: number): void;
     applyHitStun(): void;
+    takeDamage(amount: number): void;
 }
 
 export class DamageSystem {
@@ -53,10 +54,8 @@ export class DamageSystem {
         damage: number,
         knockbackVector: Phaser.Math.Vector2
     ): void {
-        victim.damagePercent = Math.min(
-            victim.damagePercent + damage,
-            PhysicsConfig.MAX_DAMAGE
-        );
+        // Use method to allow overrides (e.g. for remote players)
+        victim.takeDamage(damage);
 
         victim.setKnockback(knockbackVector.x, knockbackVector.y);
         victim.applyHitStun();

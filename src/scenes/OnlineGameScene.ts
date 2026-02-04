@@ -431,8 +431,9 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Snap threshold - if very close, just snap
         const snapThreshold = 3;
+        const TELEPORT_THRESHOLD = 500;
 
-        if (distance < snapThreshold) {
+        if (distance < snapThreshold || distance > TELEPORT_THRESHOLD) {
             player.x = netState.x;
             player.y = netState.y;
         } else {
@@ -446,6 +447,13 @@ export class OnlineGameScene extends Phaser.Scene {
         player.isAttacking = netState.isAttacking;
         player.animationKey = netState.animationKey || '';
         player.setFacingDirection(netState.facingDirection);
+
+        // Sync Damage
+        // Only update if changed to avoid unnecessary visual updates
+        if (player.damagePercent !== netState.damagePercent) {
+            console.log(`[Sync] Player ${player.playerId} damage sync: ${player.damagePercent} -> ${netState.damagePercent}`);
+            player.setDamage(netState.damagePercent);
+        }
 
         // Debug: Log state changes
         if (netState.animationKey && netState.animationKey !== 'idle' && netState.animationKey !== 'run') {
@@ -794,6 +802,16 @@ export class OnlineGameScene extends Phaser.Scene {
         // Visual distinction for remote players
         if (!isLocal) {
             player.spriteObject.setTint(0x888888); // Gray tint for remote
+
+            // CRITICAL FIX: Override takeDamage for remote players
+            // Remote players should ONLY update damage from server state (interpolatePlayer)
+            // Local hits on remote players should visual flash, but NOT update damage property
+            player.takeDamage = (amount: number) => {
+                // Calculate what damage would be for Visual Flash only
+                const estimatedDamage = player.damagePercent + amount;
+                player.flashDamageColor(estimatedDamage);
+                console.log(`[RemotePlayer] Visual Hit Flash (Damage not applied locally)`);
+            };
         }
 
         // Hide player from UI camera

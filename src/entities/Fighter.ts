@@ -40,6 +40,13 @@ export abstract class Fighter extends Phaser.GameObjects.Container implements Da
     }
 
     /**
+     * Apply damage
+     */
+    public takeDamage(amount: number): void {
+        this.damagePercent = Math.min(this.damagePercent + amount, PhysicsConfig.MAX_DAMAGE);
+    }
+
+    /**
      * Optional hook for subclasses to handle hit stun visuals
      */
     protected onHitStun(): void { }
