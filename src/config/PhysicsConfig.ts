@@ -4,20 +4,22 @@
  */
 export const PhysicsConfig = {
   // Gravity - high value for fast, heavy feel (like Brawlhalla)
-  GRAVITY: 6400, // Reduced from 7500
+  GRAVITY: 5600, // Balanced middle-ground (was 4800, original 6400)
 
   // Movement - acceleration-based for responsive feel with slight slide
   MOVE_ACCEL: 6500, // Reduced from 8000
   FRICTION: 0.85,
   RUN_FRICTION: 0.93,
+  SLIDE_ATTACK_SPEED: 1200,
+  SLIDE_ATTACK_DECELERATION: 0.9,
   MAX_SPEED: 1400, // Reduced from 1600
   MAX_FALL_SPEED: 2600, // Reduced from 3000
 
   // Jump mechanics
-  JUMP_FORCE: -1900, // Reduced from -2100 (Target ~280px height)
+  JUMP_FORCE: -2150, // Balanced middle-ground (was -2400)
   SHORT_HOP_FORCE: -1100, // Reduced from -1200
   JUMP_HOLD_THRESHOLD: 150,
-  DOUBLE_JUMP_FORCE: -1750, // Reduced from -1950
+  DOUBLE_JUMP_FORCE: -1950, // Balanced middle-ground (was -2200)
   MAX_JUMPS: 3,
 
   // Fast-fall
@@ -25,7 +27,7 @@ export const PhysicsConfig = {
   FAST_FALL_THRESHOLD: 300,
 
   // Recovery attack
-  RECOVERY_FORCE_Y: -2100, // Reduced from -2400
+  RECOVERY_FORCE_Y: -2450, // Fine-tuned (was -2800, original -2100)
   RECOVERY_FORCE_X: 550, // Reduced from 600
   RECOVERY_COOLDOWN: 1000,
   RECOVERY_DURATION: 300,

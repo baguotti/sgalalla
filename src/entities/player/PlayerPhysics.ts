@@ -524,7 +524,8 @@ export class PlayerPhysics {
                 return;
             }
             if (this.player.velocity.y < 0) return;
-            if (playerBounds.bottom > platBounds.top + 10) {
+            // FIX: Increased threshold from 10 to 45 to catch high-speed fallers (Max Fall Speed ~43px/frame)
+            if (playerBounds.bottom > platBounds.top + 45) {
                 return;
             }
         }

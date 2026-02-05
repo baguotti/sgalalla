@@ -82,14 +82,14 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         damage: 4,
         knockback: 470, // Reduced from 520
-        knockbackAngle: 80,
+        knockbackAngle: 30, // Changed from 80 (Now sends forward like side light)
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES + 30,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES + 50,
-        hitboxWidth: 50,
-        hitboxHeight: 30,
+        hitboxWidth: 90, // Wider for slide (was 50)
+        hitboxHeight: 25, // Flatter (was 30)
         hitboxOffsetX: 30,
-        hitboxOffsetY: 35,
+        hitboxOffsetY: 65, // Lower to feet (was 35)
     },
     'light_up_grounded': {
         type: AttackType.LIGHT,

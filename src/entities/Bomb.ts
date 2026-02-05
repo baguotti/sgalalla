@@ -8,8 +8,8 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
     private graceTimer: number = 0;
     constructor(scene: Phaser.Scene, x: number, y: number) {
         // Create a temporary texture if it doesn't exist
-        const textureKey = 'bomb_v5';
-        const radius = 15;
+        const textureKey = 'bomb_v6'; // New texture key to force regenerate
+        const radius = 30; // Doubled from 15
         const diameter = radius * 2;
 
         if (!scene.textures.exists(textureKey)) {
@@ -74,7 +74,7 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         this.isExploded = true;
 
         // Visual effect: single small yellow circle
-        const visualRadius = 30;
+        const visualRadius = 60; // Doubled from 30
         const explosionGraphics = this.scene.add.graphics();
         explosionGraphics.fillStyle(0xffff00, 1);
         explosionGraphics.fillCircle(this.x, this.y, visualRadius);
@@ -93,7 +93,7 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         });
 
         // Damage nearby players (blast radius for logic remains 80 or similar)
-        const blastRadius = 80;
+        const blastRadius = 160; // Doubled from 80
 
         // Damage nearby players
         const players = (this.scene as any).players as any[];
@@ -158,7 +158,7 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
                     if (this.graceTimer > 0 && player === this.thrower) continue;
 
                     const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
-                    if (dist < 45) { // Contact threshold
+                    if (dist < 90) { // Contact threshold doubled (45 -> 90)
                         this.explode();
                         return;
                     }

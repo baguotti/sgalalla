@@ -228,6 +228,11 @@ export class PlayerCombat {
             if (this.player.onAttack) {
                 this.player.onAttack(attackKey, facing);
             }
+
+            // SLIDE ATTACK LOGIC
+            if (attackKey === 'light_down_grounded') {
+                this.player.velocity.x = facing * PhysicsConfig.SLIDE_ATTACK_SPEED;
+            }
         } catch (e) {
             console.warn('Unknown attack:', attackKey);
         }
@@ -436,6 +441,13 @@ export class PlayerCombat {
 
         if (attackComplete) {
             this.endAttack();
+        } else {
+            // Apply Drag for Slide Attack
+            if (this.currentAttack.data.type === AttackType.LIGHT &&
+                this.currentAttack.data.direction === AttackDirection.DOWN &&
+                !this.currentAttack.data.isAerial) {
+                this.player.velocity.x *= PhysicsConfig.SLIDE_ATTACK_DECELERATION;
+            }
         }
     }
 

@@ -40,7 +40,7 @@ interface GameRoom {
 
 const PORT = 9208;
 const rooms: Map<string, GameRoom> = new Map();
-let nextPlayerId = 0;
+// Removed global nextPlayerId
 
 // Create Geckos.io server (v3 API - no separate HTTP server needed)
 const io = geckos({
@@ -52,17 +52,24 @@ io.listen(PORT);
 console.log(`[Server] Geckos.io server running on port ${PORT}`);
 
 io.onConnection((channel) => {
-    const playerId = nextPlayerId++;
     const roomId = 'default'; // Single room for now
-
-    console.log(`[Server] Player ${playerId} connected (${channel.id})`);
 
     // Create room if needed
     if (!rooms.has(roomId)) {
         rooms.set(roomId, { players: new Map(), frame: 0, rematchVotes: new Set() });
     }
-
     const room = rooms.get(roomId)!;
+
+    // Find lowest available player ID
+    const existingIds = new Set<number>();
+    room.players.forEach(p => existingIds.add(p.playerId));
+
+    let playerId = 0;
+    while (existingIds.has(playerId)) {
+        playerId++;
+    }
+
+    console.log(`[Server] Player ${playerId} connected (${channel.id})`);
 
     // Initialize player state (spawn on main platform at y=780)
     // Platform spans x=285 to x=1635 (center=960, width=1350)

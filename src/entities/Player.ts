@@ -145,7 +145,7 @@ export class Player extends Fighter {
     public updateHeldItemPosition(): void {
         if (this.heldItem) {
             // Position in front of the character, towards the bottom
-            const offsetForward = 25 * this.getFacingDirection();
+            const offsetForward = 55 * this.getFacingDirection(); // Increased from 25 to 55
             const offsetDown = 25; // Relative to center (Bottom is 45)
 
             this.heldItem.setPosition(this.x + offsetForward, this.y + offsetDown);

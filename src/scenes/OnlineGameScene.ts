@@ -50,17 +50,17 @@ export class OnlineGameScene extends Phaser.Scene {
     private readonly PLAY_BOUND_RIGHT = this.WALL_RIGHT_X - this.WALL_THICKNESS / 2;
 
     // Blast zone boundaries (matching GameScene)
-    private readonly BLAST_ZONE_LEFT = -1000;
-    private readonly BLAST_ZONE_RIGHT = 3000;
-    private readonly BLAST_ZONE_TOP = -1000;
-    private readonly BLAST_ZONE_BOTTOM = 2000;
+    private readonly BLAST_ZONE_LEFT = -2000; // Extended from -1000
+    private readonly BLAST_ZONE_RIGHT = 4000; // Extended from 3000
+    private readonly BLAST_ZONE_TOP = -2500; // Extended from -1000
+    private readonly BLAST_ZONE_BOTTOM = 3500; // Extended from 2000
 
     // Camera Settings (matching GameScene)
     // Camera Settings (matching GameScene)
     private currentZoomLevel: 'CLOSE' | 'NORMAL' | 'WIDE' = 'NORMAL';
     private readonly ZOOM_SETTINGS = {
-        CLOSE: { padX: 100, padY: 100, minZoom: 0.8, maxZoom: 1.5 },
-        NORMAL: { padX: 375, padY: 300, minZoom: 0.6, maxZoom: 1.1 },
+        CLOSE: { padX: 250, padY: 100, minZoom: 0.5, maxZoom: 1.5 }, // Increased padding and range
+        NORMAL: { padX: 450, padY: 300, minZoom: 0.5, maxZoom: 1.1 },
         WIDE: { padX: 600, padY: 450, minZoom: 0.3, maxZoom: 0.8 }
     };
 
@@ -924,7 +924,16 @@ export class OnlineGameScene extends Phaser.Scene {
      */
     private updateCamera(): void {
         const targets: Phaser.GameObjects.Components.Transform[] = [];
-        this.players.forEach((player) => targets.push(player));
+
+        this.players.forEach((player) => {
+            // Check bounds to filter out dying players
+            if (player.x > this.BLAST_ZONE_LEFT + 500 &&
+                player.x < this.BLAST_ZONE_RIGHT - 500 &&
+                player.y < this.BLAST_ZONE_BOTTOM - 500 &&
+                player.y > this.BLAST_ZONE_TOP + 500) {
+                targets.push(player);
+            }
+        });
 
         if (targets.length === 0) return;
 
@@ -955,10 +964,10 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Lerp Camera
         const cam = this.cameras.main;
-        cam.zoom = Phaser.Math.Linear(cam.zoom, targetZoom, 0.05);
+        cam.zoom = Phaser.Math.Linear(cam.zoom, targetZoom, 0.1); // Increased from 0.05
         cam.centerOn(
-            Phaser.Math.Linear(cam.midPoint.x, centerX, 0.1),
-            Phaser.Math.Linear(cam.midPoint.y, centerY, 0.1)
+            Phaser.Math.Linear(cam.midPoint.x, centerX, 0.2), // Increased from 0.1
+            Phaser.Math.Linear(cam.midPoint.y, centerY, 0.2)
         );
     }
 }
