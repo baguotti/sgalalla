@@ -111,6 +111,7 @@ io.onConnection((channel) => {
             player.isGrounded = data.isGrounded ?? player.isGrounded;
             player.isAttacking = data.isAttacking ?? player.isAttacking;
             player.animationKey = data.animationKey ?? player.animationKey;
+            player.damagePercent = data.damagePercent ?? player.damagePercent; // FIX: Sync damage
             player.lives = data.lives ?? player.lives;
         }
     });

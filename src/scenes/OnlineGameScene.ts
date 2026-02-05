@@ -417,6 +417,14 @@ export class OnlineGameScene extends Phaser.Scene {
 
             // Apply hitstop/stun if needed (simplified for now)
         }
+
+        // FIX: If we hit a remote player, apply visual knockback locally
+        const remoteVictim = this.players.get(event.victimId);
+        if (remoteVictim && event.victimId !== this.localPlayerId) {
+            console.log(`[OnlineGame] Applying visual knockback to remote player ${event.victimId}`);
+            remoteVictim.setVelocity(event.knockbackX, event.knockbackY);
+            remoteVictim.playHurtAnimation();
+        }
     }
 
     private interpolatePlayer(player: Player, netState: NetPlayerState): void {

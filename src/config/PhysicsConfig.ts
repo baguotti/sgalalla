@@ -36,8 +36,8 @@ export const PhysicsConfig = {
   // Attack system
   LIGHT_ATTACK_DAMAGE: 4,
   HEAVY_ATTACK_DAMAGE: 9,
-  LIGHT_ATTACK_KNOCKBACK: 7000, // increased ~5x
-  HEAVY_ATTACK_KNOCKBACK: 12000, // increased ~5x
+  LIGHT_ATTACK_KNOCKBACK: 25000, // Drastically increased for testing (was 7000)
+  HEAVY_ATTACK_KNOCKBACK: 45000, // Drastically increased for testing (was 12000)
   LIGHT_ATTACK_DURATION: 200,
   HEAVY_ATTACK_DURATION: 400,
   LIGHT_ATTACK_COOLDOWN: 300,
@@ -62,7 +62,7 @@ export const PhysicsConfig = {
 
   // Damage system
   MAX_DAMAGE: 999,
-  KNOCKBACK_SCALING: 0.02,
+  KNOCKBACK_SCALING: 0.1, // Increased from 0.02 for stronger damage impact
   HIT_STUN_DURATION: 300,
 
   // Ledge detection
