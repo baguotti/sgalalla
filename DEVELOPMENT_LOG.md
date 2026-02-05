@@ -50,3 +50,9 @@
 - **[M]** Strict Routing: Updated `InputManager.poll()` to strictly return either keyboard or gamepad input based on config, preventing multiple characters from moving on one tab.
 - **[T]** Code Cleanup: Removed unused variables (`showDebugHitboxes`, `targetHeight`) from `Player.ts`.
 - **[S]** **STATUS**: Online Gamepad restored and Focus-based testing enabled.
+### [2026-02-05] v0.5.6 - Unified Restart Input
+- **[V]** `v0.5.6`
+- **[New]** Unified Restart: Added Gamepad Button A (0) support for restarting matches on the Game Over screen in `GameScene.ts`.
+- **[M]** Game Over UI: Updated instruction text to "Press SPACE or (A) to Restart".
+- **[T]** Code Cleanup: Removed unused `gameOverText` from `GameScene.ts` and organized gamepad state tracking.
+- **[S]** **STATUS**: Match restart is now accessible via keyboard and gamepad.

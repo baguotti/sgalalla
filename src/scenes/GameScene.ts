@@ -61,7 +61,9 @@ export class GameScene extends Phaser.Scene {
 
     // Game Over State
     private isGameOver: boolean = false;
-    private gameOverText!: Phaser.GameObjects.Text;
+    private previousAButtonPressed: boolean = false;
+    private previousSelectPressed: boolean = false; // Moved here for logical grouping
+    private previousStartPressed: boolean = false; // Moved here for logical grouping
 
     constructor() {
         super({ key: 'GameScene' });
@@ -512,9 +514,12 @@ export class GameScene extends Phaser.Scene {
 
         // Stop updates if game over
         if (this.isGameOver) {
-            // Allow restarting via SPACE or ESC
-            if (Phaser.Input.Keyboard.JustDown(this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)) ||
-                Phaser.Input.Keyboard.JustDown(this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC))) {
+            // Allow restarting via SPACE, ESC, or Gamepad A Button (0)
+            const spacePressed = Phaser.Input.Keyboard.JustDown(this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE));
+            const escPressed = Phaser.Input.Keyboard.JustDown(this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC));
+            const aButtonPressed = this.checkGamepadA();
+
+            if (spacePressed || escPressed || aButtonPressed) {
                 window.location.reload();
             }
             return;
@@ -765,8 +770,6 @@ export class GameScene extends Phaser.Scene {
         );
     }
 
-    private previousSelectPressed: boolean = false;
-
     private checkGamepadSelect(): boolean {
         // Check if gamepad SELECT/BACK button was just pressed
         const gamepads = navigator.getGamepads();
@@ -788,7 +791,23 @@ export class GameScene extends Phaser.Scene {
         return justPressed;
     }
 
-    private previousStartPressed: boolean = false;
+    private checkGamepadA(): boolean {
+        // Check if gamepad A button (0) was just pressed
+        const gamepads = navigator.getGamepads();
+        let currentAPressed = false;
+
+        for (let i = 0; i < gamepads.length; i++) {
+            const gamepad = gamepads[i];
+            if (gamepad) {
+                currentAPressed = gamepad.buttons[0]?.pressed || false;
+                break; // Only check first connected gamepad
+            }
+        }
+
+        const justPressed = currentAPressed && !this.previousAButtonPressed;
+        this.previousAButtonPressed = currentAPressed;
+        return justPressed;
+    }
 
     private checkGamepadPause(): boolean {
         // Check if gamepad START button was just pressed
@@ -1013,7 +1032,7 @@ export class GameScene extends Phaser.Scene {
         text.setDepth(1001);
         this.cameras.main.ignore(text); // Only UI camera sees it
 
-        const subText = this.add.text(width / 2, height / 2 + 100, "Press SPACE to Restart", {
+        const subText = this.add.text(width / 2, height / 2 + 100, "Press SPACE or (A) to Restart", {
             fontSize: '32px',
             fontFamily: 'Arial',
             color: '#cccccc'
