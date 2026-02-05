@@ -164,10 +164,11 @@ export class Player extends Fighter {
         }
     }
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok' } = {}) {
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok' } = {}) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
+        this.isTrainingDummy = config.isTrainingDummy || false;
         this.playerId = config.playerId || 0;
 
         this.playerId = config.playerId || 0;
@@ -188,11 +189,10 @@ export class Player extends Fighter {
         this.add(this.sprite);
 
         // Visual distinction
-        if (this.isAI) {
-            this.sprite.setTint(0xff5555); // Reddish tint for AI
-        } else if (this.playerId === 1) {
-            this.sprite.setTint(0x55ff55); // Green tint for Player 2
-        }
+        // Visual distinction
+        // REMOVED: Legacy tinting (red for AI, green for P2) caused persistent visual bugs.
+        // Players should spawn with natural colors.
+        // if (this.isAI) { ... }
 
 
 
@@ -247,6 +247,7 @@ export class Player extends Fighter {
             enableGamepad: enableGamepad
         });
 
+        this.resetVisuals(); // Ensure clean visual state (no tints)
         scene.add.existing(this);
     }
 

@@ -207,12 +207,25 @@ export class GameScene extends Phaser.Scene {
 
             // Create Players
             this.players = [];
-            const spawnPoints = [
+
+            // Default Spawn Points
+            let spawnPoints = [
                 { x: 450, y: 300 },
                 { x: 1470, y: 300 },
                 { x: 960, y: 200 },
                 { x: 960, y: 400 }
             ];
+
+            // DUMMY MODE OVERRIDE: Spawn closer together at center
+            const hasDummy = this.playerData.some(p => p.isTrainingDummy);
+            if (hasDummy) {
+                spawnPoints = [
+                    { x: 880, y: 300 },  // P1: Left of center
+                    { x: 1040, y: 300 }, // P2 (Dummy): Right of center
+                    { x: 960, y: 200 },
+                    { x: 960, y: 400 }
+                ];
+            }
 
             this.playerData.forEach(pData => {
                 if (!pData.joined) return;
@@ -223,6 +236,7 @@ export class GameScene extends Phaser.Scene {
                 const player = new Player(this, spawn.x, spawn.y, {
                     playerId: pData.playerId,
                     isAI: pData.isAI,
+                    isTrainingDummy: pData.isTrainingDummy, // Pass training dummy flag
                     gamepadIndex: pData.input.gamepadIndex,
                     useKeyboard: pData.input.type === 'KEYBOARD',
                     character: pData.character

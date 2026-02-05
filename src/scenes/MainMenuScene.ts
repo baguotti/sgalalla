@@ -167,6 +167,7 @@ export class MainMenuScene extends Phaser.Scene {
                 joined: true,
                 character: 'fok', // Default enemy
                 isAI: true, // CPU
+                isTrainingDummy: true, // Force dummy mode
                 input: {
                     type: 'KEYBOARD',
                     gamepadIndex: null

@@ -47,7 +47,12 @@
 - **[Fix]** Online Gamepad: Implemented `useExternalInput` in `Player.ts` to allow `OnlineGameScene` to inject verified inputs without internal re-polling.
 - **[Fix]** Gamepad Detection: Forced `gamepadIndex: 0` for local players in `OnlineGameScene` to match local game behavior.
 - **[M]** Input Gating: Added `document.hasFocus()` check to `InputManager.ts` to allow testing multiple browser tabs on one machine without input cross-talk.
-- **[M]** Strict Routing: Updated `InputManager.poll()` to strictly return either keyboard or gamepad input based on config, preventing multiple characters from moving on one tab.
+### [2026-02-05] v0.5.6 - Visual & Input Polish
+- **[V]** `v0.5.6`
+- **[Fix]** Online Visuals: Fixed missing damage color flash on remote clients (`NetHitEvent` now triggers local flash).
+- **[Fix]** Sprite Tints: Removed legacy debug tints (Red AI/Green P2) from `Player.ts` and `OnlineGameScene.ts`.
+- **[Fix]** Input Crosstalk: Enforced strict input source separation (Keyboard vs Gamepad) in `InputManager.ts`.
+- **[UX]** Unified Restart: Added Gamepad (A) support for restarting matches.
 - **[T]** Code Cleanup: Removed unused variables (`showDebugHitboxes`, `targetHeight`) from `Player.ts`.
 - **[S]** **STATUS**: Online Gamepad restored and Focus-based testing enabled.
 ### [2026-02-05] v0.5.6 - Unified Restart Input

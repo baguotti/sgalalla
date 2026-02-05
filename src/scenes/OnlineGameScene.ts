@@ -422,12 +422,17 @@ export class OnlineGameScene extends Phaser.Scene {
             // Apply hitstop/stun if needed (simplified for now)
         }
 
-        // FIX: If we hit a remote player, apply visual knockback locally
+        // FIX: If we hit a remote player, apply visual knockback to them locally
         const remoteVictim = this.players.get(event.victimId);
         if (remoteVictim && event.victimId !== this.localPlayerId) {
             console.log(`[OnlineGame] Applying visual knockback to remote player ${event.victimId}`);
             remoteVictim.setVelocity(event.knockbackX, event.knockbackY);
             remoteVictim.playHurtAnimation();
+
+            // FIX: Trigger damage flash visual
+            // We use current + event damage for the color calculation (visual only)
+            // Actual damagePercent is synced via state_update
+            remoteVictim.flashDamageColor(remoteVictim.damagePercent + event.damage);
         }
     }
 
@@ -815,7 +820,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Visual distinction for remote players
         if (!isLocal) {
-            player.spriteObject.setTint(0x888888); // Gray tint for remote
+            player.spriteObject.clearTint(); // Ensure no tint for remote players
 
             // CRITICAL FIX: Override takeDamage for remote players
             // Remote players should ONLY update damage from server state (interpolatePlayer)
