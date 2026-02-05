@@ -42,3 +42,11 @@
 - **[T]** Attack Tuning: Changed Down Light knockback to horizontal (Angle: 80 -> 30) to match slide momentum.
 - **[Fix]** Boundaries: Extended Blast Zones (Top: -2500, Bottom: 3500) to prevent accidental boundary deaths.
 - **[Fix]** Camera: Added "Dead Player" filtering to stop camera from tracking players flying into the blast zone. Widened viewport padding.
+### [2026-02-05] v0.5.5 - Input & Online Fixes
+- **[V]** `v0.5.5`
+- **[Fix]** Online Gamepad: Implemented `useExternalInput` in `Player.ts` to allow `OnlineGameScene` to inject verified inputs without internal re-polling.
+- **[Fix]** Gamepad Detection: Forced `gamepadIndex: 0` for local players in `OnlineGameScene` to match local game behavior.
+- **[M]** Input Gating: Added `document.hasFocus()` check to `InputManager.ts` to allow testing multiple browser tabs on one machine without input cross-talk.
+- **[M]** Strict Routing: Updated `InputManager.poll()` to strictly return either keyboard or gamepad input based on config, preventing multiple characters from moving on one tab.
+- **[T]** Code Cleanup: Removed unused variables (`showDebugHitboxes`, `targetHeight`) from `Player.ts`.
+- **[S]** **STATUS**: Online Gamepad restored and Focus-based testing enabled.

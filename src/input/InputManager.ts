@@ -116,15 +116,41 @@ export class InputManager {
     /**
      * Poll all inputs and return unified state
      * Call this once per frame
+     * 
+     * STRICT ROUTING:
+     * - If useKeyboard=true && enableGamepad=false: keyboard-only
+     * - If useKeyboard=false && enableGamepad=true: gamepad-only
+     * - If both enabled: merge (online mode - first connected device wins)
      */
     poll(): InputState {
-        // Only poll gamepad if enabled
-        const gamepadState = this.config.enableGamepad ? this.gamepadInput.poll() : { ...this.gamepadInput.createEmptyState(), connected: false };
+        // FOCUS CHECK: Only process inputs if the window has focus
+        // This prevents inactive tabs from controlling the character in local testing (multiple tabs)
+        if (typeof document !== 'undefined' && !document.hasFocus()) {
+            return this.getEmptyInput();
+        }
 
-        // Only poll keyboard if enabled for this player
-        const keyboardState = this.config.useKeyboard ? this.pollKeyboard() : this.getEmptyInput();
+        const keyboardEnabled = this.config.useKeyboard;
+        const gamepadEnabled = this.config.enableGamepad;
 
-        // If gamepad is connected and has input, prefer gamepad
+        // STRICT ROUTING: Keyboard-only mode
+        if (keyboardEnabled && !gamepadEnabled) {
+            return this.pollKeyboard();
+        }
+
+        // STRICT ROUTING: Gamepad-only mode
+        if (!keyboardEnabled && gamepadEnabled) {
+            const gamepadState = this.gamepadInput.poll();
+            if (gamepadState.connected) {
+                return this.gamepadToInputState(gamepadState);
+            }
+            return this.getEmptyInput();
+        }
+
+        // MERGED MODE (both enabled - online mode)
+        // Poll both and prefer gamepad if it has input
+        const gamepadState = this.gamepadInput.poll();
+        const keyboardState = this.pollKeyboard();
+
         const usingGamepad = gamepadState.connected && this.hasGamepadInput(gamepadState);
 
         if (usingGamepad) {

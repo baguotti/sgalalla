@@ -219,10 +219,11 @@ export class OnlineGameScene extends Phaser.Scene {
         this.createStage();
 
         // Setup input (local player only)
+        // Force gamepadIndex to 0 to match local game setup
         this.inputManager = new InputManager(this, {
             playerId: this.localPlayerId,
             useKeyboard: true,
-            gamepadIndex: null,
+            gamepadIndex: 0, // Force index 0 (first gamepad)
             enableGamepad: true
         });
 
@@ -356,6 +357,9 @@ export class OnlineGameScene extends Phaser.Scene {
 
                 if (netPlayer.playerId === this.localPlayerId) {
                     this.localPlayer = player;
+                    // Let the player poll its own internal InputManager (like GameScene does)
+                    // this.localPlayer.useExternalInput = true;
+                    console.log('[OnlineGameScene] Local player using internal InputManager polling');
                 }
 
                 // Add to HUD
@@ -784,12 +788,13 @@ export class OnlineGameScene extends Phaser.Scene {
 
     private createPlayer(playerId: number, x: number, y: number): Player {
         const isLocal = playerId === this.localPlayerId;
+        console.log(`[OnlineGameScene] Creating Player ${playerId}, isLocal=${isLocal}`);
 
         const player = new Player(this, x, y, {
             playerId: playerId,
             isAI: false,
             useKeyboard: isLocal,
-            gamepadIndex: null,
+            gamepadIndex: isLocal ? 0 : null, // All local players try to use index 0 (gated by focus)
             character: 'fok'
         });
 

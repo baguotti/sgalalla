@@ -60,6 +60,7 @@ export class Player extends Fighter {
     private currentInput!: InputState;
 
     // Network input injection
+    public useExternalInput: boolean = false; // When true, updatePhysics skips internal polling
     public setInput(input: InputState): void {
         this.currentInput = input;
     }
@@ -83,7 +84,7 @@ export class Player extends Fighter {
     public character: 'fok' = 'fok';
     private animPrefix: string = 'alchemist';
     private debugRect!: Phaser.GameObjects.Rectangle;
-    private showDebugHitboxes: boolean = false;
+
     public lightAttackVariant: number = 0;
 
     // Item Holding
@@ -154,7 +155,7 @@ export class Player extends Fighter {
     }
 
     public setDebug(visible: boolean): void {
-        this.showDebugHitboxes = visible;
+
         if (this.debugRect) {
             this.debugRect.setVisible(visible);
         }
@@ -178,8 +179,7 @@ export class Player extends Fighter {
         // Create player sprite
         this.sprite = scene.add.sprite(0, 0, 'fok', '0_Fok_Idle_000.png'); // Adjusted offset (0) to ground sprite
 
-        // Auto-scale to fit hitbox height (90px)
-        const targetHeight = PhysicsConfig.PLAYER_HEIGHT;
+
 
         // Base size is 256 for both characters (User confirmed 1:1 scale)
         const scale = 1;
@@ -234,8 +234,11 @@ export class Player extends Fighter {
         // Setup input manager
         const defaultKeyboard = this.playerId === 0 && !this.isAI;
         const useKeyboard = config.useKeyboard !== undefined ? config.useKeyboard : defaultKeyboard;
-        const gamepadIdx = config.gamepadIndex !== undefined ? config.gamepadIndex : (this.playerId === 0 ? null : this.playerId);
-        const enableGamepad = gamepadIdx !== null || !useKeyboard;
+        const gamepadIdx = config.gamepadIndex !== undefined ? config.gamepadIndex : null;
+        // STRICT ROUTING: enableGamepad only when gamepadIndex is explicitly assigned
+        const enableGamepad = gamepadIdx !== null;
+
+        console.log(`[Player ${this.playerId}] Input Config: useKeyboard=${useKeyboard}, gamepadIndex=${gamepadIdx}, enableGamepad=${enableGamepad}, config.gamepadIndex=${config.gamepadIndex}`);
 
         this.inputManager = new InputManager(scene, {
             playerId: this.playerId,

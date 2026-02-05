@@ -10,6 +10,7 @@
 | `v0.5.2-infra-protocol` | **Infra & Protocol** | 2026-02-05 | Major infrastructure upgrade and logging protocol. <br> ↳ **Upgrade**: Node.js to v25.6.0 (Stability/Vite 7 compatibility) <br> ↳ **Fix**: Resolved localhost connectivity/process suspension <br> ↳ **Tweak**: Migrated client to port 5175 <br> ↳ **New**: Established LLM-optimized high-density logging protocol |
 | `v0.5.3-online-physics` | **Online Sync & Physics** | 2026-02-05 | Critical online sync fixes and physics tuning. <br> ↳ **Fix**: Opponent damage sync (added damagePercent to server relay) <br> ↳ **Fix**: Visual knockback for remote players in OnlineGameScene <br> ↳ **Tweak**: Drastic knockback force increase (L: 25k, H: 45k, Scal: 0.1) |
 | `v0.5.4-gameplay-polish` | **Gameplay Polish** | 2026-02-05 | Refined mechanics and camera logic. <br> ↳ **New**: Down Light Slide Move (horizontal knockback/velocity) <br> ↳ **Fix**: Camera filtering for dying players & wider viewport <br> ↳ **Tweak**: Extended blast zones and bomb scaling (1:1 with player) |
+| `v0.5.5-input-fixes` | **Input & Online Fixes** | 2026-02-05 | Fixed Online Gamepad and Multiple-Tab Testing. <br> ↳ **Fix**: Online Gamepad (added useExternalInput to Player.ts) <br> ↳ **Fix**: Gamepad index forcing (index 0) in OnlineGameScene <br> ↳ **New**: Focus-based input gating (document.hasFocus) for local testing <br> ↳ **New**: Strict Input Routing (prevent dual-character control) |
 
 > [!TIP]
 > This history is updated automatically after every major commit or push. Use it as a rollback reference if needed.

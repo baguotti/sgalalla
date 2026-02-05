@@ -286,7 +286,7 @@ export class LobbyScene extends Phaser.Scene {
             // Set input time to now so the debounce check in handlePlayerInput fails
             this.lastInputTime.set(slot.playerId, this.time.now);
             this.joinTime.set(slot.playerId, this.time.now);
-            console.log(`Player ${slot.playerId + 1} joined via ${type}`);
+            console.log(`[LobbyScene] Player ${slot.playerId + 1} joined via ${type}, gamepadIndex=${index}`);
         }
     }
 
