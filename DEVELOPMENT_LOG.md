@@ -1,6 +1,6 @@
 # Sgalalla - Development Log
 
-**Total Time Logged:** 9.0 Hours
+**Total Time Logged:** 10.5 Hours
 
 ---
 
@@ -25,7 +25,10 @@
 - **[M]** `server-geckos/index.ts`: Added `damagePercent` to `position_update` handler for sync.
 - **[M]** `OnlineGameScene.ts`: Added visual knockback/Hurt animation for remote players in `handleHitEvent`.
 - **[A]** `LLM_CONTEXT.md`: Established token-dense logging protocol.
-- **[S]** **STATUS**: v0.5.3 Active. Online damage/knockback fixed. Manual server start required.
+- **[S]** **STATUS**: v0.5.3 Complete.
+
+### [2026-02-05] v0.5.4 - Gameplay Polish
+- **[V]** `v0.5.4`
 - **[T]** Jump Tuning: Reduced GRAVITY (4800); Increased JUMP_FORCE (-2400) and DOUBLE_JUMP_FORCE (-2200).
 - **[T]** Recovery Tuning: Boosted RECOVERY_FORCE_Y to -3500 for extreme height.
 - **[T]** Middle-Ground Tuning: Balanced GRAVITY (5600), JUMP_FORCE (-2150), DOUBLE_JUMP_FORCE (-1950), and RECOVERY_Y (-2800).

@@ -9,6 +9,7 @@
 | `v0.5.1-physics-tweak` | **Physics & network Tweak** | 2026-02-04 | Polished network sync and physics feel. <br> ↳ **Fix**: Damage Reset Bug (Client/Server sync conflict resolution) <br> ↳ **Fix**: Teleport Glitch (Snap logic for large deltas) <br> ↳ **Tweak**: Massive Knockback Increase (x5) for lighter feel <br> ↳ **Tweak**: Instant Respawn (Removed delay) |
 | `v0.5.2-infra-protocol` | **Infra & Protocol** | 2026-02-05 | Major infrastructure upgrade and logging protocol. <br> ↳ **Upgrade**: Node.js to v25.6.0 (Stability/Vite 7 compatibility) <br> ↳ **Fix**: Resolved localhost connectivity/process suspension <br> ↳ **Tweak**: Migrated client to port 5175 <br> ↳ **New**: Established LLM-optimized high-density logging protocol |
 | `v0.5.3-online-physics` | **Online Sync & Physics** | 2026-02-05 | Critical online sync fixes and physics tuning. <br> ↳ **Fix**: Opponent damage sync (added damagePercent to server relay) <br> ↳ **Fix**: Visual knockback for remote players in OnlineGameScene <br> ↳ **Tweak**: Drastic knockback force increase (L: 25k, H: 45k, Scal: 0.1) |
+| `v0.5.4-gameplay-polish` | **Gameplay Polish** | 2026-02-05 | Refined mechanics and camera logic. <br> ↳ **New**: Down Light Slide Move (horizontal knockback/velocity) <br> ↳ **Fix**: Camera filtering for dying players & wider viewport <br> ↳ **Tweak**: Extended blast zones and bomb scaling (1:1 with player) |
 
 > [!TIP]
 > This history is updated automatically after every major commit or push. Use it as a rollback reference if needed.
