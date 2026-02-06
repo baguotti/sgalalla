@@ -9,8 +9,8 @@ export class MainMenuScene extends Phaser.Scene {
     private canInput: boolean = false;
     private selectedIndex: number = 0;
     private menuOptions = [
-        { label: 'LOCAL VERSUS', mode: 'versus' },
-        { label: 'QUICK JOIN', mode: 'online' }
+        { label: 'TRAINING', mode: 'versus' },
+        { label: '1v1', mode: 'online' }
     ];
     private menuTexts: Phaser.GameObjects.Text[] = [];
 

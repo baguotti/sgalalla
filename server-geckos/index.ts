@@ -166,6 +166,15 @@ io.on('connection', (socket) => {
     }
     const room = rooms.get(roomId)!;
 
+    // Enforce 1v1 limit (Max 2 players)
+    if (room.players.size >= 2) {
+        console.log(`[Server] Connection rejected: Room ${roomId} is full (2/2 players).`);
+        socket.emit('error', 'Room is full (1v1 only). Please try again later.');
+        socket.disconnect();
+        totalConnectedPlayers--; // Revert count since they are booted
+        return;
+    }
+
     // Find lowest available player ID
     const existingIds = new Set<number>();
     room.players.forEach(p => existingIds.add(p.playerId));

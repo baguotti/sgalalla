@@ -237,3 +237,10 @@
 - **[Fix]** Replaced velocity-based dead-reckoning with simple direct lerp (0.25 factor) - eliminates prediction stutter.
 - **[S]** **STATUS**: v0.7.4 Complete. Rematch overlay works for both players.
 
+### [2026-02-06] v0.7.5 - UI Polish & Server Limits
+- **[V]** `v0.7.5`
+- **[UI]** Renamed "LOCAL VERSUS" to "TRAINING".
+- **[UI]** Renamed "QUICK JOIN" to "1v1".
+- **[Logic]** Server now enforces strict 2-player limit per room (rejects 3rd connection).
+- **[S]** **STATUS**: v0.7.5 Complete.
+
