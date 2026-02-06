@@ -161,3 +161,9 @@
 - **[V]** `v0.6.11`
 - **[Fix]** Networking: Updated `NetworkManager.ts` to detect `192.168.` IPs as local and use port 3000.
 - **[S]** **STATUS**: v0.6.11 Complete. Local network testing enabled.
+
+### [2026-02-06] v0.6.12 - Client Production Deployment
+- **[V]** `v0.6.12`
+- **[Fix]** Deployment: Pushed client-side NetworkManager changes to `main` (was only on local branch).
+- **[Fix]** Networking: Client now correctly targets port 443 for production.
+- **[S]** **STATUS**: v0.6.12 Complete. Vercel should now have the correct client code.
