@@ -250,3 +250,17 @@
 - **[Tune]** Client: Reduced interpolation factor 0.25 → 0.1 for smoother movement (less jittery).
 - **[S]** **STATUS**: v0.7.6 Complete. Server enforces limit; Client movement smoothed.
 
+### [2026-02-06] v0.7.7 - Jitter Buffer Implementation
+- **[V]** `v0.7.7`
+- **[Network]** Client-side snapshot buffering (jitter buffer) added to smooth player movement.
+- **[Network]** Implemented 100ms render delay to mitigate TCP Head-of-Line blocking.
+- **[Entities]** `Player.ts`: Exposed `playAnim` as public to allow authoritative control from scene.
+- **[S]** **STATUS**: v0.7.7 Complete.
+
+### [2026-02-06] v0.7.8 - Advanced Netcode Optimization
+- **[V]** `v0.7.8`
+- **[Network]** Switched to **Wall-Clock Interpolation** (using `performance.now()`) to prevent frame drift.
+- **[Network]** Added **Adaptive Buffer Pacing** (±5% playback speed) to stabilize buffer size.
+- **[Server]** Reduced tick/broadcast rate 60Hz → **20Hz** to prevent TCP saturation.
+- **[Optimization]** Server now skips state broadcasts if room phase is not `PLAYING`.
+- **[S]** **STATUS**: v0.7.8 Complete. Netcode hardened for production stability.
