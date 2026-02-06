@@ -1,6 +1,6 @@
 # Sgalalla - Development Log
 
-**Total Time Logged:** 11.5 Hours
+**Total Time Logged:** 12.0 Hours
 
 ---
 
@@ -72,12 +72,13 @@
 - **[Fix]** Binary Encoding: Attempted 15-byte binary optimization; reverted to JSON due to Geckos.io protocol mismatch (Uint8Array detection issues).
 - **[S]** **STATUS**: v0.5.7 Complete. Online is synchronized but remains stuttery due to jitter.
 
-### [2026-02-06] v0.5.8 - Network Smoothing & Performance Optimizations
+### [2026-02-06] v0.5.8 - Network Smoothing, Performance & Disconnect Cleanup
 - **[V]** `v0.5.8`
 - **[T]** Dead Reckoning: Removed 100ms jitter buffer for velocity-based projection (0ms latency rendering).
 - **[T]** Adaptive Correction: Implemented 40% blend factor (lerp) toward server position to eliminate "gliding".
+- **[Fix]** Disconnect Cleanup: Implemented `player_left` handler to destroy "ghost" sprites when clients disconnect.
 - **[Fix]** Hit Detection: Restored `checkHitAgainst` call and fixed remote knockback visual sync.
 - **[Fix]** Periodic Stutter: Increased ping interval (1s -> 2s) to reduce timer-induced frame drops.
 - **[Fix]** GC Pressure: Throttled snapshot saves (3 frames) and removed all `console.log` spam from update loop.
 - **[UX]** Ping Stability: Implemented Exponential Moving Average (EMA) smoothing for HUD ping display.
-- **[S]** **STATUS**: v0.5.8 Complete. Smooth 60fps movement for guests with stable debug HUD.
+- **[S]** **STATUS**: v0.5.8 Complete. Smooth 60fps movement and proper session cleanup.

@@ -85,6 +85,7 @@ export type RollbackCallback = (targetFrame: number, confirmedState: NetGameStat
 export type AttackCallback = (attack: NetAttackEvent) => void;
 export type HitCallback = (hit: NetHitEvent) => void;
 export type RematchStartCallback = () => void;
+export type PlayerLeftCallback = (playerId: number) => void;
 
 class NetworkManager {
     private static instance: NetworkManager | null = null;
@@ -111,6 +112,7 @@ class NetworkManager {
     private onAttackCallback: AttackCallback | null = null;
     private onHitCallback: HitCallback | null = null;
     private onRematchStartCallback: RematchStartCallback | null = null;
+    private onPlayerLeftCallback: PlayerLeftCallback | null = null;
 
     // Latency tracking with smoothing
     private lastPingTime: number = 0;
@@ -229,6 +231,12 @@ class NetworkManager {
         this.channel.on(NetMessageType.REMATCH_START, () => {
             console.log('[NetworkManager] Rematch starting!');
             this.onRematchStartCallback?.();
+        });
+
+        // Player left event
+        this.channel.on(NetMessageType.PLAYER_LEFT, (data: Data) => {
+            const { playerId } = data as { playerId: number };
+            this.onPlayerLeftCallback?.(playerId);
         });
     }
 
@@ -378,6 +386,7 @@ class NetworkManager {
     public onAttack(callback: AttackCallback): void { this.onAttackCallback = callback; }
     public onHit(callback: HitCallback): void { this.onHitCallback = callback; }
     public onRematchStart(callback: RematchStartCallback): void { this.onRematchStartCallback = callback; }
+    public onPlayerLeft(callback: PlayerLeftCallback): void { this.onPlayerLeftCallback = callback; }
 
     /**
      * Send rematch vote to server

@@ -207,6 +207,7 @@ export class OnlineGameScene extends Phaser.Scene {
         this.networkManager.onAttack((event) => this.handleAttackEvent(event));
         this.networkManager.onHit((event) => this.handleHitEvent(event));
         this.networkManager.onRematchStart(() => this.handleRematchStart());
+        this.networkManager.onPlayerLeft((playerId) => this.handlePlayerLeft(playerId));
 
         // Try to connect
         this.showConnectionStatus('Connecting...');
@@ -507,6 +508,26 @@ export class OnlineGameScene extends Phaser.Scene {
         // Debug: Log state changes
         if (netState.animationKey && netState.animationKey !== 'idle' && netState.animationKey !== 'run') {
         }
+    }
+
+    /**
+     * Handle player disconnect - clean up ghost entities
+     */
+    private handlePlayerLeft(playerId: number): void {
+        const player = this.players.get(playerId);
+        if (!player) return;
+
+        // Remove from active players map
+        this.players.delete(playerId);
+
+        // Remove from dead-reckoning targets
+        this.remoteTargets.delete(playerId);
+
+        // Remove from HUD
+        this.matchHUD.removePlayer(playerId);
+
+        // Destroy Phaser sprite and cleanup
+        player.destroy();
     }
 
     /**
