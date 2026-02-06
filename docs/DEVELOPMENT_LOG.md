@@ -141,3 +141,8 @@
 - **[M]** Project Management: Moved `history.md` and `DEVELOPMENT_LOG.md` to `docs/` directory.
 - **[Rule]** Policy: Documentation MUST be updated for every commit.
 - **[S]** **STATUS**: v0.6.7 Complete. Assets restored and project structure cleaned up.
+
+### [2026-02-06] v0.6.8 - Server Build Fix
+- **[V]** `v0.6.8`
+- **[Fix]** Build: Updated `server-geckos/tsconfig.json` to output to `./dist` so Docker can find `index.js`.
+- **[S]** **STATUS**: v0.6.8 Complete. Fixes `MODULE_NOT_FOUND` crash on Fly.io.

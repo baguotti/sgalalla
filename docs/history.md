@@ -14,6 +14,7 @@
 | `v0.5.6-unified-restart` | **Unified Restart Input** | 2026-02-05 | Added Gamepad Button A support for Game Over restart. <br> ↳ **New**: Gamepad Button A (0) now triggers match restart <br> ↳ **M**: Updated Game Over instruction text |
 | `v0.5.7-network-stability` | **Network & HUD Refinement** | 2026-02-06 | Stabilized frame rates and network smoothing. <br> ↳ **New**: 60Hz FPS Capping (Sync for 120Hz displays) <br> ↳ **New**: 100ms Jitter Buffer/Render Delay for remote players <br> ↳ **New**: Delta Compression (skips redundant position updates) <br> ↳ **Tweak**: Debug HUD 30% font scale increase (16px) <br> ↳ **Fix**: Volatile packet confirmation (reliable: false) |
 | `v0.5.8-smooth-reckoning` | **Network Smoothing & Perf** | 2026-02-06 | Implemented dead-reckoning and removed update loop stutter. <br> ↳ **New**: Velocity-based Dead Reckoning (0ms latency render) <br> ↳ **Fix**: Periodic stutter (increased ping interval 1s ↳ 2s) <br> ↳ **Fix**: GC pressure (removed console log spam & throttled snapshots) <br> ↳ **Fix**: Hit detection restored for local vs remote <br> ↳ **Tweak**: Exponential Moving Average (EMA) for stable ping display |
+| `v0.6.8` | **Server Build Fix** | 2026-02-06 | Fixed `MODULE_NOT_FOUND` crash on Fly.io. <br> ↳ **Fix**: Added `"outDir": "./dist"` to `server-geckos/tsconfig.json` |
 | `v0.6.7` | **Asset Restoration** | 2026-02-06 | Fixed 404 errors by adding missing platform/background assets. <br> ↳ **M**: Moved project documentation to `docs/` folder <br> ↳ **New**: Generated `platform.png` and `background.png` <br> ↳ **Fix**: Resolved Vercel deployment asset mapping issues |
 | `v0.6.6` | **Scale to Zero (Cost Savings)** | 2026-02-06 | Implemented automated shutdown for cost efficiency. <br> ↳ **New**: 5-minute Idle Timeout (self-termination) <br> ↳ **New**: Auto-wake on connection via Fly Proxy <br> ↳ **Fix**: Explicit `0.0.0.0` binding fix via `http.createServer` |
 | `v0.6.5` | **Fly.io Deployment** | 2026-02-06 | Configured for production deployment on Fly.io. <br> ↳ **URL**: [sgalalla-geckos.fly.dev](https://sgalalla-geckos.fly.dev) <br> ↳ **New**: Environment-aware `NetworkManager` (auto-connect to Fly.io) |
@@ -35,6 +36,11 @@
 - **[M]** Project Management: Moved `history.md` and `DEVELOPMENT_LOG.md` to `docs/` directory.
 - **[Rule]** Policy: Documentation MUST be updated for every commit.
 - **[S]** **STATUS**: v0.6.7 Complete. Assets restored and project structure cleaned up.
+
+### [2026-02-06] v0.6.8 - Server Build Fix
+- **[V]** `v0.6.8`
+- **[Fix]** Build: Updated `server-geckos/tsconfig.json` to output to `./dist` so Docker can find `index.js`.
+- **[S]** **STATUS**: v0.6.8 Complete. Fixes `MODULE_NOT_FOUND` crash on Fly.io.
 
 ### [2026-02-06] v0.6.4 - Character Confirmation & Dev UX
 - **[V]** `v0.6.4`
