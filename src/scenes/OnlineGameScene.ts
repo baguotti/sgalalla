@@ -84,6 +84,21 @@ export class OnlineGameScene extends Phaser.Scene {
     private selectedButtonIndex: number = 0; // 0 = Rematch, 1 = Leave
     private menuButtons: Phaser.GameObjects.Text[] = [];
 
+    // Character Selection State
+    private phase: 'WAITING' | 'SELECTING' | 'PLAYING' = 'WAITING';
+    private selectionCountdown: number = 10;
+    private selectedCharacter: string = 'fok';
+    private opponentCharacter: string = 'fok';
+    private readonly availableCharacters = ['fok', 'fok_alt'];
+    private selectedCharIndex: number = 0;
+
+    // Selection UI Elements
+    private selectionContainer!: Phaser.GameObjects.Container;
+    private countdownText!: Phaser.GameObjects.Text;
+    private myCharacterText!: Phaser.GameObjects.Text;
+    private opponentCharacterText!: Phaser.GameObjects.Text;
+    private selectionInstructions!: Phaser.GameObjects.Text;
+
     constructor() {
         super({ key: 'OnlineGameScene' });
         this.networkManager = NetworkManager.getInstance();
@@ -207,6 +222,11 @@ export class OnlineGameScene extends Phaser.Scene {
         this.networkManager.onHit((event) => this.handleHitEvent(event));
         this.networkManager.onRematchStart(() => this.handleRematchStart());
         this.networkManager.onPlayerLeft((playerId) => this.handlePlayerLeft(playerId));
+        // Selection phase callbacks
+        this.networkManager.onSelectionStart((countdown) => this.handleSelectionStart(countdown));
+        this.networkManager.onSelectionTick((countdown) => this.handleSelectionTick(countdown));
+        this.networkManager.onCharacterSelect((playerId, character) => this.handleOpponentCharacterSelect(playerId, character));
+        this.networkManager.onGameStart((players) => this.handleGameStart(players));
 
         // Try to connect
         this.showConnectionStatus('Connecting...');
@@ -220,31 +240,27 @@ export class OnlineGameScene extends Phaser.Scene {
 
         this.isConnected = true;
         this.localPlayerId = this.networkManager.getLocalPlayerId();
-        this.showConnectionStatus(`Connected as Player ${this.localPlayerId + 1}`);
+        this.phase = 'WAITING';
+        this.showConnectionStatus(`Connected as Player ${this.localPlayerId + 1}. Waiting for opponent...`);
 
-        // Setup stage
+        // Setup stage (but don't spawn players yet)
         this.createStage();
 
         // Setup input (local player only)
-        // Force gamepadIndex to 0 to match local game setup
         this.inputManager = new InputManager(this, {
             playerId: this.localPlayerId,
             useKeyboard: true,
-            gamepadIndex: 0, // Force index 0 (first gamepad)
+            gamepadIndex: 0,
             enableGamepad: true
         });
 
-        // Setup UI
-        this.createUI();
+        // Setup selection UI (hidden initially)
+        this.createSelectionUI();
+
+        // Setup escape key
         this.setupEscapeKey();
 
-        // Create MatchHUD
-        this.matchHUD = new MatchHUD(this);
-        // Exclude HUD from Main Camera (so it doesn't zoom/pan)
-        // Main camera should NOT render HUD, only uiCamera should.
-        this.matchHUD.addToCameraIgnore(this.cameras.main);
-
-        // Start ping loop (2s interval to reduce potential stutter)
+        // Start ping loop
         this.time.addEvent({
             delay: 2000,
             callback: () => this.networkManager.ping(),
@@ -255,12 +271,21 @@ export class OnlineGameScene extends Phaser.Scene {
     update(_time: number, delta: number): void {
         if (!this.isConnected) return;
 
+        // Handle selection phase input
+        if (this.phase === 'SELECTING') {
+            this.pollSelectionInput();
+            return;
+        }
+
         // Stop updates if game over
         if (this.isGameOver) {
             // Poll gamepad for menu navigation
             this.pollGamepadForMenu();
             return;
         }
+
+        // Only run game loop in PLAYING phase
+        if (this.phase !== 'PLAYING') return;
 
         this.localFrame++;
 
@@ -834,7 +859,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
     }
 
-    private createPlayer(playerId: number, x: number, y: number): Player {
+    private createPlayer(playerId: number, x: number, y: number, character: string = 'fok'): Player {
         const isLocal = playerId === this.localPlayerId;
 
         const player = new Player(this, x, y, {
@@ -842,7 +867,7 @@ export class OnlineGameScene extends Phaser.Scene {
             isAI: false,
             useKeyboard: isLocal,
             gamepadIndex: isLocal ? 0 : null, // All local players try to use index 0 (gated by focus)
-            character: 'fok'
+            character: character as 'fok' | 'fok_alt'
         });
 
         // Network hooks for local player
@@ -902,6 +927,179 @@ export class OnlineGameScene extends Phaser.Scene {
     private createUI(): void {
         this.connectionStatusText?.setVisible(false);
         // Ping/FPS display is handled by MatchHUD (centered)
+    }
+
+    private createSelectionUI(): void {
+        const centerX = this.scale.width / 2;
+        const centerY = this.scale.height / 2;
+
+        // Container for selection UI (initially hidden)
+        this.selectionContainer = this.add.container(centerX, centerY);
+        this.selectionContainer.setDepth(500);
+        this.selectionContainer.setVisible(false);
+
+        // Background overlay
+        const bg = this.add.rectangle(0, 0, 600, 400, 0x000000, 0.85);
+        bg.setStrokeStyle(3, 0x4a90d9);
+        this.selectionContainer.add(bg);
+
+        // Title
+        const title = this.add.text(0, -160, 'SELECT CHARACTER', {
+            fontSize: '36px',
+            color: '#4a90d9',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        this.selectionContainer.add(title);
+
+        // Countdown timer
+        this.countdownText = this.add.text(0, -100, '10', {
+            fontSize: '72px',
+            color: '#ffffff',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        this.selectionContainer.add(this.countdownText);
+
+        // My character label
+        const myLabel = this.add.text(-120, 20, 'YOU:', {
+            fontSize: '24px',
+            color: '#88ff88'
+        }).setOrigin(1, 0.5);
+        this.selectionContainer.add(myLabel);
+
+        this.myCharacterText = this.add.text(0, 20, this.selectedCharacter.toUpperCase(), {
+            fontSize: '28px',
+            color: '#ffffff',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        this.selectionContainer.add(this.myCharacterText);
+
+        // Left/Right arrows
+        const leftArrow = this.add.text(-150, 20, '◀', {
+            fontSize: '32px',
+            color: '#4a90d9'
+        }).setOrigin(0.5);
+        this.selectionContainer.add(leftArrow);
+
+        const rightArrow = this.add.text(150, 20, '▶', {
+            fontSize: '32px',
+            color: '#4a90d9'
+        }).setOrigin(0.5);
+        this.selectionContainer.add(rightArrow);
+
+        // Opponent character label
+        const oppLabel = this.add.text(-120, 80, 'OPP:', {
+            fontSize: '24px',
+            color: '#ff8888'
+        }).setOrigin(1, 0.5);
+        this.selectionContainer.add(oppLabel);
+
+        this.opponentCharacterText = this.add.text(0, 80, this.opponentCharacter.toUpperCase(), {
+            fontSize: '28px',
+            color: '#888888',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        this.selectionContainer.add(this.opponentCharacterText);
+
+        // Instructions
+        this.selectionInstructions = this.add.text(0, 150, '← / → to change | A/D keys', {
+            fontSize: '18px',
+            color: '#888888'
+        }).setOrigin(0.5);
+        this.selectionContainer.add(this.selectionInstructions);
+
+        // Make UI camera render this on top
+        if (this.uiCamera) {
+            this.cameras.main.ignore(this.selectionContainer);
+        }
+    }
+
+    private handleSelectionStart(countdown: number): void {
+        console.log(`[OnlineGameScene] Selection phase started: ${countdown}s`);
+        this.phase = 'SELECTING';
+        this.selectionCountdown = countdown;
+        this.connectionStatusText?.setVisible(false);
+        this.selectionContainer.setVisible(true);
+        this.countdownText.setText(countdown.toString());
+    }
+
+    private handleSelectionTick(countdown: number): void {
+        this.selectionCountdown = countdown;
+        this.countdownText.setText(countdown.toString());
+
+        // Flash effect on low countdown
+        if (countdown <= 3) {
+            this.countdownText.setColor('#ff5555');
+        }
+    }
+
+    private handleOpponentCharacterSelect(_playerId: number, character: string): void {
+        this.opponentCharacter = character;
+        this.opponentCharacterText.setText(character.toUpperCase());
+    }
+
+    private handleGameStart(players: { playerId: number; character: string }[]): void {
+        console.log('[OnlineGameScene] Game starting with players:', players);
+        this.phase = 'PLAYING';
+
+        // Hide selection UI
+        this.selectionContainer.setVisible(false);
+
+        // Create MatchHUD
+        this.createUI();
+        this.matchHUD = new MatchHUD(this);
+        this.matchHUD.addToCameraIgnore(this.cameras.main);
+
+        // Spawn players with their selected characters
+        const spawnPoints = [600, 1200];
+        players.forEach((p, idx) => {
+            const player = this.createPlayer(p.playerId, spawnPoints[idx % 2], 780, p.character);
+            this.players.set(p.playerId, player);
+
+            if (p.playerId === this.localPlayerId) {
+                this.localPlayer = player;
+            }
+        });
+    }
+
+    private cycleCharacter(direction: number): void {
+        if (this.phase !== 'SELECTING') return;
+
+        this.selectedCharIndex = (this.selectedCharIndex + direction + this.availableCharacters.length) % this.availableCharacters.length;
+        this.selectedCharacter = this.availableCharacters[this.selectedCharIndex];
+        this.myCharacterText.setText(this.selectedCharacter.toUpperCase());
+
+        // Send to server
+        this.networkManager.sendCharacterSelect(this.selectedCharacter);
+    }
+
+    // Input state for debouncing
+    private selectionInputHeld: boolean = false;
+
+    private pollSelectionInput(): void {
+        // Check keyboard
+        const cursors = this.input.keyboard?.createCursorKeys();
+        const aKey = this.input.keyboard?.addKey('A');
+        const dKey = this.input.keyboard?.addKey('D');
+
+        const leftPressed = cursors?.left?.isDown || aKey?.isDown;
+        const rightPressed = cursors?.right?.isDown || dKey?.isDown;
+
+        // Check gamepad
+        const pad = this.input.gamepad?.pad1;
+        const padLeft = pad?.left || (pad?.leftStick?.x ?? 0) < -0.5;
+        const padRight = pad?.right || (pad?.leftStick?.x ?? 0) > 0.5;
+
+        const anyLeft = leftPressed || padLeft;
+        const anyRight = rightPressed || padRight;
+
+        // Debounce: only trigger on press, not hold
+        if ((anyLeft || anyRight) && !this.selectionInputHeld) {
+            this.selectionInputHeld = true;
+            if (anyLeft) this.cycleCharacter(-1);
+            else if (anyRight) this.cycleCharacter(1);
+        } else if (!anyLeft && !anyRight) {
+            this.selectionInputHeld = false;
+        }
     }
 
     private createStage(): void {

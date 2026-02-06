@@ -97,3 +97,11 @@
 - **[UX]** Local Lobby: Removed multi-player slots; restricted to **Player 1 Only**.
 - **[UX]** Auto-Start: Implemented automatic match start (500ms delay) upon P1 Ready confirmation.
 - **[Fix]** Lobby Logic: Bypassed P2-P4 joining logic to streamline local testing flow.
+
+### [2026-02-06] v0.6.2 - In-Room Online Selection
+- **[V]** `v0.6.2`
+- **[New]** Online Flow: Removed external lobby; character selection now happens inside `OnlineGameScene`.
+- **[New]** Selection Timer: 10-second countdown starts when 2nd player joins.
+- **[UX]** Character Cycling: Added A/D and Arrow key support for choosing characters during countdown.
+- **[Fix]** Persistence: Implemented server-side room reset and timer cleanup for reliable re-joins.
+- **[S]** **STATUS**: v0.6.2 Complete. Online matchmaking setup is now localized and automated.

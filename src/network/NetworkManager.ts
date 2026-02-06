@@ -30,7 +30,11 @@ export const NetMessageType = {
     PONG: 'pong',
     INPUT_ACK: 'input_ack', // Server acknowledges input received
     REMATCH_VOTE: 'rematch_vote',
-    REMATCH_START: 'rematch_start'
+    REMATCH_START: 'rematch_start',
+    // Character Selection
+    CHARACTER_SELECT: 'character_select',
+    SELECTION_START: 'selection_start',
+    SELECTION_TICK: 'selection_tick'
 } as const;
 
 // Serialized input for network transmission
@@ -86,6 +90,11 @@ export type AttackCallback = (attack: NetAttackEvent) => void;
 export type HitCallback = (hit: NetHitEvent) => void;
 export type RematchStartCallback = () => void;
 export type PlayerLeftCallback = (playerId: number) => void;
+// Selection callbacks
+export type SelectionStartCallback = (countdown: number) => void;
+export type SelectionTickCallback = (countdown: number) => void;
+export type CharacterSelectCallback = (playerId: number, character: string) => void;
+export type GameStartCallback = (players: { playerId: number; character: string }[]) => void;
 
 class NetworkManager {
     private static instance: NetworkManager | null = null;
@@ -113,6 +122,11 @@ class NetworkManager {
     private onHitCallback: HitCallback | null = null;
     private onRematchStartCallback: RematchStartCallback | null = null;
     private onPlayerLeftCallback: PlayerLeftCallback | null = null;
+    // Selection callbacks
+    private onSelectionStartCallback: SelectionStartCallback | null = null;
+    private onSelectionTickCallback: SelectionTickCallback | null = null;
+    private onCharacterSelectCallback: CharacterSelectCallback | null = null;
+    private onGameStartCallback: GameStartCallback | null = null;
 
     // Latency tracking with smoothing
     private lastPingTime: number = 0;
@@ -237,6 +251,32 @@ class NetworkManager {
         this.channel.on(NetMessageType.PLAYER_LEFT, (data: Data) => {
             const { playerId } = data as { playerId: number };
             this.onPlayerLeftCallback?.(playerId);
+        });
+
+        // Selection phase events
+        this.channel.on(NetMessageType.SELECTION_START, (data: Data) => {
+            const { countdown } = data as { countdown: number };
+            console.log(`[NetworkManager] Selection started, ${countdown}s`);
+            this.onSelectionStartCallback?.(countdown);
+        });
+
+        this.channel.on(NetMessageType.SELECTION_TICK, (data: Data) => {
+            const { countdown } = data as { countdown: number };
+            this.onSelectionTickCallback?.(countdown);
+        });
+
+        this.channel.on(NetMessageType.CHARACTER_SELECT, (data: Data) => {
+            const { playerId, character } = data as { playerId: number; character: string };
+            // Only notify for other players (not self echo)
+            if (playerId !== this.localPlayerId) {
+                this.onCharacterSelectCallback?.(playerId, character);
+            }
+        });
+
+        this.channel.on(NetMessageType.GAME_START, (data: Data) => {
+            const { players } = data as { players: { playerId: number; character: string }[] };
+            console.log('[NetworkManager] Game starting!', players);
+            this.onGameStartCallback?.(players);
         });
     }
 
@@ -387,6 +427,11 @@ class NetworkManager {
     public onHit(callback: HitCallback): void { this.onHitCallback = callback; }
     public onRematchStart(callback: RematchStartCallback): void { this.onRematchStartCallback = callback; }
     public onPlayerLeft(callback: PlayerLeftCallback): void { this.onPlayerLeftCallback = callback; }
+    // Selection callbacks
+    public onSelectionStart(callback: SelectionStartCallback): void { this.onSelectionStartCallback = callback; }
+    public onSelectionTick(callback: SelectionTickCallback): void { this.onSelectionTickCallback = callback; }
+    public onCharacterSelect(callback: CharacterSelectCallback): void { this.onCharacterSelectCallback = callback; }
+    public onGameStart(callback: GameStartCallback): void { this.onGameStartCallback = callback; }
 
     /**
      * Send rematch vote to server
@@ -394,6 +439,14 @@ class NetworkManager {
     public sendRematchVote(): void {
         if (!this.connected || !this.channel) return;
         this.channel.emit(NetMessageType.REMATCH_VOTE, { playerId: this.localPlayerId }, { reliable: true });
+    }
+
+    /**
+     * Send character selection to server
+     */
+    public sendCharacterSelect(character: string): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.CHARACTER_SELECT, { character }, { reliable: true });
     }
 }
 

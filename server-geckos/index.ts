@@ -15,7 +15,11 @@ const NetMessageType = {
     PING: 'ping',
     PONG: 'pong',
     REMATCH_VOTE: 'rematch_vote',
-    REMATCH_START: 'rematch_start'
+    REMATCH_START: 'rematch_start',
+    // Character Selection
+    CHARACTER_SELECT: 'character_select',
+    SELECTION_START: 'selection_start',
+    SELECTION_TICK: 'selection_tick'
 } as const;
 
 interface PlayerState {
@@ -30,12 +34,18 @@ interface PlayerState {
     animationKey: string;
     damagePercent: number;
     lives: number;
+    character: string; // 'fok' or 'fok_alt'
 }
+
+type RoomPhase = 'WAITING' | 'SELECTING' | 'PLAYING';
 
 interface GameRoom {
     players: Map<string, PlayerState>;
     frame: number;
-    rematchVotes: Set<string>; // Track channel IDs that voted for rematch
+    rematchVotes: Set<string>;
+    phase: RoomPhase;
+    selectionTimer: ReturnType<typeof setInterval> | null;
+    selectionCountdown: number;
 }
 
 // Animation key enum for binary decoding (must match client BinaryCodec.ts)
@@ -98,7 +108,14 @@ io.onConnection((channel) => {
 
     // Create room if needed
     if (!rooms.has(roomId)) {
-        rooms.set(roomId, { players: new Map(), frame: 0, rematchVotes: new Set() });
+        rooms.set(roomId, {
+            players: new Map(),
+            frame: 0,
+            rematchVotes: new Set(),
+            phase: 'WAITING',
+            selectionTimer: null,
+            selectionCountdown: 10
+        });
     }
     const room = rooms.get(roomId)!;
 
@@ -129,13 +146,71 @@ io.onConnection((channel) => {
         isAttacking: false,
         animationKey: '',
         damagePercent: 0,
-        lives: 3
+        lives: 3,
+        character: 'fok' // Default character
     };
 
     room.players.set(channel.id!, playerState);
 
-    // Notify player of their ID
-    channel.emit(NetMessageType.PLAYER_JOINED, { playerId });
+    // Notify player of their ID and current phase
+    channel.emit(NetMessageType.PLAYER_JOINED, {
+        playerId,
+        phase: room.phase,
+        countdown: room.selectionCountdown
+    });
+
+    // Check if we should start selection phase (2 players present)
+    if (room.players.size === 2 && room.phase === 'WAITING') {
+        room.phase = 'SELECTING';
+        room.selectionCountdown = 10;
+
+        console.log('[Server] 2 players connected - starting selection phase');
+
+        // Broadcast selection start to all players
+        io.emit(NetMessageType.SELECTION_START, { countdown: 10 });
+
+        // Start countdown timer
+        room.selectionTimer = setInterval(() => {
+            room.selectionCountdown--;
+
+            if (room.selectionCountdown > 0) {
+                io.emit(NetMessageType.SELECTION_TICK, { countdown: room.selectionCountdown });
+            } else {
+                // Time's up - start the game
+                if (room.selectionTimer) {
+                    clearInterval(room.selectionTimer);
+                    room.selectionTimer = null;
+                }
+                room.phase = 'PLAYING';
+
+                // Collect final character selections
+                const playerCharacters: { playerId: number; character: string }[] = [];
+                room.players.forEach((p) => {
+                    playerCharacters.push({ playerId: p.playerId, character: p.character });
+                });
+
+                console.log('[Server] Selection complete - starting game', playerCharacters);
+                io.emit(NetMessageType.GAME_START, { players: playerCharacters });
+            }
+        }, 1000);
+    }
+
+    // Handle character selection during SELECTING phase
+    channel.on(NetMessageType.CHARACTER_SELECT, (data: any) => {
+        const player = room.players.get(channel.id!);
+        if (!player) return;
+        if (room.phase !== 'SELECTING') return;
+        if (!data?.character) return;
+
+        player.character = data.character;
+        console.log(`[Server] Player ${player.playerId} selected character: ${data.character}`);
+
+        // Relay to other players
+        io.emit(NetMessageType.CHARACTER_SELECT, {
+            playerId: player.playerId,
+            character: data.character
+        });
+    });
 
     // Handle input from client (legacy - still accept inputs but don't use for physics)
     channel.on(NetMessageType.INPUT, (data: any) => {
@@ -198,10 +273,32 @@ io.onConnection((channel) => {
     channel.onDisconnect(() => {
         console.log(`[Server] Player ${playerId} disconnected`);
         room.players.delete(channel.id!);
-        room.rematchVotes.delete(channel.id!); // Clear their vote
+        room.rematchVotes.delete(channel.id!);
 
         // Broadcast departure
         io.emit(NetMessageType.PLAYER_LEFT, { playerId });
+
+        // If room is now empty, reset it
+        if (room.players.size === 0) {
+            console.log('[Server] Room empty - resetting state');
+            if (room.selectionTimer) {
+                clearInterval(room.selectionTimer);
+                room.selectionTimer = null;
+            }
+            room.phase = 'WAITING';
+            room.selectionCountdown = 10;
+            room.frame = 0;
+        }
+        // If only 1 player left during selection, cancel selection
+        else if (room.players.size === 1 && room.phase === 'SELECTING') {
+            console.log('[Server] Only 1 player left during selection - reverting to WAITING');
+            if (room.selectionTimer) {
+                clearInterval(room.selectionTimer);
+                room.selectionTimer = null;
+            }
+            room.phase = 'WAITING';
+            room.selectionCountdown = 10;
+        }
     });
 
     // Handle rematch vote
