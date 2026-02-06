@@ -2,6 +2,7 @@
     "name": "sgalalla-server",
     "version": "1.0.0",
     "description": "Sgalalla Game Server (Geckos.io)",
+    "type": "module",
     "main": "dist/index.js",
     "scripts": {
         "dev": "npx tsx watch index.ts",

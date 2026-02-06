@@ -146,3 +146,8 @@
 - **[V]** `v0.6.8`
 - **[Fix]** Build: Updated `server-geckos/tsconfig.json` to output to `./dist` so Docker can find `index.js`.
 - **[S]** **STATUS**: v0.6.8 Complete. Fixes `MODULE_NOT_FOUND` crash on Fly.io.
+
+### [2026-02-06] v0.6.9 - Server Optimization
+- **[V]** `v0.6.9`
+- **[Perf]** Boot: Added `"type": "module"` to `server-geckos/package.json` to fix Node.js ESM performance warning.
+- **[S]** **STATUS**: v0.6.9 Complete. Server boot is clean and optimized.
