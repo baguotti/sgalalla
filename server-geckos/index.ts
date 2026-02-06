@@ -101,6 +101,12 @@ const rooms: Map<string, GameRoom> = new Map();
 const httpServer = http.createServer((req, res) => {
     // Log every request to debug connectivity
     console.log(`[HTTP] ${req.method} ${req.url} from ${req.socket.remoteAddress}`);
+
+    // Basic health check response to prevent hanging
+    if (req.url === '/' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('Geckos.io Game Server is Running! 🦎\n');
+    }
 });
 
 // Create Geckos.io server with TURN relay for Fly.io compatibility

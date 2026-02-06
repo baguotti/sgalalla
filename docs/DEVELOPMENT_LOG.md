@@ -191,3 +191,10 @@
 - **[Fix]** Sync: Confirmed all files (including `src`) are correctly pushed to `main`.
 - **[S]** **STATUS**: v0.6.17 Complete. Connection successfully established using client-side relay force.
 
+### [2026-02-06] v0.6.18 - Explicit Port 3000 Strategy
+- **[V]** `v0.6.18`
+- **[Fix]** Fly.io: Removed `[http_service]` abstraction.
+- **[Fix]** Infrastructure: Defined explicit TCP (Signaling/TLS) and UDP (Game) services on Port 3000.
+- **[Fix]** Client: Updated `NetworkManager.ts` to connect strictly to `https://...:3000`.
+- **[S]** **STATUS**: v0.6.18 Complete. Pure Port 3000 architecture enabled.
+
