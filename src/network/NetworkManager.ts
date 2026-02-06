@@ -112,9 +112,10 @@ class NetworkManager {
     private onHitCallback: HitCallback | null = null;
     private onRematchStartCallback: RematchStartCallback | null = null;
 
-    // Latency tracking
+    // Latency tracking with smoothing
     private lastPingTime: number = 0;
     private latency: number = 0;
+    private smoothedLatency: number = 0;  // EMA for stable display
 
     private constructor() { }
 
@@ -195,9 +196,15 @@ class NetworkManager {
             this.onStateUpdateCallback?.(state);
         });
 
-        // Latency measurement
+        // Latency measurement with EMA smoothing
         this.channel.on(NetMessageType.PONG, () => {
             this.latency = Date.now() - this.lastPingTime;
+            // EMA: smoothed = alpha * new + (1 - alpha) * old (alpha = 0.3 for responsive smoothing)
+            if (this.smoothedLatency === 0) {
+                this.smoothedLatency = this.latency;
+            } else {
+                this.smoothedLatency = 0.3 * this.latency + 0.7 * this.smoothedLatency;
+            }
         });
 
         // Attack events from other players
@@ -359,7 +366,7 @@ class NetworkManager {
     // Getters
     public isConnected(): boolean { return this.connected; }
     public getLocalPlayerId(): number { return this.localPlayerId; }
-    public getLatency(): number { return this.latency; }
+    public getLatency(): number { return Math.round(this.smoothedLatency); }
     public getCurrentFrame(): number { return this.currentFrame; }
     public getLocalFrame(): number { return this.localFrame; }
     public getConfirmedFrame(): number { return this.confirmedFrame; }

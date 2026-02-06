@@ -43,13 +43,12 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // Network throttling
     private stateThrottleCounter: number = 0;
-    private readonly STATE_SEND_INTERVAL: number = 3; // sendState every 3rd frame (~20Hz)
+    private readonly STATE_SEND_INTERVAL: number = 2; // sendState every 2nd frame (~30Hz)
     private inputThrottleCounter: number = 0;
     private readonly INPUT_SEND_INTERVAL: number = 1; // sendInput every frame (~60Hz)
 
-    // Jitter buffer for incoming state updates
-    private stateBuffer: Array<{ state: any, timestamp: number }> = [];
-    private readonly JITTER_BUFFER_MS: number = 100; // 100ms render delay for smoothing
+    // Remote player target state for smooth interpolation
+    private remoteTargets: Map<number, NetPlayerState> = new Map();
 
     // Wall configuration (matching GameScene)
     private readonly WALL_THICKNESS = 45;
@@ -195,7 +194,6 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     async create(): Promise<void> {
-        console.log('[OnlineGameScene] Initializing...');
 
         // Create animations first
         this.createAnimations();
@@ -246,9 +244,9 @@ export class OnlineGameScene extends Phaser.Scene {
         // Main camera should NOT render HUD, only uiCamera should.
         this.matchHUD.addToCameraIgnore(this.cameras.main);
 
-        // Start ping loop
+        // Start ping loop (2s interval to reduce potential stutter)
         this.time.addEvent({
-            delay: 1000,
+            delay: 2000,
             callback: () => this.networkManager.ping(),
             loop: true
         });
@@ -274,8 +272,8 @@ export class OnlineGameScene extends Phaser.Scene {
             this.networkManager.sendInput(input);
         }
 
-        // Save snapshot BEFORE applying input (for rollback)
-        if (this.localPlayer) {
+        // Save snapshot every 3 frames (reduce GC pressure)
+        if (this.localPlayer && this.localFrame % 3 === 0) {
             const snapshot: GameSnapshot = {
                 frame: this.localFrame,
                 timestamp: Date.now(),
@@ -332,12 +330,44 @@ export class OnlineGameScene extends Phaser.Scene {
             });
         }
 
+        // Dead-reckoning: update remote players based on velocity every frame
+        this.players.forEach((player, playerId) => {
+            if (playerId !== this.localPlayerId) {
+                const dt = delta / 1000; // Convert to seconds
+                const target = this.remoteTargets.get(playerId);
+
+                if (target) {
+                    // Apply velocity-based prediction
+                    player.x += player.velocity.x * dt;
+                    player.y += player.velocity.y * dt;
+
+                    // Smooth correction toward target (entity interpolation)
+                    const dx = target.x - player.x;
+                    const dy = target.y - player.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    // Snap if too far, otherwise blend
+                    if (dist > 300) {
+                        player.x = target.x;
+                        player.y = target.y;
+                    } else if (dist > 1) {
+                        // Blend toward target (0.4 = balanced smoothness/responsiveness)
+                        player.x += dx * 0.4;
+                        player.y += dy * 0.4;
+                    }
+                }
+
+                // Check blast zone for remote players
+                this.checkBlastZone(player);
+            }
+        });
+
         // Update remote players (animations/logic, no physics)
         this.players.forEach((player) => {
             if (player !== this.localPlayer) {
                 // Update logic for animations (but not physics)
                 player.updateLogic(delta);
-                this.checkBlastZone(player);
+                // checkBlastZone is now handled in the dead-reckoning loop above
             }
         });
 
@@ -363,16 +393,8 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private handleStateUpdate(state: NetGameState): void {
-        // Jitter buffer: delay processing by JITTER_BUFFER_MS for smoother updates
-        const now = Date.now();
-        this.stateBuffer.push({ state, timestamp: now });
-
-        // Process buffered states that are old enough
-        while (this.stateBuffer.length > 0 &&
-            (now - this.stateBuffer[0].timestamp >= this.JITTER_BUFFER_MS)) {
-            const bufferedState = this.stateBuffer.shift()!;
-            this.processStateUpdate(bufferedState.state);
-        }
+        // Process state updates immediately (no jitter buffer)
+        this.processStateUpdate(state);
     }
 
     private processStateUpdate(state: NetGameState): void {
@@ -390,7 +412,6 @@ export class OnlineGameScene extends Phaser.Scene {
                     this.localPlayer = player;
                     // Let the player poll its own internal InputManager (like GameScene does)
                     // this.localPlayer.useExternalInput = true;
-                    console.log('[OnlineGameScene] Local player using internal InputManager polling');
                 }
 
                 // Add to HUD
@@ -437,10 +458,8 @@ export class OnlineGameScene extends Phaser.Scene {
      * Handle remote hit events - apply damage/knockback
      */
     private handleHitEvent(event: NetHitEvent): void {
-        console.log(`[OnlineGame] handleHitEvent: victim=${event.victimId}, localPlayer=${this.localPlayerId}`);
         // If we are the victim, apply damage/knockback
         if (event.victimId === this.localPlayerId && this.localPlayer) {
-            console.log(`[OnlineGame] Applying hit to local player - damage=${event.damage}`);
             // Apply damage
             this.localPlayer.takeDamage(event.damage);
 
@@ -456,7 +475,6 @@ export class OnlineGameScene extends Phaser.Scene {
         // FIX: If we hit a remote player, apply visual knockback to them locally
         const remoteVictim = this.players.get(event.victimId);
         if (remoteVictim && event.victimId !== this.localPlayerId) {
-            console.log(`[OnlineGame] Applying visual knockback to remote player ${event.victimId}`);
             remoteVictim.setVelocity(event.knockbackX, event.knockbackY);
             remoteVictim.playHurtAnimation();
 
@@ -468,45 +486,26 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private interpolatePlayer(player: Player, netState: NetPlayerState): void {
-        // Adaptive interpolation - smooth at high speeds, snappy at low speeds
-        const dx = Math.abs(player.x - netState.x);
-        const dy = Math.abs(player.y - netState.y);
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        // Store target for dead-reckoning in update loop
+        this.remoteTargets.set(netState.playerId, netState);
 
-        // Adaptive lerp: lower factor for large distances (smooth), higher for small (snappy)
-        // Range: 0.2 (far) to 0.6 (close)
-        const lerpFactor = Phaser.Math.Clamp(1 - (distance / 200), 0.2, 0.6);
-
-        // Snap threshold - if very close, just snap
-        const snapThreshold = 3;
-        const TELEPORT_THRESHOLD = 500;
-
-        if (distance < snapThreshold || distance > TELEPORT_THRESHOLD) {
-            player.x = netState.x;
-            player.y = netState.y;
-        } else {
-            player.x = Phaser.Math.Linear(player.x, netState.x, lerpFactor);
-            player.y = Phaser.Math.Linear(player.y, netState.y, lerpFactor);
-        }
-
+        // Update velocity immediately (used for dead-reckoning prediction)
         player.velocity.x = netState.velocityX;
         player.velocity.y = netState.velocityY;
+
+        // Sync other state directly
         player.isGrounded = netState.isGrounded;
         player.isAttacking = netState.isAttacking;
         player.animationKey = netState.animationKey || '';
         player.setFacingDirection(netState.facingDirection);
 
         // Sync Damage
-        // Only update if changed to avoid unnecessary visual updates
-        // Sync Damage
-        // Only update if changed to avoid unnecessary visual updates
         if (player.damagePercent !== netState.damagePercent) {
             player.setDamage(netState.damagePercent);
         }
 
         // Debug: Log state changes
         if (netState.animationKey && netState.animationKey !== 'idle' && netState.animationKey !== 'run') {
-            console.log(`[Remote] Player ${netState.playerId} animationKey='${netState.animationKey}'`);
         }
     }
 
@@ -529,7 +528,6 @@ export class OnlineGameScene extends Phaser.Scene {
 
             // Score update (lives)
             player.lives = Math.max(0, player.lives - 1);
-            console.log(`[Online] Local Player died. Lives: ${player.lives}`);
 
             if (player.lives > 0) {
                 this.respawnPlayer(player);
@@ -572,7 +570,6 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private killPlayer(player: Player): void {
-        console.log(`[Online] Player ${player.playerId} ELIMINATED!`);
         player.setActive(false);
         player.setVisible(false);
         player.setPosition(-9999, -9999);
@@ -613,7 +610,6 @@ export class OnlineGameScene extends Phaser.Scene {
     private handleGameOver(winnerId: number): void {
         this.isGameOver = true;
         this.hasVotedRematch = false;
-        console.log("GAME OVER! Winner:", winnerId);
 
         const { width, height } = this.scale;
 
@@ -773,7 +769,6 @@ export class OnlineGameScene extends Phaser.Scene {
     private handleRematchVote(): void {
         if (this.hasVotedRematch) return;
         this.hasVotedRematch = true;
-        console.log('[OnlineGame] Voting for rematch...');
         this.networkManager.sendRematchVote();
         this.rematchButton.setText('WAITING...');
         this.rematchButton.setColor('#888888');
@@ -781,13 +776,11 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private handleLeave(): void {
-        console.log('[OnlineGame] Leaving match...');
         this.networkManager.disconnect();
         this.scene.start('MainMenuScene');
     }
 
     private handleRematchStart(): void {
-        console.log('[OnlineGame] Rematch starting! Resetting game...');
 
         // Clear game over UI
         if (this.gameOverContainer) {
@@ -819,12 +812,10 @@ export class OnlineGameScene extends Phaser.Scene {
             player.resetVisuals();
         });
 
-        console.log('[OnlineGame] Rematch reset complete!');
     }
 
     private createPlayer(playerId: number, x: number, y: number): Player {
         const isLocal = playerId === this.localPlayerId;
-        console.log(`[OnlineGameScene] Creating Player ${playerId}, isLocal=${isLocal}`);
 
         const player = new Player(this, x, y, {
             playerId: playerId,
@@ -844,7 +835,6 @@ export class OnlineGameScene extends Phaser.Scene {
                 // Determine victim ID
                 if (target instanceof Player) {
                     this.networkManager.sendHit(target.playerId, dmg, kx, ky);
-                    console.log(`[OnlineGame] Hit remote player ${target.playerId} for ${dmg} dmg`);
                 }
             };
         }
@@ -860,7 +850,6 @@ export class OnlineGameScene extends Phaser.Scene {
                 // Calculate what damage would be for Visual Flash only
                 const estimatedDamage = player.damagePercent + amount;
                 player.flashDamageColor(estimatedDamage);
-                console.log(`[RemotePlayer] Visual Hit Flash (Damage not applied locally)`);
             };
         }
 
