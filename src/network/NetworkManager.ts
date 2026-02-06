@@ -30,7 +30,14 @@ export const NetMessageType = {
     PONG: 'pong',
     INPUT_ACK: 'input_ack', // Server acknowledges input received
     REMATCH_VOTE: 'rematch_vote',
-    REMATCH_START: 'rematch_start'
+    REMATCH_START: 'rematch_start',
+    // Lobby events
+    LOBBY_JOIN: 'lobby_join',
+    LOBBY_CHARACTER: 'lobby_character',
+    LOBBY_READY: 'lobby_ready',
+    LOBBY_LEAVE: 'lobby_leave',
+    LOBBY_STATE: 'lobby_state',
+    LOBBY_START: 'lobby_start'
 } as const;
 
 // Serialized input for network transmission
@@ -86,6 +93,8 @@ export type AttackCallback = (attack: NetAttackEvent) => void;
 export type HitCallback = (hit: NetHitEvent) => void;
 export type RematchStartCallback = () => void;
 export type PlayerLeftCallback = (playerId: number) => void;
+export type LobbyStateCallback = (players: any[]) => void;
+export type LobbyStartCallback = (players: any[]) => void;
 
 class NetworkManager {
     private static instance: NetworkManager | null = null;
@@ -113,6 +122,8 @@ class NetworkManager {
     private onHitCallback: HitCallback | null = null;
     private onRematchStartCallback: RematchStartCallback | null = null;
     private onPlayerLeftCallback: PlayerLeftCallback | null = null;
+    private onLobbyStateCallback: LobbyStateCallback | null = null;
+    private onLobbyStartCallback: LobbyStartCallback | null = null;
 
     // Latency tracking with smoothing
     private lastPingTime: number = 0;
@@ -237,6 +248,18 @@ class NetworkManager {
         this.channel.on(NetMessageType.PLAYER_LEFT, (data: Data) => {
             const { playerId } = data as { playerId: number };
             this.onPlayerLeftCallback?.(playerId);
+        });
+
+        // Lobby state update
+        this.channel.on(NetMessageType.LOBBY_STATE, (data: Data) => {
+            const { players } = data as { players: any[] };
+            this.onLobbyStateCallback?.(players);
+        });
+
+        // Lobby match start
+        this.channel.on(NetMessageType.LOBBY_START, (data: Data) => {
+            const { players } = data as { players: any[] };
+            this.onLobbyStartCallback?.(players);
         });
     }
 
@@ -387,6 +410,32 @@ class NetworkManager {
     public onHit(callback: HitCallback): void { this.onHitCallback = callback; }
     public onRematchStart(callback: RematchStartCallback): void { this.onRematchStartCallback = callback; }
     public onPlayerLeft(callback: PlayerLeftCallback): void { this.onPlayerLeftCallback = callback; }
+    public onLobbyState(callback: LobbyStateCallback): void { this.onLobbyStateCallback = callback; }
+    public onLobbyStart(callback: LobbyStartCallback): void { this.onLobbyStartCallback = callback; }
+
+    /**
+     * Send lobby join request
+     */
+    public sendLobbyJoin(): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.LOBBY_JOIN, {}, { reliable: true });
+    }
+
+    /**
+     * Send character selection
+     */
+    public sendLobbyCharacter(characterId: string): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.LOBBY_CHARACTER, { characterId }, { reliable: true });
+    }
+
+    /**
+     * Send ready toggle
+     */
+    public sendLobbyReady(isReady: boolean): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.LOBBY_READY, { isReady }, { reliable: true });
+    }
 
     /**
      * Send rematch vote to server

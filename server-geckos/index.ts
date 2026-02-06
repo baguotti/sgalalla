@@ -4,6 +4,7 @@
  */
 
 import geckos, { iceServers } from '@geckos.io/server';
+import { LobbyManager } from './LobbyManager';
 
 // Network message types (mirrored from client)
 const NetMessageType = {
@@ -15,7 +16,13 @@ const NetMessageType = {
     PING: 'ping',
     PONG: 'pong',
     REMATCH_VOTE: 'rematch_vote',
-    REMATCH_START: 'rematch_start'
+    REMATCH_START: 'rematch_start',
+    LOBBY_JOIN: 'lobby_join',
+    LOBBY_CHARACTER: 'lobby_character',
+    LOBBY_READY: 'lobby_ready',
+    LOBBY_LEAVE: 'lobby_leave',
+    LOBBY_STATE: 'lobby_state',
+    LOBBY_START: 'lobby_start'
 } as const;
 
 interface PlayerState {
@@ -82,6 +89,7 @@ function decodeBinaryPlayerState(buffer: ArrayBuffer): Partial<PlayerState> | nu
 
 const PORT = 9208;
 const rooms: Map<string, GameRoom> = new Map();
+const lobbyManager = new LobbyManager();
 // Removed global nextPlayerId
 
 // Create Geckos.io server (v3 API - no separate HTTP server needed)
@@ -102,40 +110,19 @@ io.onConnection((channel) => {
     }
     const room = rooms.get(roomId)!;
 
-    // Find lowest available player ID
-    const existingIds = new Set<number>();
-    room.players.forEach(p => existingIds.add(p.playerId));
 
-    let playerId = 0;
-    while (existingIds.has(playerId)) {
-        playerId++;
-    }
 
-    console.log(`[Server] Player ${playerId} connected (${channel.id})`);
+    console.log(`[Server] Player connected (${channel.id})`);
 
-    // Initialize player state (spawn on main platform at y=780)
-    // Platform spans x=285 to x=1635 (center=960, width=1350)
-    // Use fixed spawn points, alternating based on playerId
-    const spawnPoints = [600, 1200]; // Both well within platform
-    const spawnX = spawnPoints[playerId % 2];
-    const playerState: PlayerState = {
-        playerId,
-        x: spawnX,
-        y: 780,
-        velocityX: 0,
-        velocityY: 0,
-        facingDirection: playerId % 2 === 0 ? 1 : -1,
-        isGrounded: true,
-        isAttacking: false,
-        animationKey: '',
-        damagePercent: 0,
-        lives: 3
-    };
+    // Join channel to room for broadcasting
+    channel.join(roomId);
 
-    room.players.set(channel.id!, playerState);
+    // Notify player of connection (triggers client onConnected callback)
+    channel.emit(NetMessageType.PLAYER_JOINED, { playerId: 0 }); // playerId will be assigned by lobby
 
-    // Notify player of their ID
-    channel.emit(NetMessageType.PLAYER_JOINED, { playerId });
+    // NOTE: Game room player creation is deferred until lobby match start
+    // Lobby handles player registration separately via LOBBY_JOIN event
+
 
     // Handle input from client (legacy - still accept inputs but don't use for physics)
     channel.on(NetMessageType.INPUT, (data: any) => {
@@ -194,19 +181,58 @@ io.onConnection((channel) => {
         io.emit('hit_event', data);
     });
 
+    // ===== LOBBY EVENT HANDLERS =====
+
+    // Create lobby for this room
+    if (!lobbyManager.getLobbyState(roomId)) {
+        lobbyManager.createLobby(roomId);
+    }
+
+    // Lobby join
+    channel.on(NetMessageType.LOBBY_JOIN, () => {
+        const result = lobbyManager.joinLobby(roomId, channel.id!);
+        if (result.success) {
+            console.log(`[Server] Player joined lobby: slot ${result.slotIndex}`);
+            const lobbyState = lobbyManager.getLobbyState(roomId);
+            channel.room?.emit(NetMessageType.LOBBY_STATE, { players: lobbyState });
+        }
+    });
+
+    // Character selection
+    channel.on(NetMessageType.LOBBY_CHARACTER, (data: any) => {
+        const { characterId } = data;
+        lobbyManager.selectCharacter(roomId, channel.id!, characterId);
+        const lobbyState = lobbyManager.getLobbyState(roomId);
+        channel.room?.emit(NetMessageType.LOBBY_STATE, { players: lobbyState });
+    });
+
+    // Ready toggle
+    channel.on(NetMessageType.LOBBY_READY, () => {
+        lobbyManager.toggleReady(roomId, channel.id!);
+        const lobbyState = lobbyManager.getLobbyState(roomId);
+        channel.room?.emit(NetMessageType.LOBBY_STATE, { players: lobbyState });
+
+        // Check if match can start
+        if (lobbyManager.canStartMatch(roomId)) {
+            console.log('[Server] Lobby ready! Starting match...');
+            const players = lobbyManager.getLobbyState(roomId);
+            channel.room?.emit(NetMessageType.LOBBY_START, { players });
+        }
+    });
+
     // Handle disconnect
     channel.onDisconnect(() => {
-        console.log(`[Server] Player ${playerId} disconnected`);
+        console.log(`[Server] Player disconnected (${channel.id})`);
         room.players.delete(channel.id!);
         room.rematchVotes.delete(channel.id!); // Clear their vote
 
         // Broadcast departure
-        io.emit(NetMessageType.PLAYER_LEFT, { playerId });
+        io.emit(NetMessageType.PLAYER_LEFT, { playerId: 0 }); // Legacy event
     });
 
     // Handle rematch vote
     channel.on(NetMessageType.REMATCH_VOTE, () => {
-        console.log(`[Server] Player ${playerId} voted for rematch`);
+        console.log(`[Server] Player ${channel.id} voted for rematch`);
         room.rematchVotes.add(channel.id!);
 
         // Check if all players voted

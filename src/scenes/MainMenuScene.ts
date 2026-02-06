@@ -70,7 +70,7 @@ export class MainMenuScene extends Phaser.Scene {
         } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
             this.changeSelection(1);
         } else if (Phaser.Input.Keyboard.JustDown(this.startKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-            this.selectOption('KEYBOARD');
+            this.selectOption();
         }
 
         this.handleGamepad();
@@ -116,7 +116,7 @@ export class MainMenuScene extends Phaser.Scene {
 
         // A Button (0) or Start (9) to select
         if ((pad.buttons[0].pressed || pad.buttons[9].pressed) && !this.previousButtons['btnA']) {
-            this.selectOption('GAMEPAD', pad.index);
+            this.selectOption();
             this.previousButtons['btnA'] = true;
         } else if (!pad.buttons[0].pressed && !pad.buttons[9].pressed) {
             this.previousButtons['btnA'] = false;
@@ -140,41 +140,14 @@ export class MainMenuScene extends Phaser.Scene {
         });
     }
 
-    private selectOption(inputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD', gamepadIndex: number | null = null): void {
+    private selectOption(): void {
         const mode = this.menuOptions[this.selectedIndex].mode;
 
-        // Handle Online Quick Join
+        // Launch unified lobby for both local and online modes
         if (mode === 'online') {
-            this.scene.start('OnlineGameScene');
-            return;
+            this.scene.start('LobbyScene', { mode: 'online' });
+        } else {
+            this.scene.start('LobbyScene', { mode: 'local' });
         }
-
-        // SKIP LOBBY - Direct Launch GameScene for Local
-        // Default Config: P1 Human vs P2 CPU
-        const playerData = [
-            {
-                playerId: 0,
-                joined: true,
-                character: 'fok',
-                isAI: false,
-                input: {
-                    type: inputType,
-                    gamepadIndex: gamepadIndex
-                }
-            },
-            {
-                playerId: 1,
-                joined: true,
-                character: 'fok', // Default enemy
-                isAI: true, // CPU
-                isTrainingDummy: true, // Force dummy mode
-                input: {
-                    type: 'KEYBOARD',
-                    gamepadIndex: null
-                }
-            }
-        ];
-
-        this.scene.start('GameScene', { playerData: playerData });
     }
 }

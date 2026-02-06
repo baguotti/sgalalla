@@ -1,7 +1,24 @@
 import Phaser from 'phaser';
+import NetworkManager from '../network/NetworkManager';
 
 export type CharacterType = 'fok';
 
+/**
+ * Unified Lobby Player - supports both local and online modes
+ */
+export interface LobbyPlayer {
+    slotIndex: number;           // 0-3 (P1-P4)
+    socketId?: string;           // Online: unique socket ID
+    deviceId: string;            // Local: 'keyboard' or 'gamepad-{index}'
+    characterId: CharacterType;  // Selected character
+    isReady: boolean;            // Ready status
+    inputType: 'KEYBOARD' | 'GAMEPAD';
+    gamepadIndex: number | null;
+}
+
+/**
+ * Legacy interface for GameScene compatibility
+ */
 export interface PlayerSelection {
     playerId: number;
     joined: boolean;
@@ -16,419 +33,502 @@ export interface PlayerSelection {
 }
 
 export class LobbyScene extends Phaser.Scene {
-    private slots: PlayerSelection[] = [];
-    private maxPlayers = 4;
-    private mode: 'versus' | 'training' = 'versus';
-    private initialInputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD';
-    private initialGamepadIndex: number | null = null;
+    // Core State
+    private mode: 'local' | 'online' = 'local';
+    private players: Map<number, LobbyPlayer> = new Map();
+    private readonly MIN_PLAYERS = 2;
+    private readonly MAX_PLAYERS = 4;
+
+    // Character Data
+    private readonly characters: CharacterType[] = ['fok'];
+    private readonly charLabels: string[] = ['Fok'];
 
     // UI Elements
     private slotContainers: Phaser.GameObjects.Container[] = [];
-    private backKey!: Phaser.Input.Keyboard.Key;
+    private instructionText!: Phaser.GameObjects.Text;
 
-    // Character Data
-    private characters: CharacterType[] = ['fok'];
-    private charLabels: string[] = ['Fok'];
+    // Network (online mode)
+    private networkManager: NetworkManager | null = null;
 
-    // Input debounce & Safety
-    private lastInputTime: Map<number, number> = new Map();
-    private joinTime: Map<number, number> = new Map(); // Track when player joined to prevent instant ready
-    private canInput: boolean = false;
-    private initData: any = null;
-    private sceneStartTime: number = 0;
-
-    // Frame inputs (capture once per update to avoid JustDown clearing)
-    private frameInputs = {
-        space: false,
-        enter: false
-    };
-
-    // Keys
+    // Input Management
     private keys!: {
-        left: Phaser.Input.Keyboard.Key;
-        right: Phaser.Input.Keyboard.Key;
-        up: Phaser.Input.Keyboard.Key;
-        down: Phaser.Input.Keyboard.Key;
-        space: Phaser.Input.Keyboard.Key;
         enter: Phaser.Input.Keyboard.Key;
-        w: Phaser.Input.Keyboard.Key;
-        a: Phaser.Input.Keyboard.Key;
-        s: Phaser.Input.Keyboard.Key;
-        d: Phaser.Input.Keyboard.Key;
+        escape: Phaser.Input.Keyboard.Key;
     };
+    private registeredDevices: Set<string> = new Set(); // Track joined devices
+    private lastInputTime: Map<string, number> = new Map(); // Debounce per device
 
     constructor() {
         super({ key: 'LobbyScene' });
     }
 
-    init(data: { mode?: 'versus' | 'training', inputType?: 'KEYBOARD' | 'GAMEPAD', gamepadIndex?: number | null, slots?: PlayerSelection[] } | null): void {
-        console.log('LobbyScene.init called');
-        const safeData = data || {};
-        this.initData = safeData;
-        this.mode = safeData.mode || 'versus';
-        this.initialInputType = safeData.inputType || 'KEYBOARD';
-        this.initialGamepadIndex = safeData.gamepadIndex !== undefined ? safeData.gamepadIndex : null;
+    init(data?: { mode?: 'local' | 'online' }): void {
+        this.mode = data?.mode || 'local';
 
         // Reset state
+        this.players.clear();
+        this.registeredDevices.clear();
         this.lastInputTime.clear();
-        this.joinTime.clear();
-        this.canInput = true; // Enable immediately to debug freeze
-        this.frameInputs = { space: false, enter: false };
-        this.sceneStartTime = Date.now();
     }
 
     create(): void {
-        console.log('LobbyScene.create called');
-        this.slotContainers = []; // CRITICAL: Reset container references on scene restart
-
         const { width, height } = this.scale;
 
         // Background
         this.add.rectangle(0, 0, width, height, 0x1a1a2e).setOrigin(0);
 
         // Title
-        const titleText = this.mode === 'training' ? 'TRAINING MODE' : 'CHARACTER SELECT';
+        const titleText = this.mode === 'online' ? 'ONLINE LOBBY' : 'LOCAL LOBBY';
         this.add.text(width / 2, 60, titleText, {
             fontSize: '48px',
             color: '#ffffff',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        // Instructions (Moved to bottom to avoid overlap with panels)
-        const instructions = this.add.text(width / 2, height - 50, 'Join: [SPACE/ENTER] or [GAMEPAD A]  |  Ready: [SPACE/ENTER] or [GAMEPAD A]', {
+        // Instructions
+        this.instructionText = this.add.text(width / 2, height - 50,
+            'Press [ENTER] or [GAMEPAD START] to Join  |  [SPACE/A] to Ready', {
             fontSize: '20px',
             color: '#8ab4f8'
         }).setOrigin(0.5);
 
-        // Add "Alive" pulse
+        // Pulse animation
         this.tweens.add({
-            targets: instructions,
+            targets: this.instructionText,
             alpha: 0.5,
             duration: 800,
             yoyo: true,
             repeat: -1
         });
 
-        // Initialize Slots
-        if (this.initData?.slots) {
-            // Deep copy to ensure fresh references but keep data
-            this.slots = JSON.parse(JSON.stringify(this.initData.slots));
-            // Reset ready status so they don't auto-start
-            this.slots.forEach(s => {
-                if (s.joined) s.ready = false;
-            });
-            console.log("Restored lobby state:", this.slots);
-        } else {
-            this.slots = Array(4).fill(null).map((_, i) => ({
-                playerId: i,
-                joined: false,
-                ready: false,
-                input: { type: 'KEYBOARD', gamepadIndex: null },
-                character: 'fok'
-            }));
-        }
-
+        // Create slot UI (4 slots)
         this.createSlotUI();
 
-        // Handle specific modes
-        if (this.mode === 'training') {
-            this.setupTrainingMode();
-        }
-
-        // Initialize Keys
+        // Setup input
         this.keys = {
-            left: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),
-            right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
-            up: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP),
-            down: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN),
-            space: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
             enter: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER),
-            w: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-            a: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-            s: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-            d: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D)
+            escape: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
         };
 
-        this.backKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+        // ESC to return to menu
+        this.keys.escape.on('down', () => {
+            if (this.networkManager) {
+                this.networkManager.disconnect();
+            }
+            this.scene.start('MainMenuScene');
+        });
 
-        // Input safety delay removed, canInput set in initKeyboard Join (Only active after safety delay)
-        // We handle joins in update loop now to respect canInput easily, or add checks here.
-        // Let's stick to update loop for consistency or add checks.
+        // Online mode: Connect to server and setup callbacks
+        if (this.mode === 'online') {
+            this.setupOnlineMode();
+        }
     }
 
-    private setupTrainingMode(): void {
-        // Auto-join P1 (if keyboard)
-        const p1 = this.slots[0];
-        p1.joined = true;
-        p1.input.type = this.initialInputType;
-        p1.input.gamepadIndex = this.initialGamepadIndex;
-        // P1 not ready yet
+    /**
+     * Setup network connection and callbacks for online mode
+     */
+    private setupOnlineMode(): void {
+        this.networkManager = NetworkManager.getInstance();
 
-        // Auto-join P2 as Dummy
-        const p2 = this.slots[1];
-        p2.joined = true;
-        p2.input.type = 'KEYBOARD'; // Placeholder
-        p2.isAI = true;
-        p2.isTrainingDummy = true;
-        p2.ready = true; // Dummy is always ready
-        p2.character = 'fok';
+        // Connect to server
+        this.networkManager.connect(9208);
+
+        // Handle connection
+        this.networkManager.onConnected(() => {
+            console.log('[LobbyScene] Connected to server');
+            // Auto-join lobby
+            this.networkManager!.sendLobbyJoin();
+        });
+
+        // Handle lobby state updates
+        this.networkManager.onLobbyState((players: any[]) => {
+            console.log('[LobbyScene] Received lobby state:', players);
+            this.syncLobbyState(players);
+        });
+
+        // Handle match start
+        this.networkManager.onLobbyStart((players: any[]) => {
+            console.log('[LobbyScene] Match starting!', players);
+            // Convert to legacy PlayerSelection format
+            const playerData = players.map(p => ({
+                playerId: p.slotIndex,
+                joined: true,
+                ready: true,
+                input: { type: 'KEYBOARD' as const, gamepadIndex: null },
+                character: p.characterId,
+                isAI: false
+            }));
+            this.scene.start('OnlineGameScene', { playerData });
+        });
+
+        // Handle disconnect
+        this.networkManager.onDisconnect(() => {
+            console.log('[LobbyScene] Disconnected from server');
+            this.scene.start('MainMenuScene');
+        });
     }
 
+    /**
+     * Sync local lobby state from server update (online mode)
+     */
+    private syncLobbyState(serverPlayers: any[]): void {
+        // Clear and rebuild local state
+        this.players.clear();
+        this.registeredDevices.clear();
+
+        serverPlayers.forEach((serverPlayer: any) => {
+            const player: LobbyPlayer = {
+                slotIndex: serverPlayer.slotIndex,
+                socketId: serverPlayer.socketId,
+                deviceId: serverPlayer.socketId, // Use socketId as deviceId for online
+                characterId: serverPlayer.characterId,
+                isReady: serverPlayer.isReady,
+                inputType: 'KEYBOARD', // Online players use keyboard by default
+                gamepadIndex: null
+            };
+            this.players.set(player.slotIndex, player);
+            this.registeredDevices.add(player.deviceId);
+            this.updateSlotUI(player.slotIndex);
+        });
+
+        // Update empty slots
+        for (let i = 0; i < this.MAX_PLAYERS; i++) {
+            if (!this.players.has(i)) {
+                this.updateSlotUI(i);
+            }
+        }
+    }
+
+    update(time: number): void {
+        if (this.mode === 'local') {
+            // Local mode: Handle registration inputs (ENTER/START to join)
+            this.handleRegistrationInput(time);
+
+            // Handle per-player inputs (character selection, ready)
+            this.handlePlayerInputs(time);
+
+            // Check for match start
+            this.checkMatchStart();
+        } else {
+            // Online mode: Only handle inputs for the local player assigned by server
+            this.handleOnlinePlayerInput(time);
+        }
+    }
+
+    /**
+     * Handle inputs for the local player in online mode
+     * (character selection and ready toggle only, no registration)
+     */
+    private handleOnlinePlayerInput(time: number): void {
+        // Find the local player (first player in our map, assigned by server)
+        if (this.players.size === 0) return;
+
+        const localPlayer = this.players.values().next().value as LobbyPlayer;
+        if (!localPlayer) return;
+
+        // Handle keyboard input for local player
+        const leftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+        const rightKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+        const spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+        const lastTime = this.lastInputTime.get('online-local') || 0;
+        const debounce = 200;
+
+        // Character selection
+        if (Phaser.Input.Keyboard.JustDown(leftKey) && time - lastTime > debounce) {
+            this.cycleCharacter(localPlayer, -1);
+            this.lastInputTime.set('online-local', time);
+        }
+        if (Phaser.Input.Keyboard.JustDown(rightKey) && time - lastTime > debounce) {
+            this.cycleCharacter(localPlayer, 1);
+            this.lastInputTime.set('online-local', time);
+        }
+
+        // Ready toggle
+        if (Phaser.Input.Keyboard.JustDown(spaceKey) && time - lastTime > debounce) {
+            this.toggleReady(localPlayer);
+            this.lastInputTime.set('online-local', time);
+        }
+    }
+
+    /**
+     * Listen for ENTER or GAMEPAD START to register new players
+     */
+    private handleRegistrationInput(time: number): void {
+        // Keyboard ENTER
+        if (Phaser.Input.Keyboard.JustDown(this.keys.enter)) {
+            const deviceId = 'keyboard';
+            if (!this.registeredDevices.has(deviceId) && this.canRegisterPlayer()) {
+                this.registerPlayer(deviceId, 'KEYBOARD', null);
+            }
+        }
+
+        // Gamepad START (button 9)
+        const gamepads = this.input.gamepad?.gamepads || [];
+        for (const gp of gamepads) {
+            if (!gp) continue;
+
+            const deviceId = `gamepad-${gp.index}`;
+            const startButton = gp.buttons[9]; // START button
+
+            if (startButton?.pressed && !this.registeredDevices.has(deviceId) && this.canRegisterPlayer()) {
+                // Debounce
+                const lastTime = this.lastInputTime.get(deviceId) || 0;
+                if (time - lastTime > 300) {
+                    this.registerPlayer(deviceId, 'GAMEPAD', gp.index);
+                    this.lastInputTime.set(deviceId, time);
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle character selection and ready toggle for joined players
+     */
+    private handlePlayerInputs(time: number): void {
+        this.players.forEach((player) => {
+            if (player.inputType === 'KEYBOARD') {
+                this.handleKeyboardPlayer(player, time);
+            } else {
+                this.handleGamepadPlayer(player, time);
+            }
+        });
+    }
+
+    private handleKeyboardPlayer(player: LobbyPlayer, time: number): void {
+        const deviceId = player.deviceId;
+        const lastTime = this.lastInputTime.get(deviceId) || 0;
+        const debounce = 200;
+
+        // Character selection (Arrow keys)
+        const leftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+        const rightKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+
+        if (Phaser.Input.Keyboard.JustDown(leftKey) && time - lastTime > debounce) {
+            this.cycleCharacter(player, -1);
+            this.lastInputTime.set(deviceId, time);
+        }
+        if (Phaser.Input.Keyboard.JustDown(rightKey) && time - lastTime > debounce) {
+            this.cycleCharacter(player, 1);
+            this.lastInputTime.set(deviceId, time);
+        }
+
+        // Ready toggle (SPACE)
+        const spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        if (Phaser.Input.Keyboard.JustDown(spaceKey) && time - lastTime > debounce) {
+            this.toggleReady(player);
+            this.lastInputTime.set(deviceId, time);
+        }
+    }
+
+    private handleGamepadPlayer(player: LobbyPlayer, time: number): void {
+        const gp = this.input.gamepad?.gamepads[player.gamepadIndex!];
+        if (!gp) return;
+
+        const deviceId = player.deviceId;
+        const lastTime = this.lastInputTime.get(deviceId) || 0;
+        const debounce = 200;
+
+        // Character selection (D-pad or left stick)
+        const leftPressed = gp.left || gp.leftStick.x < -0.5;
+        const rightPressed = gp.right || gp.leftStick.x > 0.5;
+
+        if (leftPressed && time - lastTime > debounce) {
+            this.cycleCharacter(player, -1);
+            this.lastInputTime.set(deviceId, time);
+        }
+        if (rightPressed && time - lastTime > debounce) {
+            this.cycleCharacter(player, 1);
+            this.lastInputTime.set(deviceId, time);
+        }
+
+        // Ready toggle (A button - button 0)
+        const aButton = gp.buttons[0];
+        if (aButton?.pressed && time - lastTime > debounce) {
+            this.toggleReady(player);
+            this.lastInputTime.set(deviceId, time);
+        }
+    }
+
+    /**
+     * Register a new player to the lobby
+     */
+    private registerPlayer(deviceId: string, inputType: 'KEYBOARD' | 'GAMEPAD', gamepadIndex: number | null): void {
+        const slotIndex = this.findAvailableSlot();
+        if (slotIndex === -1) return;
+
+        const player: LobbyPlayer = {
+            slotIndex,
+            deviceId,
+            characterId: 'fok',
+            isReady: false,
+            inputType,
+            gamepadIndex
+        };
+
+        this.players.set(slotIndex, player);
+        this.registeredDevices.add(deviceId);
+        this.updateSlotUI(slotIndex);
+
+        // Emit event for online mode
+        if (this.mode === 'online') {
+            this.events.emit('player_joined', player);
+        }
+    }
+
+    private canRegisterPlayer(): boolean {
+        return this.players.size < this.MAX_PLAYERS;
+    }
+
+    private findAvailableSlot(): number {
+        for (let i = 0; i < this.MAX_PLAYERS; i++) {
+            if (!this.players.has(i)) return i;
+        }
+        return -1;
+    }
+
+    private cycleCharacter(player: LobbyPlayer, direction: number): void {
+        const currentIndex = this.characters.indexOf(player.characterId);
+        const newIndex = (currentIndex + direction + this.characters.length) % this.characters.length;
+        player.characterId = this.characters[newIndex];
+        this.updateSlotUI(player.slotIndex);
+
+        // Send to server in online mode
+        if (this.mode === 'online' && this.networkManager) {
+            this.networkManager.sendLobbyCharacter(player.characterId);
+        }
+    }
+
+    private toggleReady(player: LobbyPlayer): void {
+        player.isReady = !player.isReady;
+        this.updateSlotUI(player.slotIndex);
+
+        // Send to server in online mode
+        if (this.mode === 'online' && this.networkManager) {
+            this.networkManager.sendLobbyReady(player.isReady);
+        }
+    }
+
+    /**
+     * Check if match can start (min 2 players, all ready)
+     */
+    private checkMatchStart(): void {
+        const playerCount = this.players.size;
+        if (playerCount < this.MIN_PLAYERS) return;
+
+        const allReady = Array.from(this.players.values()).every(p => p.isReady);
+        if (allReady) {
+            this.startMatch();
+        }
+    }
+
+    private startMatch(): void {
+        // Convert to legacy PlayerSelection format for GameScene
+        const playerData: PlayerSelection[] = Array.from(this.players.values()).map(p => ({
+            playerId: p.slotIndex,
+            joined: true,
+            ready: true,
+            input: {
+                type: p.inputType,
+                gamepadIndex: p.gamepadIndex
+            },
+            character: p.characterId,
+            isAI: false
+        }));
+
+        // Launch game
+        if (this.mode === 'online') {
+            this.events.emit('match_start', playerData);
+            // Server will handle transition
+        } else {
+            this.scene.start('GameScene', { playerData });
+        }
+    }
+
+    /**
+     * Create UI for 4 player slots
+     */
     private createSlotUI(): void {
-        const { width } = this.scale;
-        const startX = width / 2 - 450;
-        const spacing = 300;
-        const startY = 300;
+        const { width, height } = this.scale;
+        const slotWidth = 250;
+        const slotHeight = 350;
+        const spacing = 30;
+        const startX = (width - (slotWidth * 4 + spacing * 3)) / 2;
+        const startY = height / 2 - 50;
 
-        for (let i = 0; i < this.maxPlayers; i++) {
-            const container = this.add.container(startX + (i * spacing), startY);
+        for (let i = 0; i < 4; i++) {
+            const x = startX + i * (slotWidth + spacing);
+            const container = this.add.container(x, startY);
 
-            // BG Panel
-            const panel = this.add.rectangle(0, 0, 280, 400, 0x333333);
-            panel.setStrokeStyle(4, 0x000000);
+            // Slot background
+            const bg = this.add.rectangle(0, 0, slotWidth, slotHeight, 0x2a2a3e, 0.8);
+            bg.setStrokeStyle(2, 0x4a4a5e);
 
-            // Player Label
-            const pLabel = this.add.text(0, -180, `P${i + 1}`, {
+            // Player label
+            const label = this.add.text(0, -slotHeight / 2 + 30, `P${i + 1}`, {
                 fontSize: '32px',
-                fontStyle: 'bold',
-                color: '#aaaaaa'
-            }).setOrigin(0.5);
-
-            // State Text
-            const stateText = this.add.text(0, 0, 'Press Button\nto Join', {
-                fontSize: '24px',
-                color: '#888888',
-                align: 'center'
-            }).setOrigin(0.5);
-
-            // Character Name
-            const charText = this.add.text(0, 150, '', {
-                fontSize: '28px',
                 color: '#ffffff',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
 
-            // Selection Arrows
-            const leftArrow = this.add.text(-100, 150, '<', { fontSize: '32px', color: '#ffdd00' }).setOrigin(0.5).setVisible(false);
-            const rightArrow = this.add.text(100, 150, '>', { fontSize: '32px', color: '#ffdd00' }).setOrigin(0.5).setVisible(false);
+            // Status text
+            const status = this.add.text(0, 0, 'Press ENTER/START\nto Join', {
+                fontSize: '20px',
+                color: '#8ab4f8',
+                align: 'center'
+            }).setOrigin(0.5);
 
-            container.add([panel, pLabel, stateText, charText, leftArrow, rightArrow]);
-            container.setData('panel', panel);
-            container.setData('stateText', stateText);
-            container.setData('charText', charText);
-            container.setData('arrows', [leftArrow, rightArrow]);
-
+            container.add([bg, label, status]);
             this.slotContainers.push(container);
         }
     }
 
-    update(time: number, _delta: number): void {
-        if (!this.canInput) return;
+    /**
+     * Update slot UI based on player state
+     */
+    private updateSlotUI(slotIndex: number): void {
+        const container = this.slotContainers[slotIndex];
+        const player = this.players.get(slotIndex);
 
-        // Capture inputs once per frame
-        this.frameInputs.space = Phaser.Input.Keyboard.JustDown(this.keys.space);
-        this.frameInputs.enter = Phaser.Input.Keyboard.JustDown(this.keys.enter);
-
-        this.handleNewConnections();
-        this.handleKeyboardJoin(); // Poll for join if not event-based
-        this.handlePlayerInput(time);
-
-        if (Phaser.Input.Keyboard.JustDown(this.backKey)) {
-            this.scene.start('MainMenuScene');
+        // Clear existing content (keep bg and label)
+        while (container.length > 2) {
+            container.remove(container.list[2], true);
         }
 
-        this.updateUI();
-    }
-
-    private handleNewConnections(): void {
-        if (this.mode === 'training') return; // No new joins in training mode
-
-        const gamepads = navigator.getGamepads();
-
-        for (let i = 0; i < gamepads.length; i++) {
-            const gp = gamepads[i];
-            if (!gp) continue;
-
-            const isAssigned = this.slots.some(s => s.joined && s.input.type === 'GAMEPAD' && s.input.gamepadIndex === gp.index);
-
-            if (!isAssigned) {
-                const anyPressed = gp.buttons.some(b => b.pressed);
-                if (anyPressed) {
-                    this.joinPlayer('GAMEPAD', gp.index);
-                }
-            }
-        }
-    }
-
-    private handleKeyboardJoin(): void {
-        if (this.mode === 'training' && this.slots[0].joined) return; // P1 already joined in training
-
-        // Check for join inputs using frame cache
-        const joinPressed = this.frameInputs.space || this.frameInputs.enter;
-
-        if (joinPressed) {
-            const isAssigned = this.slots.some(s => s.joined && s.input.type === 'KEYBOARD');
-            if (!isAssigned) {
-                this.joinPlayer('KEYBOARD', null);
-            }
-        }
-    }
-
-    private joinPlayer(type: 'KEYBOARD' | 'GAMEPAD', index: number | null): void {
-        const slot = this.slots.find(s => !s.joined);
-        if (slot) {
-            slot.joined = true;
-            slot.input.type = type;
-            slot.input.gamepadIndex = index;
-            slot.character = 'fok';
-
-            // Prevent immediate "Ready" input in the same frame
-            // Set input time to now so the debounce check in handlePlayerInput fails
-            this.lastInputTime.set(slot.playerId, this.time.now);
-            this.joinTime.set(slot.playerId, this.time.now);
-            console.log(`[LobbyScene] Player ${slot.playerId + 1} joined via ${type}, gamepadIndex=${index}`);
-        }
-    }
-
-    private handlePlayerInput(time: number): void {
-        this.slots.forEach(slot => {
-            if (!slot.joined) return;
-            if (slot.isAI) return; // Skip input for Dummy/AI
-
-            // Debounce for Hold inputs (arrows/stick), separate from Button press (Ready)
-            const lastTime = this.lastInputTime.get(slot.playerId) || 0;
-            const canHoldInput = time - lastTime > 200;
-
-            let left = false;
-            let right = false;
-            let select = false;
-
-            if (slot.input.type === 'KEYBOARD') {
-                if (canHoldInput) {
-                    left = this.keys.left.isDown || this.keys.a.isDown;
-                    right = this.keys.right.isDown || this.keys.d.isDown;
-                }
-
-                // Use JustDown for Ready to prevent accidental double-tap from Join
-                // Also respect joinTime to prevent join keypress from triggering ready
-                // BUT do NOT use canHoldInput (nav debounce) so we don't block ready after moving
-                const joinedTime = this.joinTime.get(slot.playerId) || 0;
-                if (time - joinedTime > 200) {
-                    select = this.frameInputs.space || this.frameInputs.enter;
-                }
-
-            } else if (slot.input.type === 'GAMEPAD' && slot.input.gamepadIndex !== null) {
-                const gp = navigator.getGamepads()[slot.input.gamepadIndex];
-                if (gp) {
-                    if (canHoldInput) {
-                        left = gp.axes[0] < -0.5 || gp.buttons[14]?.pressed;
-                        right = gp.axes[0] > 0.5 || gp.buttons[15]?.pressed;
-                    }
-
-                    // Gamepad buttons don't have built-in JustDown, need manual tracking or simple debounce
-                    // Using the same 200ms debounce for now for buttons too if needed, 
-                    // but ideally we want explicit press. 
-                    // Let's rely on transient press since we check every frame. 
-                    // To avoid repeat, we can check if it WAS NOT pressed last frame.
-                    // But simplified: checking press with debounce is okay for now.
-                    if (canHoldInput) {
-                        select = gp.buttons[0]?.pressed; // A Button
-                    }
-                }
-            }
-
-            let inputRegistered = false;
-            if (!slot.ready) {
-                if (left) {
-                    this.changeCharacter(slot, -1);
-                    inputRegistered = true;
-                } else if (right) {
-                    this.changeCharacter(slot, 1);
-                    inputRegistered = true;
-                } else if (select) {
-                    // SAFETY: Prevent immediate ready if scene just started (prevent held button carryover)
-                    if (Date.now() - this.sceneStartTime > 500) {
-                        slot.ready = true;
-                        inputRegistered = true;
-                        this.checkAllReady();
-                    }
-                }
-            } else {
-                // If ready, allow un-ready with Back/B?
-                // Not implemented yet, but good idea.
-            }
-
-            if (inputRegistered) {
-                this.lastInputTime.set(slot.playerId, time);
-            }
-        });
-    }
-
-    private changeCharacter(slot: PlayerSelection, dir: number): void {
-        const idx = this.characters.indexOf(slot.character);
-        const newIdx = (idx + dir + this.characters.length) % this.characters.length;
-        slot.character = this.characters[newIdx];
-    }
-
-    private checkAllReady(): void {
-        const joinedSlots = this.slots.filter(s => s.joined);
-        if (joinedSlots.length > 0 && joinedSlots.every(s => s.ready)) {
-            console.log('All players ready! Starting game...');
-            // Start Game
-            this.time.delayedCall(500, () => {
-                this.scene.start('GameScene', { playerData: joinedSlots });
-            });
+        if (!player) {
+            // Empty slot
+            const status = this.add.text(0, 0, 'Press ENTER/START\nto Join', {
+                fontSize: '20px',
+                color: '#8ab4f8',
+                align: 'center'
+            }).setOrigin(0.5);
+            container.add(status);
         } else {
-            console.log('Not all players ready yet:', joinedSlots.map(s => `${s.playerId}: ${s.ready}`));
+            // Joined player
+            const charLabel = this.charLabels[this.characters.indexOf(player.characterId)];
+            const charText = this.add.text(0, -50, charLabel, {
+                fontSize: '28px',
+                color: '#ffffff'
+            }).setOrigin(0.5);
+
+            const deviceText = this.add.text(0, 20,
+                player.inputType === 'KEYBOARD' ? 'Keyboard' : `Gamepad ${player.gamepadIndex}`, {
+                fontSize: '16px',
+                color: '#aaaaaa'
+            }).setOrigin(0.5);
+
+            const readyText = this.add.text(0, 80,
+                player.isReady ? '✓ READY' : 'Not Ready', {
+                fontSize: '24px',
+                color: player.isReady ? '#4ade80' : '#8ab4f8',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+
+            container.add([charText, deviceText, readyText]);
+
+            // Update border color
+            const bg = container.list[0] as Phaser.GameObjects.Rectangle;
+            bg.setStrokeStyle(3, player.isReady ? 0x4ade80 : 0x8ab4f8);
         }
-    }
-
-    private updateUI(): void {
-        this.slots.forEach((slot, i) => {
-            const container = this.slotContainers[i];
-            const panel = container.getData('panel') as Phaser.GameObjects.Rectangle;
-            const stateText = container.getData('stateText') as Phaser.GameObjects.Text;
-            const charText = container.getData('charText') as Phaser.GameObjects.Text;
-            const arrows = container.getData('arrows') as Phaser.GameObjects.Text[];
-
-            if (slot.joined) {
-                // Color panel based on ready
-                panel.setFillStyle(0x444444);
-                panel.setStrokeStyle(4, slot.ready ? 0x00ff00 : 0xffff00);
-
-                if (slot.ready) {
-                    stateText.setText('READY!');
-                    stateText.setColor('#00ff00');
-                    stateText.setFontSize(40);
-                    arrows.forEach(a => a.setVisible(false));
-                } else {
-                    stateText.setText('Select Character');
-                    stateText.setColor('#ffff00');
-                    stateText.setFontSize(24);
-                    arrows.forEach(a => a.setVisible(true));
-                }
-
-                const charIdx = this.characters.indexOf(slot.character);
-                charText.setText(this.charLabels[charIdx]);
-                charText.setVisible(true);
-
-                if (slot.isTrainingDummy) {
-                    stateText.setText('TRAINING DUMMY');
-                    stateText.setColor('#ff5555');
-                    stateText.setFontSize(24);
-                    arrows.forEach(a => a.setVisible(false));
-                }
-
-            } else {
-                panel.setFillStyle(0x222222);
-                panel.setStrokeStyle(4, 0x000000);
-
-                stateText.setText('Press Button\nto Join');
-                stateText.setColor('#888888');
-                stateText.setFontSize(24);
-                charText.setVisible(false);
-                arrows.forEach(a => a.setVisible(false));
-            }
-        });
     }
 }

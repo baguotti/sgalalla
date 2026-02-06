@@ -82,3 +82,16 @@
 - **[Fix]** GC Pressure: Throttled snapshot saves (3 frames) and removed all `console.log` spam from update loop.
 - **[UX]** Ping Stability: Implemented Exponential Moving Average (EMA) smoothing for HUD ping display.
 - **[S]** **STATUS**: v0.5.8 Complete. Smooth 60fps movement and proper session cleanup.
+
+### [2026-02-06] v0.6.0 - Unified Lobby System
+- **[V]** `v0.6.0`
+- **[New]** Unified Lobby Architecture: Consolidated Local and Online player setup into a single `LobbyScene`.
+- **[New]** Dynamic Slot Mapping: Replaced fixed arrays with `Map<number, LobbyPlayer>` for hot-plug player registration (1-4 players).
+- **[New]** Input-Driven Registration: Players join via Keyboard (ENTER) or Gamepad (START) in local mode.
+- **[New]** Online Lobby Manager: Implemented `LobbyManager.ts` on server to track online slots, character picks, and ready states.
+- **[Fix]** Room Sync: Added `channel.join(roomId)` to server-side connection flow to enable room-wide broadcasts for lobby state.
+- **[Fix]** Registration Gating: Separated update loop logic to prevent local registration keys from triggering in online mode.
+- **[Fix]** Ghost Players: Deferred game-room entity creation until match start; connection now only triggers lobby registration.
+- **[UX]** Match Start Sync: Min-2 player requirement and "All Ready" logic for auto-launching matches.
+- **[S]** **STATUS**: v0.6.0 Complete. Unified pre-game flow for all modes.
+
