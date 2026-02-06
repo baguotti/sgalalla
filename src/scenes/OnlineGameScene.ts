@@ -90,97 +90,96 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     preload(): void {
-        // Load character assets (same as GameScene)
-        this.loadCharacterAssets();
-    }
-
-    private loadCharacterAssets(): void {
+        this.load.image('platform', 'assets/platform.png');
+        this.load.image('background', 'assets/background.png');
         this.load.atlas('fok', 'assets/fok/fok_sprites/fok.png', 'assets/fok/fok_sprites/fok.json');
+        this.load.atlas('fok_alt', 'assets/fok_alt.png', 'assets/fok_alt.json');
     }
 
     private createAnimations(): void {
-        const fokAnims = [
-            { key: 'idle', prefix: '0_Fok_Idle_', count: 19, loop: true },
-            { key: 'run', prefix: '0_Fok_Running_', count: 12, loop: true },
-            { key: 'charging', prefix: '0_Fok_Charging_', count: 8, loop: true },
-            // Single frame animations (but defined as animations for consistency)
-            { key: 'attack_light', prefix: '0_Fok_AttackLight_', count: 1, suffix: '000', loop: false },
-            { key: 'attack_heavy', prefix: '0_Fok_AttackHeavy_', count: 1, suffix: '000', loop: false },
-            { key: 'attack_up', prefix: '0_Fok_AttackUp_', count: 1, suffix: '001', loop: false },
-            { key: 'attack_down', prefix: '0_Fok_DownSig_', count: 1, suffix: '001', loop: false },
-            { key: 'attack_side', prefix: '0_Fok_SideSig_', count: 1, suffix: '001', loop: false },
-            { key: 'hurt', prefix: '0_Fok_Hurt_', count: 1, suffix: '001', loop: false },
-            { key: 'ground_pound', prefix: '0_Fok_Gpound_', count: 1, suffix: '001', loop: false },
-            { key: 'fall', prefix: '0_Fok_Falling_', count: 1, suffix: '001', loop: false },
-            { key: 'jump', prefix: '0_Fok_Jump_', count: 1, suffix: '000', loop: false },
-            { key: 'slide', prefix: '0_Fok_Sliding_', count: 1, suffix: '000', loop: false }
-        ];
+        const characters = ['fok', 'fok_alt'];
 
-        fokAnims.forEach(anim => {
-            // Skip if already exists
-            if (this.anims.exists(`fok_${anim.key}`)) return;
+        characters.forEach(char => {
+            const fokAnims = [
+                { key: 'idle', prefix: '0_Fok_Idle_', count: 19, loop: true },
+                { key: 'run', prefix: '0_Fok_Running_', count: 12, loop: true },
+                { key: 'charging', prefix: '0_Fok_Charging_', count: 8, loop: true },
+                // Single frame animations (but defined as animations for consistency)
+                { key: 'attack_light', prefix: '0_Fok_AttackLight_', count: 1, suffix: '000', loop: false },
+                { key: 'attack_heavy', prefix: '0_Fok_AttackHeavy_', count: 1, suffix: '000', loop: false },
+                { key: 'attack_up', prefix: '0_Fok_AttackUp_', count: 1, suffix: '001', loop: false },
+                { key: 'attack_down', prefix: '0_Fok_DownSig_', count: 1, suffix: '001', loop: false },
+                { key: 'attack_side', prefix: '0_Fok_SideSig_', count: 1, suffix: '001', loop: false },
+                { key: 'hurt', prefix: '0_Fok_Hurt_', count: 1, suffix: '001', loop: false },
+                { key: 'ground_pound', prefix: '0_Fok_Gpound_', count: 1, suffix: '001', loop: false },
+                { key: 'fall', prefix: '0_Fok_Falling_', count: 1, suffix: '001', loop: false },
+                { key: 'jump', prefix: '0_Fok_Jump_', count: 1, suffix: '000', loop: false },
+                { key: 'slide', prefix: '0_Fok_Sliding_', count: 1, suffix: '000', loop: false }
+            ];
 
-            let frames;
-            if (anim.count === 1 && anim.suffix) {
-                // Manual single frame with specific suffix
-                frames = this.anims.generateFrameNames('fok', {
-                    prefix: anim.prefix,
-                    start: parseInt(anim.suffix),
-                    end: parseInt(anim.suffix),
-                    zeroPad: 3
+            fokAnims.forEach(anim => {
+                const animKey = `${char}_${anim.key}`;
+                if (this.anims.exists(animKey)) return;
+
+                let frames;
+                if (anim.count === 1 && anim.suffix) {
+                    frames = this.anims.generateFrameNames(char, {
+                        prefix: anim.prefix,
+                        start: parseInt(anim.suffix),
+                        end: parseInt(anim.suffix),
+                        zeroPad: 3
+                    });
+                } else {
+                    frames = this.anims.generateFrameNames(char, {
+                        prefix: anim.prefix,
+                        start: 0,
+                        end: anim.count - 1,
+                        zeroPad: 3
+                    });
+                }
+
+                this.anims.create({
+                    key: animKey,
+                    frames: frames,
+                    frameRate: anim.key === 'run' ? 20 : 15,
+                    repeat: anim.loop ? -1 : 0
                 });
-            } else {
-                // Sequence
-                frames = this.anims.generateFrameNames('fok', {
-                    prefix: anim.prefix,
-                    start: 0,
-                    end: anim.count - 1,
-                    zeroPad: 3
+            });
+
+            // Additional animation mappings
+            if (!this.anims.exists(`${char}_attack_light_0`)) {
+                this.anims.create({
+                    key: `${char}_attack_light_0`,
+                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
+                    frameRate: 10,
+                    repeat: 0
                 });
             }
-
-            this.anims.create({
-                key: `fok_${anim.key}`,
-                frames: frames,
-                frameRate: anim.key === 'run' ? 20 : 15,
-                repeat: anim.loop ? -1 : 0
-            });
+            if (!this.anims.exists(`${char}_attack_light_1`)) {
+                this.anims.create({
+                    key: `${char}_attack_light_1`,
+                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
+                    frameRate: 10,
+                    repeat: 0
+                });
+            }
+            if (!this.anims.exists(`${char}_dodge`)) {
+                this.anims.create({
+                    key: `${char}_dodge`,
+                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_Sliding_', start: 0, end: 0, zeroPad: 3 }),
+                    frameRate: 10,
+                    repeat: 0
+                });
+            }
+            if (!this.anims.exists(`${char}_jump_start`)) {
+                this.anims.create({
+                    key: `${char}_jump_start`,
+                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_Jump_', start: 0, end: 0, zeroPad: 3 }),
+                    frameRate: 10,
+                    repeat: 0
+                });
+            }
         });
-
-        // Additional animation mappings
-        if (!this.anims.exists('fok_attack_light_0')) {
-            this.anims.create({
-                key: 'fok_attack_light_0',
-                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
-                frameRate: 10,
-                repeat: 0
-            });
-        }
-        if (!this.anims.exists('fok_attack_light_1')) {
-            this.anims.create({
-                key: 'fok_attack_light_1',
-                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
-                frameRate: 10,
-                repeat: 0
-            });
-        }
-        if (!this.anims.exists('fok_dodge')) {
-            this.anims.create({
-                key: 'fok_dodge',
-                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_Sliding_', start: 0, end: 0, zeroPad: 3 }),
-                frameRate: 10,
-                repeat: 0
-            });
-        }
-        if (!this.anims.exists('fok_jump_start')) {
-            // Fallback to jump loop if start doesn't exist
-            this.anims.create({
-                key: 'fok_jump_start',
-                frames: this.anims.generateFrameNames('fok', { prefix: '0_Fok_Jump_', start: 0, end: 0, zeroPad: 3 }),
-                frameRate: 10,
-                repeat: 0
-            });
-        }
     }
 
     private setupCameras(): void {

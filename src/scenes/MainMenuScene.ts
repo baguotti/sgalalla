@@ -140,7 +140,7 @@ export class MainMenuScene extends Phaser.Scene {
         });
     }
 
-    private selectOption(inputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD', gamepadIndex: number | null = null): void {
+    private selectOption(_inputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD', _gamepadIndex: number | null = null): void {
         const mode = this.menuOptions[this.selectedIndex].mode;
 
         // Handle Online Quick Join
@@ -149,32 +149,7 @@ export class MainMenuScene extends Phaser.Scene {
             return;
         }
 
-        // SKIP LOBBY - Direct Launch GameScene for Local
-        // Default Config: P1 Human vs P2 CPU
-        const playerData = [
-            {
-                playerId: 0,
-                joined: true,
-                character: 'fok',
-                isAI: false,
-                input: {
-                    type: inputType,
-                    gamepadIndex: gamepadIndex
-                }
-            },
-            {
-                playerId: 1,
-                joined: true,
-                character: 'fok', // Default enemy
-                isAI: true, // CPU
-                isTrainingDummy: true, // Force dummy mode
-                input: {
-                    type: 'KEYBOARD',
-                    gamepadIndex: null
-                }
-            }
-        ];
-
-        this.scene.start('GameScene', { playerData: playerData });
+        // Local Game
+        this.scene.start('LobbyScene', { mode: 'versus' });
     }
 }

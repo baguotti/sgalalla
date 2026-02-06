@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-export type CharacterType = 'fok';
+export type CharacterType = 'fok' | 'fok_alt';
 
 export interface PlayerSelection {
     playerId: number;
@@ -27,14 +27,14 @@ export class LobbyScene extends Phaser.Scene {
     private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character Data
-    private characters: CharacterType[] = ['fok'];
-    private charLabels: string[] = ['Fok'];
+    private characters: CharacterType[] = ['fok', 'fok_alt'];
+    private charLabels: string[] = ['Fok', 'Fok (Alt)'];
 
     // Input debounce & Safety
     private lastInputTime: Map<number, number> = new Map();
     private joinTime: Map<number, number> = new Map(); // Track when player joined to prevent instant ready
     private canInput: boolean = false;
-    private initData: any = null;
+    private _initData: any = null;
     private sceneStartTime: number = 0;
 
     // Frame inputs (capture once per update to avoid JustDown clearing)
@@ -64,7 +64,7 @@ export class LobbyScene extends Phaser.Scene {
     init(data: { mode?: 'versus' | 'training', inputType?: 'KEYBOARD' | 'GAMEPAD', gamepadIndex?: number | null, slots?: PlayerSelection[] } | null): void {
         console.log('LobbyScene.init called');
         const safeData = data || {};
-        this.initData = safeData;
+        this._initData = safeData;
         this.mode = safeData.mode || 'versus';
         this.initialInputType = safeData.inputType || 'KEYBOARD';
         this.initialGamepadIndex = safeData.gamepadIndex !== undefined ? safeData.gamepadIndex : null;
@@ -110,23 +110,18 @@ export class LobbyScene extends Phaser.Scene {
         });
 
         // Initialize Slots
-        if (this.initData?.slots) {
-            // Deep copy to ensure fresh references but keep data
-            this.slots = JSON.parse(JSON.stringify(this.initData.slots));
-            // Reset ready status so they don't auto-start
-            this.slots.forEach(s => {
-                if (s.joined) s.ready = false;
-            });
-            console.log("Restored lobby state:", this.slots);
-        } else {
-            this.slots = Array(4).fill(null).map((_, i) => ({
-                playerId: i,
-                joined: false,
-                ready: false,
-                input: { type: 'KEYBOARD', gamepadIndex: null },
-                character: 'fok'
-            }));
-        }
+        // For this specific change, we're simplifying the slot initialization
+        // to only allow P1 to join and auto-start.
+        // The previous logic for restoring slots or creating 4 empty slots is removed
+        // to align with the "Limit joins to P1" instruction.
+        this.slots = [{
+            playerId: 0,
+            joined: false,
+            ready: false,
+            input: { type: 'KEYBOARD', gamepadIndex: null },
+            character: 'fok'
+        }];
+
 
         this.createSlotUI();
 
