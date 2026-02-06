@@ -98,12 +98,19 @@ const PORT = Number(process.env.PORT) || 3000;
 const rooms: Map<string, GameRoom> = new Map();
 
 // Create standard HTTP server to handle binding to 0.0.0.0 correctly
-const httpServer = http.createServer();
+const httpServer = http.createServer((req, res) => {
+    // Log every request to debug connectivity
+    console.log(`[HTTP] ${req.method} ${req.url} from ${req.socket.remoteAddress}`);
+});
 
 // Create Geckos.io server
 const io = geckos({
     iceServers: iceServers,
-    cors: { origin: '*', allowAuthorization: true }
+    cors: { origin: '*', allowAuthorization: true },
+    portRange: {
+        min: 3000,
+        max: 3000
+    }
 });
 
 // Attach Geckos to the HTTP server
