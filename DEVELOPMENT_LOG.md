@@ -105,3 +105,9 @@
 - **[UX]** Character Cycling: Added A/D and Arrow key support for choosing characters during countdown.
 - **[Fix]** Persistence: Implemented server-side room reset and timer cleanup for reliable re-joins.
 - **[S]** **STATUS**: v0.6.2 Complete. Online matchmaking setup is now localized and automated.
+
+### [2026-02-06] v0.6.3 - Global Sync & Ghost Fixes
+- **[V]** `v0.6.3`
+- **[Fix]** Ghost Sprites: Gated `processStateUpdate` to return early unless in `PLAYING` phase, preventing premature sprite creation.
+- **[Fix]** Lifecycle: Ensured server state updates don't leak "side-sig" frames during character selection.
+- **[S]** **STATUS**: v0.6.3 Complete. Selection flow is now visually clean and stable.

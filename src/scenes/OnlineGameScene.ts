@@ -423,6 +423,9 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private processStateUpdate(state: NetGameState): void {
+        // Only process player state during PLAYING phase
+        if (this.phase !== 'PLAYING') return;
+
         const serverFrame = state.frame;
 
         state.players.forEach((netPlayer: NetPlayerState) => {
