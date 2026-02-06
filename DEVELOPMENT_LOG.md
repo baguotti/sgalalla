@@ -82,3 +82,10 @@
 - **[Fix]** GC Pressure: Throttled snapshot saves (3 frames) and removed all `console.log` spam from update loop.
 - **[UX]** Ping Stability: Implemented Exponential Moving Average (EMA) smoothing for HUD ping display.
 - **[S]** **STATUS**: v0.5.8 Complete. Smooth 60fps movement and proper session cleanup.
+
+### [2026-02-06] v0.6.1_old_lobby - Fok Alt & Simplified Lobby
+- **[V]** `v0.6.1_old_lobby`
+- **[New]** Character Variant: Added `fok_alt` (Blue/White palette) with full texture atlas and animation mappings.
+- **[UX]** Local Lobby: Removed multi-player slots; restricted to **Player 1 Only**.
+- **[UX]** Auto-Start: Implemented automatic match start (500ms delay) upon P1 Ready confirmation.
+- **[Fix]** Lobby Logic: Bypassed P2-P4 joining logic to streamline local testing flow.

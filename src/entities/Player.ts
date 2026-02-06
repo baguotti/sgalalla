@@ -81,7 +81,7 @@ export class Player extends Fighter {
 
     // Character Type
     // Character Type
-    public character: 'fok' = 'fok';
+    public character: 'fok' | 'fok_alt' = 'fok';
     private animPrefix: string = 'alchemist';
     private debugRect!: Phaser.GameObjects.Rectangle;
 
@@ -164,7 +164,7 @@ export class Player extends Fighter {
         }
     }
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok' } = {}) {
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok' | 'fok_alt' } = {}) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
@@ -178,7 +178,7 @@ export class Player extends Fighter {
         this.animPrefix = this.character;
 
         // Create player sprite
-        this.sprite = scene.add.sprite(0, 0, 'fok', '0_Fok_Idle_000.png'); // Adjusted offset (0) to ground sprite
+        this.sprite = scene.add.sprite(0, 0, this.character, '0_Fok_Idle_000.png'); // Adjusted offset (0) to ground sprite
 
 
 
