@@ -13,6 +13,9 @@ import Phaser from 'phaser';
 import { Player, PlayerState } from '../entities/Player';
 import NetworkManager from '../network/NetworkManager';
 import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '../network/NetworkManager';
+
+// Define a snapshot type that includes the frame number
+type NetPlayerSnapshot = NetPlayerState & { frame: number };
 import { InputManager } from '../input/InputManager';
 import type { GameSnapshot, PlayerSnapshot } from '../network/StateSnapshot';
 import { MatchHUD } from '../ui/PlayerHUD';
@@ -20,6 +23,10 @@ import { MatchHUD } from '../ui/PlayerHUD';
 export class OnlineGameScene extends Phaser.Scene {
     // Networking
     private networkManager: NetworkManager;
+    private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
+    private clientRenderFrame: number = 0;
+    private isBufferInitialized: boolean = false;
+    private readonly RENDER_DELAY_FRAMES = 6; // ~100ms at 60Hz
     private localPlayerId: number = -1;
     private isConnected: boolean = false;
 
@@ -367,24 +374,64 @@ export class OnlineGameScene extends Phaser.Scene {
             });
         }
 
-        // Smooth interpolation: Lerp remote players toward server position each frame
+        // JITTER BUFFER (Render Delay) Logic
+        // ----------------------------------------------------------------
+        // Instead of immediate updates, we buffer snapshots and render ~100ms in the past.
+        // This swallows network jitter (TCP blocking) at the cost of slight latency.
+
+        // 1. Advance Client Render Time
+        const updatesPerSec = 60;
+        this.clientRenderFrame += (delta / 1000) * updatesPerSec;
+
+        // 2. Interpolate Remote Players
         this.players.forEach((player, playerId) => {
             if (playerId !== this.localPlayerId) {
-                const target = this.remoteTargets.get(playerId);
+                const buffer = this.snapshotBuffer.get(playerId);
 
-                if (target) {
-                    const dx = target.x - player.x;
-                    const dy = target.y - player.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
+                if (buffer && buffer.length >= 2) {
+                    // Find two snapshots surrounding our render frame
+                    let fromSnap = buffer[0];
+                    let toSnap = buffer[1];
 
-                    // Snap if way off (respawn, lag spike), otherwise smooth lerp
-                    if (dist > 150) {
-                        player.x = target.x;
-                        player.y = target.y;
-                    } else {
-                        // Simple lerp (0.1 = smoother, less jitter, slightly more latency)
-                        player.x += dx * 0.1;
-                        player.y += dy * 0.1;
+                    // Keep shifting if our render frame is ahead of the 'to' snapshot
+                    while (buffer.length >= 2 && this.clientRenderFrame > buffer[1].frame) {
+                        buffer.shift(); // Remove old snapshot
+                        if (buffer.length >= 2) {
+                            fromSnap = buffer[0];
+                            toSnap = buffer[1];
+                        }
+                    }
+
+                    // Perform Interpolation
+                    if (buffer.length >= 2 && this.clientRenderFrame >= fromSnap.frame && this.clientRenderFrame <= toSnap.frame) {
+                        const totalFrames = toSnap.frame - fromSnap.frame;
+                        const t = (this.clientRenderFrame - fromSnap.frame) / totalFrames;
+
+                        // Linear Interpolation for Position
+                        player.x = Phaser.Math.Linear(fromSnap.x, toSnap.x, t);
+                        player.y = Phaser.Math.Linear(fromSnap.y, toSnap.y, t);
+
+                        // Discrete State Updates (use 'from' snapshot)
+                        if (player) { // Guard against destroyed player
+                            // Animations
+                            if (fromSnap.animationKey && fromSnap.animationKey !== player.animationKey) {
+                                player.playAnim(fromSnap.animationKey, true);
+                            }
+
+                            // Facing Direction
+                            player.setFacingDirection(fromSnap.facingDirection);
+
+                            // Grounded State (for animation logic if needed)
+                            // player.isGrounded = fromSnap.isGrounded;
+                        }
+                    } else if (buffer.length > 0) {
+                        // Extrapolation or just snap to latest if we ran out of buffer
+                        // For now, snap to latest to avoid ghosting
+                        const latest = buffer[buffer.length - 1];
+                        player.x = latest.x;
+                        player.y = latest.y;
+                        if (latest.animationKey) player.playAnim(latest.animationKey, true);
+                        player.setFacingDirection(latest.facingDirection);
                     }
                 }
 
@@ -393,14 +440,6 @@ export class OnlineGameScene extends Phaser.Scene {
             }
         });
 
-        // Update remote players (animations/logic, no physics)
-        this.players.forEach((player) => {
-            if (player !== this.localPlayer) {
-                // Update logic for animations (but not physics)
-                player.updateLogic(delta);
-                // checkBlastZone is now handled in the dead-reckoning loop above
-            }
-        });
 
 
 
@@ -410,6 +449,9 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Dynamic Camera
         this.updateCamera();
+
+        // Check for Game Over
+        this.checkGameOver();
     }
 
     /**
@@ -453,23 +495,54 @@ export class OnlineGameScene extends Phaser.Scene {
                 this.matchHUD.addPlayer(netPlayer.playerId, `Player ${netPlayer.playerId + 1}`, isLocal);
             }
 
-            // For local player: check for divergence and reconcile if needed
+            // For local player: check for deviation/reconciliation
             if (netPlayer.playerId === this.localPlayerId && this.localPlayer) {
                 this.checkAndReconcile(netPlayer, serverFrame);
                 return;
             }
 
-            // Interpolate remote players
-            this.interpolatePlayer(player, netPlayer);
+            // --- JITTER BUFFER: Store Snapshot ---
+            let buffer = this.snapshotBuffer.get(netPlayer.playerId);
+            if (!buffer) {
+                buffer = [];
+                this.snapshotBuffer.set(netPlayer.playerId, buffer);
+            }
 
-            // Sync lives (only if server sends it)
+            // Create a snapshot with the server frame
+            const snapshot: NetPlayerSnapshot = {
+                ...netPlayer,
+                frame: serverFrame
+            };
+
+            // Add to buffer (assuming chronological order from TCP)
+            // If we receive out-of-order (unlikely with TCP), we might need sorting
+            if (buffer.length === 0 || snapshot.frame > buffer[buffer.length - 1].frame) {
+                buffer.push(snapshot);
+            }
+
+            // Limit buffer size (keep last 20 frames, ~300ms)
+            if (buffer.length > 20) {
+                buffer.shift();
+            }
+
+            // Initialize client render time if needed
+            if (!this.isBufferInitialized && buffer.length >= 2) {
+                // Start rendering from the past
+                this.clientRenderFrame = snapshot.frame - this.RENDER_DELAY_FRAMES;
+                this.isBufferInitialized = true;
+                console.log(`[JitterBuffer] Initialized. ServerFrame: ${serverFrame}, RenderFrame: ${this.clientRenderFrame}`);
+            }
+
+            // Sync lives and damage (stateless sync)
             if (typeof netPlayer.lives === 'number' && player.lives !== netPlayer.lives) {
                 player.lives = netPlayer.lives;
             }
+            if (typeof netPlayer.damagePercent === 'number') {
+                player.setDamage(netPlayer.damagePercent);
+            }
+            // Sync facing direction immediately if not interpolating it (or interpolate it in update)
+            // player.setFlipX(netPlayer.facingDirection < 0);
         });
-
-        // Check for Game Over after state updates
-        this.checkGameOver();
     }
 
     private checkAndReconcile(_serverPlayerState: NetPlayerState, _serverFrame: number): void {
@@ -519,30 +592,8 @@ export class OnlineGameScene extends Phaser.Scene {
         }
     }
 
-    private interpolatePlayer(player: Player, netState: NetPlayerState): void {
-        // Store target for dead-reckoning in update loop
-        this.remoteTargets.set(netState.playerId, netState);
 
-        // Update velocity immediately (used for dead-reckoning prediction)
-        player.velocity.x = netState.velocityX;
-        player.velocity.y = netState.velocityY;
 
-        // Sync other state directly
-        player.isGrounded = netState.isGrounded;
-        player.isAttacking = netState.isAttacking;
-        player.animationKey = netState.animationKey || '';
-        player.setFacingDirection(netState.facingDirection);
-
-        // Sync Damage
-        if (player.damagePercent !== netState.damagePercent) {
-            player.setDamage(netState.damagePercent);
-        }
-
-        // Sync Lives (critical for game over detection on winner's client)
-        if (player.lives !== netState.lives) {
-            player.lives = netState.lives;
-        }
-    }
 
     /**
      * Handle player disconnect - clean up ghost entities

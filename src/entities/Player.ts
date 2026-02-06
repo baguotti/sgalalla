@@ -522,7 +522,7 @@ export class Player extends Fighter {
         }
     }
 
-    private playAnim(key: string, ignoreIfPlaying: boolean = true): void {
+    public playAnim(key: string, ignoreIfPlaying: boolean = true): void {
         let fullKey = `${this.animPrefix}_${key}`;
         this.sprite.anims.play(fullKey, ignoreIfPlaying);
 
