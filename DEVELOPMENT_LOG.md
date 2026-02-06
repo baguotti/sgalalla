@@ -111,3 +111,11 @@
 - **[Fix]** Ghost Sprites: Gated `processStateUpdate` to return early unless in `PLAYING` phase, preventing premature sprite creation.
 - **[Fix]** Lifecycle: Ensured server state updates don't leak "side-sig" frames during character selection.
 - **[S]** **STATUS**: v0.6.3 Complete. Selection flow is now visually clean and stable.
+
+### [2026-02-06] v0.6.4 - Character Confirmation & Dev UX
+- **[V]** `v0.6.4`
+- **[New]** Manual Confirmation: Players can now lock their character with SPACE/ENTER/Button A. Game starts immediately if both are ready.
+- **[New]** Dev UX: Added `npm run server` shortcut in root `package.json` for easy restarts.
+- **[Fix]** UI: Restored MatchHUD (damage/character UI) initialization in the new `handleGameStart` flow.
+- **[Fix]** Stability: Fixed build errors related to unused shared state in `LobbyScene` and `OnlineGameScene`.
+- **[S]** **STATUS**: v0.6.4 Complete. Selection flow is now fully interactive and production-ready.

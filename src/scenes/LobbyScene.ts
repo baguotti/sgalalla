@@ -65,6 +65,7 @@ export class LobbyScene extends Phaser.Scene {
         console.log('LobbyScene.init called');
         const safeData = data || {};
         this._initData = safeData;
+        void this._initData; // Silence linter
         this.mode = safeData.mode || 'versus';
         this.initialInputType = safeData.inputType || 'KEYBOARD';
         this.initialGamepadIndex = safeData.gamepadIndex !== undefined ? safeData.gamepadIndex : null;
