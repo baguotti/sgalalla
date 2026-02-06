@@ -156,13 +156,14 @@ class NetworkManager {
                 hostname.startsWith('10.') ||
                 hostname.startsWith('172.');
 
-            // User requested explicit Port 3000 for everything
-            const url = isLocal ? `${window.location.protocol}//${hostname}` : `https://sgalalla-geckos.fly.dev`; // HTTPS is handled by Fly's TLS handler
-            const port = overridePort || 3000; // Use 3000 for both Local and Production
+            // Production uses standard HTTPS (443), local uses port 3000
+            const prodUrl = 'https://sgalalla-geckos.fly.dev'; // Fly.io routes 443 → internal 3000
+            const localUrl = `${window.location.protocol}//${hostname}:3000`;
+            const serverUrl = isLocal ? localUrl : prodUrl;
 
-            console.log(`[NetworkManager] Connecting to ${url}:${port}...`);
+            console.log(`[NetworkManager] Connecting to ${serverUrl}...`);
 
-            this.channel = io(`${url}:${port}`, {
+            this.channel = io(serverUrl, {
                 transports: ['websocket', 'polling'],
                 reconnection: true
             }) as any; // Cast to any to avoid type mismatch for now

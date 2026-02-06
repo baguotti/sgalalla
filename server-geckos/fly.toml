@@ -29,10 +29,6 @@ primary_region = 'cdg'
     hard_limit = 25
     soft_limit = 20
 
-  
-  [[services.ports]]
-    port = 3000
-
 [[vm]]
   memory = '1gb'
   cpus = 1
