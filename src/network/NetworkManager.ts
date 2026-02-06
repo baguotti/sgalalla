@@ -147,13 +147,20 @@ class NetworkManager {
 
     /**
      * Connect to the game server
-     * @param port - Server port (default: 9208)
+     * @param port - Override server port (default: 9208 local, fly.io production)
      */
-    public async connect(port: number = 9208): Promise<boolean> {
+    public async connect(overridePort?: number): Promise<boolean> {
         return new Promise((resolve) => {
-            console.log(`[NetworkManager] Connecting to localhost:${port}...`);
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const url = isLocal ? `http://localhost` : `https://sgalalla-geckos.fly.dev`;
+            const port = overridePort || (isLocal ? 9208 : 443);
 
-            this.channel = geckos({ port: port });
+            console.log(`[NetworkManager] Connecting to ${url}:${port}...`);
+
+            this.channel = geckos({
+                url: url,
+                port: port
+            });
 
             this.channel.onConnect((error) => {
                 if (error) {

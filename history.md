@@ -14,6 +14,7 @@
 | `v0.5.6-unified-restart` | **Unified Restart Input** | 2026-02-05 | Added Gamepad Button A support for Game Over restart. <br> ↳ **New**: Gamepad Button A (0) now triggers match restart <br> ↳ **M**: Updated Game Over instruction text |
 | `v0.5.7-network-stability` | **Network & HUD Refinement** | 2026-02-06 | Stabilized frame rates and network smoothing. <br> ↳ **New**: 60Hz FPS Capping (Sync for 120Hz displays) <br> ↳ **New**: 100ms Jitter Buffer/Render Delay for remote players <br> ↳ **New**: Delta Compression (skips redundant position updates) <br> ↳ **Tweak**: Debug HUD 30% font scale increase (16px) <br> ↳ **Fix**: Volatile packet confirmation (reliable: false) |
 | `v0.5.8-smooth-reckoning` | **Network Smoothing & Perf** | 2026-02-06 | Implemented dead-reckoning and removed update loop stutter. <br> ↳ **New**: Velocity-based Dead Reckoning (0ms latency render) <br> ↳ **Fix**: Periodic stutter (increased ping interval 1s ↳ 2s) <br> ↳ **Fix**: GC pressure (removed console log spam & throttled snapshots) <br> ↳ **Fix**: Hit detection restored for local vs remote <br> ↳ **Tweak**: Exponential Moving Average (EMA) for stable ping display |
+| `v0.6.5` | **Fly.io Deployment** | 2026-02-06 | Configured for production deployment on Fly.io. <br> ↳ **New**: Environment-aware `NetworkManager` (auto-connect to Fly.io) <br> ↳ **New**: UDP Service support in `fly.toml` (Port 3000) <br> ↳ **Tech**: Unified server port to 3000 (standard Fly.io port) <br> ↳ **Fix**: Fixed WebRTC SSL bridge config for Geckos.io |
 | `v0.6.4` | **Manual Confirmation** | 2026-02-06 | Added character locking and manual confirmation for online rooms. <br> ↳ **New**: Manual Confirmation (SPACE/Button A) to skip selection timer <br> ↳ **New**: `npm run server` root shortcut for manual restarts <br> ↳ **Fix**: MatchHUD UI visibility restoration after selection <br> ↳ **Fix**: Unified `LobbyScene` and `OnlineGameScene` state synchronization |
 | `v0.6.3` | **Online Selection Fix** | 2026-02-06 | Fixed ghost sprites and lifecycle issues in Online Selection. <br> ↳ **Fix**: Ghost sprites (side-sig frames) no longer appear during countdown <br> ↳ **Fix**: Phase-gated state updates (players only spawn when match starts) |
 | `v0.6.2` | **Online Selection** | 2026-02-06 | In-room character selection for Online mode. <br> ↳ **New**: Character cycling (10s timer) inside Online room <br> ↳ **New**: Automatic match start after countdown <br> ↳ **Fix**: Server-side room reset and timer cleanup on disconnect |
@@ -27,6 +28,13 @@
 - **[Fix]** UI: Restored MatchHUD (damage/character UI) initialization in the new `handleGameStart` flow.
 - **[Fix]** Stability: Fixed build errors related to unused shared state in `LobbyScene` and `OnlineGameScene`.
 - **[S]** **STATUS**: v0.6.4 Complete. Selection flow is now fully interactive and production-ready.
+
+### [2026-02-06] v0.6.5 - Fly.io Deployment & Prod Sync
+- **[V]** `v0.6.5`
+- **[New]** Fly.io Config: Added `fly.toml`, `Dockerfile`, and `.dockerignore` for server deployment.
+- **[New]** Networking: Updated `NetworkManager.ts` to be environment-aware (auto-connects to production URL).
+- **[Tech]** Port Unification: Standardized on port 3000 for server/fly.io compatibility.
+- **[S]** **STATUS**: v0.6.5 Complete. Infrastructure ready for production rollout.
 
 ### [2026-02-06] v0.6.3 - Global Sync & Ghost Fixes
 - **[V]** `v0.6.3`
