@@ -165,7 +165,8 @@ class NetworkManager {
 
             this.channel = geckos({
                 url: url,
-                port: port
+                port: port,
+                iceTransportPolicy: 'relay' // Force TURN relay on client side
             });
 
             this.channel.onConnect((error) => {

@@ -116,7 +116,6 @@ const customIceServers = [
 
 const io = geckos({
     iceServers: customIceServers,
-    iceTransportPolicy: 'relay', // Force all traffic through TURN relay
     cors: { origin: '*', allowAuthorization: true },
     portRange: {
         min: 3000,
