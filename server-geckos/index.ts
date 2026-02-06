@@ -103,9 +103,20 @@ const httpServer = http.createServer((req, res) => {
     console.log(`[HTTP] ${req.method} ${req.url} from ${req.socket.remoteAddress}`);
 });
 
-// Create Geckos.io server
+// Create Geckos.io server with TURN relay for Fly.io compatibility
+// Fly.io only exposes one UDP port, so we force relay mode
+const customIceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    // Free Metered TURN servers (metered.ca)
+    { urls: 'turn:a.relay.metered.ca:80', username: 'e77c8f0ba84a3e28b4d41c5f', credential: 'ZNv/KqEW+LxkKGcQ' },
+    { urls: 'turn:a.relay.metered.ca:443', username: 'e77c8f0ba84a3e28b4d41c5f', credential: 'ZNv/KqEW+LxkKGcQ' },
+    { urls: 'turn:a.relay.metered.ca:443?transport=tcp', username: 'e77c8f0ba84a3e28b4d41c5f', credential: 'ZNv/KqEW+LxkKGcQ' }
+];
+
 const io = geckos({
-    iceServers: iceServers,
+    iceServers: customIceServers,
+    iceTransportPolicy: 'relay', // Force all traffic through TURN relay
     cors: { origin: '*', allowAuthorization: true },
     portRange: {
         min: 3000,

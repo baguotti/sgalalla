@@ -167,3 +167,22 @@
 - **[Fix]** Deployment: Pushed client-side NetworkManager changes to `main` (was only on local branch).
 - **[Fix]** Networking: Client now correctly targets port 443 for production.
 - **[S]** **STATUS**: v0.6.12 Complete. Vercel should now have the correct client code.
+
+### [2026-02-06] v0.6.13 - Server Logic & UDP Consolidation
+- **[V]** `v0.6.13`
+- **[Fix]** Server: Consolidated duplicate HTTP server instances in `index.ts` to ensure consistent logging and signaling.
+- **[Fix]** Networking: Explicitly forced Geckos.io to use UDP port 3000 to match `fly.toml` configuration.
+- **[S]** **STATUS**: v0.6.13 Complete. Internal signaling path verified.
+
+### [2026-02-06] v0.6.14 - Infrastructure Persistence
+- **[V]** `v0.6.14`
+- **[Fix]** Scaling: Set `min_machines_running: 1` in `fly.toml` to prevent mid-handshake restarts.
+- **[Fix]** Stability: Fixed connection ID expiration (404) by ensuring one machine is always "warm".
+- **[S]** **STATUS**: v0.6.14 Complete. Signal persistence verified.
+
+### [2026-02-06] v0.6.15 - Production Connectivity (FINAL FIX)
+- **[V]** `v0.6.15`
+- **[Fix]** WebRTC: Implemented **TURN Relay** configuration with `iceTransportPolicy: 'relay'`.
+- **[Fix]** NAT: Traffic now bypasses Fly.io UDP limitations by using a professional relay (metered.ca).
+- **[S]** **STATUS**: v0.6.15 Complete. Connection successfully established from production client to production server.
+
