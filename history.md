@@ -12,6 +12,7 @@
 | `v0.5.4-gameplay-polish` | **Gameplay Polish** | 2026-02-05 | Refined mechanics and camera logic. <br> ↳ **New**: Down Light Slide Move (horizontal knockback/velocity) <br> ↳ **Fix**: Camera filtering for dying players & wider viewport <br> ↳ **Tweak**: Extended blast zones and bomb scaling (1:1 with player) |
 | `v0.5.5-input-fixes` | **Input & Online Fixes** | 2026-02-05 | Fixed Online Gamepad and Multiple-Tab Testing. <br> ↳ **Fix**: Online Gamepad (added useExternalInput to Player.ts) <br> ↳ **Fix**: Gamepad index forcing (index 0) in OnlineGameScene <br> ↳ **New**: Focus-based input gating (document.hasFocus) for local testing <br> ↳ **New**: Strict Input Routing (prevent dual-character control) |
 | `v0.5.6-unified-restart` | **Unified Restart Input** | 2026-02-05 | Added Gamepad Button A support for Game Over restart. <br> ↳ **New**: Gamepad Button A (0) now triggers match restart <br> ↳ **M**: Updated Game Over instruction text |
+| `v0.5.7-network-stability` | **Network & HUD Refinement** | 2026-02-06 | Stabilized frame rates and network smoothing. <br> ↳ **New**: 60Hz FPS Capping (Sync for 120Hz displays) <br> ↳ **New**: 100ms Jitter Buffer/Render Delay for remote players <br> ↳ **New**: Delta Compression (skips redundant position updates) <br> ↳ **Tweak**: Debug HUD 30% font scale increase (16px) <br> ↳ **Fix**: Volatile packet confirmation (reliable: false) |
 
 > [!TIP]
 > This history is updated automatically after every major commit or push. Use it as a rollback reference if needed.

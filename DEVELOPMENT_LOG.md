@@ -1,6 +1,6 @@
 # Sgalalla - Development Log
 
-**Total Time Logged:** 10.5 Hours
+**Total Time Logged:** 11.5 Hours
 
 ---
 
@@ -61,3 +61,13 @@
 - **[M]** Game Over UI: Updated instruction text to "Press SPACE or (A) to Restart".
 - **[T]** Code Cleanup: Removed unused `gameOverText` from `GameScene.ts` and organized gamepad state tracking.
 - **[S]** **STATUS**: Match restart is now accessible via keyboard and gamepad.
+
+### [2026-02-06] v0.5.7 - Network Stability & HUD Refinement
+- **[V]** `v0.5.7`
+- **[T]** FPS Capping: Forced `target: 60` and `forceSetTimeOut: true` in Phaser config to sync 60Hz and 120Hz devices.
+- **[T]** Network Smoothing: Implemented 100ms jitter buffer (render delay) for remote player interpolation.
+- **[T]** Delta Compression: Added `shouldSendState` to skip redundant position updates (2px threshold).
+- **[T]** Volatile Flags: Confirmed movement packets use `reliable: false` to prevent buffering/rubber-banding.
+- **[M]** Debug HUD: Increased font size by 30% (16px) and scaled background for better visibility on remote screens.
+- **[Fix]** Binary Encoding: Attempted 15-byte binary optimization; reverted to JSON due to Geckos.io protocol mismatch (Uint8Array detection issues).
+- **[S]** **STATUS**: v0.5.7 Complete. Online is synchronized but remains stuttery due to jitter.
