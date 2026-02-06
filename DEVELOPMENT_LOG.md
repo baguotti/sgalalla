@@ -119,3 +119,12 @@
 - **[Fix]** UI: Restored MatchHUD (damage/character UI) initialization in the new `handleGameStart` flow.
 - **[Fix]** Stability: Fixed build errors related to unused shared state in `LobbyScene` and `OnlineGameScene`.
 - **[S]** **STATUS**: v0.6.4 Complete. Selection flow is now fully interactive and production-ready.
+
+### [2026-02-06] v0.6.5 - Fly.io Deployment & Prod Sync
+- **[V]** `v0.6.5`
+- **[Live]** Production Backend: `https://sgalalla-geckos.fly.dev`
+- **[New]** Fly.io Config: Added `fly.toml`, `Dockerfile`, and `.dockerignore` for server deployment (App: sgalalla-geckos).
+- **[New]** Networking: Updated `NetworkManager.ts` to be environment-aware (auto-connects to `sgalalla-geckos.fly.dev`).
+- **[Tech]** Port Unification: Standardized on port 3000 for server/fly.io compatibility.
+- **[Fix]** Server Stability: Created dedicated `tsconfig.json` for server Node.js types.
+- **[S]** **STATUS**: v0.6.5 Complete. Infrastructure live on Fly.io.
