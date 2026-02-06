@@ -228,6 +228,7 @@ class NetworkManager {
         });
 
         // Latency measurement with EMA smoothing
+        // Latency measurement with EMA smoothing
         this.channel.on(NetMessageType.PONG, () => {
             this.latency = Date.now() - this.lastPingTime;
             // EMA: smoothed = alpha * new + (1 - alpha) * old (alpha = 0.3 for responsive smoothing)
