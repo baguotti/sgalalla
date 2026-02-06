@@ -244,3 +244,9 @@
 - **[Logic]** Server now enforces strict 2-player limit per room (rejects 3rd connection).
 - **[S]** **STATUS**: v0.7.5 Complete.
 
+### [2026-02-06] v0.7.6 - Lag Tuning (Deploy Fix)
+- **[V]** `v0.7.6`
+- **[Fix]** Server: DEPLOYED v0.7.5 logic (fixed Player 3 joining issue which was due to missing deploy).
+- **[Tune]** Client: Reduced interpolation factor 0.25 → 0.1 for smoother movement (less jittery).
+- **[S]** **STATUS**: v0.7.6 Complete. Server enforces limit; Client movement smoothed.
+

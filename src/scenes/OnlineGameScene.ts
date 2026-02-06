@@ -382,9 +382,9 @@ export class OnlineGameScene extends Phaser.Scene {
                         player.x = target.x;
                         player.y = target.y;
                     } else {
-                        // Simple lerp (0.25 = responsive but smooth)
-                        player.x += dx * 0.25;
-                        player.y += dy * 0.25;
+                        // Simple lerp (0.1 = smoother, less jitter, slightly more latency)
+                        player.x += dx * 0.1;
+                        player.y += dy * 0.1;
                     }
                 }
 

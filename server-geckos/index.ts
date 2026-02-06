@@ -145,7 +145,7 @@ function checkIdleStatus() {
 checkIdleStatus();
 
 httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Server] Geckos.io server running on 0.0.0.0:${PORT}`);
+    console.log(`[Server] Geckos.io server (v0.7.5) running on 0.0.0.0:${PORT}`);
 });
 
 io.on('connection', (socket) => {
