@@ -231,3 +231,9 @@
 - **[Fix]** Adjusted snap threshold from 300→200 and blend threshold from 1→2 for gentler corrections.
 - **[S]** **STATUS**: v0.7.3 Complete. Stutter reduced.
 
+### [2026-02-06] v0.7.4 - Rematch Overlay & Lag Fix
+- **[V]** `v0.7.4`
+- **[Fix]** Added `lives` sync in `interpolatePlayer` - winner now sees loser's lives drop and triggers game over overlay.
+- **[Fix]** Replaced velocity-based dead-reckoning with simple direct lerp (0.25 factor) - eliminates prediction stutter.
+- **[S]** **STATUS**: v0.7.4 Complete. Rematch overlay works for both players.
+

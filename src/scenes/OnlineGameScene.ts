@@ -367,31 +367,24 @@ export class OnlineGameScene extends Phaser.Scene {
             });
         }
 
-        // Dead-reckoning: update remote players based on velocity every frame
+        // Smooth interpolation: Lerp remote players toward server position each frame
         this.players.forEach((player, playerId) => {
             if (playerId !== this.localPlayerId) {
-                const dt = delta / 1000; // Convert to seconds
                 const target = this.remoteTargets.get(playerId);
 
                 if (target) {
-                    // Apply velocity-based prediction
-                    player.x += player.velocity.x * dt;
-                    player.y += player.velocity.y * dt;
-
-                    // Smooth correction toward target (entity interpolation)
                     const dx = target.x - player.x;
                     const dy = target.y - player.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
-                    // Snap if too far, otherwise blend very smoothly
-                    if (dist > 200) {
-                        // Teleport if way off (respawn, lag spike)
+                    // Snap if way off (respawn, lag spike), otherwise smooth lerp
+                    if (dist > 150) {
                         player.x = target.x;
                         player.y = target.y;
-                    } else if (dist > 2) {
-                        // Gentle blend (0.15 = very smooth, minimal visible correction)
-                        player.x += dx * 0.15;
-                        player.y += dy * 0.15;
+                    } else {
+                        // Simple lerp (0.25 = responsive but smooth)
+                        player.x += dx * 0.25;
+                        player.y += dy * 0.25;
                     }
                 }
 
@@ -545,8 +538,9 @@ export class OnlineGameScene extends Phaser.Scene {
             player.setDamage(netState.damagePercent);
         }
 
-        // Debug: Log state changes
-        if (netState.animationKey && netState.animationKey !== 'idle' && netState.animationKey !== 'run') {
+        // Sync Lives (critical for game over detection on winner's client)
+        if (player.lives !== netState.lives) {
+            player.lives = netState.lives;
         }
     }
 
