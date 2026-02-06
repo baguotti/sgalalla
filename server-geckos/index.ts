@@ -452,6 +452,9 @@ setInterval(() => {
     const deltaSeconds = 1 / 60;
 
     rooms.forEach((room) => {
+        // Skip broadcast if not in PLAYING phase
+        if (room.phase !== 'PLAYING') return;
+
         room.frame++;
 
         // NO SERVER PHYSICS - clients are authoritative
@@ -467,4 +470,4 @@ setInterval(() => {
         // Broadcast to all players in room
         io.emit(NetMessageType.STATE_UPDATE, state);
     });
-}, 1000 / 60);
+}, 1000 / 20);  // 20Hz = 50ms tick (industry standard for TCP)
