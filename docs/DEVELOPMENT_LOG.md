@@ -151,3 +151,8 @@
 - **[V]** `v0.6.9`
 - **[Perf]** Boot: Added `"type": "module"` to `server-geckos/package.json` to fix Node.js ESM performance warning.
 - **[S]** **STATUS**: v0.6.9 Complete. Server boot is clean and optimized.
+
+### [2026-02-06] v0.6.10 - Infrastructure Scaling Fix
+- **[V]** `v0.6.10`
+- **[Fix]** Infrastructure: Forced Fly.io scale to 1 machine to prevent load-balancing errors (404 on matching) with in-memory Geckos state.
+- **[S]** **STATUS**: v0.6.10 Complete. Connection reliability restored.

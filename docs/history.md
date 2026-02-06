@@ -14,6 +14,7 @@
 | `v0.5.6-unified-restart` | **Unified Restart Input** | 2026-02-05 | Added Gamepad Button A support for Game Over restart. <br> ↳ **New**: Gamepad Button A (0) now triggers match restart <br> ↳ **M**: Updated Game Over instruction text |
 | `v0.5.7-network-stability` | **Network & HUD Refinement** | 2026-02-06 | Stabilized frame rates and network smoothing. <br> ↳ **New**: 60Hz FPS Capping (Sync for 120Hz displays) <br> ↳ **New**: 100ms Jitter Buffer/Render Delay for remote players <br> ↳ **New**: Delta Compression (skips redundant position updates) <br> ↳ **Tweak**: Debug HUD 30% font scale increase (16px) <br> ↳ **Fix**: Volatile packet confirmation (reliable: false) |
 | `v0.5.8-smooth-reckoning` | **Network Smoothing & Perf** | 2026-02-06 | Implemented dead-reckoning and removed update loop stutter. <br> ↳ **New**: Velocity-based Dead Reckoning (0ms latency render) <br> ↳ **Fix**: Periodic stutter (increased ping interval 1s ↳ 2s) <br> ↳ **Fix**: GC pressure (removed console log spam & throttled snapshots) <br> ↳ **Fix**: Hit detection restored for local vs remote <br> ↳ **Tweak**: Exponential Moving Average (EMA) for stable ping display |
+| `v0.6.10` | **Scaling Fix** | 2026-02-06 | Fixed 404 Signaling errors. <br> ↳ **Fix**: Scaled Fly.io app to 1 machine (preventing round-robin load balancing of UDP state) |
 | `v0.6.9` | **Server Optimization** | 2026-02-06 | Removed Node.js ESM boot warning. <br> ↳ **Perf**: Added `"type": "module"` to server package.json |
 | `v0.6.8` | **Server Build Fix** | 2026-02-06 | Fixed `MODULE_NOT_FOUND` crash on Fly.io. <br> ↳ **Fix**: Added `"outDir": "./dist"` to `server-geckos/tsconfig.json` |
 | `v0.6.7` | **Asset Restoration** | 2026-02-06 | Fixed 404 errors by adding missing platform/background assets. <br> ↳ **M**: Moved project documentation to `docs/` folder <br> ↳ **New**: Generated `platform.png` and `background.png` <br> ↳ **Fix**: Resolved Vercel deployment asset mapping issues |
@@ -47,6 +48,11 @@
 - **[V]** `v0.6.9`
 - **[Perf]** Boot: Added `"type": "module"` to `Start-geckos/package.json` to fix Node.js ESM performance warning.
 - **[S]** **STATUS**: v0.6.9 Complete. Server boot is clean and optimized.
+
+### [2026-02-06] v0.6.10 - Infrastructure Scaling Fix
+- **[V]** `v0.6.10`
+- **[Fix]** Infrastructure: Forced Fly.io scale to 1 machine to prevent load-balancing errors (404 on matching) with in-memory Geckos state.
+- **[S]** **STATUS**: v0.6.10 Complete. Connection reliability restored.
 
 ### [2026-02-06] v0.6.4 - Character Confirmation & Dev UX
 - **[V]** `v0.6.4`
