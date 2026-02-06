@@ -11,6 +11,11 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 1080,
   parent: 'game-container',
   backgroundColor: '#1a1a2e',
+  // FPS capping for cross-device sync (120Hz displays capped to 60Hz)
+  fps: {
+    target: 60,
+    forceSetTimeOut: true
+  },
   dom: {
     createContainer: true
   },

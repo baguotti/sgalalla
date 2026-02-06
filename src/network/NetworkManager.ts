@@ -14,6 +14,7 @@ import type { ClientChannel, Data } from '@geckos.io/client';
 import type { InputState } from '../input/InputManager';
 import { InputBuffer, SnapshotBuffer } from './StateSnapshot';
 import type { FrameInput, GameSnapshot } from './StateSnapshot';
+import { shouldSendState } from './BinaryCodec';
 
 // Network message types
 export const NetMessageType = {
@@ -107,7 +108,6 @@ class NetworkManager {
     private onConnectedCallback: ConnectionCallback | null = null;
     private onStateUpdateCallback: StateUpdateCallback | null = null;
     private onDisconnectCallback: DisconnectCallback | null = null;
-    private onRollbackCallback: RollbackCallback | null = null;
     private onAttackCallback: AttackCallback | null = null;
     private onHitCallback: HitCallback | null = null;
     private onRematchStartCallback: RematchStartCallback | null = null;
@@ -253,13 +253,24 @@ class NetworkManager {
         this.channel.emit(NetMessageType.INPUT, netInput, { reliable: false });
     }
 
+    // Delta compression: track last sent state
+    private lastSentState: NetPlayerState | null = null;
+
     /**
-     * Send local player's actual position state to server
+     * Send local player's actual position state to server (with delta compression)
      * Server will relay this to other clients
      */
     public sendState(state: NetPlayerState): void {
         if (!this.connected || !this.channel) return;
+
+        // Delta compression: skip if state hasn't changed significantly
+        if (!shouldSendState(state, this.lastSentState)) {
+            return;
+        }
+
+        // Send as JSON (binary encoding deferred until server decode is fixed)
         this.channel.emit(NetMessageType.POSITION_UPDATE, state, { reliable: false });
+        this.lastSentState = { ...state };
     }
 
     /**
@@ -357,7 +368,6 @@ class NetworkManager {
     public onConnected(callback: ConnectionCallback): void { this.onConnectedCallback = callback; }
     public onStateUpdate(callback: StateUpdateCallback): void { this.onStateUpdateCallback = callback; }
     public onDisconnect(callback: DisconnectCallback): void { this.onDisconnectCallback = callback; }
-    public onRollback(callback: RollbackCallback): void { this.onRollbackCallback = callback; }
     public onAttack(callback: AttackCallback): void { this.onAttackCallback = callback; }
     public onHit(callback: HitCallback): void { this.onHitCallback = callback; }
     public onRematchStart(callback: RematchStartCallback): void { this.onRematchStartCallback = callback; }

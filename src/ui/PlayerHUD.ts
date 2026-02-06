@@ -152,21 +152,21 @@ export class MatchHUD {
         this.debugContainer.setDepth(100);
 
         // Background
-        const bg = scene.add.rectangle(0, 0, 100, 50, 0x000000, 0.6);
+        const bg = scene.add.rectangle(0, 0, 130, 60, 0x000000, 0.6);
         bg.setStrokeStyle(1, 0x444444);
         this.debugContainer.add(bg);
 
         // Ping text
-        this.pingText = scene.add.text(-40, -12, 'PING: --', {
-            fontSize: '12px',
+        this.pingText = scene.add.text(-55, -14, 'PING: --', {
+            fontSize: '16px',
             fontFamily: 'monospace',
             color: '#00ff00'
         });
         this.debugContainer.add(this.pingText);
 
         // FPS text
-        this.fpsText = scene.add.text(-40, 4, 'FPS: --', {
-            fontSize: '12px',
+        this.fpsText = scene.add.text(-55, 6, 'FPS: --', {
+            fontSize: '16px',
             fontFamily: 'monospace',
             color: '#ffff00'
         });

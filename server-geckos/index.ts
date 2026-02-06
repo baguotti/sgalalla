@@ -38,6 +38,48 @@ interface GameRoom {
     rematchVotes: Set<string>; // Track channel IDs that voted for rematch
 }
 
+// Animation key enum for binary decoding (must match client BinaryCodec.ts)
+const ANIMATION_KEYS = [
+    '',           // 0 - empty/idle
+    'idle',       // 1
+    'run',        // 2
+    'jump',       // 3
+    'fall',       // 4
+    'attack_light', // 5
+    'attack_heavy', // 6
+    'attack_up',  // 7
+    'hurt',       // 8
+    'slide',      // 9
+    'dash',       // 10
+    'block',      // 11
+    'charge',     // 12
+];
+
+/**
+ * Decode binary player state (15 bytes) from client
+ */
+function decodeBinaryPlayerState(buffer: ArrayBuffer): Partial<PlayerState> | null {
+    if (buffer.byteLength !== 15) return null;
+
+    const view = new DataView(buffer);
+    const flags = view.getUint8(10);
+    const animIndex = view.getUint8(11);
+
+    return {
+        playerId: view.getUint8(0),
+        x: view.getInt16(1, true) / 10,
+        y: view.getInt16(3, true) / 10,
+        velocityX: view.getInt16(5, true) / 10,
+        velocityY: view.getInt16(7, true) / 10,
+        facingDirection: view.getInt8(9),
+        isGrounded: (flags & 0x01) !== 0,
+        isAttacking: (flags & 0x02) !== 0,
+        animationKey: ANIMATION_KEYS[animIndex] || '',
+        damagePercent: view.getUint16(12, true),
+        lives: view.getUint8(14),
+    };
+}
+
 const PORT = 9208;
 const rooms: Map<string, GameRoom> = new Map();
 // Removed global nextPlayerId
@@ -103,23 +145,37 @@ io.onConnection((channel) => {
         // Client is authoritative and will send position updates
     });
 
-    // Handle position update from client (client-authoritative)
+    // Handle position update from client (client-authoritative, binary encoded)
     channel.on('position_update', (data: any) => {
         const player = room.players.get(channel.id!);
         if (!player) return;
 
-        // Directly update player position from client
-        if (data) {
-            player.x = data.x ?? player.x;
-            player.y = data.y ?? player.y;
-            player.velocityX = data.velocityX ?? player.velocityX;
-            player.velocityY = data.velocityY ?? player.velocityY;
-            player.facingDirection = data.facingDirection ?? player.facingDirection;
-            player.isGrounded = data.isGrounded ?? player.isGrounded;
-            player.isAttacking = data.isAttacking ?? player.isAttacking;
-            player.animationKey = data.animationKey ?? player.animationKey;
-            player.damagePercent = data.damagePercent ?? player.damagePercent; // FIX: Sync damage
-            player.lives = data.lives ?? player.lives;
+        // Try to decode binary data (Geckos.io sends as Uint8Array)
+        let decoded: Partial<PlayerState> | null = null;
+
+        if (data instanceof Uint8Array) {
+            // Direct Uint8Array from Geckos.io
+            decoded = decodeBinaryPlayerState(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer);
+        } else if (data instanceof ArrayBuffer) {
+            decoded = decodeBinaryPlayerState(data);
+        } else if (data?.buffer instanceof ArrayBuffer) {
+            // Typed array view
+            decoded = decodeBinaryPlayerState(data.buffer);
+        }
+
+        // Use decoded data or fall back to JSON (backwards compatibility)
+        const src = decoded || data;
+        if (src) {
+            player.x = src.x ?? player.x;
+            player.y = src.y ?? player.y;
+            player.velocityX = src.velocityX ?? player.velocityX;
+            player.velocityY = src.velocityY ?? player.velocityY;
+            player.facingDirection = src.facingDirection ?? player.facingDirection;
+            player.isGrounded = src.isGrounded ?? player.isGrounded;
+            player.isAttacking = src.isAttacking ?? player.isAttacking;
+            player.animationKey = src.animationKey ?? player.animationKey;
+            player.damagePercent = src.damagePercent ?? player.damagePercent;
+            player.lives = src.lives ?? player.lives;
         }
     });
 

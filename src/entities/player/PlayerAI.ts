@@ -117,7 +117,6 @@ export class PlayerAI {
         }
 
         const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.target.x, this.target.y);
-        const heightDiff = this.target.y - this.player.y; // + means target is below, - means target is above
 
         // Behavior logic
         if (this.state === 'DEFEND') {

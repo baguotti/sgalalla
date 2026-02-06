@@ -36,11 +36,20 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // UI
     private connectionStatusText!: Phaser.GameObjects.Text;
-    private latencyText!: Phaser.GameObjects.Text;
     private matchHUD!: MatchHUD;
 
     // Rollback netcode
     private localFrame: number = 0;
+
+    // Network throttling
+    private stateThrottleCounter: number = 0;
+    private readonly STATE_SEND_INTERVAL: number = 3; // sendState every 3rd frame (~20Hz)
+    private inputThrottleCounter: number = 0;
+    private readonly INPUT_SEND_INTERVAL: number = 1; // sendInput every frame (~60Hz)
+
+    // Jitter buffer for incoming state updates
+    private stateBuffer: Array<{ state: any, timestamp: number }> = [];
+    private readonly JITTER_BUFFER_MS: number = 100; // 100ms render delay for smoothing
 
     // Wall configuration (matching GameScene)
     private readonly WALL_THICKNESS = 45;
@@ -257,9 +266,13 @@ export class OnlineGameScene extends Phaser.Scene {
 
         this.localFrame++;
 
-        // Poll and send local input
+        // Poll and send local input (throttled to ~30Hz)
         const input = this.inputManager.poll();
-        this.networkManager.sendInput(input);
+        this.inputThrottleCounter++;
+        if (this.inputThrottleCounter >= this.INPUT_SEND_INTERVAL) {
+            this.inputThrottleCounter = 0;
+            this.networkManager.sendInput(input);
+        }
 
         // Save snapshot BEFORE applying input (for rollback)
         if (this.localPlayer) {
@@ -300,10 +313,16 @@ export class OnlineGameScene extends Phaser.Scene {
                 damagePercent: this.localPlayer.damagePercent,
                 lives: this.localPlayer.lives
             };
-            if (stateToSend.animationKey === 'hurt') {
-                console.log(`[SendState] Sending animationKey='hurt' to server`);
+            // Throttle state updates to reduce bandwidth (every 3rd frame = ~20Hz)
+            this.stateThrottleCounter++;
+            const shouldSendState = this.stateThrottleCounter >= this.STATE_SEND_INTERVAL ||
+                stateToSend.animationKey === 'hurt' || // Always send on damage
+                stateToSend.isAttacking; // Always send on attack
+
+            if (shouldSendState) {
+                this.stateThrottleCounter = 0;
+                this.networkManager.sendState(stateToSend);
             }
-            this.networkManager.sendState(stateToSend);
 
             // Check local player attacks against all remote players
             this.players.forEach((target) => {
@@ -322,8 +341,7 @@ export class OnlineGameScene extends Phaser.Scene {
             }
         });
 
-        // Update latency display
-        this.latencyText?.setText(`Ping: ${this.networkManager.getLatency()}ms | Frame: ${this.localFrame}`);
+
 
         // Update MatchHUD
         this.matchHUD.updatePlayers(this.players);
@@ -345,6 +363,19 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private handleStateUpdate(state: NetGameState): void {
+        // Jitter buffer: delay processing by JITTER_BUFFER_MS for smoother updates
+        const now = Date.now();
+        this.stateBuffer.push({ state, timestamp: now });
+
+        // Process buffered states that are old enough
+        while (this.stateBuffer.length > 0 &&
+            (now - this.stateBuffer[0].timestamp >= this.JITTER_BUFFER_MS)) {
+            const bufferedState = this.stateBuffer.shift()!;
+            this.processStateUpdate(bufferedState.state);
+        }
+    }
+
+    private processStateUpdate(state: NetGameState): void {
         const serverFrame = state.frame;
 
         state.players.forEach((netPlayer: NetPlayerState) => {
@@ -575,7 +606,7 @@ export class OnlineGameScene extends Phaser.Scene {
         // If game has started (we can use frame count or just if we have >= 2 players)
         // Simple rule: If <= 1 survivor, Game Over.
         if (survivorCount <= 1 && this.players.size >= 2) {
-            this.handleGameOver(lastSurvivor ? lastSurvivor.playerId : -1);
+            this.handleGameOver(lastSurvivor ? (lastSurvivor as Player & { playerId: number }).playerId : -1);
         }
     }
 
@@ -861,11 +892,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
     private createUI(): void {
         this.connectionStatusText?.setVisible(false);
-
-        this.latencyText = this.add.text(10, 10, 'Ping: ---', {
-            fontSize: '16px',
-            color: '#00ff00'
-        }).setScrollFactor(0).setDepth(1000);
+        // Ping/FPS display is handled by MatchHUD (centered)
     }
 
     private createStage(): void {

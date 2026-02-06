@@ -85,7 +85,6 @@ export class SnapshotBuffer {
 export class InputBuffer {
     private buffer: Map<number, FrameInput[]> = new Map(); // frame -> inputs for that frame
     private readonly maxFrames: number;
-    private oldestFrame: number = 0;
 
     constructor(maxFrames: number = 120) {
         this.maxFrames = maxFrames;
