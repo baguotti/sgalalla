@@ -213,3 +213,10 @@
 - **[Fix]** Infra: Updated `fly.toml` to pure TCP 3000/443 (removed UDP service).
 - **[S]** **STATUS**: v0.7.0 Complete. Reliable WebSocket connectivity enabled.
 
+### [2026-02-06] v0.7.1 - Socket.io Deployment Fixes
+- **[V]** `v0.7.1`
+- **[Fix]** fly.toml: Removed orphaned port 3000 entry (was causing routing confusion).
+- **[Fix]** Client: Fixed production URL to use standard HTTPS (443) instead of explicit :3000.
+- **[Fix]** Dependencies: Added `socket.io-client` to `package.json` (was missing from initial migration).
+- **[S]** **STATUS**: v0.7.1 Complete. WebSocket routing corrected.
+
