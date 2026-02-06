@@ -156,3 +156,8 @@
 - **[V]** `v0.6.10`
 - **[Fix]** Infrastructure: Forced Fly.io scale to 1 machine to prevent load-balancing errors (404 on matching) with in-memory Geckos state.
 - **[S]** **STATUS**: v0.6.10 Complete. Connection reliability restored.
+
+### [2026-02-06] v0.6.11 - Local Network & Dev UX
+- **[V]** `v0.6.11`
+- **[Fix]** Networking: Updated `NetworkManager.ts` to detect `192.168.` IPs as local and use port 3000.
+- **[S]** **STATUS**: v0.6.11 Complete. Local network testing enabled.

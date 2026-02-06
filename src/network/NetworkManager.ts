@@ -151,9 +151,15 @@ class NetworkManager {
      */
     public async connect(overridePort?: number): Promise<boolean> {
         return new Promise((resolve) => {
-            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            const url = isLocal ? `http://localhost` : `https://sgalalla-geckos.fly.dev`;
-            const port = overridePort || (isLocal ? 9208 : 443);
+            const hostname = window.location.hostname;
+            const isLocal = hostname === 'localhost' ||
+                hostname === '127.0.0.1' ||
+                hostname.startsWith('192.168.') ||
+                hostname.startsWith('10.') ||
+                hostname.startsWith('172.');
+
+            const url = isLocal ? `${window.location.protocol}//${hostname}` : `https://sgalalla-geckos.fly.dev`;
+            const port = overridePort || (isLocal ? 3000 : 443);
 
             console.log(`[NetworkManager] Connecting to ${url}:${port}...`);
 
