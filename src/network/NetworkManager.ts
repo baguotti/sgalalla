@@ -145,9 +145,8 @@ class NetworkManager {
 
     /**
      * Connect to the game server
-     * @param port - Override server port (default: 9208 local, fly.io production)
      */
-    public async connect(overridePort?: number): Promise<boolean> {
+    public async connect(): Promise<boolean> {
         return new Promise((resolve) => {
             const hostname = window.location.hostname;
             const isLocal = hostname === 'localhost' ||

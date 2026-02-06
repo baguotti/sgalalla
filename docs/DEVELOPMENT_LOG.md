@@ -220,3 +220,8 @@
 - **[Fix]** Dependencies: Added `socket.io-client` to `package.json` (was missing from initial migration).
 - **[S]** **STATUS**: v0.7.1 Complete. WebSocket routing corrected.
 
+### [2026-02-06] v0.7.2 - Build Fix
+- **[V]** `v0.7.2`
+- **[Fix]** Removed unused `overridePort` parameter causing TS6133 build failure on Vercel.
+- **[S]** **STATUS**: v0.7.2 Complete. Build passes.
+
