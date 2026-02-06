@@ -17,22 +17,18 @@ primary_region = 'cdg'
   protocol = "tcp"
   
   [[services.ports]]
-    port = 3000
-    handlers = ["tls", "http"] # Enable HTTPS on port 3000
-  
-  [[services.ports]]
     port = 443
     handlers = ["tls", "http"]
+  
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
 
   [services.concurrency]
     type = "connections"
     hard_limit = 25
     soft_limit = 20
 
-# UDP Service (WebRTC Data)
-[[services]]
-  internal_port = 3000
-  protocol = "udp"
   
   [[services.ports]]
     port = 3000

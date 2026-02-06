@@ -9,8 +9,7 @@
  * - INPUT BUFFER: Stores last N frames of inputs for rollback replay
  */
 
-import geckos from '@geckos.io/client';
-import type { ClientChannel, Data } from '@geckos.io/client';
+import { io } from 'socket.io-client';
 import type { InputState } from '../input/InputManager';
 import { InputBuffer, SnapshotBuffer } from './StateSnapshot';
 import type { FrameInput, GameSnapshot } from './StateSnapshot';
@@ -99,9 +98,8 @@ export type CharacterConfirmCallback = (playerId: number) => void;
 export type GameStartCallback = (players: { playerId: number; character: string }[]) => void;
 
 class NetworkManager {
-    private static instance: NetworkManager | null = null;
-
-    private channel: ClientChannel | null = null;
+    private static instance: NetworkManager    // Singleton pattern
+    private channel: any | null = null; // Socket.io Socket instance
     private connected: boolean = false;
     private localPlayerId: number = -1;
     private currentFrame: number = 0;
@@ -164,21 +162,14 @@ class NetworkManager {
 
             console.log(`[NetworkManager] Connecting to ${url}:${port}...`);
 
-            this.channel = geckos({
-                url: url,
-                port: port,
-                iceTransportPolicy: 'relay'
-            });
+            this.channel = io(`${url}:${port}`, {
+                transports: ['websocket', 'polling'],
+                reconnection: true
+            }) as any; // Cast to any to avoid type mismatch for now
 
-            this.channel.onConnect((error) => {
-                if (error) {
-                    console.error('[NetworkManager] Connection failed:', error);
-                    this.connected = false;
-                    resolve(false);
-                    return;
-                }
+            this.channel.on('connect', () => {
 
-                console.log('[NetworkManager] WebRTC connected, waiting for player assignment...');
+                console.log('[NetworkManager] WebSocket connected, waiting for player assignment...');
                 this.connected = true;
 
                 // Clear buffers on new connection
@@ -191,7 +182,13 @@ class NetworkManager {
                 this.setupMessageHandlers(resolve);
             });
 
-            this.channel.onDisconnect(() => {
+            this.channel.on('connect_error', (error: any) => {
+                console.error('[NetworkManager] Connection failed:', error);
+                this.connected = false;
+                resolve(false);
+            });
+
+            this.channel.on('disconnect', () => {
                 console.log('[NetworkManager] Disconnected');
                 this.connected = false;
                 this.onDisconnectCallback?.();
@@ -203,7 +200,7 @@ class NetworkManager {
         if (!this.channel) return;
 
         // Player assignment from server - resolve connect() promise here
-        this.channel.on(NetMessageType.PLAYER_JOINED, (data: Data) => {
+        this.channel.on(NetMessageType.PLAYER_JOINED, (data: any) => {
             const payload = data as { playerId: number };
             this.localPlayerId = payload.playerId;
             console.log(`[NetworkManager] Assigned Player ID: ${this.localPlayerId}`);
@@ -212,7 +209,7 @@ class NetworkManager {
         });
 
         // Game state updates from server
-        this.channel.on(NetMessageType.STATE_UPDATE, (data: Data) => {
+        this.channel.on(NetMessageType.STATE_UPDATE, (data: any) => {
             const state = data as NetGameState;
             this.currentFrame = state.frame;
 
@@ -242,7 +239,7 @@ class NetworkManager {
         });
 
         // Attack events from other players
-        this.channel.on(NetMessageType.ATTACK_START, (data: Data) => {
+        this.channel.on(NetMessageType.ATTACK_START, (data: any) => {
             const attack = data as NetAttackEvent;
             // Only trigger callback for remote players (not our own attack echo)
             if (attack.playerId !== this.localPlayerId) {
@@ -251,7 +248,7 @@ class NetworkManager {
         });
 
         // Hit events (damage/knockback)
-        this.channel.on(NetMessageType.HIT_EVENT, (data: Data) => {
+        this.channel.on(NetMessageType.HIT_EVENT, (data: any) => {
             const hit = data as NetHitEvent;
             // Only apply if we are the victim
             if (hit.victimId === this.localPlayerId) {
@@ -266,24 +263,24 @@ class NetworkManager {
         });
 
         // Player left event
-        this.channel.on(NetMessageType.PLAYER_LEFT, (data: Data) => {
+        this.channel.on(NetMessageType.PLAYER_LEFT, (data: any) => {
             const { playerId } = data as { playerId: number };
             this.onPlayerLeftCallback?.(playerId);
         });
 
         // Selection phase events
-        this.channel.on(NetMessageType.SELECTION_START, (data: Data) => {
+        this.channel.on(NetMessageType.SELECTION_START, (data: any) => {
             const { countdown } = data as { countdown: number };
             console.log(`[NetworkManager] Selection started, ${countdown}s`);
             this.onSelectionStartCallback?.(countdown);
         });
 
-        this.channel.on(NetMessageType.SELECTION_TICK, (data: Data) => {
+        this.channel.on(NetMessageType.SELECTION_TICK, (data: any) => {
             const { countdown } = data as { countdown: number };
             this.onSelectionTickCallback?.(countdown);
         });
 
-        this.channel.on(NetMessageType.CHARACTER_SELECT, (data: Data) => {
+        this.channel.on(NetMessageType.CHARACTER_SELECT, (data: any) => {
             const { playerId, character } = data as { playerId: number; character: string };
             // Only notify for other players (not self echo)
             if (playerId !== this.localPlayerId) {
@@ -291,12 +288,12 @@ class NetworkManager {
             }
         });
 
-        this.channel.on(NetMessageType.CHARACTER_CONFIRM, (data: Data) => {
+        this.channel.on(NetMessageType.CHARACTER_CONFIRM, (data: any) => {
             const { playerId } = data as { playerId: number };
             this.onCharacterConfirmCallback?.(playerId);
         });
 
-        this.channel.on(NetMessageType.GAME_START, (data: Data) => {
+        this.channel.on(NetMessageType.GAME_START, (data: any) => {
             const { players } = data as { players: { playerId: number; character: string }[] };
             console.log('[NetworkManager] Game starting!', players);
             this.onGameStartCallback?.(players);

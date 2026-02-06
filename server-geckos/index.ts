@@ -1,9 +1,9 @@
 /**
  * Sgalalla Game Server
- * WebRTC server using Geckos.io for low-latency multiplayer
+ * WebSocket server using Socket.io for reliable multiplayer
  */
 
-import geckos, { iceServers } from '@geckos.io/server';
+import { Server } from 'socket.io';
 
 // Network message types (mirrored from client)
 const NetMessageType = {
@@ -105,32 +105,18 @@ const httpServer = http.createServer((req, res) => {
     // Basic health check response to prevent hanging
     if (req.url === '/' && req.method === 'GET') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('Geckos.io Game Server is Running! 🦎\n');
+        res.end('Socket.io Game Server is Running! 🎮\n');
     }
 });
 
-// Create Geckos.io server with TURN relay for Fly.io compatibility
-// Fly.io only exposes one UDP port, so we force relay mode
-const customIceServers = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    // Free Metered TURN servers (metered.ca)
-    { urls: 'turn:a.relay.metered.ca:80', username: 'e77c8f0ba84a3e28b4d41c5f', credential: 'ZNv/KqEW+LxkKGcQ' },
-    { urls: 'turn:a.relay.metered.ca:443', username: 'e77c8f0ba84a3e28b4d41c5f', credential: 'ZNv/KqEW+LxkKGcQ' },
-    { urls: 'turn:a.relay.metered.ca:443?transport=tcp', username: 'e77c8f0ba84a3e28b4d41c5f', credential: 'ZNv/KqEW+LxkKGcQ' }
-];
-
-const io = geckos({
-    iceServers: customIceServers,
-    cors: { origin: '*', allowAuthorization: true },
-    portRange: {
-        min: 3000,
-        max: 3000
-    }
+// Create Socket.io server (WebSockets instead of WebRTC)
+const io = new Server(httpServer, {
+    cors: {
+        origin: '*',
+        credentials: true
+    },
+    transports: ['websocket', 'polling']
 });
-
-// Attach Geckos to the HTTP server
-io.addServer(httpServer);
 
 // IDLE TIMEOUT LOGIC (Scale to Zero)
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -162,7 +148,7 @@ httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`[Server] Geckos.io server running on 0.0.0.0:${PORT}`);
 });
 
-io.onConnection((channel) => {
+io.on('connection', (socket) => {
     totalConnectedPlayers++;
     checkIdleStatus();
     const roomId = 'default'; // Single room for now
@@ -189,7 +175,7 @@ io.onConnection((channel) => {
         playerId++;
     }
 
-    console.log(`[Server] Player ${playerId} connected (${channel.id})`);
+    console.log(`[Server] Player ${playerId} connected (${socket.id})`);
 
     // Initialize player state (spawn on main platform at y=780)
     // Platform spans x=285 to x=1635 (center=960, width=1350)
@@ -211,10 +197,10 @@ io.onConnection((channel) => {
         character: 'fok' // Default character
     };
 
-    room.players.set(channel.id!, playerState);
+    room.players.set(socket.id!, playerState);
 
     // Notify player of their ID and current phase
-    channel.emit(NetMessageType.PLAYER_JOINED, {
+    socket.emit(NetMessageType.PLAYER_JOINED, {
         playerId,
         phase: room.phase,
         countdown: room.selectionCountdown
@@ -257,8 +243,8 @@ io.onConnection((channel) => {
     }
 
     // Handle character selection during SELECTING phase
-    channel.on(NetMessageType.CHARACTER_SELECT, (data: any) => {
-        const player = room.players.get(channel.id!);
+    socket.on(NetMessageType.CHARACTER_SELECT, (data: any) => {
+        const player = room.players.get(socket.id!);
         if (!player) return;
         if (room.phase !== 'SELECTING') return;
         if (!data?.character) return;
@@ -275,8 +261,8 @@ io.onConnection((channel) => {
     });
 
     // Handle character confirmation
-    channel.on(NetMessageType.CHARACTER_CONFIRM, () => {
-        const player = room.players.get(channel.id!);
+    socket.on(NetMessageType.CHARACTER_CONFIRM, () => {
+        const player = room.players.get(socket.id!);
         if (!player || room.phase !== 'SELECTING') return;
         if (player.isConfirmed) return;
 
@@ -317,16 +303,16 @@ io.onConnection((channel) => {
     });
 
     // Handle input from client (legacy - still accept inputs but don't use for physics)
-    channel.on(NetMessageType.INPUT, (data: any) => {
-        const player = room.players.get(channel.id!);
+    socket.on(NetMessageType.INPUT, (data: any) => {
+        const player = room.players.get(socket.id!);
         if (!player) return;
         // Input received - we no longer simulate based on this
         // Client is authoritative and will send position updates
     });
 
     // Handle position update from client (client-authoritative, binary encoded)
-    channel.on('position_update', (data: any) => {
-        const player = room.players.get(channel.id!);
+    socket.on('position_update', (data: any) => {
+        const player = room.players.get(socket.id!);
         if (!player) return;
 
         // Try to decode binary data (Geckos.io sends as Uint8Array)
@@ -359,25 +345,25 @@ io.onConnection((channel) => {
     });
 
     // Handle ping
-    channel.on(NetMessageType.PING, () => {
-        channel.emit(NetMessageType.PONG, {});
+    socket.on(NetMessageType.PING, () => {
+        socket.emit(NetMessageType.PONG, {});
     });
 
     // Relay attack events to all clients
-    channel.on('attack_start', (data: any) => {
+    socket.on('attack_start', (data: any) => {
         io.emit('attack_start', data);
     });
 
     // Relay hit events to all clients
-    channel.on('hit_event', (data: any) => {
+    socket.on('hit_event', (data: any) => {
         io.emit('hit_event', data);
     });
 
     // Handle disconnect
-    channel.onDisconnect(() => {
+    socket.on('disconnect', () => {
         console.log(`[Server] Player ${playerId} disconnected`);
-        room.players.delete(channel.id!);
-        room.rematchVotes.delete(channel.id!);
+        room.players.delete(socket.id!);
+        room.rematchVotes.delete(socket.id!);
 
         // Broadcast departure
         io.emit(NetMessageType.PLAYER_LEFT, { playerId });
@@ -406,9 +392,9 @@ io.onConnection((channel) => {
     });
 
     // Handle rematch vote
-    channel.on(NetMessageType.REMATCH_VOTE, () => {
+    socket.on(NetMessageType.REMATCH_VOTE, () => {
         console.log(`[Server] Player ${playerId} voted for rematch`);
-        room.rematchVotes.add(channel.id!);
+        room.rematchVotes.add(socket.id!);
 
         // Check if all players voted
         if (room.rematchVotes.size >= room.players.size && room.players.size >= 2) {
@@ -436,9 +422,9 @@ io.onConnection((channel) => {
         }
     });
 
-    channel.onDisconnect(() => {
-        console.log(`[Server] Player ${playerId} disconnected (${channel.id})`);
-        room.players.delete(channel.id!);
+    socket.on('disconnect', () => {
+        console.log(`[Server] Player ${playerId} disconnected (${socket.id})`);
+        room.players.delete(socket.id!);
         totalConnectedPlayers = Math.max(0, totalConnectedPlayers - 1);
         checkIdleStatus();
     });
