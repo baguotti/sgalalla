@@ -92,12 +92,19 @@ export class OnlineGameScene extends Phaser.Scene {
     private readonly availableCharacters = ['fok', 'fok_alt'];
     private selectedCharIndex: number = 0;
 
+    // Confirmation state
+    private isConfirmed: boolean = false;
+    private isOpponentConfirmed: boolean = false;
+
     // Selection UI Elements
     private selectionContainer!: Phaser.GameObjects.Container;
     private countdownText!: Phaser.GameObjects.Text;
     private myCharacterText!: Phaser.GameObjects.Text;
     private opponentCharacterText!: Phaser.GameObjects.Text;
     private selectionInstructions!: Phaser.GameObjects.Text;
+    private confirmInstructions!: Phaser.GameObjects.Text;
+    private myConfirmText!: Phaser.GameObjects.Text;
+    private opponentConfirmText!: Phaser.GameObjects.Text;
 
     constructor() {
         super({ key: 'OnlineGameScene' });
@@ -226,7 +233,12 @@ export class OnlineGameScene extends Phaser.Scene {
         this.networkManager.onSelectionStart((countdown) => this.handleSelectionStart(countdown));
         this.networkManager.onSelectionTick((countdown) => this.handleSelectionTick(countdown));
         this.networkManager.onCharacterSelect((playerId, character) => this.handleOpponentCharacterSelect(playerId, character));
+        this.networkManager.onCharacterConfirm((playerId) => this.handleCharacterConfirm(playerId));
         this.networkManager.onGameStart((players) => this.handleGameStart(players));
+
+        // Silence unused but maintained state
+        void this.selectionCountdown;
+        void this.isOpponentConfirmed;
 
         // Try to connect
         this.showConnectionStatus('Connecting...');
@@ -1004,11 +1016,36 @@ export class OnlineGameScene extends Phaser.Scene {
         this.selectionContainer.add(this.opponentCharacterText);
 
         // Instructions
-        this.selectionInstructions = this.add.text(0, 150, '← / → to change | A/D keys', {
+        this.selectionInstructions = this.add.text(0, 150, '← / → to change', {
             fontSize: '18px',
             color: '#888888'
         }).setOrigin(0.5);
         this.selectionContainer.add(this.selectionInstructions);
+
+        // Confirm Instructions
+        this.confirmInstructions = this.add.text(0, 180, 'Press SPACE / A to Confirm', {
+            fontSize: '20px',
+            color: '#ffffff',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        this.selectionContainer.add(this.confirmInstructions);
+
+        // Confirmation Status Labels (Hidden initially)
+        this.myConfirmText = this.add.text(0, 50, 'READY', {
+            fontSize: '16px',
+            color: '#00ff00',
+            fontStyle: 'bold',
+            backgroundColor: '#004400'
+        }).setOrigin(0.5).setVisible(false);
+        this.selectionContainer.add(this.myConfirmText);
+
+        this.opponentConfirmText = this.add.text(0, 110, 'READY', {
+            fontSize: '16px',
+            color: '#00ff00',
+            fontStyle: 'bold',
+            backgroundColor: '#004400'
+        }).setOrigin(0.5).setVisible(false);
+        this.selectionContainer.add(this.opponentConfirmText);
 
         // Make UI camera render this on top
         if (this.uiCamera) {
@@ -1040,12 +1077,27 @@ export class OnlineGameScene extends Phaser.Scene {
         this.opponentCharacterText.setText(character.toUpperCase());
     }
 
+    private handleCharacterConfirm(playerId: number): void {
+        if (playerId === this.localPlayerId) {
+            this.isConfirmed = true;
+            this.myConfirmText.setVisible(true);
+            this.confirmInstructions.setText('Waiting for opponent...');
+        } else {
+            this.isOpponentConfirmed = true;
+            this.opponentConfirmText.setVisible(true);
+        }
+    }
+
     private handleGameStart(players: { playerId: number; character: string }[]): void {
         console.log('[OnlineGameScene] Game starting with players:', players);
         this.phase = 'PLAYING';
 
         // Hide selection UI
         this.selectionContainer.setVisible(false);
+        this.isConfirmed = false;
+        this.isOpponentConfirmed = false;
+        this.myConfirmText.setVisible(false);
+        this.opponentConfirmText.setVisible(false);
 
         // Create MatchHUD
         this.createUI();
@@ -1061,7 +1113,14 @@ export class OnlineGameScene extends Phaser.Scene {
             if (p.playerId === this.localPlayerId) {
                 this.localPlayer = player;
             }
+
+            // Add to HUD
+            const isLocal = p.playerId === this.localPlayerId;
+            this.matchHUD.addPlayer(p.playerId, `Player ${p.playerId + 1}`, isLocal);
         });
+
+        // Setup collision overlap for hit detection
+        // ... (existing collision code)
     }
 
     private cycleCharacter(direction: number): void {
@@ -1079,30 +1138,52 @@ export class OnlineGameScene extends Phaser.Scene {
     private selectionInputHeld: boolean = false;
 
     private pollSelectionInput(): void {
+        if (this.isConfirmed) return; // Input locked when confirmed
+
         // Check keyboard
         const cursors = this.input.keyboard?.createCursorKeys();
         const aKey = this.input.keyboard?.addKey('A');
         const dKey = this.input.keyboard?.addKey('D');
+        const enterKey = this.input.keyboard?.addKey('ENTER');
+        const spaceKey = this.input.keyboard?.addKey('SPACE');
 
         const leftPressed = cursors?.left?.isDown || aKey?.isDown;
         const rightPressed = cursors?.right?.isDown || dKey?.isDown;
+        const confirmPressed = enterKey?.isDown || spaceKey?.isDown;
 
         // Check gamepad
         const pad = this.input.gamepad?.pad1;
         const padLeft = pad?.left || (pad?.leftStick?.x ?? 0) < -0.5;
         const padRight = pad?.right || (pad?.leftStick?.x ?? 0) > 0.5;
+        const padConfirm = pad?.A || pad?.B; // Accept A or B (some controllers swap)
 
         const anyLeft = leftPressed || padLeft;
         const anyRight = rightPressed || padRight;
+        const anyConfirm = confirmPressed || padConfirm;
 
         // Debounce: only trigger on press, not hold
-        if ((anyLeft || anyRight) && !this.selectionInputHeld) {
+        if ((anyLeft || anyRight || anyConfirm) && !this.selectionInputHeld) {
             this.selectionInputHeld = true;
-            if (anyLeft) this.cycleCharacter(-1);
-            else if (anyRight) this.cycleCharacter(1);
-        } else if (!anyLeft && !anyRight) {
+
+            if (anyConfirm) {
+                this.confirmCharacterSelection();
+            } else if (anyLeft) {
+                this.cycleCharacter(-1);
+            } else if (anyRight) {
+                this.cycleCharacter(1);
+            }
+        } else if (!anyLeft && !anyRight && !anyConfirm) {
             this.selectionInputHeld = false;
         }
+    }
+
+    private confirmCharacterSelection(): void {
+        if (this.phase !== 'SELECTING' || this.isConfirmed) return;
+
+        console.log('[OnlineGameScene] Confirmed selection');
+        this.networkManager.sendCharacterConfirm();
+        // Optimistic update (handler will also set this)
+        this.handleCharacterConfirm(this.localPlayerId);
     }
 
     private createStage(): void {

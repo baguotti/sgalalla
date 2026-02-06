@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
+    "server": "lsof -ti:9208 | xargs kill -9 2>/dev/null; sleep 1; npm run dev --prefix server-geckos",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

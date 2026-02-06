@@ -18,6 +18,7 @@ const NetMessageType = {
     REMATCH_START: 'rematch_start',
     // Character Selection
     CHARACTER_SELECT: 'character_select',
+    CHARACTER_CONFIRM: 'character_confirm',
     SELECTION_START: 'selection_start',
     SELECTION_TICK: 'selection_tick'
 } as const;
@@ -35,6 +36,7 @@ interface PlayerState {
     damagePercent: number;
     lives: number;
     character: string; // 'fok' or 'fok_alt'
+    isConfirmed?: boolean;
 }
 
 type RoomPhase = 'WAITING' | 'SELECTING' | 'PLAYING';
@@ -201,6 +203,7 @@ io.onConnection((channel) => {
         if (!player) return;
         if (room.phase !== 'SELECTING') return;
         if (!data?.character) return;
+        if (player.isConfirmed) return; // Can't change after confirming
 
         player.character = data.character;
         console.log(`[Server] Player ${player.playerId} selected character: ${data.character}`);
@@ -210,6 +213,48 @@ io.onConnection((channel) => {
             playerId: player.playerId,
             character: data.character
         });
+    });
+
+    // Handle character confirmation
+    channel.on(NetMessageType.CHARACTER_CONFIRM, () => {
+        const player = room.players.get(channel.id!);
+        if (!player || room.phase !== 'SELECTING') return;
+        if (player.isConfirmed) return;
+
+        player.isConfirmed = true;
+        console.log(`[Server] Player ${player.playerId} confirmed selection`);
+
+        // Broadcast confirmation
+        io.emit(NetMessageType.CHARACTER_CONFIRM, { playerId: player.playerId });
+
+        // Check if ALL players are confirmed
+        let allConfirmed = true;
+        let playerCount = 0;
+        room.players.forEach(p => {
+            if (!p.isConfirmed) allConfirmed = false;
+            playerCount++;
+        });
+
+        // Only auto-start if we have 2 players and both confirmed
+        if (playerCount === 2 && allConfirmed) {
+            console.log('[Server] All players confirmed - starting game immediately');
+
+            // Clear timer
+            if (room.selectionTimer) {
+                clearInterval(room.selectionTimer);
+                room.selectionTimer = null;
+            }
+
+            room.phase = 'PLAYING';
+            room.frame = 0;
+
+            const startPayload = Array.from(room.players.values()).map(p => ({
+                playerId: p.playerId,
+                character: p.character
+            }));
+
+            io.emit(NetMessageType.GAME_START, { players: startPayload });
+        }
     });
 
     // Handle input from client (legacy - still accept inputs but don't use for physics)

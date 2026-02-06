@@ -34,7 +34,8 @@ export const NetMessageType = {
     // Character Selection
     CHARACTER_SELECT: 'character_select',
     SELECTION_START: 'selection_start',
-    SELECTION_TICK: 'selection_tick'
+    SELECTION_TICK: 'selection_tick',
+    CHARACTER_CONFIRM: 'character_confirm'
 } as const;
 
 // Serialized input for network transmission
@@ -94,6 +95,7 @@ export type PlayerLeftCallback = (playerId: number) => void;
 export type SelectionStartCallback = (countdown: number) => void;
 export type SelectionTickCallback = (countdown: number) => void;
 export type CharacterSelectCallback = (playerId: number, character: string) => void;
+export type CharacterConfirmCallback = (playerId: number) => void;
 export type GameStartCallback = (players: { playerId: number; character: string }[]) => void;
 
 class NetworkManager {
@@ -126,6 +128,7 @@ class NetworkManager {
     private onSelectionStartCallback: SelectionStartCallback | null = null;
     private onSelectionTickCallback: SelectionTickCallback | null = null;
     private onCharacterSelectCallback: CharacterSelectCallback | null = null;
+    private onCharacterConfirmCallback: CharacterConfirmCallback | null = null;
     private onGameStartCallback: GameStartCallback | null = null;
 
     // Latency tracking with smoothing
@@ -271,6 +274,11 @@ class NetworkManager {
             if (playerId !== this.localPlayerId) {
                 this.onCharacterSelectCallback?.(playerId, character);
             }
+        });
+
+        this.channel.on(NetMessageType.CHARACTER_CONFIRM, (data: Data) => {
+            const { playerId } = data as { playerId: number };
+            this.onCharacterConfirmCallback?.(playerId);
         });
 
         this.channel.on(NetMessageType.GAME_START, (data: Data) => {
@@ -431,6 +439,7 @@ class NetworkManager {
     public onSelectionStart(callback: SelectionStartCallback): void { this.onSelectionStartCallback = callback; }
     public onSelectionTick(callback: SelectionTickCallback): void { this.onSelectionTickCallback = callback; }
     public onCharacterSelect(callback: CharacterSelectCallback): void { this.onCharacterSelectCallback = callback; }
+    public onCharacterConfirm(callback: CharacterConfirmCallback): void { this.onCharacterConfirmCallback = callback; }
     public onGameStart(callback: GameStartCallback): void { this.onGameStartCallback = callback; }
 
     /**
@@ -447,6 +456,14 @@ class NetworkManager {
     public sendCharacterSelect(character: string): void {
         if (!this.connected || !this.channel) return;
         this.channel.emit(NetMessageType.CHARACTER_SELECT, { character }, { reliable: true });
+    }
+
+    /**
+     * Send character confirmation to server
+     */
+    public sendCharacterConfirm(): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.CHARACTER_CONFIRM, {}, { reliable: true });
     }
 }
 
