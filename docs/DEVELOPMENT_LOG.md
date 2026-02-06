@@ -204,3 +204,12 @@
 - **[Fix]** Health Check: Root URL now returns "Geckos.io Game Server is Running! 🦎".
 - **[S]** **STATUS**: v0.6.19 Complete. Server reachability confirmed.
 
+### [2026-02-06] v0.7.0 - Socket.io Migration (Pivoting from WebRTC)
+- **[V]** `v0.7.0`
+- **[A]** Architecture: Pivoted from WebRTC/UDP (Geckos.io) to WebSockets/TCP (Socket.io).
+- **[Reason]** Diagnosis: Fly.io UDP support found unreliable for WebRTC data channels; signaling worked but data failed.
+- **[Fix]** Server: Replaced Geckos.io with Socket.io server; handled connection/logic mapping.
+- **[Fix]** Client: Replaced Geckos.io with Socket.io-client in `NetworkManager.ts`.
+- **[Fix]** Infra: Updated `fly.toml` to pure TCP 3000/443 (removed UDP service).
+- **[S]** **STATUS**: v0.7.0 Complete. Reliable WebSocket connectivity enabled.
+
