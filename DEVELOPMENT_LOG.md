@@ -128,3 +128,9 @@
 - **[Tech]** Port Unification: Standardized on port 3000 for server/fly.io compatibility.
 - **[Fix]** Server Stability: Created dedicated `tsconfig.json` for server Node.js types.
 - **[S]** **STATUS**: v0.6.5 Complete. Infrastructure live on Fly.io.
+
+### [2026-02-06] v0.6.6 - Scale to Zero (Cost Optimization)
+- **[V]** `v0.6.6`
+- **[New]** Auto-Stop: Server now automatically shuts down after 5 minutes of inactivity (saves money).
+- **[Fix]** Connectivity: Explicitly binding to `0.0.0.0` using `http.createServer` (fixes Fly.io reachability).
+- **[S]** **STATUS**: v0.6.6 Complete. Production cost-efficiency implemented.

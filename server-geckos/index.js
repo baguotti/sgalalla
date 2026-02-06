@@ -59,17 +59,48 @@ function decodeBinaryPlayerState(buffer) {
         lives: view.getUint8(14),
     };
 }
+import http from 'http';
 const PORT = Number(process.env.PORT) || 3000;
 const rooms = new Map();
-// Removed global nextPlayerId
-// Create Geckos.io server (v3 API - no separate HTTP server needed)
+// Create standard HTTP server to handle binding to 0.0.0.0 correctly
+const httpServer = http.createServer();
+// Create Geckos.io server
 const io = geckos({
     iceServers: iceServers,
     cors: { origin: '*', allowAuthorization: true }
 });
-io.listen(PORT);
-console.log(`[Server] Geckos.io server running on port ${PORT}`);
+// Attach Geckos to the HTTP server
+io.addServer(httpServer);
+// IDLE TIMEOUT LOGIC (Scale to Zero)
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+let idleTimer = null;
+let totalConnectedPlayers = 0;
+function checkIdleStatus() {
+    if (totalConnectedPlayers === 0) {
+        if (!idleTimer) {
+            console.log(`[Server] No players connected. Starting idle timer (${IDLE_TIMEOUT_MS / 1000}s)...`);
+            idleTimer = setTimeout(() => {
+                console.log('[Server] Idle timeout reached. Shutting down for cost savings.');
+                process.exit(0);
+            }, IDLE_TIMEOUT_MS);
+        }
+    }
+    else {
+        if (idleTimer) {
+            console.log('[Server] Player connected. Cancelling idle timer.');
+            clearTimeout(idleTimer);
+            idleTimer = null;
+        }
+    }
+}
+// Initial check
+checkIdleStatus();
+httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`[Server] Geckos.io server running on 0.0.0.0:${PORT}`);
+});
 io.onConnection((channel) => {
+    totalConnectedPlayers++;
+    checkIdleStatus();
     const roomId = 'default'; // Single room for now
     // Create room if needed
     if (!rooms.has(roomId)) {
