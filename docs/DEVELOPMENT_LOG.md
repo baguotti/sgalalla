@@ -225,3 +225,9 @@
 - **[Fix]** Removed unused `overridePort` parameter causing TS6133 build failure on Vercel.
 - **[S]** **STATUS**: v0.7.2 Complete. Build passes.
 
+### [2026-02-06] v0.7.3 - Remote Player Stutter Fix
+- **[V]** `v0.7.3`
+- **[Fix]** Reduced interpolation blend factor from 0.4 to 0.15 for smoother remote player movement.
+- **[Fix]** Adjusted snap threshold from 300→200 and blend threshold from 1→2 for gentler corrections.
+- **[S]** **STATUS**: v0.7.3 Complete. Stutter reduced.
+

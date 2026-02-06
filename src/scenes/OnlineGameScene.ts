@@ -383,14 +383,15 @@ export class OnlineGameScene extends Phaser.Scene {
                     const dy = target.y - player.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
-                    // Snap if too far, otherwise blend
-                    if (dist > 300) {
+                    // Snap if too far, otherwise blend very smoothly
+                    if (dist > 200) {
+                        // Teleport if way off (respawn, lag spike)
                         player.x = target.x;
                         player.y = target.y;
-                    } else if (dist > 1) {
-                        // Blend toward target (0.4 = balanced smoothness/responsiveness)
-                        player.x += dx * 0.4;
-                        player.y += dy * 0.4;
+                    } else if (dist > 2) {
+                        // Gentle blend (0.15 = very smooth, minimal visible correction)
+                        player.x += dx * 0.15;
+                        player.y += dy * 0.15;
                     }
                 }
 
