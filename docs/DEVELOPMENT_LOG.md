@@ -134,3 +134,10 @@
 - **[New]** Auto-Stop: Server now automatically shuts down after 5 minutes of inactivity (saves money).
 - **[Fix]** Connectivity: Explicitly binding to `0.0.0.0` using `http.createServer` (fixes Fly.io reachability).
 - **[S]** **STATUS**: v0.6.6 Complete. Production cost-efficiency implemented.
+
+### [2026-02-06] v0.6.7 - Asset Restoration & Docs Reorg
+- **[V]** `v0.6.7`
+- **[Fix]** Assets: Generated and added `platform.png` and `background.png` to `public/assets/` to fix Vercel 404s.
+- **[M]** Project Management: Moved `history.md` and `DEVELOPMENT_LOG.md` to `docs/` directory.
+- **[Rule]** Policy: Documentation MUST be updated for every commit.
+- **[S]** **STATUS**: v0.6.7 Complete. Assets restored and project structure cleaned up.
