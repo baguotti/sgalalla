@@ -8,17 +8,32 @@ primary_region = 'cdg'
 
 [build]
 
-[http_service]
-  internal_port = 3000
-  force_https = true
-  auto_stop_machines = false
-  auto_start_machines = true
-  min_machines_running = 1
-  processes = ['app']
+# [http_service] REMOVED in favor of explicit services
+# We expose Port 3000 for BOTH TCP (Signaling/HTTP) and UDP (Game Data)
 
+# TCP Service (Signaling + HTTP)
+[[services]]
+  internal_port = 3000
+  protocol = "tcp"
+  
+  [[services.ports]]
+    port = 3000
+    handlers = ["tls", "http"] # Enable HTTPS on port 3000
+  
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+# UDP Service (WebRTC Data)
 [[services]]
   internal_port = 3000
   protocol = "udp"
+  
   [[services.ports]]
     port = 3000
 

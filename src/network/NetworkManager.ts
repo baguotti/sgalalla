@@ -158,15 +158,16 @@ class NetworkManager {
                 hostname.startsWith('10.') ||
                 hostname.startsWith('172.');
 
-            const url = isLocal ? `${window.location.protocol}//${hostname}` : `https://sgalalla-geckos.fly.dev`;
-            const port = overridePort || (isLocal ? 3000 : 443);
+            // User requested explicit Port 3000 for everything
+            const url = isLocal ? `${window.location.protocol}//${hostname}` : `https://sgalalla-geckos.fly.dev`; // HTTPS is handled by Fly's TLS handler
+            const port = overridePort || 3000; // Use 3000 for both Local and Production
 
             console.log(`[NetworkManager] Connecting to ${url}:${port}...`);
 
             this.channel = geckos({
                 url: url,
                 port: port,
-                iceTransportPolicy: 'relay' // Force TURN relay on client side
+                iceTransportPolicy: 'relay'
             });
 
             this.channel.onConnect((error) => {

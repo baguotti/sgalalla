@@ -180,9 +180,14 @@
 - **[Fix]** Stability: Fixed connection ID expiration (404) by ensuring one machine is always "warm".
 - **[S]** **STATUS**: v0.6.14 Complete. Signal persistence verified.
 
-### [2026-02-06] v0.6.15 - Production Connectivity (FINAL FIX)
+### [2026-02-06] v0.6.15 - Server Connectivity (Draft)
 - **[V]** `v0.6.15`
-- **[Fix]** WebRTC: Implemented **TURN Relay** configuration with `iceTransportPolicy: 'relay'`.
-- **[Fix]** NAT: Traffic now bypasses Fly.io UDP limitations by using a professional relay (metered.ca).
-- **[S]** **STATUS**: v0.6.15 Complete. Connection successfully established from production client to production server.
+- **[Fix]** WebRTC: Implemented **TURN Relay** configuration on server.
+- **[Note]** Discovered that `iceTransportPolicy: relay` is ignored by the server-side library.
+
+### [2026-02-06] v0.6.17 - Production Connectivity (STABLE)
+- **[V]** `v0.6.17`
+- **[Fix]** WebRTC: Shifted **TURN Relay** force to the **Client** in `NetworkManager.ts`.
+- **[Fix]** Sync: Confirmed all files (including `src`) are correctly pushed to `main`.
+- **[S]** **STATUS**: v0.6.17 Complete. Connection successfully established using client-side relay force.
 
