@@ -264,3 +264,10 @@
 - **[Server]** Reduced tick/broadcast rate 60Hz → **20Hz** to prevent TCP saturation.
 - **[Optimization]** Server now skips state broadcasts if room phase is not `PLAYING`.
 - **[S]** **STATUS**: v0.7.8 Complete. Netcode hardened for production stability.
+
+### [2026-02-07] v0.7.9 - Stable Timeline Interpolation
+- **[V]** `v0.7.9`
+- **[Fix]** Refactored interpolation from **arrival-time** to **reconstructed server timeline**.
+- **[Fix]** Uses fixed 50ms delta (`serverTime = frame * 50`) instead of jittery `receiveTime`.
+- **[Fix]** Corrected syntax corruption (HTML entities, operator spacing) in `OnlineGameScene.ts`.
+- **[S]** **STATUS**: v0.7.9 Complete. Remote player movement should be smooth.
