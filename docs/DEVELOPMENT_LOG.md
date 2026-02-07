@@ -283,3 +283,8 @@
 - **[Move]** Slide Buff: Increased Slide Attack speed (2200) and reduced deceleration for massive travel distance.
 - **[Vis]** Wall Slide: Added 2px visual offset to close the gap between character and wall.
 - **[S]** **STATUS**: v0.8.0 Complete. Fok_v3 feels distinct, floaty, and responsive.
+
+### [2026-02-07] v0.8.1 - Build Hotfix
+- **[V]** `v0.8.1`
+- **[Fix]** Build: Removed unused `onFloor` variable in `Player.ts` causing TS6133 error during Vercel deployment.
+- **[S]** **STATUS**: v0.8.1 Complete. Build should pass.

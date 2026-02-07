@@ -462,7 +462,7 @@ export class Player extends Fighter {
     }
 
     private updateAnimation(): void {
-        const onFloor = this.isGrounded;
+        // onFloor removed (unused)
         const velocity = this.velocity;
 
         // Dynamic Run Speed (Refinement Round 5)
