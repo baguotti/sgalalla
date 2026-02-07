@@ -81,7 +81,7 @@ export class Player extends Fighter {
 
     // Character Type
     // Character Type
-    public character: 'fok' | 'fok_alt' = 'fok';
+    public character: 'fok' | 'fok_alt' | 'fok_v3' = 'fok';
     private animPrefix: string = 'alchemist';
     private debugRect!: Phaser.GameObjects.Rectangle;
 
@@ -164,7 +164,7 @@ export class Player extends Fighter {
         }
     }
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok' | 'fok_alt' } = {}) {
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok' | 'fok_alt' | 'fok_v3' } = {}) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
@@ -178,7 +178,11 @@ export class Player extends Fighter {
         this.animPrefix = this.character;
 
         // Create player sprite
-        this.sprite = scene.add.sprite(0, 0, this.character, '0_Fok_Idle_000.png'); // Adjusted offset (0) to ground sprite
+        let initialFrame = '0_Fok_Idle_000.png';
+        if (this.character === 'fok_v3') {
+            initialFrame = 'Fok_v3_Idle_000';
+        }
+        this.sprite = scene.add.sprite(0, 0, this.character, initialFrame); // Adjusted offset (0) to ground sprite
 
 
 
@@ -206,7 +210,7 @@ export class Player extends Fighter {
             displayName = this.character.toUpperCase();
         }
 
-        this.nameTag = scene.add.text(0, -60, displayName, {
+        this.nameTag = scene.add.text(0, -100, displayName, {
             fontSize: '18px',
             fontFamily: 'Arial',
             fontStyle: 'bold',
@@ -224,6 +228,14 @@ export class Player extends Fighter {
             this.ai = new PlayerAI(this, scene);
         }
 
+        // Explicitly set size (BEFORE Debug Hitbox creation)
+        this.setSize(60, 120); // Default size
+
+        // Refinement Round 9: Wider hitbox for fok_v3 (40px width - +5px each side)
+        if (this.character === 'fok_v3') {
+            this.setSize(40, 120);
+        }
+
         // Create Debug Hitbox (Hidden by default)
         this.debugRect = scene.add.rectangle(0, 0, this.width, this.height);
         this.debugRect.setStrokeStyle(2, 0x00ff00);
@@ -239,6 +251,10 @@ export class Player extends Fighter {
         const enableGamepad = gamepadIdx !== null;
 
         console.log(`[Player ${this.playerId}] Input Config: useKeyboard=${useKeyboard}, gamepadIndex=${gamepadIdx}, enableGamepad=${enableGamepad}, config.gamepadIndex=${config.gamepadIndex}`);
+
+
+        // Physics Body Creation happens in PlayerPhysics using this.width/height
+        // OR it uses its own constants. Let's check PlayerPhysics.
 
         this.inputManager = new InputManager(scene, {
             playerId: this.playerId,
@@ -446,6 +462,36 @@ export class Player extends Fighter {
     }
 
     private updateAnimation(): void {
+        const onFloor = this.isGrounded;
+        const velocity = this.velocity;
+
+        // Dynamic Run Speed (Refinement Round 5)
+        // Aggressively separate Walk vs Run using physics state
+        if (this.sprite.anims.currentAnim && this.sprite.anims.currentAnim.key.includes('run')) {
+            const speed = Math.abs(velocity.x);
+
+            if (this.physics.isRunning) {
+                // RUNNING: Fast playback, but slightly reduced (Refinement 6)
+                // Start at 0.85x and scale up gently
+                const normalizedSpeed = 0.85 + (speed / 2500);
+                this.sprite.anims.timeScale = normalizedSpeed;
+            } else {
+                // WALKING: Forced Slow playback
+                // Cap at 0.5x speed for that "lazy/heavy" walk feel
+                this.sprite.anims.timeScale = 0.5;
+            }
+        } else {
+            // Reset timeScale for non-run animations
+            this.sprite.anims.timeScale = 1;
+        }
+
+        // Priority 1: Combat / Hittable (Locked animations)
+        // If an attack or hitstun is playing, ensure timeScale is reset.
+        // DO NOT RETURN HERE: Let the logic below select and play the specific 'attack' or 'hurt' animation key.
+        if (this.isAttacking || this.isHitStunned) {
+            this.sprite.anims.timeScale = 1;
+        }
+
         // Remote players use synced animationKey directly (set from network)
         // We detect remote players by checking if they have no current input
         const isRemotePlayer = !this.currentInput;
@@ -477,18 +523,49 @@ export class Player extends Fighter {
         if (this.isAttacking) {
             // Determine attack animation from currentAttack
             const currentAttack = this.getCurrentAttack();
-            if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
-                if (currentAttack.data.direction === AttackDirection.DOWN) {
-                    this.animationKey = 'attack_down';
-                } else if (currentAttack.data.direction === AttackDirection.SIDE) {
-                    this.animationKey = 'attack_side';
+            if (currentAttack) {
+                if (currentAttack.data.type === AttackType.HEAVY) {
+                    if (currentAttack.data.direction === AttackDirection.DOWN) {
+                        this.animationKey = 'attack_down';
+                    } else if (currentAttack.data.direction === AttackDirection.SIDE) {
+                        this.animationKey = 'attack_side';
+                    } else if (currentAttack.data.direction === AttackDirection.UP) {
+                        // User request: Up Sig uses Side Light (which we mapped to attack_side in config, or we can map specifically to attack_up_sig if we wanted separation, 
+                        // but config has attack_up mapped to Neutral Light 2-frame loop per refinement?)
+                        // Wait, refinement 2 said: "neutral light is a 2 frame loop. that needs to be applied also for up+light"
+                        // UP+LIGHT is generic input. UP SIG is Heavy Up.
+                        // I mapped attack_up (Heavy Up usually?) to Neutral Light loop.
+                        // Let's stick to the config mapping: attack_up -> Neutral Light loop.
+                        this.animationKey = 'attack_up';
+                    } else {
+                        this.animationKey = 'attack_heavy'; // Neutral Heavy?
+                    }
                 } else {
-                    this.animationKey = 'attack_heavy';
+                    // LIGHT ATTACKS
+                    if (currentAttack.data.direction === AttackDirection.UP) {
+                        // Up Light -> Neutral Light loop (mapped to attack_up per config rename or just reuse light?)
+                        // Actually, I mapped attack_up in config.
+                        // If this is LIGHT UP, let's use 'attack_up' key if mapped, or 'attack_light_0'.
+                        this.animationKey = 'attack_up';
+                    } else if (currentAttack.data.direction === AttackDirection.DOWN) {
+                        this.animationKey = 'attack_down_light'; // NEW KEY
+                    } else if (currentAttack.data.direction === AttackDirection.SIDE) {
+                        if (!this.isGrounded) {
+                            this.animationKey = 'attack_side_air'; // NEW KEY
+                        } else {
+                            this.animationKey = 'attack_side'; // Reusing heavier side attack frame? Or should we have distinct side light?
+                            // User request 4: "side air has its own frame". Implies Side Ground Light is different?
+                            // Original config mapped attack_side to Side_Light frame.
+                            // So let's use attack_side for Side Light Ground.
+                            this.animationKey = 'attack_side';
+                        }
+                    } else {
+                        // Neutral Light
+                        this.animationKey = 'attack_light'; // Mapped to loop
+                    }
                 }
-            } else if (currentAttack && currentAttack.data.direction === AttackDirection.UP) {
-                this.animationKey = 'attack_up';
             } else {
-                this.animationKey = 'attack_light_0';
+                this.animationKey = 'attack_light';
             }
             this.playAnim(this.animationKey, true);
             return;
@@ -502,6 +579,22 @@ export class Player extends Fighter {
 
         // Airborne
         if (!this.isGrounded) {
+            if (this.physics.isWallSliding) {
+                // Check if animation exists (fok_v3 only for now)
+                // We'll rely on the key; if it doesn't exist, it might fallback or do nothing.
+                // Assuming wall_slide is registered for char.
+                // Since updateAnimation checks 'exists' via Phaser logic usually, but we are using prefix helper.
+                // Let's just set the key. If the animation isn't created for this char (e.g. fok/fok_alt), it will warn or play nothing.
+                // For fok/fok_alt, we didn't add it.
+                // Let's check logic:
+                if (this.character === 'fok_v3') {
+                    this.animationKey = 'wall_slide';
+                    this.playAnim('wall_slide', true);
+                    return;
+                }
+                // Fallback for others to fall/jump?
+            }
+
             if (this.velocity.y < 0) {
                 this.animationKey = 'jump';
                 this.playAnim('jump', true);
@@ -523,12 +616,23 @@ export class Player extends Fighter {
     }
 
     public playAnim(key: string, ignoreIfPlaying: boolean = true): void {
-        let fullKey = `${this.animPrefix}_${key}`;
+        const fullKey = `${this.animPrefix}_${key}`;
+
+        // Opt-out if already playing to avoid resetting visual offsets (like shake)
+        if (ignoreIfPlaying && this.sprite.anims.currentAnim && this.sprite.anims.currentAnim.key === fullKey) {
+            return;
+        }
+
         this.sprite.anims.play(fullKey, ignoreIfPlaying);
 
         // Apply custom offsets for misaligned sprites
         if (key === 'attack_side') {
             this.sprite.x = 35;
+        } else if (key === 'wall_slide' && this.character === 'fok_v3') {
+            // Refinement 8: Offset towards the wall by 2px to close gap
+            // wallDirection: -1 (Left) -> Offset -2
+            // wallDirection: 1 (Right) -> Offset 2
+            this.sprite.x = this.physics.wallDirection * 2;
         } else {
             this.sprite.x = 0;
         }

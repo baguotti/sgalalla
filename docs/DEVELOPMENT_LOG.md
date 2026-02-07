@@ -271,3 +271,15 @@
 - **[Fix]** Uses fixed 50ms delta (`serverTime = frame * 50`) instead of jittery `receiveTime`.
 - **[Fix]** Corrected syntax corruption (HTML entities, operator spacing) in `OnlineGameScene.ts`.
 - **[S]** **STATUS**: v0.7.9 Complete. Remote player movement should be smooth.
+
+### [2026-02-07] v0.8.0 - Fok_v3 Character Refinements
+- **[V]** `v0.8.0`
+- **[New]** Character: Implemented `fok_v3` with distinct hitbox, animations, and move properties.
+- **[Phys]** Hitbox Tuning: Converged on precise 40x120px hitbox (Skinny) with correct debug visualization.
+- **[Anim]** Walk vs Run: Implemented strict state separation; Walk forced to 0.5x speed, Run scales dynamically from 0.85x.
+- **[Anim]** Checks: Fixed `updateAnimation` logic where `isAttacking` early return prevented attack animations from playing.
+- **[Phys]** Floatiness: Drastically reduced Gravity (5600 -> 3800) and Jump Force (-2150 -> -1700) for "floatier" air control.
+- **[Move]** Slide Attack: Implemented Run-Attack Override (Running + Light = Down Light Slide).
+- **[Move]** Slide Buff: Increased Slide Attack speed (2200) and reduced deceleration for massive travel distance.
+- **[Vis]** Wall Slide: Added 2px visual offset to close the gap between character and wall.
+- **[S]** **STATUS**: v0.8.0 Complete. Fok_v3 feels distinct, floaty, and responsive.

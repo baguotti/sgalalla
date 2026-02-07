@@ -139,7 +139,14 @@ export class PlayerCombat {
             }
 
             // 3. Normal Attack
-            const direction = this.getInputDirection(input);
+            let direction = this.getInputDirection(input);
+
+            // Refinement Round 10: Run-Attack Override (Slide Attack)
+            // Any light attack while running becomes a Down Light (Slide) to use momentum
+            if (this.player.physics.isRunning && this.player.isGrounded) {
+                direction = AttackDirection.DOWN;
+            }
+
             const isAerial = !this.player.isGrounded;
             const attackKey = Attack.getAttackKey(AttackType.LIGHT, direction, isAerial);
             this.startAttack(attackKey);

@@ -14,6 +14,7 @@ export class GameScene extends Phaser.Scene {
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
     public bombs: Bomb[] = [];
     private background!: Phaser.GameObjects.Graphics;
+    private backgroundImage!: Phaser.GameObjects.Image; // Add class property
     private walls: Phaser.GameObjects.Rectangle[] = [];
     private wallTexts: Phaser.GameObjects.Text[] = [];
 
@@ -76,49 +77,103 @@ export class GameScene extends Phaser.Scene {
     private loadCharacterAssets(): void {
         this.load.atlas('fok', 'assets/fok/fok_sprites/fok.png', 'assets/fok/fok_sprites/fok.json');
         this.load.atlas('fok_alt', 'assets/fok_alt.png', 'assets/fok_alt.json');
+        this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
+
+        // Load Maps
+        this.load.image('background_lake', 'assets/pixel-lake08-sunny-water.jpg');
     }
 
     private createAnimations(): void {
-        const characters = ['fok', 'fok_alt'];
+        const charConfigs = {
+            'fok': {
+                idle: { prefix: '0_Fok_Idle_', count: 19, loop: true },
+                run: { prefix: '0_Fok_Running_', count: 12, loop: true },
+                charging: { prefix: '0_Fok_Charging_', count: 8, loop: true },
+                attack_light: { prefix: '0_Fok_AttackLight_', count: 1, suffix: '000', loop: false },
+                attack_heavy: { prefix: '0_Fok_AttackHeavy_', count: 1, suffix: '000', loop: false },
+                attack_up: { prefix: '0_Fok_AttackUp_', count: 1, suffix: '001', loop: false },
+                attack_down: { prefix: '0_Fok_DownSig_', count: 1, suffix: '001', loop: false },
+                attack_side: { prefix: '0_Fok_SideSig_', count: 1, suffix: '001', loop: false },
+                hurt: { prefix: '0_Fok_Hurt_', count: 1, suffix: '001', loop: false },
+                ground_pound: { prefix: '0_Fok_Gpound_', count: 1, suffix: '001', loop: false },
+                fall: { prefix: '0_Fok_Falling_', count: 1, suffix: '001', loop: false },
+                jump: { prefix: '0_Fok_Jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: '0_Fok_Sliding_', count: 1, suffix: '000', loop: false }
+            },
+            'fok_alt': { // Same as fok
+                idle: { prefix: '0_Fok_Idle_', count: 19, loop: true },
+                run: { prefix: '0_Fok_Running_', count: 12, loop: true },
+                charging: { prefix: '0_Fok_Charging_', count: 8, loop: true },
+                attack_light: { prefix: '0_Fok_AttackLight_', count: 1, suffix: '000', loop: false },
+                attack_heavy: { prefix: '0_Fok_AttackHeavy_', count: 1, suffix: '000', loop: false },
+                attack_up: { prefix: '0_Fok_AttackUp_', count: 1, suffix: '001', loop: false },
+                attack_down: { prefix: '0_Fok_DownSig_', count: 1, suffix: '001', loop: false },
+                attack_side: { prefix: '0_Fok_SideSig_', count: 1, suffix: '001', loop: false },
+                hurt: { prefix: '0_Fok_Hurt_', count: 1, suffix: '001', loop: false },
+                ground_pound: { prefix: '0_Fok_Gpound_', count: 1, suffix: '001', loop: false },
+                fall: { prefix: '0_Fok_Falling_', count: 1, suffix: '001', loop: false },
+                jump: { prefix: '0_Fok_Jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: '0_Fok_Sliding_', count: 1, suffix: '000', loop: false }
+            },
+            'fok_v3': {
+                idle: { prefix: 'Fok_v3_Idle_', count: 12, loop: true },
+                run: { prefix: 'Fok_v3_Run_', count: 9, loop: true },
+                charging: { prefix: 'Fok_v3_Charge_', count: 2, loop: true },
+
+                // Refinements Round 2:
+                // Neutral Light: 1 frame (Reverted loop per request)
+                attack_light: { prefix: 'Fok_v3_Neutral_Light_', count: 1, suffix: '000', loop: false },
+                attack_up: { prefix: 'Fok_v3_Neutral_Light_', count: 1, suffix: '000', loop: false },
+
+                // Down Light: Specific frame
+                attack_down_light: { prefix: 'Fok_v3_Down_Light_', count: 1, suffix: '000', loop: false },
+
+                // Side Air: Specific frame
+                attack_side_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false },
+
+                // Wall Slide: specific frame
+                wall_slide: { prefix: 'Fok_v3_Wall_Slide_', count: 1, suffix: '000', loop: false },
+
+                // MAPPED FALLBACKS and SPECIFIC FRAMES
+                attack_heavy: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false }, // Side Sig
+
+                attack_side: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false }, // Side Sig -> Side Light
+
+                attack_down: { prefix: 'Fok_v3_Down_Sig_', count: 2, loop: false }, // Down_Sig: 2 frames
+
+                hurt: { prefix: 'Fok_v3_Hurt_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'Fok_v3_Down_Sig_', count: 1, suffix: '000', loop: false }, // Fallback
+                fall: { prefix: 'Fok_v3_Fall_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'Fok_v3_Jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false }
+            }
+        };
+
+        const characters = ['fok', 'fok_alt', 'fok_v3'];
 
         characters.forEach(char => {
-            const fokAnims = [
-                { key: 'idle', prefix: '0_Fok_Idle_', count: 19, loop: true },
-                { key: 'run', prefix: '0_Fok_Running_', count: 12, loop: true },
-                { key: 'charging', prefix: '0_Fok_Charging_', count: 8, loop: true },
-                // Single frame animations (but defined as animations for consistency)
-                { key: 'attack_light', prefix: '0_Fok_AttackLight_', count: 1, suffix: '000', loop: false },
-                { key: 'attack_heavy', prefix: '0_Fok_AttackHeavy_', count: 1, suffix: '000', loop: false },
-                { key: 'attack_up', prefix: '0_Fok_AttackUp_', count: 1, suffix: '001', loop: false },
-                { key: 'attack_down', prefix: '0_Fok_DownSig_', count: 1, suffix: '001', loop: false },
-                { key: 'attack_side', prefix: '0_Fok_SideSig_', count: 1, suffix: '001', loop: false },
-                { key: 'hurt', prefix: '0_Fok_Hurt_', count: 1, suffix: '001', loop: false },
-                { key: 'ground_pound', prefix: '0_Fok_Gpound_', count: 1, suffix: '001', loop: false },
-                { key: 'fall', prefix: '0_Fok_Falling_', count: 1, suffix: '001', loop: false },
-                { key: 'jump', prefix: '0_Fok_Jump_', count: 1, suffix: '000', loop: false },
-                { key: 'slide', prefix: '0_Fok_Sliding_', count: 1, suffix: '000', loop: false }
-            ];
+            const config = charConfigs[char as keyof typeof charConfigs];
+            if (!config) return;
 
-            fokAnims.forEach(anim => {
-                const animKey = `${char}_${anim.key}`;
-                // Skip if already exists
+            Object.entries(config).forEach(([animName, animData]: [string, any]) => {
+                const animKey = `${char}_${animName}`;
                 if (this.anims.exists(animKey)) return;
 
                 let frames;
-                if (anim.count === 1 && anim.suffix) {
-                    // Manual single frame with specific suffix
+                if (animData.count === 1 && animData.suffix) {
                     frames = this.anims.generateFrameNames(char, {
-                        prefix: anim.prefix,
-                        start: parseInt(anim.suffix),
-                        end: parseInt(anim.suffix),
+                        prefix: animData.prefix,
+                        start: parseInt(animData.suffix),
+                        end: parseInt(animData.suffix),
                         zeroPad: 3
                     });
                 } else {
-                    // Sequence
+                    // Sequence 0 to count-1
+                    // Note: fok_v3 uses 3 digit zero pad for all? json shows "000", "001" etc.
                     frames = this.anims.generateFrameNames(char, {
-                        prefix: anim.prefix,
+                        prefix: animData.prefix,
                         start: 0,
-                        end: anim.count - 1,
+                        end: animData.count - 1,
                         zeroPad: 3
                     });
                 }
@@ -126,43 +181,69 @@ export class GameScene extends Phaser.Scene {
                 this.anims.create({
                     key: animKey,
                     frames: frames,
-                    frameRate: anim.key === 'run' ? 20 : 15,
-                    repeat: anim.loop ? -1 : 0
+                    frameRate: animName === 'run' ? 24 : 10, // Increased run speed to reduce sliding look
+                    repeat: animData.loop ? -1 : 0
                 });
             });
 
-            // Additional animation mappings
-            if (!this.anims.exists(`${char}_attack_light_0`)) {
-                this.anims.create({
-                    key: `${char}_attack_light_0`,
-                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
-                    frameRate: 10,
-                    repeat: 0
-                });
-            }
-            if (!this.anims.exists(`${char}_attack_light_1`)) {
-                this.anims.create({
-                    key: `${char}_attack_light_1`,
-                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
-                    frameRate: 10,
-                    repeat: 0
-                });
-            }
-            if (!this.anims.exists(`${char}_dodge`)) {
-                this.anims.create({
-                    key: `${char}_dodge`,
-                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_Sliding_', start: 0, end: 0, zeroPad: 3 }),
-                    frameRate: 10,
-                    repeat: 0
-                });
-            }
-            if (!this.anims.exists(`${char}_jump_start`)) {
-                this.anims.create({
-                    key: `${char}_jump_start`,
-                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_Jump_', start: 0, end: 0, zeroPad: 3 }),
-                    frameRate: 10,
-                    repeat: 0
-                });
+            // Special cases / Extra mappings to ensure all keys exist
+            // Some keys in original code were manually created if they didn't exist, e.g. attack_light_0
+            // We should ensure compatibility with Player.ts which might call these specific keys.
+
+            const ensureAnim = (key: string, frameName: string, frameIndex: number = 0) => {
+                if (!this.anims.exists(key)) {
+                    this.anims.create({
+                        key: key,
+                        frames: this.anims.generateFrameNames(char, { prefix: frameName, start: frameIndex, end: frameIndex, zeroPad: 3 }),
+                        frameRate: 10,
+                        repeat: 0
+                    });
+                }
+            };
+
+            // Common mapping helpers
+
+            // attack_light_0, attack_light_1 (used for combos maybe?)
+            // For fok_v3, attack_light has 2 frames. maybe 0 is first, 1 is second?
+            if (char === 'fok_v3') {
+                ensureAnim(`${char}_attack_light_0`, 'Fok_v3_Neutral_Light_', 0);
+                ensureAnim(`${char}_attack_light_1`, 'Fok_v3_Neutral_Light_', 1);
+                ensureAnim(`${char}_dodge`, 'Fok_v3_Dodge_', 0);
+                ensureAnim(`${char}_jump_start`, 'Fok_v3_Jump_', 0);
+            } else {
+                // Original mappings
+                if (!this.anims.exists(`${char}_attack_light_0`)) {
+                    this.anims.create({
+                        key: `${char}_attack_light_0`,
+                        frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
+                        frameRate: 10,
+                        repeat: 0
+                    });
+                }
+                if (!this.anims.exists(`${char}_attack_light_1`)) {
+                    this.anims.create({
+                        key: `${char}_attack_light_1`,
+                        frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
+                        frameRate: 10,
+                        repeat: 0
+                    });
+                }
+                if (!this.anims.exists(`${char}_dodge`)) {
+                    this.anims.create({
+                        key: `${char}_dodge`,
+                        frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_Sliding_', start: 0, end: 0, zeroPad: 3 }),
+                        frameRate: 10,
+                        repeat: 0
+                    });
+                }
+                if (!this.anims.exists(`${char}_jump_start`)) {
+                    this.anims.create({
+                        key: `${char}_jump_start`,
+                        frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_Jump_', start: 0, end: 0, zeroPad: 3 }),
+                        frameRate: 10,
+                        repeat: 0
+                    });
+                }
             }
         });
     }
@@ -177,7 +258,7 @@ export class GameScene extends Phaser.Scene {
         } else {
             // Fallback defaults
             this.playerData = [
-                { playerId: 0, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok' },
+                { playerId: 0, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok_v3' },
                 { playerId: 1, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok', isAI: true, isTrainingDummy: true }
             ];
         }
@@ -204,11 +285,44 @@ export class GameScene extends Phaser.Scene {
             this.createAnimations();
 
 
-            // Set background color
-            this.cameras.main.setBackgroundColor('#1a1a2e');
+            // BACKGROUND LOGIC
+            // Move background creation here to ensure it's managed, but depth should handle order.
+            // If SetDepth(-20) isn't working, it might be due to display list order if depth sorting isn't enabled or is buggy.
+            // Safest: create background FIRST.
+            // But since we are patching, let's try to force it to back of display list AND use depth.
+
+            // Note: I added background loading in createAnimations() earlier, which is called above.
+            // Let's remove it from there and put it here cleanly.
+            // Actually, let's just use what was added in createAnimations (which I effectively patched into 'create' in previous step? No, wait.)
+
+            // In the previous patch, I added the background code inside 'createAnimations'??
+            // Let's check where line 271 is. 
+            // Ah, I see "this.createAnimations();" at line 271.
+            // And then "Set background color (fallback)" at line 274.
+            // It seems I added the background code AFTER createAnimations, inside 'create'.
+
+            // If z-index -20 is obscuring, maybe the camera transform is ignored for background?
+            // Or maybe the players have lower Z?
+            // Player Z is 0.
+
+            // Let's try setScrollFactor(0) to make it static and ensure depth is comfortably low.
+            // And also `sendToBack()`.
 
             // Create stage platforms
             this.createStage();
+
+            // BACKGROUND LOGIC
+            // Now that stage is created, we can hide the default gradient
+            this.cameras.main.setBackgroundColor('#1a1a2e');
+
+            this.backgroundImage = this.add.image(width / 2, height / 2, 'background_lake'); // Center it
+            this.backgroundImage.setDisplaySize(width, height);
+            this.backgroundImage.setScrollFactor(0); // Static background
+            this.backgroundImage.setDepth(-100); // Deep background
+
+            if (this.background) {
+                this.background.setVisible(false);
+            }
 
             // Create Players
             this.players = [];
@@ -367,6 +481,7 @@ export class GameScene extends Phaser.Scene {
 
         // Ignore static world elements
         if (this.background) this.uiCamera.ignore(this.background);
+        if (this.backgroundImage) this.uiCamera.ignore(this.backgroundImage); // Ignore bg image
         if (this.platforms.length > 0) this.uiCamera.ignore(this.platforms);
         if (this.softPlatforms.length > 0) this.uiCamera.ignore(this.softPlatforms);
         if (this.walls.length > 0) this.uiCamera.ignore(this.walls);
