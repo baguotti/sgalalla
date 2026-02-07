@@ -14,8 +14,8 @@ import { Player, PlayerState } from '../entities/Player';
 import NetworkManager from '../network/NetworkManager';
 import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '../network/NetworkManager';
 
-// Define a snapshot type that includes receive timestamp for wall-clock interpolation
-type NetPlayerSnapshot = NetPlayerState & { frame: number; receiveTime: number };
+// Define a snapshot type that includes reconstructed server timestamp for fixed-timeline interpolation
+type NetPlayerSnapshot = NetPlayerState & { frame: number; serverTime: number };
 import { InputManager } from '../input/InputManager';
 import type { GameSnapshot, PlayerSnapshot } from '../network/StateSnapshot';
 import { MatchHUD } from '../ui/PlayerHUD';
@@ -24,10 +24,10 @@ export class OnlineGameScene extends Phaser.Scene {
     // Networking
     private networkManager: NetworkManager;
     private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
-    private clientRenderTime: number = 0;  // Wall-clock render time
+    private interpolationTime: number = 0; // Stable playback timeline
     private isBufferInitialized: boolean = false;
-    private readonly RENDER_DELAY_MS = 100; // 100ms buffer (2 ticks at 20Hz)
-    private playbackMultiplier: number = 1.0; // Adaptive pacing
+    private readonly RENDER_DELAY_MS = 100; // 100ms historical window
+    private readonly SERVER_TICK_MS = 50;   // 20Hz fixed rate
     private localPlayerId: number = -1;
     private isConnected: boolean = false;
 
@@ -375,59 +375,50 @@ export class OnlineGameScene extends Phaser.Scene {
             });
         }
 
-        // JITTER BUFFER (Render Delay) Logic
+        // JITTER BUFFER (Fixed Timeline Interpolation)
         // ----------------------------------------------------------------
-        // Instead of immediate updates, we buffer snapshots and render ~100ms in the past.
-        // This swallows network jitter (TCP blocking) at the cost of slight latency.
+        // Interpolate from reconstructed server timeline, decoupled from network jitter.
 
-        // 1. Advance Client Render Time with Adaptive Pacing
-        this.clientRenderTime += delta * this.playbackMultiplier;
+        // 1. Advance Stable Interpolation Clock
+        if (this.isBufferInitialized) {
+            this.interpolationTime += delta;
+        }
 
-        // 2. Interpolate Remote Players using Wall-Clock Time
-        const renderTime = performance.now() - this.RENDER_DELAY_MS;
+        // 2. Interpolate Remote Players
         this.players.forEach((player, playerId) => {
             if (playerId !== this.localPlayerId) {
                 const buffer = this.snapshotBuffer.get(playerId);
 
                 if (buffer && buffer.length >= 2) {
-                    // Adaptive buffer pacing
-                    if (buffer.length < 2) {
-                        this.playbackMultiplier = 0.95; // Underrun: slow down
-                    } else if (buffer.length > 5) {
-                        this.playbackMultiplier = 1.05; // Overflow: speed up
-                    } else {
-                        this.playbackMultiplier = 1.0;
-                    }
-
-                    // Find two snapshots surrounding our render time
+                    // Find snapshots A and B such that A.serverTime <= interpolationTime < B.serverTime
                     let fromSnap = buffer[0];
                     let toSnap = buffer[1];
 
-                    // Keep shifting if our render time is ahead of the 'to' snapshot
-                    while (buffer.length >= 2 && renderTime > buffer[1].receiveTime) {
-                        buffer.shift(); // Remove old snapshot
+                    // Shift buffer based on interpolationTime
+                    while (buffer.length >= 2 && this.interpolationTime > buffer[1].serverTime) {
+                        buffer.shift();
                         if (buffer.length >= 2) {
                             fromSnap = buffer[0];
                             toSnap = buffer[1];
                         }
                     }
 
-                    // Perform Interpolation using wall-clock time
-                    if (buffer.length >= 2 && renderTime >= fromSnap.receiveTime && renderTime <= toSnap.receiveTime) {
-                        const totalTime = toSnap.receiveTime - fromSnap.receiveTime;
-                        const t = totalTime > 0 ? (renderTime - fromSnap.receiveTime) / totalTime : 0;
+                    // Perform Interpolation
+                    if (buffer.length >= 2 && this.interpolationTime >= fromSnap.serverTime && this.interpolationTime <= toSnap.serverTime) {
+                        const segmentDuration = toSnap.serverTime - fromSnap.serverTime;
+                        const t = segmentDuration > 0 ? (this.interpolationTime - fromSnap.serverTime) / segmentDuration : 0;
 
                         // Linear Interpolation for Position
                         player.x = Phaser.Math.Linear(fromSnap.x, toSnap.x, t);
                         player.y = Phaser.Math.Linear(fromSnap.y, toSnap.y, t);
 
-                        // Discrete State Updates (use 'from' snapshot)
+                        // Discrete State Updates
                         if (fromSnap.animationKey && fromSnap.animationKey !== player.animationKey) {
                             player.playAnim(fromSnap.animationKey, true);
                         }
                         player.setFacingDirection(fromSnap.facingDirection);
                     } else if (buffer.length > 0) {
-                        // Extrapolation or just snap to latest if we ran out of buffer
+                        // Extrapolation fallback: snap to latest
                         const latest = buffer[buffer.length - 1];
                         player.x = latest.x;
                         player.y = latest.y;
@@ -440,9 +431,6 @@ export class OnlineGameScene extends Phaser.Scene {
                 this.checkBlastZone(player);
             }
         });
-
-
-
 
         // Update MatchHUD
         this.matchHUD.updatePlayers(this.players);
@@ -509,39 +497,38 @@ export class OnlineGameScene extends Phaser.Scene {
                 this.snapshotBuffer.set(netPlayer.playerId, buffer);
             }
 
-            // Create a snapshot with receive timestamp for wall-clock interpolation
+            // Create a snapshot with reconstructed server timestamp
             const snapshot: NetPlayerSnapshot = {
                 ...netPlayer,
                 frame: serverFrame,
-                receiveTime: performance.now()
+                serverTime: serverFrame * this.SERVER_TICK_MS
             };
 
-            // Add to buffer (assuming chronological order from TCP)
-            if (buffer.length === 0 || snapshot.receiveTime > buffer[buffer.length - 1].receiveTime) {
+            // Add to buffer in chronological order
+            if (buffer.length === 0 || snapshot.frame > buffer[buffer.length - 1].frame) {
                 buffer.push(snapshot);
             }
 
-            // Limit buffer size (keep last 10 snapshots, ~500ms at 20Hz)
+            // Cap buffer size (keeping 10 snapshots = 500ms at 20Hz)
             if (buffer.length > 10) {
                 buffer.shift();
             }
 
-            // Initialize client render time if needed
+            // Initialize clock
             if (!this.isBufferInitialized && buffer.length >= 2) {
-                this.clientRenderTime = performance.now();
+                // Initialize interpolationTime to ~100ms behind the latest server snapshot
+                this.interpolationTime = snapshot.serverTime - this.RENDER_DELAY_MS;
                 this.isBufferInitialized = true;
-                console.log(`[JitterBuffer] Initialized. BufferSize: ${buffer.length}, RenderDelay: ${this.RENDER_DELAY_MS}ms`);
+                console.log(`[JitterBuffer] Initialized. interpolationTime: ${this.interpolationTime}, ServerTime: ${snapshot.serverTime}`);
             }
 
-            // Sync lives and damage (stateless sync)
+            // Sync stats (stateless)
             if (typeof netPlayer.lives === 'number' && player.lives !== netPlayer.lives) {
                 player.lives = netPlayer.lives;
             }
             if (typeof netPlayer.damagePercent === 'number') {
                 player.setDamage(netPlayer.damagePercent);
             }
-            // Sync facing direction immediately if not interpolating it (or interpolate it in update)
-            // player.setFlipX(netPlayer.facingDirection < 0);
         });
     }
 
