@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 export // Character Type Definition
-    type CharacterType = 'fok' | 'fok_alt' | 'fok_v3';
+    type CharacterType = 'fok' | 'fok_v3' | 'dummy';
 
 export interface PlayerSelection {
     playerId: number;
@@ -28,8 +28,9 @@ export class LobbyScene extends Phaser.Scene {
     private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character Data
-    private characters: CharacterType[] = ['fok', 'fok_alt', 'fok_v3'];
-    private charLabels: string[] = ['Fok', 'Fok (Alt)', 'Fok V3'];
+    private characters: CharacterType[] = ['fok_v3', 'fok', 'dummy'] as any; // Refinement: fok_v3 is default. Cast to any to bypass strict type for now.
+    private charLabels: string[] = ['Fok V3', 'Fok', 'Dummy'];
+    // P1_KEYS removed (unused in Lobby)
 
     // Input debounce & Safety
     private lastInputTime: Map<number, number> = new Map();

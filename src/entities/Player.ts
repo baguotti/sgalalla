@@ -164,17 +164,15 @@ export class Player extends Fighter {
         }
     }
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok' | 'fok_alt' | 'fok_v3' } = {}) {
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok' | 'fok_v3' } = {}) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
         this.isTrainingDummy = config.isTrainingDummy || false;
         this.playerId = config.playerId || 0;
 
-        this.playerId = config.playerId || 0;
-
         // Character Selection
-        this.character = config.character || 'fok';
+        this.character = config.character || 'fok_v3'; // Refinement: Default is fok_v3
         this.animPrefix = this.character;
 
         // Create player sprite
@@ -471,14 +469,15 @@ export class Player extends Fighter {
             const speed = Math.abs(velocity.x);
 
             if (this.physics.isRunning) {
-                // RUNNING: Fast playback, but slightly reduced (Refinement 6)
+                // RUNNING: Fast playback logic
                 // Start at 0.85x and scale up gently
                 const normalizedSpeed = 0.85 + (speed / 2500);
                 this.sprite.anims.timeScale = normalizedSpeed;
             } else {
-                // WALKING: Forced Slow playback
-                // Cap at 0.5x speed for that "lazy/heavy" walk feel
-                this.sprite.anims.timeScale = 0.5;
+                // Should not happen if isRunning covers all grounded movement, 
+                // but if we are decelerating, default to normal speed?
+                // Or just keep the scaling logic if speed > 0
+                this.sprite.anims.timeScale = 1;
             }
         } else {
             // Reset timeScale for non-run animations

@@ -288,3 +288,26 @@
 - **[V]** `v0.8.1`
 - **[Fix]** Build: Removed unused `onFloor` variable in `Player.ts` causing TS6133 error during Vercel deployment.
 - **[S]** **STATUS**: v0.8.1 Complete. Build should pass.
+
+### [2026-02-07] v0.8.2 - Fok_v3 Standardization
+- **[V]** `v0.8.2`
+- **[Refactor]** Default Character: Set `fok_v3` as the default selection in both Local Lobby and Online Play.
+- **[Refactor]** Cleanup: Removed `fok_alt` from `Player.ts` constructor, `LobbyScene.ts` character list, and `OnlineGameScene.ts` types.
+- **[Asset]** Optimization: Removed `fok_alt` asset loading from `GameScene.ts`.
+- [Fix] Linter: Removed unused `P1_KEYS` from `LobbyScene.ts`.
+- [S] **STATUS**: v0.8.2 Complete. Fok_v3 is now the main character.
+
+### [2026-02-07] v0.8.3 - Mechanics Tuning (Round 11)
+- **[V]** `v0.8.3`
+- **[Phys]** Floatiness: Gravity reduced (3800 -> 2200), Jump Force reduced (-1700 -> -1250), Max Fall Speed reduced (2600 -> 1800).
+- **[Move]** Run Default: Removed "Walk" state. All ground movement is now Running by default.
+- **[Anim]** Scaling: Removed walk speed clamping; run animation scales dynamically from base speed.
+- **[S]** **STATUS**: v0.8.3 Complete. Physics are significantly floatier and movement is faster/streamlined.
+
+### [2026-02-07] v0.8.4 - Stage Expansion (Round 12)
+- **[V]** `v0.8.4`
+- **[Stage]** Width: Main Platform wider (1800 -> 2400).
+- **[Stage]** Walls: Pushed boundaries out by 200px each side (-400 / 2320).
+- **[Stage]** Platforms: Soft platforms spaced further apart (+/- 200px).
+- **[Stage]** Blast Zones: Extended to prevent early kills with new mobility.
+- **[S]** **STATUS**: v0.8.4 Complete. Stage is wider to match floaty physics.

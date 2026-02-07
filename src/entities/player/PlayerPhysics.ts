@@ -269,10 +269,14 @@ export class PlayerPhysics {
         // Disable movement if dodging (unless it's a directional dodge which carries momentum, implemented in startDodge)
         if (this.isDodging) return;
 
-        // Run Mechanic: Grounded + Moving + Dodge Held (but not during attack recovery)
+        // Run Mechanic: Default movement is RUN (Refinement 11)
+        // Dash input (dodgeHeld) triggers dash (handled in handleDodgeInput), but running is always on if moving.
         const isMoving = input.moveLeft || input.moveRight;
-        const inRecovery = this.player.isAttacking; // If isAttacking is true here, we're in recovery (due to check above)
-        this.isRunning = this.player.isGrounded && isMoving && input.dodgeHeld && !inRecovery;
+        const inRecovery = this.player.isAttacking;
+
+        // Refinement 11: Remove input.dodgeHeld requirement. 
+        // If grounded and moving, we are running.
+        this.isRunning = this.player.isGrounded && isMoving && !inRecovery;
 
         let accel = PhysicsConfig.MOVE_ACCEL;
         if (this.isRunning) {

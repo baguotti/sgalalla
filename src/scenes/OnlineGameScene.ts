@@ -60,16 +60,16 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // Wall configuration (matching GameScene)
     private readonly WALL_THICKNESS = 45;
-    private readonly WALL_LEFT_X = -200; // Moved way out
-    private readonly WALL_RIGHT_X = 2120; // 1920 + 200
+    private readonly WALL_LEFT_X = -400; // Refinement 12: Pushed out from -200
+    private readonly WALL_RIGHT_X = 2320; // Refinement 12: Pushed out from 2120
     private readonly PLAY_BOUND_LEFT = this.WALL_LEFT_X + this.WALL_THICKNESS / 2;
     private readonly PLAY_BOUND_RIGHT = this.WALL_RIGHT_X - this.WALL_THICKNESS / 2;
 
     // Blast zone boundaries (matching GameScene)
-    private readonly BLAST_ZONE_LEFT = -2000; // Extended from -1000
-    private readonly BLAST_ZONE_RIGHT = 4000; // Extended from 3000
-    private readonly BLAST_ZONE_TOP = -2500; // Extended from -1000
-    private readonly BLAST_ZONE_BOTTOM = 3500; // Extended from 2000
+    private readonly BLAST_ZONE_LEFT = -3000; // Extended from -2000
+    private readonly BLAST_ZONE_RIGHT = 5000; // Extended from 4000
+    private readonly BLAST_ZONE_TOP = -2500;
+    private readonly BLAST_ZONE_BOTTOM = 3500;
 
     // Camera Settings (matching GameScene)
     // Camera Settings (matching GameScene)
@@ -97,10 +97,9 @@ export class OnlineGameScene extends Phaser.Scene {
     private selectionCountdown: number = 10;
     private selectedCharacter: string = 'fok';
     private opponentCharacter: string = 'fok';
-    private readonly availableCharacters = ['fok', 'fok_alt'];
+    // Character Selection
+    private availableCharacters: string[] = ['fok_v3', 'fok']; // Refinement: fok_v3 is default
     private selectedCharIndex: number = 0;
-
-    // Confirmation state
     private isConfirmed: boolean = false;
     private isOpponentConfirmed: boolean = false;
 
@@ -915,7 +914,7 @@ export class OnlineGameScene extends Phaser.Scene {
             isAI: false,
             useKeyboard: isLocal,
             gamepadIndex: isLocal ? 0 : null, // All local players try to use index 0 (gated by focus)
-            character: character as 'fok' | 'fok_alt'
+            character: character as 'fok' | 'fok_v3'
         });
 
         // Network hooks for local player
@@ -1238,22 +1237,22 @@ export class OnlineGameScene extends Phaser.Scene {
         rightWall.setAlpha(0.6);
         rightWall.setDepth(-5);
 
-        // Main platform (centered, wider - Brawlhaven style)
-        // Center: 960. Width 1800. Y = 900
-        const mainPlatform = this.add.rectangle(960, 900, 1800, 60, 0x2c3e50);
+        // Main platform (centered, wider - Refinement 12)
+        // Center: 960. Width 2400 (Was 1800). Y = 900
+        const mainPlatform = this.add.rectangle(960, 900, 2400, 60, 0x2c3e50);
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
         if (this.uiCamera) this.uiCamera.ignore(mainPlatform);
 
         // Soft platforms (floating HIGHER)
-        // Left
-        const softPlatform1 = this.add.rectangle(460, 500, 500, 30, 0x0f3460);
+        // Left - Refinement 12: Pushed left to 260
+        const softPlatform1 = this.add.rectangle(260, 500, 500, 30, 0x0f3460);
         softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform1.setAlpha(0.85);
         this.softPlatforms.push(softPlatform1);
 
-        // Right
-        const softPlatform2 = this.add.rectangle(1460, 500, 500, 30, 0x0f3460);
+        // Right - Refinement 12: Pushed right to 1660
+        const softPlatform2 = this.add.rectangle(1660, 500, 500, 30, 0x0f3460);
         softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform2.setAlpha(0.85);
         this.softPlatforms.push(softPlatform2);

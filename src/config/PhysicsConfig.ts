@@ -4,23 +4,23 @@
  */
 export const PhysicsConfig = {
   // Gravity - high value for fast, heavy feel (like Brawlhalla)
-  // Refinement Round 9: "Floaty" jump requested. Reduced significantly.
-  GRAVITY: 3800, // Was 5600
+  // Refinement Round 11: "Floaty" jump requested. Reduced significantly from 3800.
+  GRAVITY: 2200,
 
   // Movement - acceleration-based for responsive feel with slight slide
   MOVE_ACCEL: 6500,
   FRICTION: 0.85,
   RUN_FRICTION: 0.93,
-  SLIDE_ATTACK_SPEED: 2200, // Refinement 9: Much faster slide (was 1200)
-  SLIDE_ATTACK_DECELERATION: 0.96, // Refinement 9: Less drag to slide further (was 0.9)
+  SLIDE_ATTACK_SPEED: 2200,
+  SLIDE_ATTACK_DECELERATION: 0.96,
   MAX_SPEED: 1400,
-  MAX_FALL_SPEED: 2600,
+  MAX_FALL_SPEED: 1800, // Reduced from 2600 for floatier fall
 
   // Jump mechanics
-  JUMP_FORCE: -1700, // Refinement 9: Reduced for lower gravity (was -2150)
-  SHORT_HOP_FORCE: -900, // Reduced from -1100
+  JUMP_FORCE: -1250, // Refinement 11: Reduced for lower gravity (was -1700)
+  SHORT_HOP_FORCE: -700, // Reduced from -900
   JUMP_HOLD_THRESHOLD: 150,
-  DOUBLE_JUMP_FORCE: -1600, // Reduced from -1950
+  DOUBLE_JUMP_FORCE: -1150, // Reduced from -1600
   MAX_JUMPS: 3,
 
   // Fast-fall
