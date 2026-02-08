@@ -155,11 +155,11 @@ class NetworkManager {
                 hostname.startsWith('10.') ||
                 hostname.startsWith('172.');
 
-            // Geckos.io: Local uses 9208, Production (DigitalOcean) also uses 9208 directly
+            // Geckos.io: Both local and production use port 9208
             const port = 9208;
-            // FORCE DigitalOcean IP for testing (even locally)
-            const url = 'http://164.90.235.15';
-            // const url = isLocal ? `http://${hostname}` : 'http://164.90.235.15';
+            // Local uses localhost, Production (DigitalOcean) uses Droplet IP
+            // NOTE: For HTTPS clients (Vercel), we need HTTPS on server or Mixed Content will block
+            const url = isLocal ? `http://${hostname}` : 'http://164.90.235.15';
 
             console.log(`[NetworkManager] Connecting to ${url}:${port} via Geckos.io (UDP)...`);
 

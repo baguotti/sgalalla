@@ -408,3 +408,8 @@
 - **[Fix]** Server: Enabled CORS (`origin: '*'`) in `server-geckos/index.ts` to allow connections from localhost and Vercel.
 - **[Ops]** Recovery: Pushed fix to git to recover from potential `sed` command corruption on server.
 - **[S]** **STATUS**: v0.9.5 Pushed. User needs to `git pull` on server.
+
+### [2026-02-08] v0.9.6 - WebRTC Port Range Fix
+- **[V]** `v0.9.6`
+- **[Fix]** Firewall: Updated `setup_digitalocean.sh` to allow UDP ports `1025:65535`. WebRTC data channels use random high ports, not just the signaling port 9208.
+- **[S]** **STATUS**: v0.9.6 Pushed. User needs to run `ufw allow 1025:65535/udp` on server.
