@@ -360,3 +360,13 @@
 - **[V]** `v0.8.10`
 - **[Fix]** Input: Resolved issue where Xbox controllers didn't work in the Training lobby because `inputType` and `gamepadIndex` were not being passed from the main menu.
 - **[S]** **STATUS**: v0.8.10 Complete. Controller data now correctly persists from the main menu into the character selection lobby.
+
+### [2026-02-08] v0.8.11 - Interpolation & Codebase Audit
+- **[V]** `v0.8.11`
+- **[Fix]** Network: Replaced frame-based timing (`frame * 50ms`) with client arrival timestamps (`performance.now()`) for jitter buffer. Eliminates teleportation caused by clock drift.
+- **[Fix]** Network: Added adaptive clock speed (80%-120%) based on buffer fullness to prevent starvation/overflow.
+- **[Refactor]** Event Parity: Added missing `ATTACK_START`, `HIT_EVENT`, `POSITION_UPDATE`, `INPUT_ACK` to server `NetMessageType`.
+- **[Refactor]** Dead Code: Deleted `LocalMultiplayerSetupScene.ts` (258 lines). Removed commented blocks in `TrainingDummy.ts`.
+- **[Refactor]** Memory: Added pooled `_boundsRect` to `Player.getBounds()` to eliminate per-frame allocations.
+- **[Refactor]** Lifecycle: Added `shutdown()` method to `OnlineGameScene` for proper socket/player cleanup on scene stop.
+- **[S]** **STATUS**: v0.8.11 Complete. Online interpolation is now smooth and codebase is audited for performance.

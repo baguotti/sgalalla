@@ -24,10 +24,9 @@ export class OnlineGameScene extends Phaser.Scene {
     // Networking
     private networkManager: NetworkManager;
     private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
-    private interpolationTime: number = 0; // Stable playback timeline
+    private interpolationTime: number = 0; // Stable playback timeline (milliseconds)
     private isBufferInitialized: boolean = false;
     private readonly RENDER_DELAY_MS = 100; // 100ms historical window
-    private readonly SERVER_TICK_MS = 50;   // 20Hz fixed rate
     private localPlayerId: number = -1;
     private isConnected: boolean = false;
 
@@ -384,9 +383,30 @@ export class OnlineGameScene extends Phaser.Scene {
         // ----------------------------------------------------------------
         // Interpolate from reconstructed server timeline, decoupled from network jitter.
 
-        // 1. Advance Stable Interpolation Clock
+        // 1. Advance Stable Interpolation Clock (with drift correction)
         if (this.isBufferInitialized) {
-            this.interpolationTime += delta;
+            // Check if we're running too far ahead (buffer starvation)
+            let maxBufferTime = 0;
+            this.snapshotBuffer.forEach((buffer) => {
+                if (buffer.length > 0) {
+                    maxBufferTime = Math.max(maxBufferTime, buffer[buffer.length - 1].serverTime);
+                }
+            });
+
+            const targetLead = maxBufferTime - this.interpolationTime;
+
+            // If target lead < RENDER_DELAY, we're running too fast - slow down
+            // If target lead > RENDER_DELAY * 1.5, we're running too slow - speed up
+            let clockSpeed = 1.0;
+            if (targetLead < this.RENDER_DELAY_MS * 0.5) {
+                // Buffer nearly empty - slow down to 80%
+                clockSpeed = 0.8;
+            } else if (targetLead > this.RENDER_DELAY_MS * 2.0) {
+                // Too far behind - speed up to 120%
+                clockSpeed = 1.2;
+            }
+
+            this.interpolationTime += delta * clockSpeed;
         }
 
         // 2. Interpolate Remote Players
@@ -505,11 +525,13 @@ export class OnlineGameScene extends Phaser.Scene {
                 this.snapshotBuffer.set(netPlayer.playerId, buffer);
             }
 
-            // Create a snapshot with reconstructed server timestamp
+            // Create a snapshot with CLIENT ARRIVAL timestamp (not reconstructed from frame)
+            // This decouples interpolation from server frame timing issues
+            const arrivalTime = performance.now();
             const snapshot: NetPlayerSnapshot = {
                 ...netPlayer,
                 frame: serverFrame,
-                serverTime: serverFrame * this.SERVER_TICK_MS
+                serverTime: arrivalTime // Use real wall-clock arrival time
             };
 
             // Add to buffer in chronological order
@@ -524,10 +546,10 @@ export class OnlineGameScene extends Phaser.Scene {
 
             // Initialize clock
             if (!this.isBufferInitialized && buffer.length >= 2) {
-                // Initialize interpolationTime to ~100ms behind the latest server snapshot
-                this.interpolationTime = snapshot.serverTime - this.RENDER_DELAY_MS;
+                // Initialize interpolationTime to RENDER_DELAY behind the newest arrival
+                this.interpolationTime = arrivalTime - this.RENDER_DELAY_MS;
                 this.isBufferInitialized = true;
-                console.log(`[JitterBuffer] Initialized. interpolationTime: ${this.interpolationTime}, ServerTime: ${snapshot.serverTime}`);
+                console.log(`[JitterBuffer] Initialized. interpolationTime: ${this.interpolationTime.toFixed(0)}, arrivalTime: ${arrivalTime.toFixed(0)}`);
             }
 
             // Sync stats (stateless)
