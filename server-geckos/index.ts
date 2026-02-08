@@ -9,11 +9,15 @@ import { Server } from 'socket.io';
 const NetMessageType = {
     INPUT: 'input',
     STATE_UPDATE: 'state_update',
+    POSITION_UPDATE: 'position_update',
+    ATTACK_START: 'attack_start',
+    HIT_EVENT: 'hit_event',
     PLAYER_JOINED: 'player_joined',
     PLAYER_LEFT: 'player_left',
     GAME_START: 'game_start',
     PING: 'ping',
     PONG: 'pong',
+    INPUT_ACK: 'input_ack',
     REMATCH_VOTE: 'rematch_vote',
     REMATCH_START: 'rematch_start',
     // Character Selection
@@ -359,13 +363,13 @@ io.on('connection', (socket) => {
     });
 
     // Relay attack events to all clients
-    socket.on('attack_start', (data: any) => {
-        io.emit('attack_start', data);
+    socket.on(NetMessageType.ATTACK_START, (data: any) => {
+        io.emit(NetMessageType.ATTACK_START, data);
     });
 
     // Relay hit events to all clients
-    socket.on('hit_event', (data: any) => {
-        io.emit('hit_event', data);
+    socket.on(NetMessageType.HIT_EVENT, (data: any) => {
+        io.emit(NetMessageType.HIT_EVENT, data);
     });
 
     // Handle disconnect

@@ -9,16 +9,6 @@ import { Fighter } from './Fighter';
 export class TrainingDummy extends Fighter {
     private bodyRect: Phaser.GameObjects.Rectangle;
     private faceGraphics: Phaser.GameObjects.Graphics;
-
-    // Combat properties inherited from Fighter
-    // public velocity: Phaser.Math.Vector2;
-    // public damagePercent: number = 0;
-    // public isInvincible: boolean = false;
-    // public isGrounded: boolean = true;
-    // public isHitStunned: boolean = false;
-    // private hitStunTimer: number = 0;
-
-
     // Spawn position
     private spawnX: number;
     private spawnY: number;

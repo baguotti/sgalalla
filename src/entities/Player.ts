@@ -85,6 +85,9 @@ export class Player extends Fighter {
     private animPrefix: string = 'alchemist';
     private debugRect!: Phaser.GameObjects.Rectangle;
 
+    // Pooled rectangle for getBounds() - avoids per-frame GC pressure
+    private _boundsRect: Phaser.Geom.Rectangle = new Phaser.Geom.Rectangle();
+
     public lightAttackVariant: number = 0;
 
     // Item Holding
@@ -721,12 +724,12 @@ export class Player extends Fighter {
 
 
     getBounds(): Phaser.Geom.Rectangle {
-        return new Phaser.Geom.Rectangle(
-            this.x - PhysicsConfig.PLAYER_WIDTH / 2,
-            this.y - PhysicsConfig.PLAYER_HEIGHT / 2,
-            PhysicsConfig.PLAYER_WIDTH,
-            PhysicsConfig.PLAYER_HEIGHT
-        );
+        // Reuse pooled rectangle to avoid per-frame allocations
+        this._boundsRect.x = this.x - PhysicsConfig.PLAYER_WIDTH / 2;
+        this._boundsRect.y = this.y - PhysicsConfig.PLAYER_HEIGHT / 2;
+        this._boundsRect.width = PhysicsConfig.PLAYER_WIDTH;
+        this._boundsRect.height = PhysicsConfig.PLAYER_HEIGHT;
+        return this._boundsRect;
     }
 
     isGamepadConnected(): boolean {

@@ -1361,4 +1361,29 @@ export class OnlineGameScene extends Phaser.Scene {
             Phaser.Math.Linear(cam.midPoint.y, centerY, 0.2)
         );
     }
+
+    /**
+     * Phaser lifecycle: Called when scene is stopped or destroyed.
+     * Ensures all socket listeners and game objects are cleaned up.
+     */
+    shutdown(): void {
+        // Disconnect from server (removes socket listeners)
+        this.networkManager.disconnect();
+
+        // Destroy all player instances
+        this.players.forEach(player => player.destroy());
+        this.players.clear();
+        this.remoteTargets.clear();
+        this.snapshotBuffer.clear();
+
+        // Clear HUD
+        if (this.matchHUD) {
+            this.matchHUD.destroy();
+        }
+
+        // Remove keyboard listeners
+        if (this.input.keyboard) {
+            this.input.keyboard.removeAllKeys();
+        }
+    }
 }
