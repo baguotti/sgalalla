@@ -422,3 +422,10 @@
 - **[Infra]** Cloudflare: Established `cloudflared` tunnel on the DigitalOcean Droplet to provide a stable HTTPS endpoint (`https://sensors-flash-trackback-survival.trycloudflare.com`).
 - **[Fix]** Security: Solved "Mixed Content" blocker preventing the HTTPS Vercel client from communicating with the HTTP DigitalOcean backend.
 - **[S]** **STATUS**: v0.9.8 Deployed. Online mode is functionally active via DigitalOcean + Cloudflare Tunnel.
+
+### [2026-02-08] v0.9.9 - Latency Optimizations
+- **[V]** `v0.9.9`
+- **[Perf]** Server: Increased tick rate from 20Hz to 60Hz for smoother state updates.
+- **[Perf]** Client: Reduced interpolation buffer from 100ms to 40ms (~2.5 frames at 60Hz).
+- **[Perf]** Client: Increased state send rate from 30Hz to 60Hz for faster position updates.
+- **[S]** **STATUS**: v0.9.9 Complete. Local testing shows acceptable input responsiveness.
