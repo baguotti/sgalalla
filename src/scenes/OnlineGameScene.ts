@@ -26,9 +26,23 @@ export class OnlineGameScene extends Phaser.Scene {
     private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
     private interpolationTime: number = 0; // Stable playback timeline (milliseconds)
     private isBufferInitialized: boolean = false;
-    // Adaptive buffer: 60ms for local (optimal), 80ms for production (user requested balance)
-    private readonly RENDER_DELAY_MS = (window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1') ? 60 : 80;
+
+    // Dynamic RTT-Based Buffer
+    private currentRTT: number = 80; // Current round-trip time (ms)
+    private jitter: number = 20; // Current jitter variance (ms)
+    private rttSamples: number[] = []; // Last 10 RTT samples for jitter calculation
+    private lastPingTime: number = 0;
+    private pingInterval: number = 1000; // Measure RTT every 1 second
+
+    // Dynamic buffer: Buffer = RTT/2 + Jitter * 2 (min 40ms, max 150ms)
+    private get RENDER_DELAY_MS(): number {
+        return Phaser.Math.Clamp(
+            this.currentRTT / 2 + this.jitter * 2,
+            40,  // Minimum buffer (very good connection)
+            150  // Maximum buffer (poor connection)
+        );
+    }
+
     private localPlayerId: number = -1;
     private isConnected: boolean = false;
 
@@ -286,12 +300,7 @@ export class OnlineGameScene extends Phaser.Scene {
         // Setup escape key
         this.setupEscapeKey();
 
-        // Start ping loop
-        this.time.addEvent({
-            delay: 2000,
-            callback: () => this.networkManager.ping(),
-            loop: true
-        });
+
     }
 
     update(_time: number, delta: number): void {
@@ -321,6 +330,34 @@ export class OnlineGameScene extends Phaser.Scene {
         if (this.inputThrottleCounter >= this.INPUT_SEND_INTERVAL) {
             this.inputThrottleCounter = 0;
             this.networkManager.sendInput(input);
+        }
+
+        // Setup dynamic buffer listener
+        if (!this.isBufferInitialized) {
+            this.networkManager.onPong((rtt: number) => {
+                this.currentRTT = rtt;
+
+                // Calculate jitter (variance)
+                this.rttSamples.push(rtt);
+                if (this.rttSamples.length > 10) this.rttSamples.shift();
+
+                if (this.rttSamples.length > 1) {
+                    // Standard deviation or simple mean absolute deviation
+                    const mean = this.rttSamples.reduce((a, b) => a + b, 0) / this.rttSamples.length;
+                    const variance = this.rttSamples.reduce((a, b) => a + Math.abs(b - mean), 0) / this.rttSamples.length;
+
+                    // Smooth jitter updates
+                    this.jitter = 0.7 * this.jitter + 0.3 * variance;
+                }
+            });
+            this.isBufferInitialized = true;
+        }
+
+        // Measure RTT every second for dynamic buffer
+        const now = Date.now();
+        if (now - this.lastPingTime >= this.pingInterval) {
+            this.lastPingTime = now;
+            this.networkManager.sendPing(now);
         }
 
         // Save snapshot every 3 frames (reduce GC pressure)
