@@ -156,7 +156,7 @@ class NetworkManager {
                 hostname.startsWith('172.');
 
             // Geckos.io: Both local and production use port 9208
-            // Cloudflare Tunnel handles HTTPS → HTTP proxying for production
+            // v0.9.12: Cloudflare Tunnel for HTTPS compatibility with Vercel
             const port = isLocal ? 9208 : 443;
             const url = isLocal ? `http://${hostname}` : 'https://sensors-flash-trackback-survival.trycloudflare.com';
 

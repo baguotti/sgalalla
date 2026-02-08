@@ -26,7 +26,7 @@ export class OnlineGameScene extends Phaser.Scene {
     private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
     private interpolationTime: number = 0; // Stable playback timeline (milliseconds)
     private isBufferInitialized: boolean = false;
-    private readonly RENDER_DELAY_MS = 120; // 120ms buffer for production network jitter (~4 frames at 30Hz)
+    private readonly RENDER_DELAY_MS = 60; // 60ms buffer (~4 frames at 60Hz)
     private localPlayerId: number = -1;
     private isConnected: boolean = false;
 
@@ -395,15 +395,14 @@ export class OnlineGameScene extends Phaser.Scene {
 
             const targetLead = maxBufferTime - this.interpolationTime;
 
-            // If target lead < RENDER_DELAY, we're running too fast - slow down
-            // If target lead > RENDER_DELAY * 1.5, we're running too slow - speed up
+            // Simple clock speed adjustment
             let clockSpeed = 1.0;
             if (targetLead < this.RENDER_DELAY_MS * 0.5) {
-                // Buffer nearly empty - slow down to 80%
-                clockSpeed = 0.8;
+                // Buffer low - slow down
+                clockSpeed = 0.9;
             } else if (targetLead > this.RENDER_DELAY_MS * 2.0) {
-                // Too far behind - speed up to 120%
-                clockSpeed = 1.2;
+                // Buffer high - speed up
+                clockSpeed = 1.1;
             }
 
             this.interpolationTime += delta * clockSpeed;

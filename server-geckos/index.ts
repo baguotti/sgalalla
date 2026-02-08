@@ -383,4 +383,4 @@ setInterval(() => {
 
         emitToRoom(NetMessageType.STATE_UPDATE, state);
     });
-}, 1000 / 30); // 30Hz for production stability (~33ms)
+}, 1000 / 60); // 60Hz for low latency (~16.67ms)

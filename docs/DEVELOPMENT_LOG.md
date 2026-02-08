@@ -445,3 +445,10 @@
 - **[Perf]** Server: Lowered tick rate from 60Hz to 30Hz - reduces packet pressure through Cloudflare Tunnel.
 - **[Fix]** Client: Increased interpolation buffer from 80ms to 120ms for better jitter absorption.
 - **[S]** **STATUS**: Testing production performance.
+
+### [2026-02-08] v0.9.12 - Optimal Local Performance (TARGET)
+- **[V]** `v0.9.12`
+- **[Perf]** Server: 60Hz tick rate (16.67ms interval) for low-latency updates.
+- **[Perf]** Client: 60ms interpolation buffer (~4 frames at 60Hz) - best balance of smoothness and responsiveness.
+- **[Note]** This configuration is the **target performance for online**. Local testing confirms smooth movement with minimal jitter and low input delay.
+- **[S]** **STATUS**: v0.9.12 is the LOCAL baseline. Next: achieve same performance on production.
