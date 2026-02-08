@@ -369,7 +369,7 @@ io.onConnection((channel: ServerChannel) => {
     });
 });
 
-// Game loop - 20Hz state broadcast
+// Game loop - 60Hz state broadcast for smoother gameplay
 setInterval(() => {
     rooms.forEach((room) => {
         if (room.phase !== 'PLAYING') return;

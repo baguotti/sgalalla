@@ -26,7 +26,7 @@ export class OnlineGameScene extends Phaser.Scene {
     private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
     private interpolationTime: number = 0; // Stable playback timeline (milliseconds)
     private isBufferInitialized: boolean = false;
-    private readonly RENDER_DELAY_MS = 100; // 100ms historical window
+    private readonly RENDER_DELAY_MS = 40; // 40ms historical window (buffers ~2.5 frames at 60Hz)
     private localPlayerId: number = -1;
     private isConnected: boolean = false;
 
@@ -50,7 +50,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // Network throttling
     private stateThrottleCounter: number = 0;
-    private readonly STATE_SEND_INTERVAL: number = 2; // sendState every 2nd frame (~30Hz)
+    private readonly STATE_SEND_INTERVAL: number = 1; // sendState every frame (60Hz)
     private inputThrottleCounter: number = 0;
     private readonly INPUT_SEND_INTERVAL: number = 1; // sendInput every frame (~60Hz)
 
