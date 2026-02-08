@@ -149,16 +149,11 @@ class NetworkManager {
     public async connect(): Promise<boolean> {
         return new Promise((resolve) => {
             const hostname = window.location.hostname;
-            const isLocal = hostname === 'localhost' ||
-                hostname === '127.0.0.1' ||
-                hostname.startsWith('192.168.') ||
-                hostname.startsWith('10.') ||
-                hostname.startsWith('172.');
 
-            // Geckos.io: Both local and production use port 9208
-            // v0.9.12: Cloudflare Tunnel for HTTPS compatibility with Vercel
-            const port = isLocal ? 9208 : 443;
-            const url = isLocal ? `http://${hostname}` : 'https://sensors-flash-trackback-survival.trycloudflare.com';
+            // Geckos.io: Always connect to same hostname on port 9208
+            // Self-hosted: Client and Server both on DigitalOcean Droplet
+            const port = 9208;
+            const url = `http://${hostname}`;
 
             console.log(`[NetworkManager] Connecting to ${url}:${port} via Geckos.io (UDP)...`);
 

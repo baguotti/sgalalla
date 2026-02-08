@@ -464,3 +464,11 @@
 - **[Config]** Server: Explicitly set `ordered: false` in geckos config for clarity.
 - **[Perf]** Client: Set production buffer to **80ms** (user-requested balance between smoothness and responsiveness).
 - **[S]** **STATUS**: Testing 80ms buffer on production. Further investigation needed if stutter persists.
+
+### [2026-02-08] v0.9.15 - Self-Hosted Deployment (Pure Direct UDP)
+- **[V]** `v0.9.15`
+- **[Infra]** Client: Now self-hosted on DigitalOcean Droplet alongside server. No more Vercel, no more Cloudflare Tunnel.
+- **[Config]** NetworkManager: Updated to connect to `window.location.hostname:9208` (same-origin, avoiding mixed content).
+- **[Deploy]** Created `deploy_client.sh` script for easy redeployment.
+- **[Note]** This eliminates all middleware latency. Client and server communicate directly via UDP.
+- **[S]** **STATUS**: Testing at `http://164.90.235.15`. This is the best possible latency configuration.
