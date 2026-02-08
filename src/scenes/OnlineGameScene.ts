@@ -26,7 +26,7 @@ export class OnlineGameScene extends Phaser.Scene {
     private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
     private interpolationTime: number = 0; // Stable playback timeline (milliseconds)
     private isBufferInitialized: boolean = false;
-    private readonly RENDER_DELAY_MS = 80; // 80ms buffer for internet jitter tolerance (~5 frames at 60Hz)
+    private readonly RENDER_DELAY_MS = 120; // 120ms buffer for production network jitter (~4 frames at 30Hz)
     private localPlayerId: number = -1;
     private isConnected: boolean = false;
 

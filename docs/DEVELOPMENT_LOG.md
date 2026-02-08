@@ -439,3 +439,9 @@
 - **[Fix]** Client: Increased interpolation buffer from 40ms to 80ms for better internet jitter tolerance.
 - **[Fix]** Client: Replaced snap-to-position extrapolation with velocity-based smooth prediction using lerp factor 0.3.
 - **[S]** **STATUS**: Testing on production (Vercel + DigitalOcean).
+
+### [2026-02-08] v0.9.11 - Production Stability
+- **[V]** `v0.9.11`
+- **[Perf]** Server: Lowered tick rate from 60Hz to 30Hz - reduces packet pressure through Cloudflare Tunnel.
+- **[Fix]** Client: Increased interpolation buffer from 80ms to 120ms for better jitter absorption.
+- **[S]** **STATUS**: Testing production performance.
