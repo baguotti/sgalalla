@@ -484,4 +484,5 @@
 - **[Logic]** Implemented dynamic buffer sizing: `Buffer = RTT/2 + Jitter*2` (clamped 40-150ms).
 - **[Net]** Added Ping/Pong mechanism to measuring Real-Time RTT and Jitter every second.
 - **[Benefit]** Players with good connections (e.g. 40ms RTT) get tighter controls (60ms buffer). Players with bad connections get stability (100ms+ buffer).
+- **[UI]** Added visible version number (v0.9.17) to Title Screen for verification.
 - **[S]** **STATUS**: Deployed. Using live network conditions to optimize every player individually.

@@ -29,6 +29,11 @@ export class MainMenuScene extends Phaser.Scene {
             fontSize: '120px', fontFamily: 'Impact', color: '#ffffff'
         }).setOrigin(0.5);
 
+        // Version Display
+        this.add.text(width / 2, 270, `v${__APP_VERSION__}`, {
+            fontSize: '24px', fontFamily: 'Arial', color: '#888888'
+        }).setOrigin(0.5);
+
         // Menu Items
         const startY = 500;
         this.menuOptions.forEach((opt, index) => {
