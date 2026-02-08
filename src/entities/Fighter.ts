@@ -12,6 +12,13 @@ export abstract class Fighter extends Phaser.GameObjects.Container implements Da
     public isHitStunned: boolean = false;
     protected hitStunTimer: number = 0;
     public isInvincible: boolean = false;
+    public isInvulnerable: boolean = false; // Respawn invulnerability
+    protected invulnerabilityTimer: number = 0;
+
+    public setInvulnerable(duration: number): void {
+        this.isInvulnerable = true;
+        this.invulnerabilityTimer = duration;
+    }
 
     constructor(scene: Phaser.Scene, x: number, y: number) {
         super(scene, x, y);

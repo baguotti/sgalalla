@@ -74,7 +74,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     private loadCharacterAssets(): void {
-        this.load.atlas('fok', 'assets/fok/fok_sprites/fok.png', 'assets/fok/fok_sprites/fok.json');
         this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
 
         // Load Maps
@@ -83,36 +82,6 @@ export class GameScene extends Phaser.Scene {
 
     private createAnimations(): void {
         const charConfigs = {
-            'fok': {
-                idle: { prefix: '0_Fok_Idle_', count: 19, loop: true },
-                run: { prefix: '0_Fok_Running_', count: 12, loop: true },
-                charging: { prefix: '0_Fok_Charging_', count: 8, loop: true },
-                attack_light: { prefix: '0_Fok_AttackLight_', count: 1, suffix: '000', loop: false },
-                attack_heavy: { prefix: '0_Fok_AttackHeavy_', count: 1, suffix: '000', loop: false },
-                attack_up: { prefix: '0_Fok_AttackUp_', count: 1, suffix: '001', loop: false },
-                attack_down: { prefix: '0_Fok_DownSig_', count: 1, suffix: '001', loop: false },
-                attack_side: { prefix: '0_Fok_SideSig_', count: 1, suffix: '001', loop: false },
-                hurt: { prefix: '0_Fok_Hurt_', count: 1, suffix: '001', loop: false },
-                ground_pound: { prefix: '0_Fok_Gpound_', count: 1, suffix: '001', loop: false },
-                fall: { prefix: '0_Fok_Falling_', count: 1, suffix: '001', loop: false },
-                jump: { prefix: '0_Fok_Jump_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: '0_Fok_Sliding_', count: 1, suffix: '000', loop: false }
-            },
-            'fok_alt': { // Same as fok
-                idle: { prefix: '0_Fok_Idle_', count: 19, loop: true },
-                run: { prefix: '0_Fok_Running_', count: 12, loop: true },
-                charging: { prefix: '0_Fok_Charging_', count: 8, loop: true },
-                attack_light: { prefix: '0_Fok_AttackLight_', count: 1, suffix: '000', loop: false },
-                attack_heavy: { prefix: '0_Fok_AttackHeavy_', count: 1, suffix: '000', loop: false },
-                attack_up: { prefix: '0_Fok_AttackUp_', count: 1, suffix: '001', loop: false },
-                attack_down: { prefix: '0_Fok_DownSig_', count: 1, suffix: '001', loop: false },
-                attack_side: { prefix: '0_Fok_SideSig_', count: 1, suffix: '001', loop: false },
-                hurt: { prefix: '0_Fok_Hurt_', count: 1, suffix: '001', loop: false },
-                ground_pound: { prefix: '0_Fok_Gpound_', count: 1, suffix: '001', loop: false },
-                fall: { prefix: '0_Fok_Falling_', count: 1, suffix: '001', loop: false },
-                jump: { prefix: '0_Fok_Jump_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: '0_Fok_Sliding_', count: 1, suffix: '000', loop: false }
-            },
             'fok_v3': {
                 idle: { prefix: 'Fok_v3_Idle_', count: 12, loop: true },
                 run: { prefix: 'Fok_v3_Run_', count: 9, loop: true },
@@ -167,7 +136,7 @@ export class GameScene extends Phaser.Scene {
             }
         };
 
-        const characters = ['fok', 'fok_alt', 'fok_v3'];
+        const characters = ['fok_v3'];
 
         characters.forEach(char => {
             const config = charConfigs[char as keyof typeof charConfigs];
@@ -313,15 +282,16 @@ export class GameScene extends Phaser.Scene {
     create(): void {
         try {
             console.log("GameScene.create started");
-            const { width, height } = this.scale;
+            // const { width, height } = this.scale; // Unused after bounds removal
 
             // --- Physics Setup ---
-            this.matter.world.setBounds(0, 0, width, height);
+            // --- Physics Setup ---
+            // this.matter.world.setBounds(0, 0, width, height); // Removed to fix off-stage bounce
             this.matter.world.setGravity(0, 1);
 
             // --- Error Handler (Visual) ---
             // (Error text is created dynamically in catch block if needed)
-            this.matter.world.setBounds(0, 0, width, height);
+            // this.matter.world.setBounds(0, 0, width, height); // Removed duplicate
 
             // --- Fok Animations ---
             this.createAnimations();
@@ -824,8 +794,15 @@ export class GameScene extends Phaser.Scene {
                 player.lives = Math.max(0, player.lives - 1);
                 console.log(`Player ${playerId} died. Lives remaining: ${player.lives}`);
 
+                // Deactivate player immediately so camera ignores them
+                player.setActive(false);
+                player.setVisible(false);
+
                 if (player.lives > 0) {
-                    this.respawnPlayer(player, playerId);
+                    // 2 Second Respawn Delay
+                    this.time.delayedCall(2000, () => {
+                        this.respawnPlayer(player, playerId);
+                    });
                 } else {
                     // Elimination
                     this.killPlayer(player);
@@ -838,6 +815,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     private respawnPlayer(player: Player, playerId: number): void {
+        // Reactivate player
+        player.setActive(true);
+        player.setVisible(true);
+
         // Respawn position
         const spawnPoints = [
             { x: 450, y: 300 },
@@ -856,6 +837,7 @@ export class GameScene extends Phaser.Scene {
         player.setState(PlayerState.AIRBORNE);
         player.setDamage(0);
         player.resetVisuals();
+        player.setInvulnerable(1000); // 1 full second of invulnerability
 
         // Visual respawn effect (flash)
         const flash = this.add.graphics();
@@ -876,8 +858,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     private updateCamera(): void {
-        // Filter out players who are effectively dead (flying into blast zone)
+        // Filter out players who are effectively dead or inactive
         const targets = this.players.filter(p => {
+            if (!p.active) return false; // Ignore inactive (dead/waiting respawn) players
+
             // Check bounds (using slightly tighter bounds than actual kill box)
             return p.x > this.BLAST_ZONE_LEFT + 500 &&
                 p.x < this.BLAST_ZONE_RIGHT - 500 &&
@@ -1030,7 +1014,7 @@ export class GameScene extends Phaser.Scene {
             joined: true,
             ready: true,
             input: { type: 'KEYBOARD', gamepadIndex: null },
-            character: 'fok' as const,
+            character: 'fok_v3' as const,
             isAI: true,
             isTrainingDummy: true
         };
@@ -1049,7 +1033,7 @@ export class GameScene extends Phaser.Scene {
             playerId: playerId,
             gamepadIndex: null,
             useKeyboard: false,
-            character: 'fok',
+            character: 'fok_v3',
             isAI: true
         });
 

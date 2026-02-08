@@ -619,8 +619,11 @@ export class PlayerCombat {
     }
 
     public checkAttackCollision(target: Fighter): void {
-        if (this.hitTargets.has(target)) return; // Already hit this target
-        if (target.isInvincible) return; // Target is invincible
+        // Already hit this target?
+        if (this.hitTargets.has(target)) return;
+
+        // Cannot hit self, invincible targets, or respawning targets
+        if (target === this.player || target.isInvincible || target.isInvulnerable) return;
 
         // Need source data (Attack or Recovery)
         if (!this.currentAttack && !this.player.physics.isRecovering) return;
@@ -638,23 +641,27 @@ export class PlayerCombat {
 
     private applyHitTo(target: Fighter): void {
         let damage = 0;
-        let knockback = 0;
+        // let knockback = 0; // Legacy removed
+        let baseKnockback = 100; // Default fallback
+        let knockbackGrowth = 5; // Default fallback
         let knockbackAngle = 45;
         let isHeavy = false;
 
         if (this.currentAttack) {
             const data = this.currentAttack.data;
             damage = data.damage;
-            knockback = data.knockback;
+            // knockback = data.knockback; // Legacy removed
+            baseKnockback = data.baseKnockback || 150;
+            knockbackGrowth = data.knockbackGrowth || 5;
             knockbackAngle = data.knockbackAngle;
-            isHeavy = data.type === AttackType.HEAVY;
             isHeavy = data.type === AttackType.HEAVY;
         } else if (this.player.physics.isRecovering) {
             // Recovery Hit Data
             damage = 8;
-            knockback = 500;
+            // knockback = 500; // Legacy removed
+            baseKnockback = 250;
+            knockbackGrowth = 8;
             knockbackAngle = 80; // Upwards
-            isHeavy = false;
             isHeavy = false;
         } else {
             return;
@@ -663,7 +670,8 @@ export class PlayerCombat {
         // Calculate knockback
         const knockbackForce = DamageSystem.calculateKnockback(
             damage,
-            knockback,
+            baseKnockback,
+            knockbackGrowth,
             target.damagePercent
         );
 

@@ -27,7 +27,9 @@ export interface AttackData {
     direction: AttackDirection;
     isAerial: boolean;
     damage: number;
-    knockback: number;
+    knockback: number; // DEPRECATED: Used as fallback/reference for legacy
+    baseKnockback?: number; // Fixed Force (Base Impact)
+    knockbackGrowth?: number; // Variable Force (Scaling)
     knockbackAngle: number; // Angle in degrees (0 = right, 90 = up)
     startupDuration: number;
     activeDuration: number;
@@ -49,7 +51,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         direction: AttackDirection.NEUTRAL,
         isAerial: false,
         damage: 6, // Base damage tripled (Flurry)
-        knockback: 90, // Reduced from 100
+        knockback: 90,
+        baseKnockback: 120,
+        knockbackGrowth: 3,
         knockbackAngle: 90,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
         activeDuration: 400,
@@ -66,8 +70,10 @@ export const AttackRegistry: Record<string, AttackData> = {
         direction: AttackDirection.SIDE,
         isAerial: false,
         damage: 4,
-        knockback: 500, // Reduced from 550
-        knockbackAngle: 30,
+        knockback: 500,
+        baseKnockback: 250,
+        knockbackGrowth: 7, // Reduced from 9
+        knockbackAngle: 270,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES,
@@ -81,7 +87,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         direction: AttackDirection.DOWN,
         isAerial: false,
         damage: 4,
-        knockback: 470, // Reduced from 520
+        knockback: 470,
+        baseKnockback: 180,
+        knockbackGrowth: 5, // Slightly less than side light
         knockbackAngle: 30, // Changed from 80 (Now sends forward like side light)
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES + 30,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
@@ -96,7 +104,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         direction: AttackDirection.UP,
         isAerial: false,
         damage: 6, // Base damage tripled (Flurry)
-        knockback: 90, // Reduced from 100
+        knockback: 90,
+        baseKnockback: 120,
+        knockbackGrowth: 3,
         knockbackAngle: 90,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
         activeDuration: 400,
@@ -116,6 +126,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: true,
         damage: 6, // Base damage tripled (Flurry)
         knockback: 90, // Flurry
+        baseKnockback: 120,
+        knockbackGrowth: 3,
         knockbackAngle: 90,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
         activeDuration: 400, // Flurry
@@ -133,7 +145,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         direction: AttackDirection.SIDE,
         isAerial: true,
         damage: 5,
-        knockback: 430, // Reduced from 480
+        knockback: 430,
+        baseKnockback: 180,
+        knockbackGrowth: 4,
         knockbackAngle: 20,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
@@ -148,7 +162,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         direction: AttackDirection.DOWN,
         isAerial: true,
         damage: 6,
-        knockback: 500, // Reduced from 550
+        knockback: 500,
+        baseKnockback: 200,
+        knockbackGrowth: 6, // Spike strength
         knockbackAngle: 270,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES + 50,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
@@ -164,6 +180,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: true,
         damage: 5,
         knockback: 450,
+        baseKnockback: 180, // Juggle tool
+        knockbackGrowth: 5,
         knockbackAngle: 90,
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
@@ -181,6 +199,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         damage: 6,
         knockback: 600,
+        baseKnockback: 250, // Heavy Base
+        knockbackGrowth: 8, // Reduced from 10
         knockbackAngle: 80,
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
@@ -196,6 +216,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         damage: 8,
         knockback: 800,
+        baseKnockback: 300,
+        knockbackGrowth: 9.5, // Reduced from 12
         knockbackAngle: 4, // Changed from 5 to 4
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES + 50,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
@@ -211,6 +233,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         damage: 8,
         knockback: 600,
+        baseKnockback: 145, // Reduced from 220
+        knockbackGrowth: 3.6, // Reduced from 5.5
         knockbackAngle: 85,
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES + 30,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
@@ -227,6 +251,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         damage: 6,
         knockback: 580,
+        baseKnockback: 145, // Reduced from 220
+        knockbackGrowth: 3.6, // Reduced from 5.5
         knockbackAngle: 80,
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
@@ -244,6 +270,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: true,
         damage: 6,
         knockback: 550,
+        baseKnockback: 240,
+        knockbackGrowth: 8, // Reduced from 10
         knockbackAngle: 50,
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
@@ -259,6 +287,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: true,
         damage: 7,
         knockback: 800,
+        baseKnockback: 280,
+        knockbackGrowth: 9, // Reduced from 11
         knockbackAngle: 4, // Changed from 0 to 4
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
@@ -273,7 +303,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         direction: AttackDirection.DOWN,
         isAerial: true,
         damage: PhysicsConfig.GROUND_POUND_DAMAGE,
-        knockback: PhysicsConfig.GROUND_POUND_KNOCKBACK, // Uses new, lower value
+        knockback: PhysicsConfig.GROUND_POUND_KNOCKBACK,
+        baseKnockback: 160, // Reduced from 250
+        knockbackGrowth: 4, // Reduced from 6
         knockbackAngle: 270,
         startupDuration: PhysicsConfig.GROUND_POUND_STARTUP,
         activeDuration: 500,
@@ -288,7 +320,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         direction: AttackDirection.UP,
         isAerial: true,
         damage: 8,
-        knockback: 600, // Reduced from 900
+        knockback: 600,
+        baseKnockback: 145, // Reduced from 220
+        knockbackGrowth: 3.6, // Reduced from 5.5
         knockbackAngle: 90,
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
@@ -324,6 +358,8 @@ export class Attack {
                 ...data,
                 damage: Math.round(data.damage * damageMult),
                 knockback: Math.round(data.knockback * knockbackMult),
+                baseKnockback: data.baseKnockback ? Math.round(data.baseKnockback * knockbackMult) : undefined,
+                knockbackGrowth: data.knockbackGrowth ? Math.round(data.knockbackGrowth * knockbackMult) : undefined,
             };
         } else {
             this.data = data;

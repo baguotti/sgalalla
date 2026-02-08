@@ -95,10 +95,10 @@ export class OnlineGameScene extends Phaser.Scene {
     // Character Selection State
     private phase: 'WAITING' | 'SELECTING' | 'PLAYING' = 'WAITING';
     private selectionCountdown: number = 10;
-    private selectedCharacter: string = 'fok';
-    private opponentCharacter: string = 'fok';
+    private selectedCharacter: string = 'fok_v3';
+    private opponentCharacter: string = 'fok_v3';
     // Character Selection
-    private availableCharacters: string[] = ['fok_v3', 'fok']; // Refinement: fok_v3 is default
+    private availableCharacters: string[] = ['fok_v3']; // Refinement: fok_v3 is default
     private selectedCharIndex: number = 0;
     private isConfirmed: boolean = false;
     private isOpponentConfirmed: boolean = false;
@@ -121,48 +121,88 @@ export class OnlineGameScene extends Phaser.Scene {
     preload(): void {
         this.load.image('platform', 'assets/platform.png');
         this.load.image('background', 'assets/background.png');
-        this.load.atlas('fok', 'assets/fok/fok_sprites/fok.png', 'assets/fok/fok_sprites/fok.json');
-        this.load.atlas('fok_alt', 'assets/fok_alt.png', 'assets/fok_alt.json');
+        this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
     }
 
     private createAnimations(): void {
-        const characters = ['fok', 'fok_alt'];
+        const charConfigs = {
+            'fok_v3': {
+                idle: { prefix: 'Fok_v3_Idle_', count: 12, loop: true },
+                run: { prefix: 'Fok_v3_Run_', count: 9, loop: true },
+                charging: { prefix: 'Fok_v3_Charge_', count: 2, loop: true },
+
+                // Dash (New)
+                dash: { prefix: 'Fok_v3_Dash_', count: 1, suffix: '000', loop: false },
+
+                // Spot Dodge
+                spot_dodge: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false },
+
+                // --- LIGHT ATTACKS ---
+                // Neutral Light
+                attack_light_neutral: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Up Light -> Mapped to Side Light (Req 1 swap)
+                attack_light_up: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Down Light
+                attack_light_down: { prefix: 'Fok_v3_Down_Light_', count: 1, suffix: '000', loop: false },
+
+                // Side Light -> Mapped to Neutral Light (Req 1 swap)
+                attack_light_side: { prefix: 'Fok_v3_Neutral_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false },
+
+
+                // --- HEAVY ATTACKS (SIGS) ---
+                // Neutral Sig -> Mapped to Up Sig (Req 2)
+                attack_heavy_neutral: { prefix: 'Fok_v3_Up_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Up Sig
+                attack_heavy_up: { prefix: 'Fok_v3_Up_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Side Sig (Req 3)
+                attack_heavy_side: { prefix: 'Fok_v3_Side_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Down Sig 
+                attack_heavy_down: { prefix: 'Fok_v3_Down_Sig_', count: 1, suffix: '000', loop: false },
+
+
+                // Utilities
+                wall_slide: { prefix: 'Fok_v3_Wall_Slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'Fok_v3_Recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'Fok_v3_Ground_Pound_', count: 1, suffix: '000', loop: false },
+
+                hurt: { prefix: 'Fok_v3_Hurt_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'Fok_v3_Fall_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'Fok_v3_Jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false }
+            }
+        };
+
+        const characters = ['fok_v3'];
 
         characters.forEach(char => {
-            const fokAnims = [
-                { key: 'idle', prefix: '0_Fok_Idle_', count: 19, loop: true },
-                { key: 'run', prefix: '0_Fok_Running_', count: 12, loop: true },
-                { key: 'charging', prefix: '0_Fok_Charging_', count: 8, loop: true },
-                // Single frame animations (but defined as animations for consistency)
-                { key: 'attack_light', prefix: '0_Fok_AttackLight_', count: 1, suffix: '000', loop: false },
-                { key: 'attack_heavy', prefix: '0_Fok_AttackHeavy_', count: 1, suffix: '000', loop: false },
-                { key: 'attack_up', prefix: '0_Fok_AttackUp_', count: 1, suffix: '001', loop: false },
-                { key: 'attack_down', prefix: '0_Fok_DownSig_', count: 1, suffix: '001', loop: false },
-                { key: 'attack_side', prefix: '0_Fok_SideSig_', count: 1, suffix: '001', loop: false },
-                { key: 'hurt', prefix: '0_Fok_Hurt_', count: 1, suffix: '001', loop: false },
-                { key: 'ground_pound', prefix: '0_Fok_Gpound_', count: 1, suffix: '001', loop: false },
-                { key: 'fall', prefix: '0_Fok_Falling_', count: 1, suffix: '001', loop: false },
-                { key: 'jump', prefix: '0_Fok_Jump_', count: 1, suffix: '000', loop: false },
-                { key: 'slide', prefix: '0_Fok_Sliding_', count: 1, suffix: '000', loop: false }
-            ];
+            const config = charConfigs[char as keyof typeof charConfigs];
+            if (!config) return;
 
-            fokAnims.forEach(anim => {
-                const animKey = `${char}_${anim.key}`;
+            Object.entries(config).forEach(([animName, animData]: [string, any]) => {
+                const animKey = `${char}_${animName}`;
                 if (this.anims.exists(animKey)) return;
 
                 let frames;
-                if (anim.count === 1 && anim.suffix) {
+                if (animData.count === 1 && animData.suffix) {
                     frames = this.anims.generateFrameNames(char, {
-                        prefix: anim.prefix,
-                        start: parseInt(anim.suffix),
-                        end: parseInt(anim.suffix),
+                        prefix: animData.prefix,
+                        start: parseInt(animData.suffix),
+                        end: parseInt(animData.suffix),
                         zeroPad: 3
                     });
                 } else {
+                    // Sequence 0 to count-1
+                    // Note: fok_v3 uses 3 digit zero pad for all? json shows "000", "001" etc.
                     frames = this.anims.generateFrameNames(char, {
-                        prefix: anim.prefix,
+                        prefix: animData.prefix,
                         start: 0,
-                        end: anim.count - 1,
+                        end: animData.count - 1,
                         zeroPad: 3
                     });
                 }
@@ -170,44 +210,10 @@ export class OnlineGameScene extends Phaser.Scene {
                 this.anims.create({
                     key: animKey,
                     frames: frames,
-                    frameRate: anim.key === 'run' ? 20 : 15,
-                    repeat: anim.loop ? -1 : 0
+                    frameRate: animName === 'run' ? 20 : 15,
+                    repeat: animData.loop ? -1 : 0
                 });
             });
-
-            // Additional animation mappings
-            if (!this.anims.exists(`${char}_attack_light_0`)) {
-                this.anims.create({
-                    key: `${char}_attack_light_0`,
-                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
-                    frameRate: 10,
-                    repeat: 0
-                });
-            }
-            if (!this.anims.exists(`${char}_attack_light_1`)) {
-                this.anims.create({
-                    key: `${char}_attack_light_1`,
-                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
-                    frameRate: 10,
-                    repeat: 0
-                });
-            }
-            if (!this.anims.exists(`${char}_dodge`)) {
-                this.anims.create({
-                    key: `${char}_dodge`,
-                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_Sliding_', start: 0, end: 0, zeroPad: 3 }),
-                    frameRate: 10,
-                    repeat: 0
-                });
-            }
-            if (!this.anims.exists(`${char}_jump_start`)) {
-                this.anims.create({
-                    key: `${char}_jump_start`,
-                    frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_Jump_', start: 0, end: 0, zeroPad: 3 }),
-                    frameRate: 10,
-                    repeat: 0
-                });
-            }
         });
     }
 
@@ -621,8 +627,14 @@ export class OnlineGameScene extends Phaser.Scene {
             // Score update (lives)
             player.lives = Math.max(0, player.lives - 1);
 
+            // Hide immediately
+            player.setActive(false);
+            player.setVisible(false);
+
             if (player.lives > 0) {
-                this.respawnPlayer(player);
+                this.time.delayedCall(2000, () => {
+                    this.respawnPlayer(player);
+                });
             } else {
                 this.killPlayer(player);
                 // We rely on the regular checkGameOver call to trigger the end
@@ -631,6 +643,9 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private respawnPlayer(player: Player): void {
+        player.setActive(true);
+        player.setVisible(true);
+
         // Respawn position
         const spawnPoints = [
             { x: 450, y: 300 },
@@ -646,6 +661,7 @@ export class OnlineGameScene extends Phaser.Scene {
         player.setState(PlayerState.AIRBORNE);
         player.setDamage(0);
         player.resetVisuals();
+        player.setInvulnerable(1000); // 1 full second invulnerability
 
         // Flash effect
         const flash = this.add.graphics();
@@ -914,7 +930,7 @@ export class OnlineGameScene extends Phaser.Scene {
             isAI: false,
             useKeyboard: isLocal,
             gamepadIndex: isLocal ? 0 : null, // All local players try to use index 0 (gated by focus)
-            character: character as 'fok' | 'fok_v3'
+            character: character as 'fok_v3'
         });
 
         // Network hooks for local player
@@ -1013,7 +1029,7 @@ export class OnlineGameScene extends Phaser.Scene {
         }).setOrigin(1, 0.5);
         this.selectionContainer.add(myLabel);
 
-        this.myCharacterText = this.add.text(0, 20, this.selectedCharacter.toUpperCase(), {
+        this.myCharacterText = this.add.text(0, 20, this.getCharacterDisplayName(this.selectedCharacter), {
             fontSize: '28px',
             color: '#ffffff',
             fontStyle: 'bold'
@@ -1040,7 +1056,7 @@ export class OnlineGameScene extends Phaser.Scene {
         }).setOrigin(1, 0.5);
         this.selectionContainer.add(oppLabel);
 
-        this.opponentCharacterText = this.add.text(0, 80, this.opponentCharacter.toUpperCase(), {
+        this.opponentCharacterText = this.add.text(0, 80, this.getCharacterDisplayName(this.opponentCharacter), {
             fontSize: '28px',
             color: '#888888',
             fontStyle: 'bold'
@@ -1106,7 +1122,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
     private handleOpponentCharacterSelect(_playerId: number, character: string): void {
         this.opponentCharacter = character;
-        this.opponentCharacterText.setText(character.toUpperCase());
+        this.opponentCharacterText.setText(this.getCharacterDisplayName(character));
     }
 
     private handleCharacterConfirm(playerId: number): void {
@@ -1160,10 +1176,15 @@ export class OnlineGameScene extends Phaser.Scene {
 
         this.selectedCharIndex = (this.selectedCharIndex + direction + this.availableCharacters.length) % this.availableCharacters.length;
         this.selectedCharacter = this.availableCharacters[this.selectedCharIndex];
-        this.myCharacterText.setText(this.selectedCharacter.toUpperCase());
+        this.myCharacterText.setText(this.getCharacterDisplayName(this.selectedCharacter));
 
         // Send to server
         this.networkManager.sendCharacterSelect(this.selectedCharacter);
+    }
+
+    private getCharacterDisplayName(charKey: string): string {
+        if (charKey === 'fok_v3') return 'FOK';
+        return charKey.toUpperCase();
     }
 
     // Input state for debouncing
@@ -1286,6 +1307,7 @@ export class OnlineGameScene extends Phaser.Scene {
         const targets: Phaser.GameObjects.Components.Transform[] = [];
 
         this.players.forEach((player) => {
+            if (!player.active) return; // Ignore inactive (dead/waiting respawn) players
             // Check bounds to filter out dying players
             if (player.x > this.BLAST_ZONE_LEFT + 500 &&
                 player.x < this.BLAST_ZONE_RIGHT - 500 &&

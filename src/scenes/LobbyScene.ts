@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 
-export // Character Type Definition
-    type CharacterType = 'fok' | 'fok_v3' | 'dummy';
+type CharacterType = 'fok_v3' | 'dummy';
 
 export interface PlayerSelection {
     playerId: number;
@@ -28,8 +27,8 @@ export class LobbyScene extends Phaser.Scene {
     private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character Data
-    private characters: CharacterType[] = ['fok_v3', 'fok', 'dummy'] as any; // Refinement: fok_v3 is default. Cast to any to bypass strict type for now.
-    private charLabels: string[] = ['Fok V3', 'Fok', 'Dummy'];
+    private characters: CharacterType[] = ['fok_v3', 'dummy'] as any; // Refinement: Only fok_v3 and dummy
+    private charLabels: string[] = ['Fok', 'Dummy']; // Refinement: Display "Fok" for fok_v3
     // P1_KEYS removed (unused in Lobby)
 
     // Input debounce & Safety
@@ -122,7 +121,7 @@ export class LobbyScene extends Phaser.Scene {
             joined: false,
             ready: false,
             input: { type: 'KEYBOARD', gamepadIndex: null },
-            character: 'fok'
+            character: 'fok_v3'
         }];
 
 
@@ -169,7 +168,7 @@ export class LobbyScene extends Phaser.Scene {
         p2.isAI = true;
         p2.isTrainingDummy = true;
         p2.ready = true; // Dummy is always ready
-        p2.character = 'fok';
+        p2.character = 'fok_v3';
     }
 
     private createSlotUI(): void {
@@ -278,7 +277,7 @@ export class LobbyScene extends Phaser.Scene {
             slot.joined = true;
             slot.input.type = type;
             slot.input.gamepadIndex = index;
-            slot.character = 'fok';
+            slot.character = 'fok_v3';
 
             // Prevent immediate "Ready" input in the same frame
             // Set input time to now so the debounce check in handlePlayerInput fails

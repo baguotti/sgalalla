@@ -392,7 +392,7 @@ export class PlayerPhysics {
         this.isFastFalling = false;
 
         // Visuals
-        this.player.setVisualTint(0x00ffff); // Cyan for recovery
+        // this.player.setVisualTint(0x00ffff); // Removed: User request "remove color change effect"
     }
 
     private wallJump(): void {

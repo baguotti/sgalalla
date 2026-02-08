@@ -9,6 +9,7 @@ export const PhysicsConfig = {
 
   // Movement - acceleration-based for responsive feel with slight slide
   MOVE_ACCEL: 6500,
+  GLOBAL_KNOCKBACK_SCALING: 5.0, // Increased from 0.12 to match pixel scale
   FRICTION: 0.60, // Refinement Round 5: Low base friction for fast stopping when input released
   RUN_FRICTION: 0.93, // Refinement Round 5: Restored high friction to allow running speed
   SLIDE_ATTACK_SPEED: 2200,
@@ -17,7 +18,7 @@ export const PhysicsConfig = {
   MAX_FALL_SPEED: 1800, // Reduced from 2600 for floatier fall
 
   // Jump mechanics
-  JUMP_FORCE: -990, // Refinement 14: Reduced by 10% (was -1100)
+  JUMP_FORCE: -1050, // Refinement 16: Increased slightly (was -990)
   SHORT_HOP_FORCE: -540, // Reduced proportionally
   JUMP_HOLD_THRESHOLD: 150,
   DOUBLE_JUMP_FORCE: -900, // Reduced proportionally
@@ -66,7 +67,6 @@ export const PhysicsConfig = {
 
   // Damage system
   MAX_DAMAGE: 999,
-  KNOCKBACK_SCALING: 0.1, // Increased from 0.02 for stronger damage impact
   HIT_STUN_DURATION: 300,
 
   // Ledge detection
@@ -93,7 +93,7 @@ export const PhysicsConfig = {
   GROUND_POUND_STARTUP: 200,
   GROUND_POUND_SPEED: 3200, // Reduced from 3600
   GROUND_POUND_DAMAGE: 8,
-  GROUND_POUND_KNOCKBACK: 1800, // Reduced from 2100
+  GROUND_POUND_KNOCKBACK: 500, // Reduced from 1800 to match recovery
 
   // Directional attack hitbox offsets (Doubled)
   // Refinement 13: Increased offset to center wider hitbox (was 200)

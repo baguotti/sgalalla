@@ -80,8 +80,8 @@ export class Player extends Fighter {
     public playerId: number = 0;
 
     // Character Type
-    // Character Type
-    public character: 'fok' | 'fok_alt' | 'fok_v3' = 'fok';
+    // Character config
+    public character: 'fok_v3' = 'fok_v3';
     private animPrefix: string = 'alchemist';
     private debugRect!: Phaser.GameObjects.Rectangle;
 
@@ -167,7 +167,7 @@ export class Player extends Fighter {
         }
     }
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok' | 'fok_v3' } = {}) {
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok_v3' } = {}) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
@@ -175,14 +175,11 @@ export class Player extends Fighter {
         this.playerId = config.playerId || 0;
 
         // Character Selection
-        this.character = config.character || 'fok_v3'; // Refinement: Default is fok_v3
+        this.character = config.character || 'fok_v3'; // Default is fok_v3
         this.animPrefix = this.character;
 
         // Create player sprite
-        let initialFrame = '0_Fok_Idle_000.png';
-        if (this.character === 'fok_v3') {
-            initialFrame = 'Fok_v3_Idle_000';
-        }
+        const initialFrame = 'Fok_v3_Idle_000';
         this.sprite = scene.add.sprite(0, 0, this.character, initialFrame); // Adjusted offset (0) to ground sprite
 
 
@@ -325,7 +322,22 @@ export class Player extends Fighter {
 
         if (this.hitStunTimer <= 0 && this.isHitStunned) {
             this.isHitStunned = false;
+            this.isHitStunned = false;
             this.resetVisuals();
+        }
+
+        if (this.invulnerabilityTimer > 0) {
+            this.invulnerabilityTimer -= delta;
+
+            // Visual Flash (Alpha toggle every 50ms)
+            // 6 frames is very short (100ms), so this will blink once or twice.
+            const blink = Math.floor(this.invulnerabilityTimer / 50) % 2 === 0;
+            this.sprite.setAlpha(blink ? 0.5 : 1);
+
+            if (this.invulnerabilityTimer <= 0) {
+                this.isInvulnerable = false;
+                this.sprite.setAlpha(1); // Ensure visual reset
+            }
         }
 
         if (this.dodgeCooldownTimer > 0) {

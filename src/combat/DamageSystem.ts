@@ -13,12 +13,28 @@ export class DamageSystem {
      * Calculate knockback based on damage percentage and attack strength
      */
     static calculateKnockback(
-        _baseDamage: number,
-        baseKnockback: number,
-        currentDamage: number
+        baseDamage: number,
+        baseKnockback: number, // Treated as FIXED FORCE
+        knockbackGrowth: number, // Treated as VARIABLE FORCE
+        currentDamage: number // Victim's accumulated damage
     ): number {
-        const knockbackMultiplier = 1 + currentDamage * PhysicsConfig.KNOCKBACK_SCALING;
-        return baseKnockback * knockbackMultiplier;
+        // Brawlhalla-style Logic:
+        // Force = Fixed Force + (Variable Force * Scaling Factor * (Damage + 10))
+
+        // Our Adaptation:
+        // KB = Base + (Growth * Scaling * (CurrentDamage + AttackDamage))
+
+        const scaling = PhysicsConfig.GLOBAL_KNOCKBACK_SCALING; // Global scaling factor to map force to pixels/sec
+        // Include attack damage in the scaling so strong moves scale harder
+        const damageFactor = currentDamage + baseDamage;
+
+        // Calculate Variable Component
+        const variableForce = knockbackGrowth * scaling * damageFactor;
+
+        // Total Knockback
+        const totalKnockback = baseKnockback + variableForce;
+
+        return totalKnockback;
     }
 
     /**
