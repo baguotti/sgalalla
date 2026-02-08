@@ -9,7 +9,7 @@
  * - INPUT BUFFER: Stores last N frames of inputs for rollback replay
  */
 
-import { io } from 'socket.io-client';
+import geckos, { type ClientChannel } from '@geckos.io/client';
 import type { InputState } from '../input/InputManager';
 import { InputBuffer, SnapshotBuffer } from './StateSnapshot';
 import type { FrameInput, GameSnapshot } from './StateSnapshot';
@@ -99,7 +99,7 @@ export type GameStartCallback = (players: { playerId: number; character: string 
 
 class NetworkManager {
     private static instance: NetworkManager    // Singleton pattern
-    private channel: any | null = null; // Socket.io Socket instance
+    private channel: ClientChannel | null = null; // Geckos.io client channel
     private connected: boolean = false;
     private localPlayerId: number = -1;
     private currentFrame: number = 0;
@@ -155,21 +155,23 @@ class NetworkManager {
                 hostname.startsWith('10.') ||
                 hostname.startsWith('172.');
 
-            // Production uses standard HTTPS (443), local uses port 3000
-            const prodUrl = 'https://sgalalla-geckos.fly.dev'; // Fly.io routes 443 → internal 3000
-            const localUrl = `${window.location.protocol}//${hostname}:3000`;
-            const serverUrl = isLocal ? localUrl : prodUrl;
+            // Geckos.io uses port 9208 by default
+            const port = isLocal ? 9208 : 9208;
+            const url = isLocal ? `http://${hostname}` : 'https://sgalalla-geckos.fly.dev';
 
-            console.log(`[NetworkManager] Connecting to ${serverUrl}...`);
+            console.log(`[NetworkManager] Connecting to ${url}:${port} via Geckos.io (UDP)...`);
 
-            this.channel = io(serverUrl, {
-                transports: ['websocket', 'polling'],
-                reconnection: true
-            }) as any; // Cast to any to avoid type mismatch for now
+            this.channel = geckos({ url, port });
 
-            this.channel.on('connect', () => {
+            this.channel.onConnect((error) => {
+                if (error) {
+                    console.error('[NetworkManager] Connection failed:', error);
+                    this.connected = false;
+                    resolve(false);
+                    return;
+                }
 
-                console.log('[NetworkManager] WebSocket connected, waiting for player assignment...');
+                console.log('[NetworkManager] UDP connected, waiting for player assignment...');
                 this.connected = true;
 
                 // Clear buffers on new connection
@@ -182,13 +184,7 @@ class NetworkManager {
                 this.setupMessageHandlers(resolve);
             });
 
-            this.channel.on('connect_error', (error: any) => {
-                console.error('[NetworkManager] Connection failed:', error);
-                this.connected = false;
-                resolve(false);
-            });
-
-            this.channel.on('disconnect', () => {
+            this.channel.onDisconnect(() => {
                 console.log('[NetworkManager] Disconnected');
                 this.connected = false;
                 this.onDisconnectCallback?.();

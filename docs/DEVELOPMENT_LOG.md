@@ -370,3 +370,11 @@
 - **[Refactor]** Memory: Added pooled `_boundsRect` to `Player.getBounds()` to eliminate per-frame allocations.
 - **[Refactor]** Lifecycle: Added `shutdown()` method to `OnlineGameScene` for proper socket/player cleanup on scene stop.
 - **[S]** **STATUS**: v0.8.11 Complete. Online interpolation is now smooth and codebase is audited for performance.
+
+### [2026-02-08] v0.9.0 - Geckos.io UDP Migration
+- **[V]** `v0.9.0`
+- **[Major]** Network: Migrated from Socket.io (TCP) to Geckos.io (UDP/WebRTC) to eliminate TCP head-of-line blocking lag.
+- **[Refactor]** Server: Rewrote `server-geckos/index.ts` to use `@geckos.io/server` API (`onConnection`, `onDisconnect`, `channel.emit`).
+- **[Refactor]** Client: Rewrote `NetworkManager.ts` to use `@geckos.io/client` API (`geckos()`, `onConnect`, `onDisconnect`).
+- **[Config]** Port: Changed from 3000 to 9208 (Geckos.io default).
+- **[S]** **STATUS**: v0.9.0 Complete. UDP-based networking should dramatically reduce lag and teleportation.

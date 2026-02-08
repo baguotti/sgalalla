@@ -16,6 +16,7 @@
         "typescript": "^5.0.0"
     },
     "dependencies": {
+        "@geckos.io/server": "^3.0.2",
         "socket.io": "^4.8.3"
     }
 }
