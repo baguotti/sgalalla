@@ -26,7 +26,7 @@ export class OnlineGameScene extends Phaser.Scene {
     private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
     private interpolationTime: number = 0; // Stable playback timeline (milliseconds)
     private isBufferInitialized: boolean = false;
-    private readonly RENDER_DELAY_MS = 40; // 40ms historical window (buffers ~2.5 frames at 60Hz)
+    private readonly RENDER_DELAY_MS = 80; // 80ms buffer for internet jitter tolerance (~5 frames at 60Hz)
     private localPlayerId: number = -1;
     private isConnected: boolean = false;
 
@@ -443,10 +443,18 @@ export class OnlineGameScene extends Phaser.Scene {
                         }
                         player.setFacingDirection(fromSnap.facingDirection);
                     } else if (buffer.length > 0) {
-                        // Extrapolation fallback: snap to latest
+                        // Smooth extrapolation using last known velocity
                         const latest = buffer[buffer.length - 1];
-                        player.x = latest.x;
-                        player.y = latest.y;
+                        const timeSinceLast = this.interpolationTime - latest.serverTime;
+
+                        // Use velocity for smooth prediction instead of snapping
+                        const predictedX = latest.x + (latest.velocityX || 0) * (timeSinceLast / 1000);
+                        const predictedY = latest.y + (latest.velocityY || 0) * (timeSinceLast / 1000);
+
+                        // Smoothly lerp to predicted position to avoid sudden jumps
+                        player.x = Phaser.Math.Linear(player.x, predictedX, 0.3);
+                        player.y = Phaser.Math.Linear(player.y, predictedY, 0.3);
+
                         if (latest.animationKey) player.playAnim(latest.animationKey, true);
                         player.setFacingDirection(latest.facingDirection);
                     }

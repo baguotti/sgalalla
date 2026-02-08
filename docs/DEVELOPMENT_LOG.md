@@ -433,3 +433,9 @@
 ### [2026-02-08] v0.9.9.1 - Server Tick Rate Bugfix
 - **[V]** `v0.9.9.1`
 - **[Bugfix]** Server: Fixed `setInterval` timing - was still `1000/20` (50ms/20Hz) despite comment saying 60Hz. Changed to `1000/60` (16.67ms) for actual 60Hz updates.
+
+### [2026-02-08] v0.9.10 - Interpolation Stutter Fixes
+- **[V]** `v0.9.10`
+- **[Fix]** Client: Increased interpolation buffer from 40ms to 80ms for better internet jitter tolerance.
+- **[Fix]** Client: Replaced snap-to-position extrapolation with velocity-based smooth prediction using lerp factor 0.3.
+- **[S]** **STATUS**: Testing on production (Vercel + DigitalOcean).
