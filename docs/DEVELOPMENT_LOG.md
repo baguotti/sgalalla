@@ -395,3 +395,10 @@
 - **[V]** `v0.9.3`
 - **[Fix]** Network: Updated `NetworkManager.ts` to use port 443 for production (Fly.io routes 443 → internal 9208). Local still uses 9208 directly.
 - **[S]** **STATUS**: v0.9.3 Complete. Production client now connects via HTTPS port 443.
+- **[S]** **STATUS**: v0.9.3 Complete. Production client now connects via HTTPS port 443.
+
+### [2026-02-08] v0.9.4 - DigitalOcean UDP Migration
+- **[V]** `v0.9.4`
+- **[Infra]** DigitalOcean: Created setup script `server-geckos/setup_digitalocean.sh` for auto-provisioning.
+- **[Config]** Network: Updated `NetworkManager.ts` to point to DigitalOcean Droplet IP `164.90.235.15` on port 9208 (UDP).
+- **[S]** **STATUS**: v0.9.4 Pending Deployment. User needs to run setup script on Droplet.

@@ -155,9 +155,9 @@ class NetworkManager {
                 hostname.startsWith('10.') ||
                 hostname.startsWith('172.');
 
-            // Geckos.io: Local uses 9208 directly, production uses 443 (Fly.io routes to internal 9208)
-            const port = isLocal ? 9208 : 443;
-            const url = isLocal ? `http://${hostname}` : 'https://sgalalla-geckos.fly.dev';
+            // Geckos.io: Local uses 9208, Production (DigitalOcean) also uses 9208 directly
+            const port = 9208;
+            const url = isLocal ? `http://${hostname}` : 'http://164.90.235.15';
 
             console.log(`[NetworkManager] Connecting to ${url}:${port} via Geckos.io (UDP)...`);
 
