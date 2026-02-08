@@ -430,6 +430,9 @@ export class OnlineGameScene extends Phaser.Scene {
                         if (latest.animationKey) player.playAnim(latest.animationKey, true);
                         player.setFacingDirection(latest.facingDirection);
                     }
+
+                    // Update Visuals (Timers, Blink, etc.) independent of interpolation
+                    player.updateVisuals(delta);
                 }
 
                 // Check blast zone for remote players
@@ -922,7 +925,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
     }
 
-    private createPlayer(playerId: number, x: number, y: number, character: string = 'fok'): Player {
+    private createPlayer(playerId: number, x: number, y: number, character: string = 'fok_v3'): Player {
         const isLocal = playerId === this.localPlayerId;
 
         const player = new Player(this, x, y, {
@@ -1137,7 +1140,8 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private handleGameStart(players: { playerId: number; character: string }[]): void {
-        console.log('[OnlineGameScene] Game starting with players:', players);
+        console.log('[OnlineGameScene] Game starting with players:', JSON.stringify(players));
+        players.forEach(p => console.log(`Player ${p.playerId} char: "${p.character}"`));
         this.phase = 'PLAYING';
 
         // Hide selection UI
@@ -1155,7 +1159,11 @@ export class OnlineGameScene extends Phaser.Scene {
         // Spawn players with their selected characters
         const spawnPoints = [600, 1200];
         players.forEach((p, idx) => {
-            const player = this.createPlayer(p.playerId, spawnPoints[idx % 2], 780, p.character);
+            // Use server character if valid, otherwise fallback to 'fok_v3'
+            const char = (p.character && p.character.length > 0) ? p.character : 'fok_v3';
+            console.log(`[OnlineGameScene] Creating player ${p.playerId} with char: ${char} (Server sent: "${p.character}")`);
+
+            const player = this.createPlayer(p.playerId, spawnPoints[idx % 2], 780, char);
             this.players.set(p.playerId, player);
 
             if (p.playerId === this.localPlayerId) {

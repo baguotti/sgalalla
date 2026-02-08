@@ -317,6 +317,16 @@ export class Player extends Fighter {
         this.updateLogic(delta);
     }
 
+    /**
+     * Safe update for remote players (networked)
+     * updates timers and visuals without physics/input
+     */
+    public updateVisuals(delta: number): void {
+        this.updateTimers(delta);
+        this.updateDamageDisplay();
+        this.updateHeldItemPosition();
+    }
+
     private updateTimers(delta: number): void {
         this.hitStunTimer -= delta;
 

@@ -340,3 +340,12 @@
 - **[Fix]** Input: Fixed timing mismatch bug where `sceneStartTime` used `Date.now()` while input checks used Phaser's game time, causing broken debouncing.
 - **[Fix]** Slots: Corrected slot initialization to ensure 2 slots are available in Training mode (fixing undefined access to CPU slot).
 - **[S]** **STATUS**: v0.8.7 Complete. Training mode is now fully customizable.
+
+### [2026-02-08] v0.8.8 - Online Asset Parity
+- **[V]** `v0.8.8`
+- **[Fix]** Sprites: Resolved critical bug where remote players in 1v1 mode appeared as squares.
+    - Added fallback to `'fok_v3'` in `OnlineGameScene.ts` when server sends empty/invalid character string.
+    - Updated `createPlayer` default to `'fok_v3'`.
+- **[Fix]** Training: Removed "Dummy" from selectable character list in `LobbyScene.ts` (it has no sprite).
+- **[Fix]** Visuals: Patched `OnlineGameScene` to call `player.updateVisuals(delta)`, enabling the respawn invulnerability blink effect for remote players.
+- **[S]** **STATUS**: v0.8.8 Complete. Online mode now renders characters correctly and syncs visual effects.

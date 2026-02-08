@@ -27,8 +27,8 @@ export class LobbyScene extends Phaser.Scene {
     private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character Data
-    private characters: CharacterType[] = ['fok_v3', 'dummy'] as any; // Refinement: Only fok_v3 and dummy
-    private charLabels: string[] = ['Fok', 'Dummy']; // Refinement: Display "Fok" for fok_v3
+    private characters: CharacterType[] = ['fok_v3'] as any; // Refinement: Only fok_v3
+    private charLabels: string[] = ['Fok']; // Refinement: Display "Fok" for fok_v3
     // P1_KEYS removed (unused in Lobby)
 
     // Input debounce & Safety
