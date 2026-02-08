@@ -383,4 +383,4 @@ setInterval(() => {
 
         emitToRoom(NetMessageType.STATE_UPDATE, state);
     });
-}, 1000 / 20);
+}, 1000 / 60); // 60Hz = ~16.67ms
