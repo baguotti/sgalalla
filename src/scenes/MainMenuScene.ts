@@ -140,7 +140,7 @@ export class MainMenuScene extends Phaser.Scene {
         });
     }
 
-    private selectOption(_inputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD', _gamepadIndex: number | null = null): void {
+    private selectOption(inputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD', gamepadIndex: number | null = null): void {
         const mode = this.menuOptions[this.selectedIndex].mode;
 
         // Handle Online Quick Join
@@ -149,7 +149,7 @@ export class MainMenuScene extends Phaser.Scene {
             return;
         }
 
-        // Local Game (training or versus)
-        this.scene.start('LobbyScene', { mode: mode });
+        // Local Game (training or versus) - Pass input type and gamepad index
+        this.scene.start('LobbyScene', { mode: mode, inputType: inputType, gamepadIndex: gamepadIndex });
     }
 }
