@@ -429,3 +429,7 @@
 - **[Perf]** Client: Reduced interpolation buffer from 100ms to 40ms (~2.5 frames at 60Hz).
 - **[Perf]** Client: Increased state send rate from 30Hz to 60Hz for faster position updates.
 - **[S]** **STATUS**: v0.9.9 Complete. Local testing shows acceptable input responsiveness.
+
+### [2026-02-08] v0.9.9.1 - Server Tick Rate Bugfix
+- **[V]** `v0.9.9.1`
+- **[Bugfix]** Server: Fixed `setInterval` timing - was still `1000/20` (50ms/20Hz) despite comment saying 60Hz. Changed to `1000/60` (16.67ms) for actual 60Hz updates.
