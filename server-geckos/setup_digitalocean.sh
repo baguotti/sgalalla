@@ -25,6 +25,8 @@ ufw allow 80/tcp
 ufw allow 443/tcp
 ufw allow 9208/udp
 ufw allow 9208/tcp
+# WebRTC UDP Port Range
+ufw allow 1025:65535/udp
 ufw --force enable
 
 # 5. Clone/Update Repo (Idempotent)

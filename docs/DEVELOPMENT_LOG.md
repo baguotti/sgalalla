@@ -402,3 +402,9 @@
 - **[Infra]** DigitalOcean: Created setup script `server-geckos/setup_digitalocean.sh` for auto-provisioning.
 - **[Config]** Network: Updated `NetworkManager.ts` to point to DigitalOcean Droplet IP `164.90.235.15` on port 9208 (UDP).
 - **[S]** **STATUS**: v0.9.4 Pending Deployment. User needs to run setup script on Droplet.
+
+### [2026-02-08] v0.9.5 - DigitalOcean CORS & Recovery
+- **[V]** `v0.9.5`
+- **[Fix]** Server: Enabled CORS (`origin: '*'`) in `server-geckos/index.ts` to allow connections from localhost and Vercel.
+- **[Ops]** Recovery: Pushed fix to git to recover from potential `sed` command corruption on server.
+- **[S]** **STATUS**: v0.9.5 Pushed. User needs to `git pull` on server.
