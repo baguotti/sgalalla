@@ -320,3 +320,12 @@
 - **[Fix]** Animation: Re-aligned `fok_v3` sprite offsets and texture boundaries.
 - **[Fix]** Runtime: Removed orphaned `controlsHintText` references in `GameScene.ts`.
 - **[S]** **STATUS**: v0.8.5 Complete. UI is cleaner and physics feel more deliberate.
+323: 
+324: ### [2026-02-08] v0.8.6 - Sig Tuning & Respawn Polish
+325: - **[V]** `v0.8.6`
+326: - **[Phys]** Sig Tuning: Reduced knockback growth of all heavy attacks by 20%; further 35% reduction for Up/Down sigs to normalize with Side Sigs.
+327: - **[New]** Respawn Flow: Implemented a 2-second delay after death, immediate camera focus on survivors, and 1 second of flashing invulnerability upon respawn.
+328: - **[Fix]** Bug: Resolved "bounce" glitch during upward KOs by removing rigid world bounds.
+329: - **[T]** Mobility: Buffed `JUMP_FORCE` (-990 -> -1050) for better reach.
+330: - **[UX]** Visuals: Removed recovery state tint; implemented alpha-blink for respawn invulnerability.
+331: - **[S]** **STATUS**: v0.8.6 Complete. Sig power is balanced and respawn flow is polished.
