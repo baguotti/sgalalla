@@ -156,7 +156,8 @@ class NetworkManager {
                 hostname.startsWith('172.');
 
             // Geckos.io uses port 9208 by default
-            const port = isLocal ? 9208 : 9208;
+            // URL needs full protocol prefix
+            const port = 9208;
             const url = isLocal ? `http://${hostname}` : 'https://sgalalla-geckos.fly.dev';
 
             console.log(`[NetworkManager] Connecting to ${url}:${port} via Geckos.io (UDP)...`);
