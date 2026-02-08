@@ -452,3 +452,8 @@
 - **[Perf]** Client: 60ms interpolation buffer (~4 frames at 60Hz) - best balance of smoothness and responsiveness.
 - **[Note]** This configuration is the **target performance for online**. Local testing confirms smooth movement with minimal jitter and low input delay.
 - **[S]** **STATUS**: v0.9.12 is the LOCAL baseline. Next: achieve same performance on production.
+
+### [2026-02-08] v0.9.13 - Adaptive Buffer for Production
+- **[V]** `v0.9.13`
+- **[Perf]** Client: Implemented adaptive buffer based on environment. Local (`localhost`/`127.0.0.1`) uses 60ms, production uses 100ms.
+- **[Note]** Production requires larger buffer due to real internet jitter. 100ms provides stability while maintaining reasonable responsiveness.
