@@ -397,15 +397,14 @@ export class OnlineGameScene extends Phaser.Scene {
 
             const targetLead = maxBufferTime - this.interpolationTime;
 
-            // Simple clock speed adjustment
-            let clockSpeed = 1.0;
-            if (targetLead < this.RENDER_DELAY_MS * 0.5) {
-                // Buffer low - slow down
-                clockSpeed = 0.9;
-            } else if (targetLead > this.RENDER_DELAY_MS * 2.0) {
-                // Buffer high - speed up
-                clockSpeed = 1.1;
-            }
+            // Smooth continuous clock speed curve (eliminates discrete jumps)
+            // Maps targetLead to clockSpeed: closer to target = slower adjustment
+            const leadError = targetLead - this.RENDER_DELAY_MS;
+            const clockSpeed = Phaser.Math.Clamp(
+                1.0 + (leadError * 0.002), // Gentle adjustment factor
+                0.95,  // Lower bound (slow down when buffer is low)
+                1.05   // Upper bound (speed up when buffer is high)
+            );
 
             this.interpolationTime += delta * clockSpeed;
         }
@@ -452,9 +451,9 @@ export class OnlineGameScene extends Phaser.Scene {
                         const predictedX = latest.x + (latest.velocityX || 0) * (timeSinceLast / 1000);
                         const predictedY = latest.y + (latest.velocityY || 0) * (timeSinceLast / 1000);
 
-                        // Smoothly lerp to predicted position to avoid sudden jumps
-                        player.x = Phaser.Math.Linear(player.x, predictedX, 0.3);
-                        player.y = Phaser.Math.Linear(player.y, predictedY, 0.3);
+                        // Gentler lerp (0.15) to reduce snap-back when new data arrives
+                        player.x = Phaser.Math.Linear(player.x, predictedX, 0.15);
+                        player.y = Phaser.Math.Linear(player.y, predictedY, 0.15);
 
                         if (latest.animationKey) player.playAnim(latest.animationKey, true);
                         player.setFacingDirection(latest.facingDirection);

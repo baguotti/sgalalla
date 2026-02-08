@@ -472,3 +472,9 @@
 - **[Deploy]** Created `deploy_client.sh` script for easy redeployment.
 - **[Note]** This eliminates all middleware latency. Client and server communicate directly via UDP.
 - **[S]** **STATUS**: Testing at `http://164.90.235.15`. This is the best possible latency configuration.
+
+### [2026-02-08] v0.9.16 - Smooth Interpolation Tweaks
+- **[V]** `v0.9.16`
+- **[Perf]** Clock Speed: Changed from discrete jumps (0.9/1.0/1.1) to smooth continuous curve (0.95-1.05). Eliminates visible stuttering from clock adjustments.
+- **[Perf]** Extrapolation: Reduced lerp factor from 0.3 to 0.15 for gentler blending. Reduces snap-back when new packets arrive.
+- **[S]** **STATUS**: Deployed to `http://164.90.235.15`. Testing smoothness improvements.
