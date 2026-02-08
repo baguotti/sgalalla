@@ -162,6 +162,7 @@ class NetworkManager {
 
             console.log(`[NetworkManager] Connecting to ${url}:${port} via Geckos.io (UDP)...`);
 
+            // Geckos.io defaults to ordered: false (unreliable/unordered) for real-time
             this.channel = geckos({ url, port });
 
             this.channel.onConnect((error) => {

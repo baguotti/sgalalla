@@ -94,9 +94,10 @@ const httpServer = http.createServer((req, res) => {
 });
 
 // Create Geckos.io server (UDP via WebRTC)
-// Create Geckos.io server (UDP via WebRTC)
+// ordered: false = Unreliable/Unordered - eliminates Head-of-Line Blocking stutter
 const io: GeckosServer = geckos({
     cors: { origin: '*' },
+    ordered: false, // Critical for real-time: don't wait for lost packets
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' }

@@ -457,3 +457,10 @@
 - **[V]** `v0.9.13`
 - **[Perf]** Client: Implemented adaptive buffer based on environment. Local (`localhost`/`127.0.0.1`) uses 60ms, production uses 100ms.
 - **[Note]** Production requires larger buffer due to real internet jitter. 100ms provides stability while maintaining reasonable responsiveness.
+
+### [2026-02-08] v0.9.14 - Reliability Research & Buffer Tuning
+- **[V]** `v0.9.14`
+- **[Research]** Investigated "Head-of-Line Blocking" - turns out Geckos.io **already defaults to `ordered: false`** (unreliable/unordered). Not the stutter cause.
+- **[Config]** Server: Explicitly set `ordered: false` in geckos config for clarity.
+- **[Perf]** Client: Set production buffer to **80ms** (user-requested balance between smoothness and responsiveness).
+- **[S]** **STATUS**: Testing 80ms buffer on production. Further investigation needed if stutter persists.
