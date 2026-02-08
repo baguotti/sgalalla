@@ -94,7 +94,9 @@ const httpServer = http.createServer((req, res) => {
 });
 
 // Create Geckos.io server (UDP via WebRTC)
+// Create Geckos.io server (UDP via WebRTC)
 const io: GeckosServer = geckos({
+    cors: { origin: '*' },
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' }

@@ -157,7 +157,9 @@ class NetworkManager {
 
             // Geckos.io: Local uses 9208, Production (DigitalOcean) also uses 9208 directly
             const port = 9208;
-            const url = isLocal ? `http://${hostname}` : 'http://164.90.235.15';
+            // FORCE DigitalOcean IP for testing (even locally)
+            const url = 'http://164.90.235.15';
+            // const url = isLocal ? `http://${hostname}` : 'http://164.90.235.15';
 
             console.log(`[NetworkManager] Connecting to ${url}:${port} via Geckos.io (UDP)...`);
 
