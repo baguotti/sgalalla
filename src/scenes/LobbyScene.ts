@@ -64,6 +64,7 @@ export class LobbyScene extends Phaser.Scene {
 
     init(data: { mode?: 'versus' | 'training', inputType?: 'KEYBOARD' | 'GAMEPAD', gamepadIndex?: number | null, slots?: PlayerSelection[] } | null): void {
         console.log('LobbyScene.init called');
+        this.selectionPhase = 'P1'; // Reset phase
         const safeData = data || {};
         this._initData = safeData;
         void this._initData; // Silence linter
@@ -78,6 +79,8 @@ export class LobbyScene extends Phaser.Scene {
         this.frameInputs = { space: false, enter: false };
         this.sceneStartTime = Date.now();
     }
+
+
 
     create(): void {
         console.log('LobbyScene.create called');
@@ -111,18 +114,23 @@ export class LobbyScene extends Phaser.Scene {
             repeat: -1
         });
 
-        // Initialize Slots
-        // For this specific change, we're simplifying the slot initialization
-        // to only allow P1 to join and auto-start.
-        // The previous logic for restoring slots or creating 4 empty slots is removed
-        // to align with the "Limit joins to P1" instruction.
-        this.slots = [{
-            playerId: 0,
-            joined: false,
-            ready: false,
-            input: { type: 'KEYBOARD', gamepadIndex: null },
-            character: 'fok_v3'
-        }];
+        // Initialize Slots (need at least 2 for training mode)
+        this.slots = [
+            {
+                playerId: 0,
+                joined: false,
+                ready: false,
+                input: { type: 'KEYBOARD', gamepadIndex: null },
+                character: 'fok_v3'
+            },
+            {
+                playerId: 1,
+                joined: false,
+                ready: false,
+                input: { type: 'KEYBOARD', gamepadIndex: null },
+                character: 'fok_v3'
+            }
+        ];
 
 
         this.createSlotUI();
@@ -153,13 +161,15 @@ export class LobbyScene extends Phaser.Scene {
         // Let's stick to update loop for consistency or add checks.
     }
 
+    private selectionPhase: 'P1' | 'CPU' = 'P1';
+
     private setupTrainingMode(): void {
         // Auto-join P1 (if keyboard)
         const p1 = this.slots[0];
         p1.joined = true;
         p1.input.type = this.initialInputType;
         p1.input.gamepadIndex = this.initialGamepadIndex;
-        // P1 not ready yet
+        // P1 starts NOT ready
 
         // Auto-join P2 as Dummy
         const p2 = this.slots[1];
@@ -167,8 +177,8 @@ export class LobbyScene extends Phaser.Scene {
         p2.input.type = 'KEYBOARD'; // Placeholder
         p2.isAI = true;
         p2.isTrainingDummy = true;
-        p2.ready = true; // Dummy is always ready
-        p2.character = 'fok_v3';
+        p2.ready = false; // Dummy starts NOT ready (waiting for selection)
+        p2.character = 'dummy'; // Default to dummy
     }
 
     private createSlotUI(): void {
@@ -288,6 +298,12 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private handlePlayerInput(time: number): void {
+        // Special Training Mode Handling
+        if (this.mode === 'training') {
+            this.handleTrainingInput(time);
+            return;
+        }
+
         this.slots.forEach(slot => {
             if (!slot.joined) return;
             if (slot.isAI) return; // Skip input for Dummy/AI
@@ -322,12 +338,6 @@ export class LobbyScene extends Phaser.Scene {
                         right = gp.axes[0] > 0.5 || gp.buttons[15]?.pressed;
                     }
 
-                    // Gamepad buttons don't have built-in JustDown, need manual tracking or simple debounce
-                    // Using the same 200ms debounce for now for buttons too if needed, 
-                    // but ideally we want explicit press. 
-                    // Let's rely on transient press since we check every frame. 
-                    // To avoid repeat, we can check if it WAS NOT pressed last frame.
-                    // But simplified: checking press with debounce is okay for now.
                     if (canHoldInput) {
                         select = gp.buttons[0]?.pressed; // A Button
                     }
@@ -358,6 +368,77 @@ export class LobbyScene extends Phaser.Scene {
             if (inputRegistered) {
                 this.lastInputTime.set(slot.playerId, time);
             }
+        });
+    }
+
+    private handleTrainingInput(time: number): void {
+        const p1 = this.slots[0];
+        const cpu = this.slots[1];
+
+        // Target slot depends on phase
+        const targetSlot = this.selectionPhase === 'P1' ? p1 : cpu;
+
+        // Use P1 input device to control targetSlot
+        const lastTime = this.lastInputTime.get(0) || 0;
+        const canHoldInput = time - lastTime > 200;
+
+        let left = false;
+        let right = false;
+        let select = false;
+
+        if (p1.input.type === 'KEYBOARD') {
+            if (canHoldInput) {
+                left = this.keys.left.isDown || this.keys.a.isDown;
+                right = this.keys.right.isDown || this.keys.d.isDown;
+            }
+            // Debounce select - use Date.now() to compare with sceneStartTime (also Date.now())
+            if (Date.now() - this.sceneStartTime > 500) {
+                select = this.frameInputs.space || this.frameInputs.enter;
+            }
+        } else if (p1.input.type === 'GAMEPAD' && p1.input.gamepadIndex !== null) {
+            const gp = navigator.getGamepads()[p1.input.gamepadIndex];
+            if (gp) {
+                if (canHoldInput) {
+                    left = gp.axes[0] < -0.5 || gp.buttons[14]?.pressed;
+                    right = gp.axes[0] > 0.5 || gp.buttons[15]?.pressed;
+                }
+                if (canHoldInput && Date.now() - this.sceneStartTime > 500) {
+                    select = gp.buttons[0]?.pressed;
+                }
+            }
+        }
+
+        let inputRegistered = false;
+        if (left) {
+            this.changeCharacter(targetSlot, -1);
+            inputRegistered = true;
+        } else if (right) {
+            this.changeCharacter(targetSlot, 1);
+            inputRegistered = true;
+        } else if (select) {
+            console.log(`[LobbyScene] Select Pressed. Phase: ${this.selectionPhase}`);
+            if (this.selectionPhase === 'P1') {
+                p1.ready = true;
+                this.selectionPhase = 'CPU';
+                inputRegistered = true;
+                console.log('[LobbyScene] Switched to CPU Phase');
+            } else {
+                cpu.ready = true;
+                inputRegistered = true;
+                console.log('[LobbyScene] Starting Game');
+                this.startTrainingGame();
+            }
+        }
+
+        if (inputRegistered) {
+            this.lastInputTime.set(0, time);
+        }
+    }
+
+    private startTrainingGame(): void {
+        console.log('Training Setup Complete. Starting game...');
+        this.time.delayedCall(500, () => {
+            this.scene.start('GameScene', { playerData: [this.slots[0], this.slots[1]] });
         });
     }
 
@@ -399,10 +480,24 @@ export class LobbyScene extends Phaser.Scene {
                     stateText.setFontSize(40);
                     arrows.forEach(a => a.setVisible(false));
                 } else {
-                    stateText.setText('Select Character');
-                    stateText.setColor('#ffff00');
-                    stateText.setFontSize(24);
-                    arrows.forEach(a => a.setVisible(true));
+                    if (this.mode === 'training' && i === 1 && this.selectionPhase === 'P1') {
+                        // CPU Waiting for P1
+                        stateText.setText('Waiting for P1...');
+                        stateText.setColor('#888888');
+                        stateText.setFontSize(24);
+                        arrows.forEach(a => a.setVisible(false));
+                    } else if (this.mode === 'training' && i === 1 && this.selectionPhase === 'CPU') {
+                        // CPU Selection Active
+                        stateText.setText('SELECT CPU');
+                        stateText.setColor('#ffff00');
+                        stateText.setFontSize(24);
+                        arrows.forEach(a => a.setVisible(true));
+                    } else {
+                        stateText.setText('Select Character');
+                        stateText.setColor('#ffff00');
+                        stateText.setFontSize(24);
+                        arrows.forEach(a => a.setVisible(true));
+                    }
                 }
 
                 const charIdx = this.characters.indexOf(slot.character);
@@ -410,10 +505,15 @@ export class LobbyScene extends Phaser.Scene {
                 charText.setVisible(true);
 
                 if (slot.isTrainingDummy) {
-                    stateText.setText('TRAINING DUMMY');
-                    stateText.setColor('#ff5555');
-                    stateText.setFontSize(24);
-                    arrows.forEach(a => a.setVisible(false));
+                    // Update: Override "TRAINING DUMMY" text with state if selecting
+                    if (this.selectionPhase === 'CPU') {
+                        stateText.setText('SELECT CPU');
+                    } else if (slot.ready) {
+                        stateText.setText('READY!');
+                    } else {
+                        // Default
+                        stateText.setText('TRAINING DUMMY');
+                    }
                 }
 
             } else {

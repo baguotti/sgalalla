@@ -323,9 +323,20 @@
 323: 
 324: ### [2026-02-08] v0.8.6 - Sig Tuning & Respawn Polish
 325: - **[V]** `v0.8.6`
-326: - **[Phys]** Sig Tuning: Reduced knockback growth of all heavy attacks by 20%; further 35% reduction for Up/Down sigs to normalize with Side Sigs.
-327: - **[New]** Respawn Flow: Implemented a 2-second delay after death, immediate camera focus on survivors, and 1 second of flashing invulnerability upon respawn.
-328: - **[Fix]** Bug: Resolved "bounce" glitch during upward KOs by removing rigid world bounds.
-329: - **[T]** Mobility: Buffed `JUMP_FORCE` (-990 -> -1050) for better reach.
-330: - **[UX]** Visuals: Removed recovery state tint; implemented alpha-blink for respawn invulnerability.
-331: - **[S]** **STATUS**: v0.8.6 Complete. Sig power is balanced and respawn flow is polished.
+
+### [2026-02-08] v0.8.6 - Sig Tuning & Respawn Polish
+- **[V]** `v0.8.6`
+- **[Phys]** Sig Tuning: Reduced knockback growth of all heavy attacks by 20%; further 35% reduction for Up/Down sigs to normalize with Side Sigs.
+- **[New]** Respawn Flow: Implemented a 2-second delay after death, immediate camera focus on survivors, and 1 second of flashing invulnerability upon respawn.
+- **[Fix]** Bug: Resolved "bounce" glitch during upward KOs by removing rigid world bounds.
+- **[T]** Mobility: Buffed `JUMP_FORCE` (-990 -> -1050) for better reach.
+- **[UX]** Visuals: Removed recovery state tint; implemented alpha-blink for respawn invulnerability.
+- **[S]** **STATUS**: v0.8.6 Complete. Sig power is balanced and respawn flow is polished.
+
+### [2026-02-08] v0.8.7 - Training Mode Improvements
+- **[V]** `v0.8.7`
+- **[New]** Training Mode: Implemented CPU character selection flow. Players now select their character first, then the CPU character.
+- **[Fix]** Logic: Resolved issue where Training mode was incorrectly initialized as 'versus' in `MainMenuScene.ts`.
+- **[Fix]** Input: Fixed timing mismatch bug where `sceneStartTime` used `Date.now()` while input checks used Phaser's game time, causing broken debouncing.
+- **[Fix]** Slots: Corrected slot initialization to ensure 2 slots are available in Training mode (fixing undefined access to CPU slot).
+- **[S]** **STATUS**: v0.8.7 Complete. Training mode is now fully customizable.

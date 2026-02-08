@@ -9,7 +9,7 @@ export class MainMenuScene extends Phaser.Scene {
     private canInput: boolean = false;
     private selectedIndex: number = 0;
     private menuOptions = [
-        { label: 'TRAINING', mode: 'versus' },
+        { label: 'TRAINING', mode: 'training' },
         { label: '1v1', mode: 'online' }
     ];
     private menuTexts: Phaser.GameObjects.Text[] = [];
@@ -149,7 +149,7 @@ export class MainMenuScene extends Phaser.Scene {
             return;
         }
 
-        // Local Game
-        this.scene.start('LobbyScene', { mode: 'versus' });
+        // Local Game (training or versus)
+        this.scene.start('LobbyScene', { mode: mode });
     }
 }
