@@ -350,13 +350,13 @@
 - **[Fix]** Visuals: Patched `OnlineGameScene` to call `player.updateVisuals(delta)`, enabling the respawn invulnerability blink effect for remote players.
 - **[S]** **STATUS**: v0.8.8 Complete. Online mode now renders characters correctly and syncs visual effects.
 
-### [2026-02-08] v0.8.10 - Controller Handover Fix
-- **[V]** `v0.8.10`
-- **[Fix]** Input: Resolved issue where Xbox controllers didn't work in the Training lobby because `inputType` and `gamepadIndex` were not being passed from the main menu.
-- **[S]** **STATUS**: v0.8.10 Complete. Controller data now correctly persists from the main menu into the character selection lobby.
-
 ### [2026-02-08] v0.8.9 - Input and Sprite Robustness
 - **[V]** `v0.8.9`
 - **[Fix]** Input: Implemented gamepad edge detection in `LobbyScene.ts`. Character selection now requires a discrete press, preventing held buttons from bypassing selection phases.
 - **[Fix]** Sprites: Hardened character validation in `OnlineGameScene.ts`. Implemented strict whitelist checking (`['fok_v3']`) for incoming server data, ensuring invalid keys default correctly to a loaded texture.
 - **[S]** **STATUS**: v0.8.9 Complete. Input handling and asset loading are now robust against server-side data inconsistencies.
+
+### [2026-02-08] v0.8.10 - Controller Handover Fix
+- **[V]** `v0.8.10`
+- **[Fix]** Input: Resolved issue where Xbox controllers didn't work in the Training lobby because `inputType` and `gamepadIndex` were not being passed from the main menu.
+- **[S]** **STATUS**: v0.8.10 Complete. Controller data now correctly persists from the main menu into the character selection lobby.
