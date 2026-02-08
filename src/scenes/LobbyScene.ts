@@ -44,6 +44,9 @@ export class LobbyScene extends Phaser.Scene {
         enter: false
     };
 
+    // Gamepad edge detection for Training mode
+    private prevGamepadSelect: boolean = false;
+
     // Keys
     private keys!: {
         left: Phaser.Input.Keyboard.Key;
@@ -77,6 +80,7 @@ export class LobbyScene extends Phaser.Scene {
         this.joinTime.clear();
         this.canInput = true; // Enable immediately to debug freeze
         this.frameInputs = { space: false, enter: false };
+        this.prevGamepadSelect = false;
         this.sceneStartTime = Date.now();
     }
 
@@ -402,9 +406,12 @@ export class LobbyScene extends Phaser.Scene {
                     left = gp.axes[0] < -0.5 || gp.buttons[14]?.pressed;
                     right = gp.axes[0] > 0.5 || gp.buttons[15]?.pressed;
                 }
-                if (canHoldInput && Date.now() - this.sceneStartTime > 500) {
-                    select = gp.buttons[0]?.pressed;
+                // Edge detection for select: only trigger on button DOWN, not held
+                const currentSelect = gp.buttons[0]?.pressed ?? false;
+                if (Date.now() - this.sceneStartTime > 500) {
+                    select = currentSelect && !this.prevGamepadSelect;
                 }
+                this.prevGamepadSelect = currentSelect;
             }
         }
 

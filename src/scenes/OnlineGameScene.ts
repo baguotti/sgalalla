@@ -1159,8 +1159,9 @@ export class OnlineGameScene extends Phaser.Scene {
         // Spawn players with their selected characters
         const spawnPoints = [600, 1200];
         players.forEach((p, idx) => {
-            // Use server character if valid, otherwise fallback to 'fok_v3'
-            const char = (p.character && p.character.length > 0) ? p.character : 'fok_v3';
+            // Validate character against loaded textures. Fallback to 'fok_v3' if invalid.
+            const validChars = ['fok_v3'];
+            const char = validChars.includes(p.character) ? p.character : 'fok_v3';
             console.log(`[OnlineGameScene] Creating player ${p.playerId} with char: ${char} (Server sent: "${p.character}")`);
 
             const player = this.createPlayer(p.playerId, spawnPoints[idx % 2], 780, char);

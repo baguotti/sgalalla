@@ -349,3 +349,9 @@
 - **[Fix]** Training: Removed "Dummy" from selectable character list in `LobbyScene.ts` (it has no sprite).
 - **[Fix]** Visuals: Patched `OnlineGameScene` to call `player.updateVisuals(delta)`, enabling the respawn invulnerability blink effect for remote players.
 - **[S]** **STATUS**: v0.8.8 Complete. Online mode now renders characters correctly and syncs visual effects.
+
+### [2026-02-08] v0.8.9 - Input and Sprite Robustness
+- **[V]** `v0.8.9`
+- **[Fix]** Input: Implemented gamepad edge detection in `LobbyScene.ts`. Character selection now requires a discrete press, preventing held buttons from bypassing selection phases.
+- **[Fix]** Sprites: Hardened character validation in `OnlineGameScene.ts`. Implemented strict whitelist checking (`['fok_v3']`) for incoming server data, ensuring invalid keys default correctly to a loaded texture.
+- **[S]** **STATUS**: v0.8.9 Complete. Input handling and asset loading are now robust against server-side data inconsistencies.
