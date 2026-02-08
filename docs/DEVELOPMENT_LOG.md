@@ -411,5 +411,14 @@
 
 ### [2026-02-08] v0.9.6 - WebRTC Port Range Fix
 - **[V]** `v0.9.6`
-- **[Fix]** Firewall: Updated `setup_digitalocean.sh` to allow UDP ports `1025:65535`. WebRTC data channels use random high ports, not just the signaling port 9208.
-- **[S]** **STATUS**: v0.9.6 Pushed. User needs to run `ufw allow 1025:65535/udp` on server.
+- **[Fix]** Firewall: Updated `setup_digitalocean.sh` and server UFW to allow UDP ports `1025:65535`. Necessary for WebRTC data channels which use random high ports for peer connectivity.
+
+### [2026-02-08] v0.9.7 - Distribution URL Logic
+- **[V]** `v0.9.7`
+- **[Refactor]** Network: Restored proper conditional URL logic in `NetworkManager.ts` to distinguish between `localhost` development and production endpoints.
+
+### [2026-02-08] v0.9.8 - Cloudflare Tunnel Migration
+- **[V]** `v0.9.8`
+- **[Infra]** Cloudflare: Established `cloudflared` tunnel on the DigitalOcean Droplet to provide a stable HTTPS endpoint (`https://sensors-flash-trackback-survival.trycloudflare.com`).
+- **[Fix]** Security: Solved "Mixed Content" blocker preventing the HTTPS Vercel client from communicating with the HTTP DigitalOcean backend.
+- **[S]** **STATUS**: v0.9.8 Deployed. Online mode is functionally active via DigitalOcean + Cloudflare Tunnel.
