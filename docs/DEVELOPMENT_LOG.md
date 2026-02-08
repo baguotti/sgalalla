@@ -378,3 +378,8 @@
 - **[Refactor]** Client: Rewrote `NetworkManager.ts` to use `@geckos.io/client` API (`geckos()`, `onConnect`, `onDisconnect`).
 - **[Config]** Port: Changed from 3000 to 9208 (Geckos.io default).
 - **[S]** **STATUS**: v0.9.0 Complete. UDP-based networking should dramatically reduce lag and teleportation.
+
+### [2026-02-08] v0.9.1 - Geckos.io Connection Patch
+- **[V]** `v0.9.1`
+- **[Fix]** Network: Restored `http://` protocol prefix in `NetworkManager.ts`. Geckos.io requires a valid protocol (http/https) for the initial WebRTC signaling handshake.
+- **[S]** **STATUS**: v0.9.1 Complete. Geckos.io connection is now stable for local and production environments.
