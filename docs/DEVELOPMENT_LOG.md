@@ -390,3 +390,8 @@
 - **[Config]** Fly.io: Updated `fly.toml` internal_port and `Dockerfile` EXPOSE from 3000 to 9208.
 - **[Deploy]** Server: Deployed Geckos.io UDP server to Fly.io production.
 - **[S]** **STATUS**: v0.9.2 Complete. UDP networking is now live at `sgalalla-geckos.fly.dev`.
+
+### [2026-02-08] v0.9.3 - Production Port Fix
+- **[V]** `v0.9.3`
+- **[Fix]** Network: Updated `NetworkManager.ts` to use port 443 for production (Fly.io routes 443 → internal 9208). Local still uses 9208 directly.
+- **[S]** **STATUS**: v0.9.3 Complete. Production client now connects via HTTPS port 443.
