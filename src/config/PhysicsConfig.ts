@@ -9,18 +9,18 @@ export const PhysicsConfig = {
 
   // Movement - acceleration-based for responsive feel with slight slide
   MOVE_ACCEL: 6500,
-  FRICTION: 0.85,
-  RUN_FRICTION: 0.93,
+  FRICTION: 0.60, // Refinement Round 5: Low base friction for fast stopping when input released
+  RUN_FRICTION: 0.93, // Refinement Round 5: Restored high friction to allow running speed
   SLIDE_ATTACK_SPEED: 2200,
   SLIDE_ATTACK_DECELERATION: 0.96,
   MAX_SPEED: 1400,
   MAX_FALL_SPEED: 1800, // Reduced from 2600 for floatier fall
 
   // Jump mechanics
-  JUMP_FORCE: -1250, // Refinement 11: Reduced for lower gravity (was -1700)
-  SHORT_HOP_FORCE: -700, // Reduced from -900
+  JUMP_FORCE: -990, // Refinement 14: Reduced by 10% (was -1100)
+  SHORT_HOP_FORCE: -540, // Reduced proportionally
   JUMP_HOLD_THRESHOLD: 150,
-  DOUBLE_JUMP_FORCE: -1150, // Reduced from -1600
+  DOUBLE_JUMP_FORCE: -900, // Reduced proportionally
   MAX_JUMPS: 3,
 
   // Fast-fall
@@ -28,7 +28,7 @@ export const PhysicsConfig = {
   FAST_FALL_THRESHOLD: 300,
 
   // Recovery attack
-  RECOVERY_FORCE_Y: -2450, // Fine-tuned (was -2800, original -2100)
+  RECOVERY_FORCE_Y: -1760, // Refinement 14: Reduced by 20% (was -2200)
   RECOVERY_FORCE_X: 550, // Reduced from 600
   RECOVERY_COOLDOWN: 1000,
   RECOVERY_DURATION: 300,
@@ -49,7 +49,8 @@ export const PhysicsConfig = {
   // Hitbox sizes (Doubled for 1:1 scale)
   LIGHT_HITBOX_WIDTH: 120,
   LIGHT_HITBOX_HEIGHT: 80,
-  HEAVY_HITBOX_WIDTH: 160,
+  // Refinement 13: Massive hitbox for Sigs (was 320, originally 160)
+  HEAVY_HITBOX_WIDTH: 600,
   HEAVY_HITBOX_HEIGHT: 120,
 
   // Dodge/Dash - Brawlhalla style
@@ -82,8 +83,10 @@ export const PhysicsConfig = {
   LIGHT_RECOVERY_FRAMES: 50,
 
   // Heavy attacks
-  HEAVY_STARTUP_FRAMES: 80,
-  HEAVY_ACTIVE_FRAMES: 150,
+  // Refinement 13: Faster startup (was 80)
+  HEAVY_STARTUP_FRAMES: 30,
+  // Refinement: Extended duration to match animation (was 150)
+  HEAVY_ACTIVE_FRAMES: 300,
   HEAVY_RECOVERY_FRAMES: 200,
 
   // Ground pound
@@ -93,7 +96,8 @@ export const PhysicsConfig = {
   GROUND_POUND_KNOCKBACK: 1800, // Reduced from 2100
 
   // Directional attack hitbox offsets (Doubled)
-  SIDE_ATTACK_OFFSET_X: 150,
+  // Refinement 13: Increased offset to center wider hitbox (was 200)
+  SIDE_ATTACK_OFFSET_X: 300,
   UP_ATTACK_OFFSET_Y: -150,
   DOWN_ATTACK_OFFSET_Y: 150,
 
@@ -105,7 +109,7 @@ export const PhysicsConfig = {
   // Wall mechanics
   WALL_SLIDE_SPEED: 400, // Reduced from 450
   WALL_JUMP_FORCE_X: 1600, // Reduced from 1800
-  WALL_JUMP_FORCE_Y: -1750, // Reduced from -1950
+  WALL_JUMP_FORCE_Y: -1050, // Refinement 15: Reduced from -1750 to match regular jump height (-990)
   WALL_FRICTION: 0.7,
 
   // Edge grab mechanics

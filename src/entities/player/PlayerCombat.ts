@@ -506,7 +506,7 @@ export class PlayerCombat {
             offset.y = PhysicsConfig.PLAYER_HEIGHT / 2;
 
             // Adjust dimensions: Wider and Less Tall
-            width = 110;
+            width = 127; // Round 12: +15% (was 110)
             height = 30;
         }
 
@@ -520,8 +520,42 @@ export class PlayerCombat {
             offset.y = -PhysicsConfig.PLAYER_HEIGHT / 2;
 
             // Adjust dimensions: Wider and Flat (but slightly taller than DownSig)
-            width = 110;
+            width = 127; // Round 12: +15% (was 110)
             height = 34;
+        }
+
+        // Refinement Round 6: Explicit Override for Fok_v3 Side Sig
+        // Placed at the very end to ensure it overwrites everything else
+        if (this.player.character === 'fok_v3' &&
+            this.currentAttack.data.type === AttackType.HEAVY &&
+            this.currentAttack.data.direction === AttackDirection.SIDE) {
+
+            console.log('[HitboxDebug] Applying Side Sig Override for Fok_v3');
+
+            // Round 11: 12% smaller
+            width = 277;
+            height = 137;
+            const facing = this.player.getFacingDirection();
+            offset.x = facing * 175; // Adjusted for new width
+            offset.y = 0;
+
+            console.log(`[HitboxDebug] New Width: ${width}, Height: ${height}, OffsetX: ${offset.x}`);
+        }
+
+        // Side/Neutral/Up Light Attacks - Easy Tweak Block
+        if (this.currentAttack.data.type === AttackType.LIGHT &&
+            (this.currentAttack.data.direction === AttackDirection.SIDE ||
+                this.currentAttack.data.direction === AttackDirection.NEUTRAL ||
+                this.currentAttack.data.direction === AttackDirection.UP)) {
+
+            // User requested: "skinnier and move it forward 10pixels"
+            // Previous width was 90. Skinnier -> 70?
+            width = 70;
+            const facing = this.player.getFacingDirection();
+            // Previous logic added 10. Now user wants forward 10 more?
+            // Or just "move it forward 10pixels" relative to standard?
+            // "move it forward 10pixels" implies adding to offset.
+            offset.x += facing * 20; // 10 (prev) + 10 (new)
         }
 
         const hitboxX = this.player.x + offset.x;

@@ -311,3 +311,12 @@
 - **[Stage]** Platforms: Soft platforms spaced further apart (+/- 200px).
 - **[Stage]** Blast Zones: Extended to prevent early kills with new mobility.
 - **[S]** **STATUS**: v0.8.4 Complete. Stage is wider to match floaty physics.
+### [2026-02-08] v0.8.5 - UI Cleanup & Physics Tuning
+- **[V]** `v0.8.5`
+- **[UX]** UI Cleanup: Hid name tags by default; removed debug legend; updated pause menu controls.
+- **[Phys]** Air Control: Increased `AIR_FRICTION` to 0.91 for floatier drift.
+- **[Phys]** Commitment: Disabled sprint, dodge, and jumping during Signature (Heavy) attacks.
+- **[Phys]** Jump Metrics: Reduced Jump height (10%), Recovery height (20%), and Wall Jump height (to match regular jump).
+- **[Fix]** Animation: Re-aligned `fok_v3` sprite offsets and texture boundaries.
+- **[Fix]** Runtime: Removed orphaned `controlsHintText` references in `GameScene.ts`.
+- **[S]** **STATUS**: v0.8.5 Complete. UI is cleaner and physics feel more deliberate.

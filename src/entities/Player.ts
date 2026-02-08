@@ -159,6 +159,9 @@ export class Player extends Fighter {
         if (this.debugRect) {
             this.debugRect.setVisible(visible);
         }
+        if (this.nameTag) {
+            this.nameTag.setVisible(visible);
+        }
         if (this.combat) {
             this.combat.setDebug(visible);
         }
@@ -217,6 +220,7 @@ export class Player extends Fighter {
         });
         this.nameTag.setOrigin(0.5);
         this.add(this.nameTag);
+        this.nameTag.setVisible(false); // Hidden by default, shown in debug mode
 
         // Initialize Components
         this.physics = new PlayerPhysics(this);
@@ -470,8 +474,10 @@ export class Player extends Fighter {
 
             if (this.physics.isRunning) {
                 // RUNNING: Fast playback logic
-                // Start at 0.85x and scale up gently
-                const normalizedSpeed = 0.85 + (speed / 2500);
+                // Refinement Round 6: User says "running slides", so reducing speed again
+                // Previous: 1.2 + (speed / 2000)
+                // New: 0.8 + (speed / 3000) -> Matches ground speed better
+                const normalizedSpeed = 0.8 + (speed / 3000);
                 this.sprite.anims.timeScale = normalizedSpeed;
             } else {
                 // Should not happen if isRunning covers all grounded movement, 
@@ -525,73 +531,63 @@ export class Player extends Fighter {
             if (currentAttack) {
                 if (currentAttack.data.type === AttackType.HEAVY) {
                     if (currentAttack.data.direction === AttackDirection.DOWN) {
-                        this.animationKey = 'attack_down';
+                        this.animationKey = 'attack_heavy_down';
                     } else if (currentAttack.data.direction === AttackDirection.SIDE) {
-                        this.animationKey = 'attack_side';
+                        this.animationKey = 'attack_heavy_side';
                     } else if (currentAttack.data.direction === AttackDirection.UP) {
-                        // User request: Up Sig uses Side Light (which we mapped to attack_side in config, or we can map specifically to attack_up_sig if we wanted separation, 
-                        // but config has attack_up mapped to Neutral Light 2-frame loop per refinement?)
-                        // Wait, refinement 2 said: "neutral light is a 2 frame loop. that needs to be applied also for up+light"
-                        // UP+LIGHT is generic input. UP SIG is Heavy Up.
-                        // I mapped attack_up (Heavy Up usually?) to Neutral Light loop.
-                        // Let's stick to the config mapping: attack_up -> Neutral Light loop.
-                        this.animationKey = 'attack_up';
+                        this.animationKey = 'attack_heavy_up';
                     } else {
-                        this.animationKey = 'attack_heavy'; // Neutral Heavy?
+                        this.animationKey = 'attack_heavy_neutral';
                     }
                 } else {
                     // LIGHT ATTACKS
                     if (currentAttack.data.direction === AttackDirection.UP) {
-                        // Up Light -> Neutral Light loop (mapped to attack_up per config rename or just reuse light?)
-                        // Actually, I mapped attack_up in config.
-                        // If this is LIGHT UP, let's use 'attack_up' key if mapped, or 'attack_light_0'.
-                        this.animationKey = 'attack_up';
+                        this.animationKey = 'attack_light_up';
                     } else if (currentAttack.data.direction === AttackDirection.DOWN) {
-                        this.animationKey = 'attack_down_light'; // NEW KEY
+                        this.animationKey = 'attack_light_down';
                     } else if (currentAttack.data.direction === AttackDirection.SIDE) {
                         if (!this.isGrounded) {
-                            this.animationKey = 'attack_side_air'; // NEW KEY
+                            this.animationKey = 'attack_light_side_air';
                         } else {
-                            this.animationKey = 'attack_side'; // Reusing heavier side attack frame? Or should we have distinct side light?
-                            // User request 4: "side air has its own frame". Implies Side Ground Light is different?
-                            // Original config mapped attack_side to Side_Light frame.
-                            // So let's use attack_side for Side Light Ground.
-                            this.animationKey = 'attack_side';
+                            this.animationKey = 'attack_light_side';
                         }
                     } else {
                         // Neutral Light
-                        this.animationKey = 'attack_light'; // Mapped to loop
+                        this.animationKey = 'attack_light_neutral';
                     }
                 }
             } else {
-                this.animationKey = 'attack_light';
+                this.animationKey = 'attack_light_neutral';
             }
             this.playAnim(this.animationKey, true);
             return;
         }
 
         if (this.isDodging) {
-            this.animationKey = 'slide';
-            this.playAnim('slide', true);
+            // User Request 5: Dash if moving, Spot Dodge if still
+            // Using logic similar to run threshold
+            if (Math.abs(this.velocity.x) > 10) {
+                this.animationKey = 'dash';
+                this.playAnim('dash', true);
+            } else {
+                this.animationKey = 'spot_dodge';
+                this.playAnim('spot_dodge', true);
+            }
             return;
         }
 
         // Airborne
         if (!this.isGrounded) {
+            if (this.physics.isRecovering) {
+                this.animationKey = 'recovery';
+                this.playAnim('recovery', true);
+                return;
+            }
+
             if (this.physics.isWallSliding) {
-                // Check if animation exists (fok_v3 only for now)
-                // We'll rely on the key; if it doesn't exist, it might fallback or do nothing.
-                // Assuming wall_slide is registered for char.
-                // Since updateAnimation checks 'exists' via Phaser logic usually, but we are using prefix helper.
-                // Let's just set the key. If the animation isn't created for this char (e.g. fok/fok_alt), it will warn or play nothing.
-                // For fok/fok_alt, we didn't add it.
-                // Let's check logic:
-                if (this.character === 'fok_v3') {
-                    this.animationKey = 'wall_slide';
-                    this.playAnim('wall_slide', true);
-                    return;
-                }
-                // Fallback for others to fall/jump?
+                this.animationKey = 'wall_slide';
+                this.playAnim('wall_slide', true);
+                return;
             }
 
             if (this.velocity.y < 0) {
@@ -605,7 +601,10 @@ export class Player extends Fighter {
         }
 
         // Grounded
-        if (Math.abs(this.velocity.x) > 10) {
+        // Refinement 13: Increased threshold from 10 to 100 to stop run animation earlier
+        // This prevents the "slide completely into stop" look
+        // Refinement Round 4: Keeping this high threshold (100) but combining with low friction
+        if (Math.abs(this.velocity.x) > 20) { // Reverted to 20 per request (user says "sliding")
             this.animationKey = 'run';
             this.playAnim('run', true);
         } else {
@@ -613,6 +612,27 @@ export class Player extends Fighter {
             this.playAnim('idle', true);
         }
     }
+
+    // Add recovery to updateAnimation?
+    // Wait, let's look at updateAnimation again. Where is RECOVERING handled?
+    // It's part of !isGrounded usually?
+    // Ah, logic:
+    // ...
+    // Airborne
+    // if (!this.isGrounded) {
+    //     if (this.physics.isWallSliding) ...
+    //     if (this.velocity.y < 0) ...
+    // }
+    //
+    // Recovery is an airborne state initiated by Up Special usually.
+    // If PlayerState.RECOVERING is true (this.physics.isRecovering), we should play it.
+    // But isRecovering is a flag in Physics.
+    // Let's Insert it before general airborne check.
+
+    /* 
+        Correct insertion point:
+        Inside updateAnimation(), before or inside '!this.isGrounded' check.
+    */
 
     public playAnim(key: string, ignoreIfPlaying: boolean = true): void {
         const fullKey = `${this.animPrefix}_${key}`;
@@ -625,13 +645,14 @@ export class Player extends Fighter {
         this.sprite.anims.play(fullKey, ignoreIfPlaying);
 
         // Apply custom offsets for misaligned sprites
-        if (key === 'attack_side') {
-            this.sprite.x = 35;
-        } else if (key === 'wall_slide' && this.character === 'fok_v3') {
+        // Apply custom offsets for misaligned sprites
+        if (key === 'wall_slide' && this.character === 'fok_v3') {
             // Refinement 8: Offset towards the wall by 2px to close gap
-            // wallDirection: -1 (Left) -> Offset -2
-            // wallDirection: 1 (Right) -> Offset 2
             this.sprite.x = this.physics.wallDirection * 2;
+        } else if (key === 'attack_heavy_side' && this.character === 'fok_v3') {
+            // Refinement Round 7: Offset animation further (was 80 -> 130)
+            // Shifts sprite in facing direction to simulate stepping forward
+            this.sprite.x = this.getFacingDirection() * 130;
         } else {
             this.sprite.x = 0;
         }

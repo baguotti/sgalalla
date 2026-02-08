@@ -24,7 +24,6 @@ export class GameScene extends Phaser.Scene {
     private trainingToggleKey!: Phaser.Input.Keyboard.Key;
     // Debug bomb spawn key
     private spawnKey!: Phaser.Input.Keyboard.Key;
-    private controlsHintText!: Phaser.GameObjects.Text;
 
     // Kill tracking
     // private player1HUD!: PlayerHUD;
@@ -119,29 +118,49 @@ export class GameScene extends Phaser.Scene {
                 run: { prefix: 'Fok_v3_Run_', count: 9, loop: true },
                 charging: { prefix: 'Fok_v3_Charge_', count: 2, loop: true },
 
-                // Refinements Round 2:
-                // Neutral Light: 1 frame (Reverted loop per request)
-                attack_light: { prefix: 'Fok_v3_Neutral_Light_', count: 1, suffix: '000', loop: false },
-                attack_up: { prefix: 'Fok_v3_Neutral_Light_', count: 1, suffix: '000', loop: false },
+                // Dash (New)
+                dash: { prefix: 'Fok_v3_Dash_', count: 1, suffix: '000', loop: false },
 
-                // Down Light: Specific frame
-                attack_down_light: { prefix: 'Fok_v3_Down_Light_', count: 1, suffix: '000', loop: false },
+                // Spot Dodge
+                spot_dodge: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false },
 
-                // Side Air: Specific frame
-                attack_side_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false },
+                // --- LIGHT ATTACKS ---
 
-                // Wall Slide: specific frame
+                // Neutral Light
+                attack_light_neutral: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Up Light -> Mapped to Side Light (Req 1 swap)
+                attack_light_up: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Down Light
+                attack_light_down: { prefix: 'Fok_v3_Down_Light_', count: 1, suffix: '000', loop: false },
+
+                // Side Light -> Mapped to Neutral Light (Req 1 swap)
+                attack_light_side: { prefix: 'Fok_v3_Neutral_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false },
+
+
+                // --- HEAVY ATTACKS (SIGS) ---
+
+                // Neutral Sig -> Mapped to Up Sig (Req 2)
+                attack_heavy_neutral: { prefix: 'Fok_v3_Up_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Up Sig
+                attack_heavy_up: { prefix: 'Fok_v3_Up_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Side Sig (Req 3)
+                attack_heavy_side: { prefix: 'Fok_v3_Side_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Down Sig 
+                attack_heavy_down: { prefix: 'Fok_v3_Down_Sig_', count: 1, suffix: '000', loop: false },
+
+
+                // Utilities
                 wall_slide: { prefix: 'Fok_v3_Wall_Slide_', count: 1, suffix: '000', loop: false },
-
-                // MAPPED FALLBACKS and SPECIFIC FRAMES
-                attack_heavy: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false }, // Side Sig
-
-                attack_side: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false }, // Side Sig -> Side Light
-
-                attack_down: { prefix: 'Fok_v3_Down_Sig_', count: 2, loop: false }, // Down_Sig: 2 frames
+                recovery: { prefix: 'Fok_v3_Recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'Fok_v3_Ground_Pound_', count: 1, suffix: '000', loop: false },
 
                 hurt: { prefix: 'Fok_v3_Hurt_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'Fok_v3_Down_Sig_', count: 1, suffix: '000', loop: false }, // Fallback
                 fall: { prefix: 'Fok_v3_Fall_', count: 1, suffix: '000', loop: false },
                 jump: { prefix: 'Fok_v3_Jump_', count: 1, suffix: '000', loop: false },
                 slide: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false }
@@ -186,9 +205,6 @@ export class GameScene extends Phaser.Scene {
             });
 
             // Special cases / Extra mappings to ensure all keys exist
-            // Some keys in original code were manually created if they didn't exist, e.g. attack_light_0
-            // We should ensure compatibility with Player.ts which might call these specific keys.
-
             const ensureAnim = (key: string, frameName: string, frameIndex: number = 0) => {
                 if (!this.anims.exists(key)) {
                     this.anims.create({
@@ -200,10 +216,6 @@ export class GameScene extends Phaser.Scene {
                 }
             };
 
-            // Common mapping helpers
-
-            // attack_light_0, attack_light_1 (used for combos maybe?)
-            // For fok_v3, attack_light has 2 frames. maybe 0 is first, 1 is second?
             if (char === 'fok_v3') {
                 ensureAnim(`${char}_attack_light_0`, 'Fok_v3_Neutral_Light_', 0);
                 ensureAnim(`${char}_attack_light_1`, 'Fok_v3_Neutral_Light_', 1);
@@ -243,6 +255,37 @@ export class GameScene extends Phaser.Scene {
                         repeat: 0
                     });
                 }
+
+                // COMPATIBILITY ALIASING for 'fok'/'fok_alt'
+                // Alias new specific keys to existing legacy ones
+                const createAlias = (newSuffix: string, existingSuffix: string) => {
+                    const newKey = `${char}_${newSuffix}`;
+                    const existingKey = `${char}_${existingSuffix}`;
+                    if (!this.anims.exists(newKey) && this.anims.exists(existingKey)) {
+                        const existingAnim = this.anims.get(existingKey);
+                        const frames = existingAnim.frames.map(f => ({ key: f.textureKey, frame: f.textureFrame }));
+                        this.anims.create({
+                            key: newKey,
+                            frames: frames,
+                            frameRate: 10,
+                            repeat: 0
+                        });
+                    }
+                };
+
+                createAlias('attack_light_neutral', 'attack_light');
+                createAlias('attack_light_up', 'attack_up');
+                createAlias('attack_light_down', 'attack_down');
+                createAlias('attack_light_side', 'attack_side');
+                createAlias('attack_light_side_air', 'attack_side');
+
+                createAlias('attack_heavy_neutral', 'attack_heavy');
+                createAlias('attack_heavy_up', 'attack_up');
+                createAlias('attack_heavy_side', 'attack_side');
+                createAlias('attack_heavy_down', 'attack_down');
+
+                createAlias('spot_dodge', 'slide');
+                createAlias('dash', 'slide'); // Use slide for dash too (legacy fallback)
             }
         });
     }
@@ -311,16 +354,12 @@ export class GameScene extends Phaser.Scene {
             this.createStage();
 
             // BACKGROUND LOGIC
-            // Now that stage is created, we can hide the default gradient
-            this.cameras.main.setBackgroundColor('#1a1a2e');
+            // Refinement: Removed image, using static dark blue gradient
+            this.cameras.main.setBackgroundColor('#000000'); // Fallback black
 
-            this.backgroundImage = this.add.image(width / 2, height / 2, 'background_lake'); // Center it
-            this.backgroundImage.setDisplaySize(width, height);
-            this.backgroundImage.setScrollFactor(0); // Static background
-            this.backgroundImage.setDepth(-100); // Deep background
-
+            // Background graphics are created in createStage(), ensure they are visible
             if (this.background) {
-                this.background.setVisible(false);
+                this.background.setVisible(true);
             }
 
             // Create Players
@@ -385,7 +424,8 @@ export class GameScene extends Phaser.Scene {
             this.debugOverlay.setCameraIgnore(this.cameras.main);
 
             // Add controls hint
-            this.createControlsHint();
+            // Refinement: Removed as requested ("remove control legend from debug mode")
+            // this.createControlsHint();
 
             // Create HUDs
             this.createHUDs();
@@ -502,10 +542,14 @@ export class GameScene extends Phaser.Scene {
 
     private createStage(): void {
         // Background gradient to show play area
+        // Background gradient to show play area
         this.background = this.add.graphics();
-        this.background.fillGradientStyle(0x0a0a1a, 0x0a0a1a, 0x1a1a2e, 0x1a1a2e, 1);
+        // Refinement: Dark Blue Gradient (Deep Navy -> Dark Blue/Grey)
+        // Top: 0x0f2027, Bottom: 0x203a43
+        this.background.fillGradientStyle(0x0f2027, 0x0f2027, 0x203a43, 0x203a43, 1);
         this.background.fillRect(0, 0, this.scale.width, this.scale.height);
-        this.background.setDepth(-10);
+        this.background.setScrollFactor(0); // Ensure static relative to camera
+        this.background.setDepth(-100); // Ensure behind everything
 
         // Main platform (centered, wider - Refinement 12)
         // Center: 960. Width 2400 (Was 1800). Y = 900
@@ -573,31 +617,6 @@ export class GameScene extends Phaser.Scene {
         rightWallText.setAlpha(0.5);
         rightWallText.setDepth(-4);
         this.wallTexts.push(rightWallText);
-    }
-
-    private createControlsHint(): void {
-        const controlsText = [
-            'Keyboard / Joypad Controls:',
-            'Move: Arrows/WASD | Stick/D-pad',
-            'Jump: Space/↑    | A (Cross)',
-            'Light: C / J     | X (Square)',
-            'Heavy: X / K     | B / Y (Circle/Tri)',
-            'Dodge: Z / L     | Triggers (LT/RT)',
-            'Recov: V / Shift | Up + Heavy',
-            '',
-            'Debug: Q / Select | AI: O | Dummy: T',
-        ].join('\n');
-
-        this.controlsHintText = this.add.text(15, 750, controlsText, { // 10->15, 500->750
-            fontSize: '16px', // 10->16?
-            color: '#888888',
-            fontFamily: 'monospace', // Monospace for alignment
-            lineSpacing: 1,
-        });
-        this.controlsHintText.setScrollFactor(0);
-        this.controlsHintText.setDepth(500);
-        // Make controls hint ignore main camera zoom
-        this.cameras.main.ignore(this.controlsHintText);
     }
 
     // Player Config
@@ -772,10 +791,8 @@ export class GameScene extends Phaser.Scene {
                     displayPlayer.isGamepadConnected()
                 );
                 this.debugOverlay.setVisible(true);
-                this.controlsHintText.setVisible(true);
             } else {
                 this.debugOverlay.setVisible(false);
-                this.controlsHintText.setVisible(false);
             }
         }
 
@@ -1148,9 +1165,9 @@ export class GameScene extends Phaser.Scene {
 
         let winnerText = "GAME!";
         if (winnerId >= 0) {
-            winnerText += `\nPLAYER ${winnerId + 1} WINS!`;
+            winnerText += `\\nPLAYER ${winnerId + 1} WINS!`;
         } else {
-            winnerText += "\nDRAW GAME!";
+            winnerText += "\\nDRAW GAME!";
         }
 
         const text = this.add.text(width / 2, height / 2, winnerText, {

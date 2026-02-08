@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { Player } from '../Player';
 import { PhysicsConfig } from '../../config/PhysicsConfig';
 import type { InputState } from '../../input/InputManager';
-import { AttackPhase } from '../../combat/Attack';
+import { AttackPhase, AttackType } from '../../combat/Attack';
 
 export class PlayerPhysics {
     private player: Player;
@@ -140,7 +140,9 @@ export class PlayerPhysics {
         velocity.y += this.acceleration.y * deltaSeconds;
 
         // Apply friction
-        let friction: number = PhysicsConfig.FRICTION;
+        // Refinement Round 13: More floaty air movement (requested)
+        // Ground uses Config.FRICTION (0.6) for crisp stops. Air uses 0.91 for floaty drift (was 0.85).
+        let friction: number = this.player.isGrounded ? PhysicsConfig.FRICTION : 0.91;
 
         // Dynamic Friction: Check momentum
         const isHighSpeed = Math.abs(velocity.x) > PhysicsConfig.MAX_SPEED * 1.2;
@@ -247,6 +249,11 @@ export class PlayerPhysics {
         if (this.player.y > 600 && velocity.y > 0) {
             // Let the game scene kill mechanic handle falling off screen
         }
+
+        // Refinement: Reset grounded state at end of physics update
+        // Movement has been applied using the previous frame's grounded state (friction etc)
+        // Now we reset it so GameScene collision checks can determine if we are still grounded
+        this.player.isGrounded = false;
     }
 
     // Run State
@@ -259,8 +266,15 @@ export class PlayerPhysics {
         // Prevent movement during attack startup and active frames, but allow during recovery
         if (this.player.isAttacking) {
             const currentAttack = this.player.getCurrentAttack();
+
+            // Refinement: Lock movement entirely for Heavy Attacks (Sigs) to prevent sliding
+            if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
+                this.isRunning = false; // Force sprint off
+                return;
+            }
+
             if (currentAttack && currentAttack.phase !== AttackPhase.RECOVERY) {
-                return; // Lock movement during STARTUP and ACTIVE phases only
+                return; // Lock movement during STARTUP and ACTIVE phases only for Light attacks
             }
         }
 
@@ -291,6 +305,14 @@ export class PlayerPhysics {
 
     private handleJump(delta: number, input: InputState): void {
         if (this.isDodging) return; // No jumping while dodging
+
+        // Refinement: Lock Jumping during Heavy Attacks (Sigs)
+        if (this.player.isAttacking) {
+            const currentAttack = this.player.getCurrentAttack();
+            if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
+                return;
+            }
+        }
 
         // Platform Drop: Down + Jump
         if (input.moveDown && input.jump && this.currentPlatform) {
@@ -393,6 +415,15 @@ export class PlayerPhysics {
 
     private handleDodgeInput(input: InputState): void {
         if (this.dodgeCooldownTimer > 0) return;
+
+        // Refinement: Disable Dodge during Heavy Attacks (Sigs)
+        if (this.player.isAttacking) {
+            const currentAttack = this.player.getCurrentAttack();
+            if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
+                return;
+            }
+        }
+
         if (!input.dodge) return;
 
         this.startDodge(input);
