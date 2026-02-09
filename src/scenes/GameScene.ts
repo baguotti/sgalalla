@@ -419,10 +419,11 @@ export class GameScene extends Phaser.Scene {
                 this.time.delayedCall(10, () => {
                     try {
                         console.log("Switching to LobbyScene");
-                        // Pass current player data back to lobby to preserve connections
+                        // Infer mode from playerData (if dummy exists, it's training)
+                        const isTraining = this.playerData.some((p: any) => p.isTrainingDummy);
                         this.scene.start('LobbyScene', {
-                            mode: 'versus', // Defaulting to versus for now
-                            slots: this.playerData
+                            mode: isTraining ? 'training' : 'versus',
+                            // Don't pass old slots - let LobbyScene.create reset fresh
                         });
                     } catch (e) {
                         console.error("Failed to start LobbyScene:", e);
