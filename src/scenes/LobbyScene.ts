@@ -182,7 +182,7 @@ export class LobbyScene extends Phaser.Scene {
         p2.isAI = true;
         p2.isTrainingDummy = true;
         p2.ready = false; // Dummy starts NOT ready (waiting for selection)
-        p2.character = 'dummy'; // Default to dummy
+        p2.character = 'fok_v3'; // Use valid character (dummy behavior is from isTrainingDummy flag)
     }
 
     private createSlotUI(): void {
