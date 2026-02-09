@@ -484,3 +484,9 @@
 - **[Dev]** Enhanced `deploy_client.sh` with version prompt and safer SCP path handling.
 - **[Fix]** Ensured clean separation from experimental netcode changes.
 
+## v0.9.19: Stability & Visual Polish
+- **[Fix]** Training mode: Return to lobby now correctly restores training mode.
+- **[Fix]** Scene restart: Reset all state arrays to prevent freeze on second game start.
+- **[Fix]** Training dummy uses valid character sprite to prevent freeze.
+- **[Visual]** Removed blue tint and opacity effects from dash (kept on spot dodge).
+
