@@ -297,12 +297,9 @@ io.onConnection((channel: ServerChannel) => {
         }
     });
 
-
-
     // Ping
-    channel.on(NetMessageType.PING, (data: any) => {
-        // Echo timestamp back to client for RTT calculation
-        channel.emit(NetMessageType.PONG, data);
+    channel.on(NetMessageType.PING, () => {
+        channel.emit(NetMessageType.PONG, {});
     });
 
     // Attack relay

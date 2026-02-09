@@ -90,7 +90,6 @@ export type AttackCallback = (attack: NetAttackEvent) => void;
 export type HitCallback = (hit: NetHitEvent) => void;
 export type RematchStartCallback = () => void;
 export type PlayerLeftCallback = (playerId: number) => void;
-export type PongCallback = (rtt: number) => void;
 // Selection callbacks
 export type SelectionStartCallback = (countdown: number) => void;
 export type SelectionTickCallback = (countdown: number) => void;
@@ -123,7 +122,6 @@ class NetworkManager {
     private onHitCallback: HitCallback | null = null;
     private onRematchStartCallback: RematchStartCallback | null = null;
     private onPlayerLeftCallback: PlayerLeftCallback | null = null;
-    private onPongCallback: PongCallback | null = null;
     // Selection callbacks
     private onSelectionStartCallback: SelectionStartCallback | null = null;
     private onSelectionTickCallback: SelectionTickCallback | null = null;
@@ -132,6 +130,7 @@ class NetworkManager {
     private onGameStartCallback: GameStartCallback | null = null;
 
     // Latency tracking with smoothing
+    private lastPingTime: number = 0;
     private latency: number = 0;
     private smoothedLatency: number = 0;  // EMA for stable display
 
@@ -221,22 +220,16 @@ class NetworkManager {
             this.onStateUpdateCallback?.(state);
         });
 
-        // Latency measurement (Ping/Pong)
-        this.channel.on(NetMessageType.PONG, (data: any) => {
-            const timestamp = Number(data);
-            const now = Date.now();
-            const rtt = now - timestamp;
-            this.latency = rtt;
-
-            // EMA smoothing for display
+        // Latency measurement with EMA smoothing
+        // Latency measurement with EMA smoothing
+        this.channel.on(NetMessageType.PONG, () => {
+            this.latency = Date.now() - this.lastPingTime;
+            // EMA: smoothed = alpha * new + (1 - alpha) * old (alpha = 0.3 for responsive smoothing)
             if (this.smoothedLatency === 0) {
                 this.smoothedLatency = this.latency;
             } else {
                 this.smoothedLatency = 0.3 * this.latency + 0.7 * this.smoothedLatency;
             }
-
-            // Expose raw RTT to game scene for dynamic buffer
-            this.onPongCallback?.(rtt);
         });
 
         // Attack events from other players
@@ -412,9 +405,10 @@ class NetworkManager {
     /**
      * Ping server for latency measurement
      */
-    public sendPing(timestamp: number): void {
+    public ping(): void {
         if (!this.connected || !this.channel) return;
-        this.channel.emit(NetMessageType.PING, timestamp);
+        this.lastPingTime = Date.now();
+        this.channel.emit(NetMessageType.PING, {});
     }
 
     /**
@@ -447,7 +441,6 @@ class NetworkManager {
     public onHit(callback: HitCallback): void { this.onHitCallback = callback; }
     public onRematchStart(callback: RematchStartCallback): void { this.onRematchStartCallback = callback; }
     public onPlayerLeft(callback: PlayerLeftCallback): void { this.onPlayerLeftCallback = callback; }
-    public onPong(callback: PongCallback): void { this.onPongCallback = callback; }
     // Selection callbacks
     public onSelectionStart(callback: SelectionStartCallback): void { this.onSelectionStartCallback = callback; }
     public onSelectionTick(callback: SelectionTickCallback): void { this.onSelectionTickCallback = callback; }
