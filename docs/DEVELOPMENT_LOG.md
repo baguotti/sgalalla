@@ -478,3 +478,9 @@
 - **[Perf]** Clock Speed: Changed from discrete jumps (0.9/1.0/1.1) to smooth continuous curve (0.95-1.05). Eliminates visible stuttering from clock adjustments.
 - **[Perf]** Extrapolation: Reduced lerp factor from 0.3 to 0.15 for gentler blending. Reduces snap-back when new packets arrive.
 - **[S]** **STATUS**: Deployed to `http://164.90.235.15`. Testing smoothness improvements.
+
+## v0.9.18: Re-implement Version Display (Stable)
+- **[UI]** Restored version number on Title Screen (v0.9.18) after revert.
+- **[Dev]** Enhanced `deploy_client.sh` with version prompt and safer SCP path handling.
+- **[Fix]** Ensured clean separation from experimental netcode changes.
+
