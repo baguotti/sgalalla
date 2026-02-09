@@ -282,11 +282,20 @@ export class GameScene extends Phaser.Scene {
     create(): void {
         try {
             console.log("GameScene.create started");
-            // const { width, height } = this.scale; // Unused after bounds removal
+
+            // CRITICAL: Reset state arrays on scene restart
+            this.players.forEach(p => p.destroy());
+            this.players = [];
+            this.playerHUDs = [];
+            this.platforms = [];
+            this.softPlatforms = [];
+            this.walls = [];
+            this.wallTexts = [];
+            this.bombs = [];
+            this.isGameOver = false;
+            this.isPaused = false;
 
             // --- Physics Setup ---
-            // --- Physics Setup ---
-            // this.matter.world.setBounds(0, 0, width, height); // Removed to fix off-stage bounce
             this.matter.world.setGravity(0, 1);
 
             // --- Error Handler (Visual) ---
