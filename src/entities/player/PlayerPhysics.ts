@@ -476,8 +476,8 @@ export class PlayerPhysics {
                 this.player.velocity.y *= 0.3;
             }
 
-            this.player.setVisualTint(0x8888ff);
-            this.player.spriteObject.setAlpha(0.5);
+            // No visual effects for dash (user request)
+            // Keep sprite fully visible and untinted
         }
     }
 
