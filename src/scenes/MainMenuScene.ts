@@ -26,18 +26,18 @@ export class MainMenuScene extends Phaser.Scene {
         // Visuals
         this.add.rectangle(0, 0, width, height, 0x1a1a1a).setOrigin(0);
         this.add.text(width / 2, 200, 'SGALALLA', {
-            fontSize: '120px', fontFamily: 'Impact', color: '#ffffff'
+            fontSize: '120px', fontFamily: '"Silkscreen"', color: '#ffffff'
         }).setOrigin(0.5);
 
         this.add.text(width / 2, 270, `v${__APP_VERSION__}`, {
-            fontSize: '24px', fontFamily: 'Arial', color: '#888888'
+            fontSize: '24px', fontFamily: '"Silkscreen"', color: '#888888'
         }).setOrigin(0.5);
 
         // Menu Items
         const startY = 500;
         this.menuOptions.forEach((opt, index) => {
             const text = this.add.text(width / 2, startY + (index * 100), opt.label, {
-                fontSize: '48px', fontFamily: 'Arial', color: '#888888'
+                fontSize: '48px', fontFamily: '"Silkscreen"', color: '#888888'
             }).setOrigin(0.5);
             this.menuTexts.push(text);
         });

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { Player, PlayerState } from '../entities/Player';
-import { PlayerHUD } from '../ui/PlayerHUD';
+import { MatchHUD } from '../ui/PlayerHUD'; // Import MatchHUD
 import { DebugOverlay } from '../components/DebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
 import { Bomb } from '../entities/Bomb';
@@ -13,13 +13,14 @@ export class GameScene extends Phaser.Scene {
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
     public bombs: Bomb[] = [];
+    public seals: any[] = []; // Seal projectiles
     private background!: Phaser.GameObjects.Graphics;
     private backgroundImage!: Phaser.GameObjects.Image; // Add class property
     private walls: Phaser.GameObjects.Rectangle[] = [];
     private wallTexts: Phaser.GameObjects.Text[] = [];
 
     // Debug visibility
-    private debugVisible: boolean = false;
+    public debugVisible: boolean = false;
     private debugToggleKey!: Phaser.Input.Keyboard.Key;
     private trainingToggleKey!: Phaser.Input.Keyboard.Key;
     // Debug bomb spawn key
@@ -75,6 +76,7 @@ export class GameScene extends Phaser.Scene {
 
     private loadCharacterAssets(): void {
         this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
+        this.load.image('fok_icon', 'assets/fok_icon.png'); // Refinement V2
 
         // Load Maps
         this.load.image('background_lake', 'assets/pixel-lake08-sunny-water.jpg');
@@ -93,6 +95,9 @@ export class GameScene extends Phaser.Scene {
                 // Spot Dodge
                 spot_dodge: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false },
 
+                // Seal Summon (Side Sig Projectile)
+                seal: { prefix: 'Fok_v3_Side Sig_Seal', count: 9, loop: true },
+
                 // --- LIGHT ATTACKS ---
 
                 // Neutral Light
@@ -100,6 +105,7 @@ export class GameScene extends Phaser.Scene {
 
                 // Up Light -> Mapped to Side Light (Req 1 swap)
                 attack_light_up: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_up_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false }, // New: Separate Air Up
 
                 // Down Light
                 attack_light_down: { prefix: 'Fok_v3_Down_Light_', count: 1, suffix: '000', loop: false },
@@ -107,6 +113,9 @@ export class GameScene extends Phaser.Scene {
                 // Side Light -> Mapped to Neutral Light (Req 1 swap)
                 attack_light_side: { prefix: 'Fok_v3_Neutral_Light_', count: 1, suffix: '000', loop: false },
                 attack_light_side_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false },
+
+                // Running Light Attack (New)
+                attack_light_run: { prefix: 'Fok_v3_Side_Run_', count: 1, suffix: '000', loop: false },
 
 
                 // --- HEAVY ATTACKS (SIGS) ---
@@ -260,7 +269,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     private players: Player[] = [];
-    private playerHUDs: PlayerHUD[] = [];
+    // private playerHUDs: PlayerHUD[] = []; // Deprecated
+    private matchHUD!: MatchHUD;
     private playerData: any[] = [];
 
     init(data: any): void {
@@ -284,9 +294,13 @@ export class GameScene extends Phaser.Scene {
             console.log("GameScene.create started");
 
             // CRITICAL: Reset state arrays on scene restart
+            // CRITICAL: Reset state arrays on scene restart
             this.players.forEach(p => p.destroy());
             this.players = [];
-            this.playerHUDs = [];
+            // this.playerHUDs = [];
+            if (this.matchHUD) {
+                this.matchHUD.destroy();
+            }
             this.platforms = [];
             this.softPlatforms = [];
             this.walls = [];
@@ -392,6 +406,9 @@ export class GameScene extends Phaser.Scene {
 
                 this.players.push(player);
                 console.log(`Player ${pData.playerId} pushed to array.`);
+
+                // Add to HUD
+                this.addPlayerToHUD(player);
             });
 
 
@@ -579,7 +596,7 @@ export class GameScene extends Phaser.Scene {
         const leftWallText = this.add.text(this.WALL_LEFT_X - 12, 375, 'WALL', {
             fontSize: '18px',
             color: '#8ab4f8',
-            fontFamily: 'Arial',
+            fontFamily: '"Silkscreen"',
             fontStyle: 'bold'
         });
         leftWallText.setRotation(-Math.PI / 2);
@@ -590,7 +607,7 @@ export class GameScene extends Phaser.Scene {
         const rightWallText = this.add.text(this.WALL_RIGHT_X + 12, 525, 'WALL', {
             fontSize: '18px',
             color: '#8ab4f8',
-            fontFamily: 'Arial',
+            fontFamily: '"Silkscreen"',
             fontStyle: 'bold'
         });
         rightWallText.setRotation(Math.PI / 2);
@@ -608,36 +625,36 @@ export class GameScene extends Phaser.Scene {
     ];
 
     private createHUDs(): void {
-        this.playerHUDs = [];
-        this.playerData.forEach(pData => {
-            if (!pData.joined) return;
+        // Initialize HUD
+        this.matchHUD = new MatchHUD(this);
+        this.matchHUD.addToCameraIgnore(this.cameras.main);
 
-            // Layout: P1 TL, P2 TR, P3 BL, P4 BR
-            // Increased margins from edge
-            let x = 120;
-            let y = 80;
-            let isLeft = true;
+        // Add existing players if any
+        this.players.forEach(p => this.addPlayerToHUD(p));
+    }
 
-            switch (pData.playerId) {
-                case 0: x = 120; y = 80; isLeft = true; break;
-                case 1: x = this.scale.width - 120; y = 80; isLeft = false; break;
-                case 2: x = 120; y = this.scale.height - 80; isLeft = true; break;
-                case 3: x = this.scale.width - 120; y = this.scale.height - 80; isLeft = false; break;
+    private addPlayerToHUD(player: Player): void {
+        if (this.matchHUD) {
+            // Local game logic
+            // If strictly 1 human vs CPU, P1 is You. 
+            // If local multiplayer (P1 vs P2 human), both are "You"? No, that's confusing.
+            // Let's say Player 1 is ALWAYS "You" in single/local? 
+            // Or just P1 / P2 tags.
+            // User complained: "In training mode I'm currently battling a CPU, display the correct name (it's not P2 (YOU))"
+
+            // Logic:
+            // If AI -> Name = "CPU" or Character Name. isLocal = false.
+            // If Human -> Name = "P1" etc. isLocal = true (for P1 only maybe?)
+
+            const isYOU = (player.playerId === 0); // Only P1 is "YOU"
+
+            let name = `P${player.playerId + 1}`;
+            if (player.isAI) {
+                name = "CPU"; // or player.character
             }
 
-            const color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
-
-            let displayName = '';
-            if (pData.isAI) {
-                displayName = `CPU ${pData.playerId + 1}`;
-            } else {
-                displayName = (pData.character || 'fok').toUpperCase();
-            }
-
-            const hud = new PlayerHUD(this, x, y, isLeft, displayName, color);
-            hud.addToCameraIgnore(this.cameras.main);
-            this.playerHUDs.push(hud);
-        });
+            this.matchHUD.addPlayer(player.playerId, name, isYOU, player.character || 'fok');
+        }
     }
 
     private debugUpdateCounter = 0;
@@ -686,6 +703,8 @@ export class GameScene extends Phaser.Scene {
             this.debugOverlay.setVisible(this.debugVisible);
             // Update Players
             this.players.forEach(p => p.setDebug(this.debugVisible));
+            // Update Seals
+            this.seals.forEach(s => s.setDebug(this.debugVisible));
         }
 
         // Handle Training Toggle (T)
@@ -778,14 +797,12 @@ export class GameScene extends Phaser.Scene {
 
 
         // Update HUDs
-        this.playerHUDs.forEach((hud, index) => {
-            // Matching logic is brittle if players and HUDs align by index of *joined* players. 
-            // Logic in createHUDs iterates playerData, same as createPlayers (if sequential).
-            // Simpler: playerHUDs[i] corresponds to players[i] if created in same order.
-            if (this.players[index]) {
-                hud.update(this.players[index].damage, this.players[index].lives);
-            }
-        });
+        if (this.matchHUD) {
+            // Create a map for MatchHUD
+            const playerMap = new Map<number, Player>();
+            this.players.forEach(p => playerMap.set(p.playerId, p));
+            this.matchHUD.updatePlayers(playerMap);
+        }
 
     }
 
@@ -1058,27 +1075,8 @@ export class GameScene extends Phaser.Scene {
         this.players.push(player);
         player.addToCameraIgnore(this.uiCamera);
 
-        // Create HUD
-        // Layout logic
-        let x = 120;
-        let y = 80;
-        let isLeft = true;
-
-        switch (playerId) {
-            case 0: x = 120; y = 80; isLeft = true; break;
-            case 1: x = this.scale.width - 120; y = 80; isLeft = false; break;
-            case 2: x = 120; y = this.scale.height - 80; isLeft = true; break;
-            case 3: x = this.scale.width - 120; y = this.scale.height - 80; isLeft = false; break;
-        }
-
-        const hud = new PlayerHUD(this, x, y, isLeft, `CPU ${playerId + 1}`, color);
-        hud.addToCameraIgnore(this.cameras.main);
-
-        // Ensure we don't duplicate HUD if re-spawning (though player array check prevents this)
-        // Just push new logic
-        this.playerHUDs.push(hud);
-
-
+        // Add to MatchHUD
+        this.addPlayerToHUD(player);
     }
 
     // Clean up when scene is shut down (e.g. switching to menu)
@@ -1166,7 +1164,7 @@ export class GameScene extends Phaser.Scene {
 
         const text = this.add.text(width / 2, height / 2, winnerText, {
             fontSize: '64px',
-            fontFamily: 'Arial',
+            fontFamily: '"Silkscreen"',
             fontStyle: 'bold',
             color: '#ffffff',
             align: 'center',
@@ -1179,7 +1177,7 @@ export class GameScene extends Phaser.Scene {
 
         const subText = this.add.text(width / 2, height / 2 + 100, "Press SPACE or (A) to Restart", {
             fontSize: '32px',
-            fontFamily: 'Arial',
+            fontFamily: '"Silkscreen"',
             color: '#cccccc'
         });
         subText.setOrigin(0.5);

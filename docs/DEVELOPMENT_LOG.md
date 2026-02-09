@@ -490,3 +490,18 @@
 - **[Fix]** Training dummy uses valid character sprite to prevent freeze.
 - **[Visual]** Removed blue tint and opacity effects from dash (kept on spot dodge).
 
+### [2026-02-09] v0.10.0 - Side Sig Seal & UI Polish
+- **[V]** `v0.10.0`
+- **[New]** **Side Sig Seal**: Summoned Seal now functions as a piercing projectile.
+    - Reverted charge scaling per feedback (light attacks restored).
+    - Fixed duplication and camera following bugs.
+    - Updated Seal physics (sensor, no gravity).
+- **[T]** **Physics Tuning**:
+    - Increased `FAST_FALL_MULTIPLIER` to `1.7` for snappier vertical movement.
+    - Refined Fok's hitbox: Shaved 10px from top, added 6px width (46x174).
+- **[UI]** **Visual Overhaul**:
+    - Changed global font to **"Silkscreen"** (16-bit style).
+    - **HUD Updates**:
+        - Right-side player icons are now flipped horizontally.
+        - Right-side HUD layout is mirrored ([Damage] [Portrait] [Stocks]).
+- **[S]** **STATUS**: v0.10.0 Complete.

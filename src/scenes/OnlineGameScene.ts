@@ -11,6 +11,7 @@
 
 import Phaser from 'phaser';
 import { Player, PlayerState } from '../entities/Player';
+import { Bomb } from '../entities/Bomb';
 import NetworkManager from '../network/NetworkManager';
 import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '../network/NetworkManager';
 
@@ -43,6 +44,9 @@ export class OnlineGameScene extends Phaser.Scene {
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
 
+    // Bombs (synced from server)
+    public bombs: Map<number, Bomb> = new Map();
+
     // UI
     private connectionStatusText!: Phaser.GameObjects.Text;
     private matchHUD!: MatchHUD;
@@ -58,6 +62,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // Remote player target state for smooth interpolation
     private remoteTargets: Map<number, NetPlayerState> = new Map();
+    private playerCharacters: Map<number, string> = new Map(); // Store character selections
 
     // Wall configuration (matching GameScene)
     private readonly WALL_THICKNESS = 45;
@@ -123,6 +128,7 @@ export class OnlineGameScene extends Phaser.Scene {
         this.load.image('platform', 'assets/platform.png');
         this.load.image('background', 'assets/background.png');
         this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
+        this.load.image('fok_icon', 'assets/fok_icon.png'); // Refinement V2
     }
 
     private createAnimations(): void {
@@ -271,6 +277,10 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Setup stage (but don't spawn players yet)
         this.createStage();
+
+        // Initialize HUD
+        this.matchHUD = new MatchHUD(this);
+        this.matchHUD.addToCameraIgnore(this.cameras.main);
 
         // Setup input (local player only)
         this.inputManager = new InputManager(this, {
@@ -469,8 +479,12 @@ export class OnlineGameScene extends Phaser.Scene {
         });
 
         // Update MatchHUD
-        this.matchHUD.updatePlayers(this.players);
-        this.matchHUD.updateDebug(this.networkManager.getLatency(), this.game.loop.actualFps);
+        if (this.matchHUD) {
+            this.matchHUD.updatePlayers(this.players);
+            if (this.networkManager) {
+                this.matchHUD.updateDebug(this.networkManager.getLatency(), this.game.loop.actualFps);
+            }
+        }
 
         // Dynamic Camera
         this.updateCamera();
@@ -516,8 +530,21 @@ export class OnlineGameScene extends Phaser.Scene {
                 }
 
                 // Add to HUD
-                const isLocal = netPlayer.playerId === this.localPlayerId;
-                this.matchHUD.addPlayer(netPlayer.playerId, `Player ${netPlayer.playerId + 1}`, isLocal);
+                if (this.matchHUD) {
+                    const isLocal = netPlayer.playerId === this.localPlayerId;
+                    // For online, use "Player X" or name if available
+                    // We don't have character in NetPlayerState? We DO in CharacterSelect but maybe not in state?
+                    // NetPlayerState has: playerId, x, y, velX, velY, facing, isGrounded, isAttacking, animKey, damage, lives.
+                    // It DOES NOT have character (yet). 
+                    // However, we handle CharacterSelect events. We should store map of ID -> Character.
+
+                    // Note: OnlineGameScene handles "onCharacterSelect". 
+                    // We probably need to store character mapping to pass here.
+                    // For now, default to 'fok' if unknown, but better to fix.
+                    const character = this.playerCharacters.get(netPlayer.playerId) || 'fok';
+
+                    this.matchHUD.addPlayer(netPlayer.playerId, `Player ${netPlayer.playerId + 1}`, isLocal, character);
+                }
             }
 
             // For local player: check for deviation/reconciliation
@@ -771,7 +798,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
         const text = this.add.text(width / 2, height / 2 - 50, winnerText, {
             fontSize: '64px',
-            fontFamily: 'Arial',
+            fontFamily: '"Silkscreen"',
             fontStyle: 'bold',
             color: '#ffffff',
             align: 'center',
@@ -783,7 +810,7 @@ export class OnlineGameScene extends Phaser.Scene {
         // Rematch Button
         this.rematchButton = this.add.text(width / 2 - 120, height / 2 + 80, 'REMATCH', {
             fontSize: '32px',
-            fontFamily: 'Arial',
+            fontFamily: '"Silkscreen"',
             fontStyle: 'bold',
             color: '#00ff00',
             backgroundColor: '#333333',
@@ -796,7 +823,7 @@ export class OnlineGameScene extends Phaser.Scene {
         // Leave Button
         this.leaveButton = this.add.text(width / 2 + 120, height / 2 + 80, 'LEAVE', {
             fontSize: '32px',
-            fontFamily: 'Arial',
+            fontFamily: '"Silkscreen"',
             fontStyle: 'bold',
             color: '#ff4444',
             backgroundColor: '#333333',
@@ -1153,9 +1180,13 @@ export class OnlineGameScene extends Phaser.Scene {
         }
     }
 
-    private handleOpponentCharacterSelect(_playerId: number, character: string): void {
+    private handleOpponentCharacterSelect(playerId: number, character: string): void {
+        console.log(`[OnlineGameScene] Opponent ${playerId} selected ${character}`);
         this.opponentCharacter = character;
-        this.opponentCharacterText.setText(this.getCharacterDisplayName(character));
+        this.playerCharacters.set(playerId, character);
+        if (this.opponentCharacterText) {
+            this.opponentCharacterText.setText(this.getCharacterDisplayName(character));
+        }
     }
 
     private handleCharacterConfirm(playerId: number): void {
@@ -1171,7 +1202,10 @@ export class OnlineGameScene extends Phaser.Scene {
 
     private handleGameStart(players: { playerId: number; character: string }[]): void {
         console.log('[OnlineGameScene] Game starting with players:', JSON.stringify(players));
-        players.forEach(p => console.log(`Player ${p.playerId} char: "${p.character}"`));
+        players.forEach(p => {
+            console.log(`Player ${p.playerId} char: "${p.character}"`);
+            this.playerCharacters.set(p.playerId, p.character);
+        });
         this.phase = 'PLAYING';
 
         // Hide selection UI

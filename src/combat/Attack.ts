@@ -11,6 +11,7 @@ export const AttackDirection = {
     SIDE: 'side',
     UP: 'up',
     DOWN: 'down',
+    RUN: 'run',
 } as const;
 export type AttackDirection = typeof AttackDirection[keyof typeof AttackDirection];
 
@@ -94,10 +95,28 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES + 30,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES + 50,
-        hitboxWidth: 90, // Wider for slide (was 50)
+        hitboxWidth: 99, // Wider for slide (was 90)
         hitboxHeight: 25, // Flatter (was 30)
         hitboxOffsetX: 30,
         hitboxOffsetY: 65, // Lower to feet (was 35)
+    },
+    'light_run_grounded': {
+        type: AttackType.LIGHT,
+        direction: AttackDirection.RUN,
+        isAerial: false,
+        damage: 4,
+        knockback: 470,
+        baseKnockback: 180,
+        knockbackGrowth: 5,
+        knockbackAngle: 30, // Drift/Slide physics from Down Light
+        startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES + 30,
+        activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
+        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES + 50,
+        // Hitbox from Side Light (Effective)
+        hitboxWidth: 81,
+        hitboxHeight: 35,
+        hitboxOffsetX: 60,
+        hitboxOffsetY: 0,
     },
     'light_up_grounded': {
         type: AttackType.LIGHT,
@@ -169,27 +188,27 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES + 50,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES + 80,
-        hitboxWidth: 40,
-        hitboxHeight: 50,
-        hitboxOffsetX: 0,
-        hitboxOffsetY: 45,
+        hitboxWidth: 99, // Cloned from Down Light
+        hitboxHeight: 25,
+        hitboxOffsetX: 30,
+        hitboxOffsetY: 65,
     },
     'light_up_aerial': {
         type: AttackType.LIGHT,
         direction: AttackDirection.UP,
         isAerial: true,
         damage: 5,
-        knockback: 450,
-        baseKnockback: 180, // Juggle tool
-        knockbackGrowth: 5,
-        knockbackAngle: 90,
+        knockback: 430,
+        baseKnockback: 180,
+        knockbackGrowth: 4,
+        knockbackAngle: 20, // Same as side air
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES,
-        hitboxWidth: 45,
-        hitboxHeight: 50,
-        hitboxOffsetX: 0,
-        hitboxOffsetY: -45,
+        hitboxWidth: 55, // Cloned from Side Air
+        hitboxHeight: 40,
+        hitboxOffsetX: 40,
+        hitboxOffsetY: 0,
     },
 
     // ========== GROUNDED HEAVY ATTACKS ==========
@@ -224,7 +243,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES + 100,
         hitboxWidth: 100,
         hitboxHeight: 70,
-        hitboxOffsetX: 60,
+        hitboxOffsetX: 0,
         hitboxOffsetY: 0,
     },
     'heavy_down_grounded': {
@@ -335,38 +354,25 @@ export const AttackRegistry: Record<string, AttackData> = {
 };
 
 export class Attack {
-    data: AttackData;
-    phase: AttackPhase = AttackPhase.NONE;
-    phaseTimer: number = 0;
-    facingDirection: number = 1; // 1 = right, -1 = left
-    chargePercent: number = 0; // 0-1 charge level
+    public data: AttackData;
+    public phase: AttackPhase = AttackPhase.NONE;
+    public phaseTimer: number = 0; // Restored
+    public timer: number = 0;
+    public hasHit: boolean = false;
+    public facingDirection: number;
+    public hitsRegistered: number = 0;
+    public nextHitTimer: number = 0; // For multi-hit attacks
 
-    constructor(attackKey: string, facingDirection: number = 1, chargePercent: number = 0) {
-        const data = AttackRegistry[attackKey];
+    constructor(key: string, facing: number) {
+        const data = AttackRegistry[key];
         if (!data) {
-            throw new Error(`Unknown attack: ${attackKey}`);
+            throw new Error(`Attack ${key} not found`);
         }
 
-        // Apply charge multipliers if charged
-        if (chargePercent > 0 && data.type === AttackType.HEAVY) {
-            // Calculate multipliers based on charge (linear interpolation from 1.0 to max)
-            const damageMult = 1 + chargePercent * (PhysicsConfig.CHARGE_DAMAGE_MULT - 1);
-            const knockbackMult = 1 + chargePercent * (PhysicsConfig.CHARGE_KNOCKBACK_MULT - 1);
+        // Clone data to avoid mutating registry
+        this.data = { ...data };
+        this.facingDirection = facing;
 
-            // Create a modified copy of the attack data
-            this.data = {
-                ...data,
-                damage: Math.round(data.damage * damageMult),
-                knockback: Math.round(data.knockback * knockbackMult),
-                baseKnockback: data.baseKnockback ? Math.round(data.baseKnockback * knockbackMult) : undefined,
-                knockbackGrowth: data.knockbackGrowth ? Math.round(data.knockbackGrowth * knockbackMult) : undefined,
-            };
-        } else {
-            this.data = data;
-        }
-
-        this.facingDirection = facingDirection;
-        this.chargePercent = chargePercent;
         this.phase = AttackPhase.STARTUP;
         this.phaseTimer = 0;
     }
@@ -381,8 +387,6 @@ export class Attack {
     ): string {
         return `${type}_${direction}_${isAerial ? 'aerial' : 'grounded'}`;
     }
-
-    private nextHitTimer: number = 0;
 
     /**
      * Update attack phase, returns true when attack is complete

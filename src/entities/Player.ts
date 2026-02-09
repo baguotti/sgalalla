@@ -183,7 +183,7 @@ export class Player extends Fighter {
 
         // Create player sprite
         const initialFrame = 'Fok_v3_Idle_000';
-        this.sprite = scene.add.sprite(0, 0, this.character, initialFrame); // Adjusted offset (0) to ground sprite
+        this.sprite = scene.add.sprite(0, 7, this.character, initialFrame); // Adjusted offset (7) to ground sprite after height increase
 
 
 
@@ -213,7 +213,7 @@ export class Player extends Fighter {
 
         this.nameTag = scene.add.text(0, -100, displayName, {
             fontSize: '18px',
-            fontFamily: 'Arial',
+            fontFamily: '"Silkscreen"',
             fontStyle: 'bold',
             stroke: '#000000',
             strokeThickness: 4
@@ -235,7 +235,8 @@ export class Player extends Fighter {
 
         // Refinement Round 9: Wider hitbox for fok_v3 (40px width - +5px each side)
         if (this.character === 'fok_v3') {
-            this.setSize(40, 120);
+            // Refinement Round 17: Shave top 10px, widen 3px each side (40->46)
+            this.setSize(46, PhysicsConfig.PLAYER_HEIGHT - 10);
         }
 
         // Create Debug Hitbox (Hidden by default)
@@ -575,8 +576,14 @@ export class Player extends Fighter {
                     }
                 } else {
                     // LIGHT ATTACKS
-                    if (currentAttack.data.direction === AttackDirection.UP) {
-                        this.animationKey = 'attack_light_up';
+                    if (currentAttack.data.direction === AttackDirection.RUN) {
+                        this.animationKey = 'attack_light_run';
+                    } else if (currentAttack.data.direction === AttackDirection.UP) {
+                        if (!this.isGrounded) {
+                            this.animationKey = 'attack_light_up_air';
+                        } else {
+                            this.animationKey = 'attack_light_up';
+                        }
                     } else if (currentAttack.data.direction === AttackDirection.DOWN) {
                         this.animationKey = 'attack_light_down';
                     } else if (currentAttack.data.direction === AttackDirection.SIDE) {

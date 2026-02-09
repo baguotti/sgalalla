@@ -566,7 +566,7 @@ export class PlayerPhysics {
         }
 
         if (this.player.velocity.y >= 0) {
-            this.player.y = platBounds.top - PhysicsConfig.PLAYER_HEIGHT / 2;
+            this.player.y = platBounds.top - this.player.height / 2;
             this.player.velocity.y = 0;
             this.player.isGrounded = true;
             this.isFastFalling = false;

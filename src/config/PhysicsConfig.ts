@@ -25,7 +25,7 @@ export const PhysicsConfig = {
   MAX_JUMPS: 3,
 
   // Fast-fall
-  FAST_FALL_MULTIPLIER: 1.5,
+  FAST_FALL_MULTIPLIER: 1.7, // Refinement Round 18: Increased slightly from 1.5
   FAST_FALL_THRESHOLD: 300,
 
   // Recovery attack
@@ -74,7 +74,7 @@ export const PhysicsConfig = {
 
   // Player dimensions (Doubled for 1:1 scale)
   PLAYER_WIDTH: 120,
-  PLAYER_HEIGHT: 170,
+  PLAYER_HEIGHT: 184,
   NOSE_SIZE: 24,
 
   // Attack frame timing

@@ -46,7 +46,7 @@ export class TrainingDummy extends Fighter {
         this.damageText = scene.add.text(0, -45, '0%', {
             fontSize: '18px',
             color: '#ffffff',
-            fontFamily: 'Arial',
+            fontFamily: '"Silkscreen"',
             stroke: '#000000',
             strokeThickness: 4,
         });

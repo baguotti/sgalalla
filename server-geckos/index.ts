@@ -25,7 +25,12 @@ const NetMessageType = {
     CHARACTER_SELECT: 'character_select',
     CHARACTER_CONFIRM: 'character_confirm',
     SELECTION_START: 'selection_start',
-    SELECTION_TICK: 'selection_tick'
+    SELECTION_TICK: 'selection_tick',
+    // Bomb mechanic
+    BOMB_SPAWN: 'bomb_spawn',
+    BOMB_PICKUP: 'bomb_pickup',
+    BOMB_THROW: 'bomb_throw',
+    BOMB_EXPLODE: 'bomb_explode'
 } as const;
 
 interface PlayerState {
@@ -46,6 +51,17 @@ interface PlayerState {
 
 type RoomPhase = 'WAITING' | 'SELECTING' | 'PLAYING';
 
+interface BombState {
+    id: number;
+    x: number;
+    y: number;
+    velocityX: number;
+    velocityY: number;
+    fuseTimer: number;      // ms remaining
+    isThrown: boolean;
+    holderId: number | null; // playerId holding bomb, null if on ground
+}
+
 interface GameRoom {
     players: Map<string, PlayerState>;
     frame: number;
@@ -53,6 +69,10 @@ interface GameRoom {
     phase: RoomPhase;
     selectionTimer: ReturnType<typeof setInterval> | null;
     selectionCountdown: number;
+    // Bomb mechanic
+    bombs: BombState[];
+    nextBombId: number;
+    bombSpawnTimer: number; // ms until next spawn
 }
 
 // Animation key enum for binary decoding
@@ -156,7 +176,10 @@ io.onConnection((channel: ServerChannel) => {
             rematchVotes: new Set(),
             phase: 'WAITING',
             selectionTimer: null,
-            selectionCountdown: 10
+            selectionCountdown: 10,
+            bombs: [],
+            nextBombId: 1,
+            bombSpawnTimer: 15000 + Math.random() * 10000 // 15-25 seconds initial
         });
     }
     const room = rooms.get(roomId)!;
@@ -371,11 +394,73 @@ io.onConnection((channel: ServerChannel) => {
 });
 
 // Game loop - 60Hz state broadcast for smoother gameplay
+const TICK_MS = 1000 / 60; // ~16.67ms
+
 setInterval(() => {
     rooms.forEach((room) => {
         if (room.phase !== 'PLAYING') return;
         room.frame++;
 
+        // === BOMB SPAWNING (PAUSED) ===
+        /*
+        room.bombSpawnTimer -= TICK_MS;
+        if (room.bombSpawnTimer <= 0) {
+            // Spawn a bomb at random position
+            const bombX = 500 + Math.random() * 920; // 500-1420 (central area)
+            const bombY = 100; // Drop from top
+
+            const bomb: BombState = {
+                id: room.nextBombId++,
+                x: bombX,
+                y: bombY,
+                velocityX: 0,
+                velocityY: 0,
+                fuseTimer: 5000, // 5 seconds fuse
+                isThrown: false,
+                holderId: null
+            };
+            room.bombs.push(bomb);
+
+            // Broadcast spawn to all clients
+            emitToRoom(NetMessageType.BOMB_SPAWN, {
+                id: bomb.id,
+                x: bomb.x,
+                y: bomb.y
+            });
+
+            // Next spawn: random 15-25 seconds
+            room.bombSpawnTimer = 15000 + Math.random() * 10000;
+        }
+        */
+
+        // === BOMB FUSE COUNTDOWN ===
+        const explodedBombs: number[] = [];
+        room.bombs.forEach(bomb => {
+            if (bomb.holderId === null) {
+                // Only countdown if not held
+                bomb.fuseTimer -= TICK_MS;
+                if (bomb.fuseTimer <= 0) {
+                    explodedBombs.push(bomb.id);
+                }
+            }
+        });
+
+        // Broadcast explosions
+        explodedBombs.forEach(bombId => {
+            const bomb = room.bombs.find(b => b.id === bombId);
+            if (bomb) {
+                emitToRoom(NetMessageType.BOMB_EXPLODE, {
+                    id: bombId,
+                    x: bomb.x,
+                    y: bomb.y
+                });
+            }
+        });
+
+        // Remove exploded bombs
+        room.bombs = room.bombs.filter(b => !explodedBombs.includes(b.id));
+
+        // === STATE BROADCAST ===
         const state = {
             frame: room.frame,
             confirmedInputFrame: room.frame,
@@ -384,4 +469,4 @@ setInterval(() => {
 
         emitToRoom(NetMessageType.STATE_UPDATE, state);
     });
-}, 1000 / 60); // 60Hz for low latency (~16.67ms)
+}, TICK_MS);

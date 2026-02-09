@@ -34,7 +34,12 @@ export const NetMessageType = {
     CHARACTER_SELECT: 'character_select',
     SELECTION_START: 'selection_start',
     SELECTION_TICK: 'selection_tick',
-    CHARACTER_CONFIRM: 'character_confirm'
+    CHARACTER_CONFIRM: 'character_confirm',
+    // Bomb mechanic
+    BOMB_SPAWN: 'bomb_spawn',
+    BOMB_PICKUP: 'bomb_pickup',
+    BOMB_THROW: 'bomb_throw',
+    BOMB_EXPLODE: 'bomb_explode'
 } as const;
 
 // Serialized input for network transmission

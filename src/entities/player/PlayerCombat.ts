@@ -7,6 +7,7 @@ import type { Damageable } from '../../combat/DamageSystem'; // Type import
 import { DamageSystem } from '../../combat/DamageSystem';
 import { PhysicsConfig } from '../../config/PhysicsConfig';
 import type { InputState } from '../../input/InputManager'; // Type import
+import { SealEntity } from '../projectiles/SealEntity'; // Import SealEntity
 
 export class PlayerCombat {
     private player: Player;
@@ -33,6 +34,9 @@ export class PlayerCombat {
     // Throw Charge System
     public isThrowCharging: boolean = false;
     public throwChargeTime: number = 0;
+
+    // Projectile State
+    private hasSpawnedProjectile: boolean = false;
 
     private showDebugHitboxes: boolean = false;
 
@@ -144,6 +148,11 @@ export class PlayerCombat {
             // Refinement Round 10: Run-Attack Override (Slide Attack)
             // Any light attack while running becomes a Down Light (Slide) to use momentum
             if (this.player.physics.isRunning && this.player.isGrounded) {
+                if (this.player.character === 'fok_v3') {
+                    // Use new Running Light Attack
+                    this.startAttack('light_run_grounded');
+                    return;
+                }
                 direction = AttackDirection.DOWN;
             }
 
@@ -222,6 +231,7 @@ export class PlayerCombat {
             this.currentAttack = new Attack(attackKey, facing);
             this.player.isAttacking = true;
             this.hitTargets.clear();
+            this.hasSpawnedProjectile = false;
 
             // Visual feedback
             // this.player.setVisualTint(0xff0000); // Removed red tint
@@ -239,6 +249,9 @@ export class PlayerCombat {
             // SLIDE ATTACK LOGIC
             if (attackKey === 'light_down_grounded') {
                 this.player.velocity.x = facing * PhysicsConfig.SLIDE_ATTACK_SPEED;
+            } else if (attackKey === 'light_run_grounded') {
+                // User Request: "a little more sliding"
+                this.player.velocity.x = facing * (PhysicsConfig.SLIDE_ATTACK_SPEED * 1.2);
             }
         } catch (e) {
             console.warn('Unknown attack:', attackKey);
@@ -248,9 +261,10 @@ export class PlayerCombat {
     private startChargedAttack(attackKey: string, chargePercent: number): void {
         try {
             const facing = this.player.getFacingDirection();
-            this.currentAttack = new Attack(attackKey, facing, chargePercent);
+            this.currentAttack = new Attack(attackKey, facing); // Removed chargePercent
             this.player.isAttacking = true;
             this.hitTargets.clear();
+            this.hasSpawnedProjectile = false;
 
             // Set cooldown
             this.attackCooldownTimer = this.currentAttack.data.recoveryDuration;
@@ -431,6 +445,17 @@ export class PlayerCombat {
         // Handle hitbox
         if (this.currentAttack.isHitboxActive()) {
             this.updateHitbox();
+
+            // Side Sig Projectile (Seal)
+            if (!this.hasSpawnedProjectile &&
+                this.currentAttack.data.type === AttackType.HEAVY &&
+                this.currentAttack.data.direction === AttackDirection.SIDE &&
+                this.player.character === 'fok_v3') {
+
+                this.spawnSeal();
+                this.hasSpawnedProjectile = true;
+            }
+
         } else {
             this.deactivateHitbox();
         }
@@ -525,22 +550,14 @@ export class PlayerCombat {
         }
 
         // Refinement Round 6: Explicit Override for Fok_v3 Side Sig
-        // Placed at the very end to ensure it overwrites everything else
+        // REMOVED per user request (Round 13)
+        /*
         if (this.player.character === 'fok_v3' &&
             this.currentAttack.data.type === AttackType.HEAVY &&
             this.currentAttack.data.direction === AttackDirection.SIDE) {
-
-            console.log('[HitboxDebug] Applying Side Sig Override for Fok_v3');
-
-            // Round 11: 12% smaller
-            width = 277;
-            height = 137;
-            const facing = this.player.getFacingDirection();
-            offset.x = facing * 175; // Adjusted for new width
-            offset.y = 0;
-
-            console.log(`[HitboxDebug] New Width: ${width}, Height: ${height}, OffsetX: ${offset.x}`);
+            // ... removed ...
         }
+        */
 
         // Side/Neutral/Up Light Attacks - Easy Tweak Block
         if (this.currentAttack.data.type === AttackType.LIGHT &&
@@ -550,7 +567,7 @@ export class PlayerCombat {
 
             // User requested: "skinnier and move it forward 10pixels"
             // Previous width was 90. Skinnier -> 70?
-            width = 70;
+            width = 81;
             const facing = this.player.getFacingDirection();
             // Previous logic added 10. Now user wants forward 10 more?
             // Or just "move it forward 10pixels" relative to standard?
@@ -713,5 +730,23 @@ export class PlayerCombat {
 
         // Visual Effects for Down Air (Spike)
         // Removed down arrow visual
+    }
+
+    private spawnSeal(): void {
+        console.log('Spawning Seal');
+        const facing = this.player.getFacingDirection();
+
+        // Offset: Start slightly in front of player
+        const offsetX = 50 * facing;
+        const offsetY = 0; // Center Y
+
+        // Create Seal Entity
+        new SealEntity(
+            this.scene,
+            this.player.x + offsetX,
+            this.player.y + offsetY,
+            facing,
+            this.player
+        );
     }
 }
