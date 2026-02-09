@@ -8,8 +8,28 @@ DROPLET_IP="164.90.235.15"
 DIST_PATH="./dist"
 REMOTE_PATH="/var/www/sgalalla"
 
+
+# Prompt for version bump?
+current_version=$(grep '"version":' package.json | cut -d '"' -f 4)
+read -p "Current version is $current_version. Enter new version (or press Enter to keep): " new_version
+
+if [ ! -z "$new_version" ]; then
+  echo "Updating version to $new_version..."
+  # Update package.json
+  sed -i '' "s/\"version\": \"$current_version\"/\"version\": \"$new_version\"/" package.json
+  
+  # Commit version bump
+  git add package.json
+  git commit -m "Bump version to $new_version"
+  git push
+  
+  # Rebuild with new version
+  echo "Rebuilding..."
+  npm run build
+fi
+
 echo "=== Step 1: Uploading dist folder to Droplet ==="
-scp -r $DIST_PATH root@$DROPLET_IP:$REMOTE_PATH
+scp -r $DIST_PATH/* root@$DROPLET_IP:$REMOTE_PATH
 
 echo "=== Step 2: Configuring Nginx on Droplet ==="
 ssh root@$DROPLET_IP << 'ENDSSH'
