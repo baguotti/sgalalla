@@ -297,17 +297,13 @@ io.onConnection((channel: ServerChannel) => {
         }
     });
 
-}
+
+
+    // Ping
+    channel.on(NetMessageType.PING, (data: any) => {
+        // Echo timestamp back to client for RTT calculation
+        channel.emit(NetMessageType.PONG, data);
     });
-
-// Ping
-channel.on(NetMessageType.PING, (data: any) => {
-    // Echo timestamp back to client for RTT calculation
-    channel.emit(NetMessageType.PONG, data);
-});
-
-channel.onDisconnect(() => {
-    console.log(`[Server] Player ${channelPlayerMap.get(channelId)} disconnected (${channelId})`);
 
     // Attack relay
     channel.on(NetMessageType.ATTACK_START, (data: any) => {
