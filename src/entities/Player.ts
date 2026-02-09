@@ -345,7 +345,6 @@ export class Player extends Fighter {
             // Visual Flash (Alpha toggle every 50ms)
             // 6 frames is very short (100ms), so this will blink once or twice.
             const blink = Math.floor(this.invulnerabilityTimer / 50) % 2 === 0;
-            const blink = Math.floor(this.invulnerabilityTimer / 50) % 2 === 0;
 
             // Visual Tweak: Dash should be opaque, Spot Dodge (and hitstun) should blink
             // Matches animation logic (velocity > 10 = dash)
