@@ -8,6 +8,10 @@ export class PreloadScene extends Phaser.Scene {
     preload(): void {
         this.load.image('logo', 'assets/ui/logo.jpg');
         this.load.image('title_card', 'assets/ui/title_card.jpg');
+
+        // Character Assets
+        this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
+        this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
     }
 
     create(): void {

@@ -1,0 +1,607 @@
+{
+	"textures": [
+		{
+			"image": "sga_1_0",
+			"format": "RGBA8888",
+			"size": {
+				"w": 578,
+				"h": 1927
+			},
+			"scale": 1,
+			"frames": [
+				{
+					"filename": "sga_Down_Sig_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 29,
+						"y": 66,
+						"w": 204,
+						"h": 172
+					},
+					"frame": {
+						"x": 2,
+						"y": 2,
+						"w": 204,
+						"h": 172
+					}
+				},
+				{
+					"filename": "sga_Jump_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 53,
+						"y": 26,
+						"w": 123,
+						"h": 199
+					},
+					"frame": {
+						"x": 2,
+						"y": 178,
+						"w": 123,
+						"h": 199
+					}
+				},
+				{
+					"filename": "sga_Up_Sig_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 89,
+						"y": 25,
+						"w": 107,
+						"h": 198
+					},
+					"frame": {
+						"x": 2,
+						"y": 381,
+						"w": 107,
+						"h": 198
+					}
+				},
+				{
+					"filename": "sga_Recovery_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 99,
+						"y": 33,
+						"w": 82,
+						"h": 193
+					},
+					"frame": {
+						"x": 2,
+						"y": 583,
+						"w": 82,
+						"h": 193
+					}
+				},
+				{
+					"filename": "sga_Dodge_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 77,
+						"y": 33,
+						"w": 110,
+						"h": 191
+					},
+					"frame": {
+						"x": 2,
+						"y": 780,
+						"w": 110,
+						"h": 191
+					}
+				},
+				{
+					"filename": "Sga_Idle_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 36,
+						"w": 89,
+						"h": 187
+					},
+					"frame": {
+						"x": 88,
+						"y": 583,
+						"w": 89,
+						"h": 187
+					}
+				},
+				{
+					"filename": "Sga_Idle_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 36,
+						"w": 89,
+						"h": 187
+					},
+					"frame": {
+						"x": 113,
+						"y": 381,
+						"w": 89,
+						"h": 187
+					}
+				},
+				{
+					"filename": "Sga_Idle_002",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 36,
+						"w": 89,
+						"h": 187
+					},
+					"frame": {
+						"x": 181,
+						"y": 178,
+						"w": 89,
+						"h": 187
+					}
+				},
+				{
+					"filename": "sga_Fall_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 75,
+						"y": 42,
+						"w": 136,
+						"h": 166
+					},
+					"frame": {
+						"x": 210,
+						"y": 2,
+						"w": 136,
+						"h": 166
+					}
+				},
+				{
+					"filename": "Sga_Idle_003",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 36,
+						"w": 89,
+						"h": 187
+					},
+					"frame": {
+						"x": 2,
+						"y": 975,
+						"w": 89,
+						"h": 187
+					}
+				},
+				{
+					"filename": "Sga_Idle_004",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 36,
+						"w": 89,
+						"h": 187
+					},
+					"frame": {
+						"x": 2,
+						"y": 1166,
+						"w": 89,
+						"h": 187
+					}
+				},
+				{
+					"filename": "Sga_Idle_005",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 36,
+						"w": 89,
+						"h": 187
+					},
+					"frame": {
+						"x": 2,
+						"y": 1357,
+						"w": 89,
+						"h": 187
+					}
+				},
+				{
+					"filename": "Sga_Idle_006",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 36,
+						"w": 89,
+						"h": 187
+					},
+					"frame": {
+						"x": 2,
+						"y": 1548,
+						"w": 89,
+						"h": 187
+					}
+				},
+				{
+					"filename": "sga_Side_Run_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 69,
+						"y": 38,
+						"w": 150,
+						"h": 186
+					},
+					"frame": {
+						"x": 2,
+						"y": 1739,
+						"w": 150,
+						"h": 186
+					}
+				},
+				{
+					"filename": "Sga_Idle_007",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 37,
+						"w": 89,
+						"h": 186
+					},
+					"frame": {
+						"x": 156,
+						"y": 1739,
+						"w": 89,
+						"h": 186
+					}
+				},
+				{
+					"filename": "Sga_Idle_008",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 37,
+						"w": 89,
+						"h": 186
+					},
+					"frame": {
+						"x": 95,
+						"y": 975,
+						"w": 89,
+						"h": 186
+					}
+				},
+				{
+					"filename": "Sga_Idle_009",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 37,
+						"w": 89,
+						"h": 186
+					},
+					"frame": {
+						"x": 116,
+						"y": 774,
+						"w": 89,
+						"h": 186
+					}
+				},
+				{
+					"filename": "Sga_Idle_010",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 37,
+						"w": 89,
+						"h": 186
+					},
+					"frame": {
+						"x": 188,
+						"y": 572,
+						"w": 89,
+						"h": 186
+					}
+				},
+				{
+					"filename": "Sga_Idle_011",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 37,
+						"w": 89,
+						"h": 186
+					},
+					"frame": {
+						"x": 206,
+						"y": 369,
+						"w": 89,
+						"h": 186
+					}
+				},
+				{
+					"filename": "sga_Ground_Pound_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 76,
+						"y": 39,
+						"w": 134,
+						"h": 185
+					},
+					"frame": {
+						"x": 281,
+						"y": 172,
+						"w": 134,
+						"h": 185
+					}
+				},
+				{
+					"filename": "sga_Side_Air_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 75,
+						"y": 34,
+						"w": 137,
+						"h": 155
+					},
+					"frame": {
+						"x": 350,
+						"y": 2,
+						"w": 137,
+						"h": 155
+					}
+				},
+				{
+					"filename": "sga_Dash_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 55,
+						"y": 40,
+						"w": 156,
+						"h": 184
+					},
+					"frame": {
+						"x": 95,
+						"y": 1165,
+						"w": 156,
+						"h": 184
+					}
+				},
+				{
+					"filename": "sga_Side_Light_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 73,
+						"y": 46,
+						"w": 148,
+						"h": 183
+					},
+					"frame": {
+						"x": 188,
+						"y": 964,
+						"w": 148,
+						"h": 183
+					}
+				},
+				{
+					"filename": "sga_Wall_Slide_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 38,
+						"w": 122,
+						"h": 181
+					},
+					"frame": {
+						"x": 209,
+						"y": 762,
+						"w": 122,
+						"h": 181
+					}
+				},
+				{
+					"filename": "sga_Charge_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 79,
+						"y": 44,
+						"w": 115,
+						"h": 180
+					},
+					"frame": {
+						"x": 281,
+						"y": 559,
+						"w": 115,
+						"h": 180
+					}
+				},
+				{
+					"filename": "sga_Hurt_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 47,
+						"w": 102,
+						"h": 177
+					},
+					"frame": {
+						"x": 340,
+						"y": 361,
+						"w": 102,
+						"h": 177
+					}
+				},
+				{
+					"filename": "sga_Charge_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 81,
+						"y": 48,
+						"w": 113,
+						"h": 176
+					},
+					"frame": {
+						"x": 446,
+						"y": 361,
+						"w": 113,
+						"h": 176
+					}
+				},
+				{
+					"filename": "sga_Down_Light_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 65,
+						"y": 100,
+						"w": 157,
+						"h": 121
+					},
+					"frame": {
+						"x": 419,
+						"y": 161,
+						"w": 157,
+						"h": 121
+					}
+				}
+			]
+		}
+	],
+	"meta": {
+		"app": "http://free-tex-packer.com",
+		"version": "0.6.7"
+	}
+}

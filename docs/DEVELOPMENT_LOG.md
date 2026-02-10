@@ -533,4 +533,6 @@
 - **[S]** **STATUS**: v0.10.2 Released.
 - **[Fix]** **Visual Glitches**:
     - Fixed **Duplicate Visuals (Ghosting)** in Online mode by properly configuring the UI camera to ignore game world objects.
-    - Fixed **Opening Logo 403 Error** by renaming `logo.jpeg` to standard `logo.jpg` to reset file permissions.
+- **[New]** **Character**:
+    - Added **Sga**: A new playable character mirroring "Fok" but with unique visuals.
+    - Note: Uses "Idle" animation for "Run" state as per current asset availability.

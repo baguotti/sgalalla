@@ -142,10 +142,44 @@ export class GameScene extends Phaser.Scene {
                 fall: { prefix: 'Fok_v3_Fall_', count: 1, suffix: '000', loop: false },
                 jump: { prefix: 'Fok_v3_Jump_', count: 1, suffix: '000', loop: false },
                 slide: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false }
+            },
+            'sga': {
+                // Mirror of fok_v3, but with 'Sga_' prefix
+                // Run is missing -> Mapped to Idle
+                idle: { prefix: 'Sga_Idle_', count: 12, loop: true },
+                run: { prefix: 'Sga_Idle_', count: 12, loop: true }, // Mapped to Idle
+                charging: { prefix: 'Sga_Charge_', count: 2, loop: true },
+                dash: { prefix: 'Sga_Dash_', count: 1, suffix: '000', loop: false },
+                spot_dodge: { prefix: 'Sga_Dodge_', count: 1, suffix: '000', loop: false },
+                seal: { prefix: 'Sga_Side Sig_Seal', count: 9, loop: true },
+
+                // Lights
+                attack_light_neutral: { prefix: 'Sga_Side_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_up: { prefix: 'Sga_Side_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_up_air: { prefix: 'Sga_Side_Air_', count: 1, suffix: '000', loop: false },
+                attack_light_down: { prefix: 'Sga_Down_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_side: { prefix: 'Sga_Neutral_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'Sga_Side_Air_', count: 1, suffix: '000', loop: false },
+                attack_light_run: { prefix: 'Sga_Side_Run_', count: 1, suffix: '000', loop: false },
+
+                // Heavies
+                attack_heavy_neutral: { prefix: 'Sga_Up_Sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_up: { prefix: 'Sga_Up_Sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_side: { prefix: 'Sga_Side_Sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_down: { prefix: 'Sga_Down_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Util
+                wall_slide: { prefix: 'Sga_Wall_Slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'Sga_Recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'Sga_Ground_Pound_', count: 1, suffix: '000', loop: false },
+                hurt: { prefix: 'Sga_Hurt_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'Sga_Fall_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'Sga_Jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'Sga_Dodge_', count: 1, suffix: '000', loop: false }
             }
         };
 
-        const characters = ['fok_v3'];
+        const characters = ['fok_v3', 'sga'];
 
         characters.forEach(char => {
             const config = charConfigs[char as keyof typeof charConfigs];
