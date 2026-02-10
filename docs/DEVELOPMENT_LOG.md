@@ -504,7 +504,12 @@
     - **HUD Updates**:
         - Right-side player icons are now flipped horizontally.
         - Right-side HUD layout is mirrored ([Damage] [Portrait] [Stocks]).
-- **[S]** **STATUS**: v0.10.1 Released.
+- **[Deploy]** **Server Update Instructions**:
+    - **Step 1**: SSH into your DigitalOcean Droplet: `ssh root@<your-server-ip>`
+    - **Step 2**: Navigate to the project directory: `cd sgalalla`
+    - **Step 3**: Pull the latest changes: `git pull`
+    - **Step 4**: Restart the server process: `pm2 restart geckos-server`
+    - *(Optional)* Monitor logs: `pm2 logs geckos-server`
 - **[UI]** **Preload & Polish**:
     - Implemented `PreloadScene` to ensure 'Silkscreen' font loads before game starts.
     - Added custom logo and "PRESS START" interaction to title screen.
@@ -525,4 +530,6 @@
     - Fixed game freeze when exiting Training Mode (replaced page reload with proper scene transition to `MainMenuScene`).
     - Fixed crash when returning to Main Menu (cleared `menuTexts` array on scene start to avoid referencing destroyed objects).
 - **[Refactor]** **Online Gameplay**:
-    - Synced **Wall Slide Visuals** for online play by refactoring `Player.ts` to use `facingDirection` for offsets (prevents physics dependency for remote players).
+- **[Fix]** **Visual Glitches**:
+    - Fixed **Duplicate Visuals (Ghosting)** in Online mode by properly configuring the UI camera to ignore game world objects.
+    - Fixed **Opening Logo 403 Error** by renaming `logo.jpeg` to standard `logo.jpg` to reset file permissions.

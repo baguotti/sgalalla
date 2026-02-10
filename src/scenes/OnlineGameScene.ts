@@ -240,6 +240,27 @@ export class OnlineGameScene extends Phaser.Scene {
         this.uiCamera.setZoom(1);
     }
 
+    private configureCameraExclusions(): void {
+        if (!this.uiCamera) return;
+
+        // Ignore static world elements
+        if (this.platforms.length > 0) this.uiCamera.ignore(this.platforms);
+        if (this.softPlatforms.length > 0) this.uiCamera.ignore(this.softPlatforms);
+
+        // Ignore entities
+        this.players.forEach(p => p.addToCameraIgnore(this.uiCamera));
+    }
+
+    /**
+     * Expose method to add dynamic objects to camera ignore list
+     * (Called by Hitboxes and other dynamic entities)
+     */
+    public addToCameraIgnore(object: Phaser.GameObjects.GameObject): void {
+        if (this.uiCamera) {
+            this.uiCamera.ignore(object);
+        }
+    }
+
     async create(): Promise<void> {
 
         // Create animations first
@@ -247,6 +268,8 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Setup cameras (UI separation)
         this.setupCameras();
+        // PREVENT GHOSTING: UI Camera should ignore game world objects
+        this.configureCameraExclusions();
 
         // Setup network callbacks
         this.networkManager.onStateUpdate((state) => this.handleStateUpdate(state));
