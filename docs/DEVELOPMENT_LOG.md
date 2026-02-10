@@ -530,6 +530,7 @@
     - Fixed game freeze when exiting Training Mode (replaced page reload with proper scene transition to `MainMenuScene`).
     - Fixed crash when returning to Main Menu (cleared `menuTexts` array on scene start to avoid referencing destroyed objects).
 - **[Refactor]** **Online Gameplay**:
+- **[S]** **STATUS**: v0.10.2 Released.
 - **[Fix]** **Visual Glitches**:
     - Fixed **Duplicate Visuals (Ghosting)** in Online mode by properly configuring the UI camera to ignore game world objects.
     - Fixed **Opening Logo 403 Error** by renaming `logo.jpeg` to standard `logo.jpg` to reset file permissions.
