@@ -504,7 +504,7 @@
     - **HUD Updates**:
         - Right-side player icons are now flipped horizontally.
         - Right-side HUD layout is mirrored ([Damage] [Portrait] [Stocks]).
-- **[S]** **STATUS**: v0.10.0 Complete.
+- **[S]** **STATUS**: v0.10.1 Released.
 - **[UI]** **Preload & Polish**:
     - Implemented `PreloadScene` to ensure 'Silkscreen' font loads before game starts.
     - Added custom logo and "PRESS START" interaction to title screen.
