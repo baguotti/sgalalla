@@ -533,6 +533,12 @@
 - **[S]** **STATUS**: v0.10.2 Released.
 - **[Fix]** **Visual Glitches**:
     - Fixed **Duplicate Visuals (Ghosting)** in Online mode by properly configuring the UI camera to ignore game world objects.
-- **[New]** **Character**:
-    - Added **Sga**: A new playable character mirroring "Fok" but with unique visuals.
-    - Note: Uses "Idle" animation for "Run" state as per current asset availability.
+
+## **v0.10.3** - **Sga Implementation & Polish**
+- **[New]** **Character: Sga**
+    - **Enabled**: Added **Sga** to the character selection screen in Lobby and Online.
+    - **Animations**: Mapped all Sga animations (Idle, Jump, Fall, Attacks) to the correct frames in `sga.json`.
+    - **Hitboxes**: Synced Sga's hitbox size to match **Fok** (46x174) for competitive consistency.
+    - **Assets**: Added `sga_icon` to the UI and moved asset loading to `preload()` for stability.
+- **[Fix]** **Assets**:
+    - **Renaming**: Renamed `logo.jpeg` to `logo.jpg` to resolve 403 Forbidden errors on deployment.

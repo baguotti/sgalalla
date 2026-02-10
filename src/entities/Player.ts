@@ -234,7 +234,8 @@ export class Player extends Fighter {
         this.setSize(60, 120); // Default size
 
         // Refinement Round 9: Wider hitbox for fok_v3 (40px width - +5px each side)
-        if (this.character === 'fok_v3') {
+        // Refinement Round 9: Wider hitbox for fok_v3 (40px width - +5px each side)
+        if (this.character === 'fok_v3' || this.character === 'sga') {
             // Refinement Round 17: Shave top 10px, widen 3px each side (40->46)
             this.setSize(46, PhysicsConfig.PLAYER_HEIGHT - 10);
         }

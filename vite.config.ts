@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 
 // Read package.json to get version
+// Force reload for v0.10.2
 const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
 
 export default defineConfig({

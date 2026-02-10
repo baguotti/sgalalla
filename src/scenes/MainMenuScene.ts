@@ -35,9 +35,15 @@ export class MainMenuScene extends Phaser.Scene {
             fontSize: '120px', fontFamily: '"Silkscreen"', color: '#ffffff'
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, 270, `v${__APP_VERSION__}`, {
+        this.add.text(width / 2, 270, 'Pre-Alpha Build', {
             fontSize: '24px', fontFamily: '"Silkscreen"', color: '#888888'
         }).setOrigin(0.5);
+
+        // Version
+        this.add.text(10, height - 30, 'v0.10.3', {
+            fontSize: '16px',
+            color: '#888888'
+        }).setOrigin(0, 1);
 
         // Menu Items
         const startY = 500;

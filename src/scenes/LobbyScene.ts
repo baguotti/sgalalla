@@ -27,8 +27,8 @@ export class LobbyScene extends Phaser.Scene {
     private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character Data
-    private characters: CharacterType[] = ['fok_v3'] as any; // Refinement: Only fok_v3
-    private charLabels: string[] = ['Fok']; // Refinement: Display "Fok" for fok_v3
+    private characters: CharacterType[] = ['fok_v3', 'sga'] as any; // Refinement: fok_v3 and sga
+    private charLabels: string[] = ['Fok', 'Sga']; // Refinement: Display Labels
     // P1_KEYS removed (unused in Lobby)
 
     // Input debounce & Safety
@@ -82,6 +82,13 @@ export class LobbyScene extends Phaser.Scene {
         this.frameInputs = { space: false, enter: false };
         this.prevGamepadSelect = false;
         this.sceneStartTime = Date.now();
+    }
+
+    preload(): void {
+        this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
+        this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
+        this.load.image('fok_icon', 'assets/fok_icon.png'); // Refinement V2
+        this.load.image('sga_icon', 'assets/sga_icon.png');
     }
 
 

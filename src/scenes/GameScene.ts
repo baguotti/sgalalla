@@ -144,38 +144,69 @@ export class GameScene extends Phaser.Scene {
                 slide: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false }
             },
             'sga': {
-                // Mirror of fok_v3, but with 'Sga_' prefix
-                // Run is missing -> Mapped to Idle
+                // Sga specific mappings based on sga.json
+                // Note mixed capitalization in source assets
+
+                // Idle & Run (Run mapped to Idle)
                 idle: { prefix: 'Sga_Idle_', count: 12, loop: true },
-                run: { prefix: 'Sga_Idle_', count: 12, loop: true }, // Mapped to Idle
-                charging: { prefix: 'Sga_Charge_', count: 2, loop: true },
-                dash: { prefix: 'Sga_Dash_', count: 1, suffix: '000', loop: false },
-                spot_dodge: { prefix: 'Sga_Dodge_', count: 1, suffix: '000', loop: false },
-                seal: { prefix: 'Sga_Side Sig_Seal', count: 9, loop: true },
+                run: { prefix: 'Sga_Idle_', count: 12, loop: true },
 
-                // Lights
-                attack_light_neutral: { prefix: 'Sga_Side_Light_', count: 1, suffix: '000', loop: false },
-                attack_light_up: { prefix: 'Sga_Side_Light_', count: 1, suffix: '000', loop: false },
-                attack_light_up_air: { prefix: 'Sga_Side_Air_', count: 1, suffix: '000', loop: false },
-                attack_light_down: { prefix: 'Sga_Down_Light_', count: 1, suffix: '000', loop: false },
-                attack_light_side: { prefix: 'Sga_Neutral_Light_', count: 1, suffix: '000', loop: false },
-                attack_light_side_air: { prefix: 'Sga_Side_Air_', count: 1, suffix: '000', loop: false },
-                attack_light_run: { prefix: 'Sga_Side_Run_', count: 1, suffix: '000', loop: false },
+                // Movement / States
+                charging: { prefix: 'sga_Charge_', count: 2, loop: true }, // lowercase sga
+                dash: { prefix: 'sga_Dash_', count: 1, suffix: '000', loop: false },
+                spot_dodge: { prefix: 'sga_Dodge_', count: 1, suffix: '000', loop: false },
 
-                // Heavies
-                attack_heavy_neutral: { prefix: 'Sga_Up_Sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_up: { prefix: 'Sga_Up_Sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_side: { prefix: 'Sga_Side_Sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_down: { prefix: 'Sga_Down_Sig_', count: 1, suffix: '000', loop: false },
+                // Jump / Fall / Hurt
+                jump: { prefix: 'sga_Jump_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'sga_Fall_', count: 1, suffix: '000', loop: false },
+                hurt: { prefix: 'sga_Hurt_', count: 1, suffix: '000', loop: false },
 
-                // Util
-                wall_slide: { prefix: 'Sga_Wall_Slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'Sga_Recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'Sga_Ground_Pound_', count: 1, suffix: '000', loop: false },
-                hurt: { prefix: 'Sga_Hurt_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'Sga_Fall_', count: 1, suffix: '000', loop: false },
-                jump: { prefix: 'Sga_Jump_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'Sga_Dodge_', count: 1, suffix: '000', loop: false }
+                // Utils
+                wall_slide: { prefix: 'sga_Wall_Slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'sga_Recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'sga_Ground_Pound_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'sga_Dodge_', count: 1, suffix: '000', loop: false }, // Reused Dodge
+
+                // --- LIGHT ATTACKS ---
+                // Neutral Light -> Mapped to Side Light (Match Fok logic, but using sga_Side_Light)
+                attack_light_neutral: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Side Light -> Mapped to Side Light (Source has sga_Side_Light)
+                attack_light_side: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Up Light -> Mapped to Side Light (Match Fok)
+                attack_light_up: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Aerials
+                attack_light_up_air: { prefix: 'sga_Side_Air_', count: 1, suffix: '000', loop: false }, // sga_Side_Air
+                attack_light_side_air: { prefix: 'sga_Side_Air_', count: 1, suffix: '000', loop: false },
+
+                // Down Light
+                attack_light_down: { prefix: 'sga_Down_Light_', count: 1, suffix: '000', loop: false },
+
+                // Run Attack
+                attack_light_run: { prefix: 'sga_Side_Run_', count: 1, suffix: '000', loop: false },
+
+
+                // --- HEAVY ATTACKS (SIGS) ---
+                // Neutral Sig -> Mapped to Up Sig (Match Fok)
+                attack_heavy_neutral: { prefix: 'sga_Up_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Up Sig
+                attack_heavy_up: { prefix: 'sga_Up_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Side Sig -> MISSING in JSON. Mapping to Side Light or Up Sig?
+                // Using Side Light as placeholder to prevent invisible sprite
+                attack_heavy_side: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Down Sig 
+                attack_heavy_down: { prefix: 'sga_Down_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Seal (Projectile) - MISSING. Using Up Sig as placeholder? Or generic?
+                // Fok uses 'Fok_v3_Side Sig_Seal'. Sga has no equivalent.
+                // Leave undefined or map to something safe?
+                // Map to Up Sig for now (safe placeholder)
+                seal: { prefix: 'sga_Up_Sig_', count: 1, suffix: '000', loop: false },
             }
         };
 
