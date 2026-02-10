@@ -457,7 +457,7 @@ export class GameScene extends Phaser.Scene {
                 });
             });
             this.events.on('pauseMenuExit', () => {
-                window.location.reload();
+                this.scene.start('MainMenuScene');
             });
             this.events.on('spawnDummy', () => {
                 this.togglePause(); // Unpause
@@ -787,7 +787,8 @@ export class GameScene extends Phaser.Scene {
                     displayPlayer.getState(),
                     displayPlayer.getRecoveryAvailable(),
                     attackInfo,
-                    displayPlayer.isGamepadConnected()
+                    displayPlayer.isGamepadConnected(),
+                    0 // Ping (Offline)
                 );
                 this.debugOverlay.setVisible(true);
             } else {

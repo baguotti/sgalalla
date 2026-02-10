@@ -652,6 +652,9 @@ export class Player extends Fighter {
             this.animationKey = 'idle';
             this.playAnim('idle', true);
         }
+
+        // Apply offsets every frame (catch-all)
+        this.updateSpriteOffset();
     }
 
     // Add recovery to updateAnimation?
@@ -675,6 +678,30 @@ export class Player extends Fighter {
         Inside updateAnimation(), before or inside '!this.isGrounded' check.
     */
 
+    private updateSpriteOffset(): void {
+        const anim = this.sprite.anims.currentAnim;
+        if (!anim) return;
+
+        // Reset offset by default
+        this.sprite.x = 0;
+        // this.sprite.y = 0; // If we ever need Y offset
+
+        if (this.character === 'fok_v3') {
+            if (anim.key.includes('wall_slide')) {
+                // Refinement 8: Offset towards the wall by 7px (User requested even more visibility)
+                // Use facingDirection (which is guaranteed to be away from wall during slide)
+                // If facing Right (1), wall is Left (-1). Offset should be -7 (Left).
+                // If facing Left (-1), wall is Right (1). Offset should be 7 (Right).
+                // So: -facingDirection * 7
+                this.sprite.x = -this.getFacingDirection() * 7;
+            }
+            else if (anim.key.includes('attack_heavy_side')) {
+                // Refinement Round 7: Offset animation further (was 80 -> 130)
+                this.sprite.x = this.getFacingDirection() * 130;
+            }
+        }
+    }
+
     public playAnim(key: string, ignoreIfPlaying: boolean = true): void {
         const fullKey = `${this.animPrefix}_${key}`;
 
@@ -685,18 +712,8 @@ export class Player extends Fighter {
 
         this.sprite.anims.play(fullKey, ignoreIfPlaying);
 
-        // Apply custom offsets for misaligned sprites
-        // Apply custom offsets for misaligned sprites
-        if (key === 'wall_slide' && this.character === 'fok_v3') {
-            // Refinement 8: Offset towards the wall by 2px to close gap
-            this.sprite.x = this.physics.wallDirection * 2;
-        } else if (key === 'attack_heavy_side' && this.character === 'fok_v3') {
-            // Refinement Round 7: Offset animation further (was 80 -> 130)
-            // Shifts sprite in facing direction to simulate stepping forward
-            this.sprite.x = this.getFacingDirection() * 130;
-        } else {
-            this.sprite.x = 0;
-        }
+        // Offset is now handled per-frame in updateSpriteOffset
+        this.updateSpriteOffset();
     }
 
     private updateDamageDisplay(): void {

@@ -505,3 +505,24 @@
         - Right-side player icons are now flipped horizontally.
         - Right-side HUD layout is mirrored ([Damage] [Portrait] [Stocks]).
 - **[S]** **STATUS**: v0.10.0 Complete.
+- **[UI]** **Preload & Polish**:
+    - Implemented `PreloadScene` to ensure 'Silkscreen' font loads before game starts.
+    - Added custom logo and "PRESS START" interaction to title screen.
+    - Added black background to loading screen.
+- **[G]** **gameplay**:
+    - **Reverted Side Sig**: Removed `SealEntity` and restored standard hitbox behavior for `fok_v3`.
+- **[UI]** **Debug Display**:
+    - Moved Ping and FPS from main HUD to `DebugOverlay` (toggle with 'Q').
+    - Integrated `DebugOverlay` into `OnlineGameScene`.
+- **[A]** **Animation**:
+    - **Wall Slide**: Increased visual offset to **5px** towards the wall for `fok_v3` (was 2px).
+    - **Wall Slide**: Increased visual offset to **7px** towards the wall for `fok_v3` (was 5px).
+    - **Refactor**: Moved sprite offset logic to `updateSpriteOffset` to run every frame.
+- **[UI]** **Title Screen**:
+    - Reverted Main Menu background to black.
+    - Added `title_card.jpg` as background for the **Loading Screen**.
+- **[Fix]** **Stability**:
+    - Fixed game freeze when exiting Training Mode (replaced page reload with proper scene transition to `MainMenuScene`).
+    - Fixed crash when returning to Main Menu (cleared `menuTexts` array on scene start to avoid referencing destroyed objects).
+- **[Refactor]** **Online Gameplay**:
+    - Synced **Wall Slide Visuals** for online play by refactoring `Player.ts` to use `facingDirection` for offsets (prevents physics dependency for remote players).

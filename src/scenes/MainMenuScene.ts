@@ -23,8 +23,14 @@ export class MainMenuScene extends Phaser.Scene {
     create(): void {
         const { width, height } = this.scale;
 
+        // CRITICAL: Clear menu items from previous runs
+        this.menuTexts = [];
+
+        // Visuals
         // Visuals
         this.add.rectangle(0, 0, width, height, 0x1a1a1a).setOrigin(0);
+
+        // Title Text
         this.add.text(width / 2, 200, 'SGALALLA', {
             fontSize: '120px', fontFamily: '"Silkscreen"', color: '#ffffff'
         }).setOrigin(0.5);

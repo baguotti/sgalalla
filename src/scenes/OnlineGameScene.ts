@@ -20,6 +20,7 @@ type NetPlayerSnapshot = NetPlayerState & { frame: number; serverTime: number };
 import { InputManager } from '../input/InputManager';
 import type { GameSnapshot, PlayerSnapshot } from '../network/StateSnapshot';
 import { MatchHUD } from '../ui/PlayerHUD';
+import { DebugOverlay } from '../components/DebugOverlay';
 
 export class OnlineGameScene extends Phaser.Scene {
     // Networking
@@ -88,6 +89,11 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // UI Camera
     private uiCamera!: Phaser.Cameras.Scene2D.Camera;
+
+    // Debug Overlay
+    private debugOverlay!: DebugOverlay;
+    private debugVisible: boolean = false;
+    private debugToggleKey!: Phaser.Input.Keyboard.Key;
 
     // Game Over State
     private isGameOver: boolean = false;
@@ -281,6 +287,13 @@ export class OnlineGameScene extends Phaser.Scene {
         // Initialize HUD
         this.matchHUD = new MatchHUD(this);
         this.matchHUD.addToCameraIgnore(this.cameras.main);
+
+        // Debug Overlay
+        this.debugOverlay = new DebugOverlay(this);
+        this.debugOverlay.setCameraIgnore(this.cameras.main);
+
+        // Debug Toggle Key
+        this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
 
         // Setup input (local player only)
         this.inputManager = new InputManager(this, {
@@ -481,9 +494,35 @@ export class OnlineGameScene extends Phaser.Scene {
         // Update MatchHUD
         if (this.matchHUD) {
             this.matchHUD.updatePlayers(this.players);
-            if (this.networkManager) {
-                this.matchHUD.updateDebug(this.networkManager.getLatency(), this.game.loop.actualFps);
-            }
+            // Debug moved to DebugOverlay
+        }
+
+        // Update Debug Overlay
+        if (Phaser.Input.Keyboard.JustDown(this.debugToggleKey)) {
+            this.debugVisible = !this.debugVisible;
+            this.debugOverlay.setVisible(this.debugVisible);
+            this.players.forEach(p => p.setDebug(this.debugVisible));
+        }
+
+        if (this.debugVisible && this.localPlayer) {
+            const velocity = this.localPlayer.getVelocity();
+            const currentAttack = this.localPlayer.getCurrentAttack();
+            const attackInfo = currentAttack
+                ? `${currentAttack.data.type} ${currentAttack.data.direction} (${currentAttack.phase})`
+                : 'None';
+
+            this.debugOverlay.update(
+                velocity.x,
+                velocity.y,
+                this.localPlayer.getState(),
+                this.localPlayer.getRecoveryAvailable(),
+                attackInfo,
+                this.localPlayer.isGamepadConnected(),
+                this.networkManager.getLatency()
+            );
+        } else if (!this.debugVisible) {
+            // Ensure hidden if toggled off
+            this.debugOverlay.setVisible(false);
         }
 
         // Dynamic Camera

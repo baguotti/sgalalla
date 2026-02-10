@@ -5,6 +5,7 @@ export class DebugOverlay {
     private velocityText: Phaser.GameObjects.Text;
     private stateText: Phaser.GameObjects.Text;
     private fpsText: Phaser.GameObjects.Text;
+    private pingText: Phaser.GameObjects.Text;
     private recoveryText: Phaser.GameObjects.Text;
     private attackText: Phaser.GameObjects.Text;
     private gamepadText: Phaser.GameObjects.Text;
@@ -40,7 +41,16 @@ export class DebugOverlay {
         });
         this.fpsText.setDepth(1000);
 
-        this.recoveryText = scene.add.text(10, 85, '', {
+        this.pingText = scene.add.text(10, 85, '', {
+            fontSize: '14px',
+            color: '#00ff00',
+            fontFamily: '"Silkscreen"',
+            backgroundColor: '#000000',
+            padding: { x: 5, y: 3 },
+        });
+        this.pingText.setDepth(1000);
+
+        this.recoveryText = scene.add.text(10, 110, '', {
             fontSize: '14px',
             color: '#00ff00',
             fontFamily: '"Silkscreen"',
@@ -49,7 +59,7 @@ export class DebugOverlay {
         });
         this.recoveryText.setDepth(1000);
 
-        this.attackText = scene.add.text(10, 110, '', {
+        this.attackText = scene.add.text(10, 135, '', {
             fontSize: '14px',
             color: '#ffff00',
             fontFamily: '"Silkscreen"',
@@ -58,7 +68,7 @@ export class DebugOverlay {
         });
         this.attackText.setDepth(1000);
 
-        this.gamepadText = scene.add.text(10, 135, '', {
+        this.gamepadText = scene.add.text(10, 160, '', {
             fontSize: '14px',
             color: '#00ffff',
             fontFamily: '"Silkscreen"',
@@ -71,6 +81,7 @@ export class DebugOverlay {
         this.velocityText.setScrollFactor(0);
         this.stateText.setScrollFactor(0);
         this.fpsText.setScrollFactor(0);
+        this.pingText.setScrollFactor(0);
         this.recoveryText.setScrollFactor(0);
         this.attackText.setScrollFactor(0);
         this.gamepadText.setScrollFactor(0);
@@ -82,13 +93,18 @@ export class DebugOverlay {
         state: string,
         recoveryAvailable: boolean,
         attackInfo: string = 'None',
-        gamepadConnected: boolean = false
+        gamepadConnected: boolean = false,
+        ping: number = 0
     ): void {
         this.velocityText.setText(
             `Vel: X=${velocityX.toFixed(0)} Y=${velocityY.toFixed(0)}`
         );
         this.stateText.setText(`State: ${state}`);
         this.fpsText.setText(`FPS: ${Math.round(this.scene.game.loop.actualFps)}`);
+
+        const pingColor = ping > 100 ? '#ff0000' : (ping > 50 ? '#ffff00' : '#00ff00');
+        this.pingText.setText(`Ping: ${ping}ms`).setColor(pingColor);
+
         this.recoveryText.setText(`Recovery: ${recoveryAvailable ? 'Ready' : 'Used'}`);
         this.attackText.setText(`Attack: ${attackInfo}`);
         this.gamepadText.setText(`Gamepad: ${gamepadConnected ? '🎮 Connected' : 'Not connected'}`);
@@ -98,6 +114,7 @@ export class DebugOverlay {
         this.velocityText.setVisible(visible);
         this.stateText.setVisible(visible);
         this.fpsText.setVisible(visible);
+        this.pingText.setVisible(visible);
         this.recoveryText.setVisible(visible);
         this.attackText.setVisible(visible);
         this.gamepadText.setVisible(visible);
@@ -109,6 +126,7 @@ export class DebugOverlay {
             this.velocityText,
             this.stateText,
             this.fpsText,
+            this.pingText,
             this.recoveryText,
             this.attackText,
             this.gamepadText
@@ -119,6 +137,7 @@ export class DebugOverlay {
         this.velocityText.destroy();
         this.stateText.destroy();
         this.fpsText.destroy();
+        this.pingText.destroy();
         this.recoveryText.destroy();
         this.attackText.destroy();
         this.gamepadText.destroy();

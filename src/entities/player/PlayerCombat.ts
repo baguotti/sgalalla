@@ -7,7 +7,6 @@ import type { Damageable } from '../../combat/DamageSystem'; // Type import
 import { DamageSystem } from '../../combat/DamageSystem';
 import { PhysicsConfig } from '../../config/PhysicsConfig';
 import type { InputState } from '../../input/InputManager'; // Type import
-import { SealEntity } from '../projectiles/SealEntity'; // Import SealEntity
 
 export class PlayerCombat {
     private player: Player;
@@ -36,7 +35,7 @@ export class PlayerCombat {
     public throwChargeTime: number = 0;
 
     // Projectile State
-    private hasSpawnedProjectile: boolean = false;
+    // private hasSpawnedProjectile: boolean = false; // Removed
 
     private showDebugHitboxes: boolean = false;
 
@@ -231,7 +230,7 @@ export class PlayerCombat {
             this.currentAttack = new Attack(attackKey, facing);
             this.player.isAttacking = true;
             this.hitTargets.clear();
-            this.hasSpawnedProjectile = false;
+            // this.hasSpawnedProjectile = false; // Removed
 
             // Visual feedback
             // this.player.setVisualTint(0xff0000); // Removed red tint
@@ -258,13 +257,13 @@ export class PlayerCombat {
         }
     }
 
-    private startChargedAttack(attackKey: string, chargePercent: number): void {
+    private startChargedAttack(attackKey: string, _chargePercent: number): void {
         try {
             const facing = this.player.getFacingDirection();
             this.currentAttack = new Attack(attackKey, facing); // Removed chargePercent
             this.player.isAttacking = true;
             this.hitTargets.clear();
-            this.hasSpawnedProjectile = false;
+            // this.hasSpawnedProjectile = false; // Removed
 
             // Set cooldown
             this.attackCooldownTimer = this.currentAttack.data.recoveryDuration;
@@ -446,15 +445,15 @@ export class PlayerCombat {
         if (this.currentAttack.isHitboxActive()) {
             this.updateHitbox();
 
-            // Side Sig Projectile (Seal)
-            if (!this.hasSpawnedProjectile &&
-                this.currentAttack.data.type === AttackType.HEAVY &&
-                this.currentAttack.data.direction === AttackDirection.SIDE &&
-                this.player.character === 'fok_v3') {
-
-                this.spawnSeal();
-                this.hasSpawnedProjectile = true;
-            }
+            // Side Sig Projectile (Seal) - REVERTED
+            // if (!this.hasSpawnedProjectile &&
+            //     this.currentAttack.data.type === AttackType.HEAVY &&
+            //     this.currentAttack.data.direction === AttackDirection.SIDE &&
+            //     this.player.character === 'fok_v3') {
+            //
+            //     this.spawnSeal();
+            //     this.hasSpawnedProjectile = true;
+            // }
 
         } else {
             this.deactivateHitbox();
@@ -730,23 +729,5 @@ export class PlayerCombat {
 
         // Visual Effects for Down Air (Spike)
         // Removed down arrow visual
-    }
-
-    private spawnSeal(): void {
-        console.log('Spawning Seal');
-        const facing = this.player.getFacingDirection();
-
-        // Offset: Start slightly in front of player
-        const offsetX = 50 * facing;
-        const offsetY = 0; // Center Y
-
-        // Create Seal Entity
-        new SealEntity(
-            this.scene,
-            this.player.x + offsetX,
-            this.player.y + offsetY,
-            facing,
-            this.player
-        );
     }
 }

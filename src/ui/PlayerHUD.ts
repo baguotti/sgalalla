@@ -179,33 +179,14 @@ export class MatchHUD {
     private slots: Map<number, PlayerHudSlot> = new Map();
 
     // Debug display
-    private debugContainer: Phaser.GameObjects.Container;
-    private pingText: Phaser.GameObjects.Text;
-    private fpsText: Phaser.GameObjects.Text;
+    // private debugContainer: Phaser.GameObjects.Container;
+    // private pingText: Phaser.GameObjects.Text;
+    // private fpsText: Phaser.GameObjects.Text;
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
 
-        const { width } = scene.cameras.main;
-
-        // Create debug display
-        this.debugContainer = scene.add.container(width / 2, 20);
-        this.debugContainer.setScrollFactor(0);
-        this.debugContainer.setDepth(100);
-
-        const bg = scene.add.rectangle(0, 0, 130, 60, 0x000000, 0.6);
-        bg.setStrokeStyle(1, 0x444444);
-        this.debugContainer.add(bg);
-
-        this.pingText = scene.add.text(-55, -14, 'PING: --', {
-            fontSize: '16px', fontFamily: '"Silkscreen"', color: '#00ff00'
-        });
-        this.debugContainer.add(this.pingText);
-
-        this.fpsText = scene.add.text(-55, 6, 'FPS: --', {
-            fontSize: '16px', fontFamily: '"Silkscreen"', color: '#ffff00'
-        });
-        this.debugContainer.add(this.fpsText);
+        // Debug display removed (Moved to DebugOverlay)
     }
 
     private ignoredCameras: Phaser.Cameras.Scene2D.Camera[] = [];
@@ -260,7 +241,7 @@ export class MatchHUD {
         if (!this.ignoredCameras.includes(camera)) {
             this.ignoredCameras.push(camera);
         }
-        camera.ignore(this.debugContainer);
+        // camera.ignore(this.debugContainer);
         this.slots.forEach(slot => slot.addToCameraIgnore(camera));
     }
 
@@ -273,12 +254,6 @@ export class MatchHUD {
         });
     }
 
-    updateDebug(ping: number, fps: number): void {
-        const pingColor = ping > 100 ? '#ff0000' : (ping > 50 ? '#ffff00' : '#00ff00');
-        this.pingText.setText(`PING: ${ping}ms`).setColor(pingColor);
-        const fpsColor = fps < 30 ? '#ff0000' : (fps < 50 ? '#ffff00' : '#00ff00');
-        this.fpsText.setText(`FPS: ${Math.round(fps)}`).setColor(fpsColor);
-    }
 
     removePlayer(playerId: number): void {
         const slot = this.slots.get(playerId);
@@ -290,7 +265,7 @@ export class MatchHUD {
 
     destroy(): void {
         this.slots.forEach(slot => slot.destroy());
-        this.debugContainer.destroy();
+        // this.debugContainer.destroy();
     }
 }
 
