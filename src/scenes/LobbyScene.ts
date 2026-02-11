@@ -27,8 +27,8 @@ export class LobbyScene extends Phaser.Scene {
     private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character Data
-    private characters: CharacterType[] = ['fok_v3', 'sga'] as any; // Refinement: fok_v3 and sga
-    private charLabels: string[] = ['Fok', 'Sga']; // Refinement: Display Labels
+    private characters: CharacterType[] = ['fok_v3', 'sga', 'sgu'] as any;
+    private charLabels: string[] = ['Fok', 'Sga', 'Sgu'];
     // P1_KEYS removed (unused in Lobby)
 
     // Input debounce & Safety
@@ -89,6 +89,7 @@ export class LobbyScene extends Phaser.Scene {
         this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
         this.load.image('fok_icon', 'assets/fok_icon.png'); // Refinement V2
         this.load.image('sga_icon', 'assets/sga_icon.png');
+        this.load.image('sgu_icon', 'assets/sgu_icon.png');
     }
 
 
@@ -107,13 +108,15 @@ export class LobbyScene extends Phaser.Scene {
         this.add.text(width / 2, 60, titleText, {
             fontSize: '48px',
             color: '#ffffff',
+            fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
         // Instructions (Moved to bottom to avoid overlap with panels)
         const instructions = this.add.text(width / 2, height - 50, 'Join: [SPACE/ENTER] or [GAMEPAD A]  |  Ready: [SPACE/ENTER] or [GAMEPAD A]', {
             fontSize: '20px',
-            color: '#8ab4f8'
+            color: '#8ab4f8',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
 
         // Add "Alive" pulse
@@ -209,6 +212,7 @@ export class LobbyScene extends Phaser.Scene {
             const pLabel = this.add.text(0, -180, `P${i + 1}`, {
                 fontSize: '32px',
                 fontStyle: 'bold',
+                fontFamily: '"Pixeloid Sans"',
                 color: '#aaaaaa'
             }).setOrigin(0.5);
 
@@ -216,6 +220,7 @@ export class LobbyScene extends Phaser.Scene {
             const stateText = this.add.text(0, 0, 'Press Button\nto Join', {
                 fontSize: '24px',
                 color: '#888888',
+                fontFamily: '"Pixeloid Sans"',
                 align: 'center'
             }).setOrigin(0.5);
 
@@ -223,12 +228,13 @@ export class LobbyScene extends Phaser.Scene {
             const charText = this.add.text(0, 150, '', {
                 fontSize: '28px',
                 color: '#ffffff',
+                fontFamily: '"Pixeloid Sans"',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
 
             // Selection Arrows
-            const leftArrow = this.add.text(-100, 150, '<', { fontSize: '32px', color: '#ffdd00' }).setOrigin(0.5).setVisible(false);
-            const rightArrow = this.add.text(100, 150, '>', { fontSize: '32px', color: '#ffdd00' }).setOrigin(0.5).setVisible(false);
+            const leftArrow = this.add.text(-100, 150, '<', { fontSize: '32px', fontFamily: '"Pixeloid Sans"', color: '#ffdd00' }).setOrigin(0.5).setVisible(false);
+            const rightArrow = this.add.text(100, 150, '>', { fontSize: '32px', fontFamily: '"Pixeloid Sans"', color: '#ffdd00' }).setOrigin(0.5).setVisible(false);
 
             container.add([panel, pLabel, stateText, charText, leftArrow, rightArrow]);
             container.setData('panel', panel);

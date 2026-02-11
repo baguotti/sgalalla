@@ -40,109 +40,149 @@ export class PlayerHudSlot {
         const color = SMASH_COLORS[playerIndex % SMASH_COLORS.length];
 
         // --- 1. Background Box ---
-        // Rounded box with stroke and transparent inside
+        // Rounded Rectangle again
+        // Longer to accommodate triple digit %
+
+        const mainW = width + 80; // Significantly longer (was +40)
+        const mainH = height - 10; // ~70
+
         const bgGraphics = scene.add.graphics();
 
-        // Fill: Semi-transparent black 
-        bgGraphics.fillStyle(0x000000, 0.4);
-        bgGraphics.fillRoundedRect(-width / 2, -height / 2, width, height, 16);
+        // Fill: Black (Rounded)
+        bgGraphics.fillStyle(0x000000, 0.9);
+        bgGraphics.fillRoundedRect(-mainW / 2, -mainH / 2, mainW, mainH, 16);
 
-        // Stroke: Player Color, thick
+        // Stroke: Player Color, thick (Rounded)
         bgGraphics.lineStyle(4, color, 1);
-        bgGraphics.strokeRoundedRect(-width / 2, -height / 2, width, height, 16);
+        bgGraphics.strokeRoundedRect(-mainW / 2, -mainH / 2, mainW, mainH, 16);
 
         this.container.add(bgGraphics);
 
         // --- Layout Calculation ---
-        // Basic element spacing
-        const stockX = -width / 2 + 30;
-        const portraitX = -30;
-        const damageX = 40;
+        const halfW = mainW / 2;
+        // Ignore mirroring: Always standard layout
+        // Layout: [Stocks] [Portrait] -- [Damage] -- [Lip/P1]
 
-        // Mirror multiplier: 1 for left, -1 for right
-        const sideMult = isRightSide ? -1 : 1;
+        // --- 2. Stocks (Far Left) ---
+        const stockOffset = -halfW + 35; // Slightly more padding
 
-        // --- 2. Stocks (Left / Right) ---
-        // If right side, we move it to the right end
-        const finalStockX = isRightSide ? (width / 2 - 30) : stockX;
+        const stockContainer = scene.add.container(stockOffset, 0);
 
-        const stockContainer = scene.add.container(finalStockX, 0);
-
-        // Heart Icon (Text for now)
-        this.stockIcon = scene.add.text(0, -8, '♥', {
-            fontSize: '24px',
-            color: Phaser.Display.Color.IntegerToColor(color).rgba,
+        // Heart Icon
+        this.stockIcon = scene.add.text(0, -12, '♥', {
+            fontSize: '18px',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 2
         }).setOrigin(0.5);
         stockContainer.add(this.stockIcon);
 
-        this.stocksText = scene.add.text(0, 15, '3', {
-            fontSize: '18px',
-            fontFamily: '"Silkscreen"',
+        // Stock Number
+        this.stocksText = scene.add.text(0, 12, '3', {
+            fontSize: '20px',
+            fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
-            color: '#ffffff'
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 2
         }).setOrigin(0.5);
         stockContainer.add(this.stocksText);
 
         this.container.add(stockContainer);
 
-        // --- 3. Portrait (Center-Left / Center-Right) ---
+        // --- 3. Portrait (Left-Center) ---
+        const portraitOffset = -halfW + 70; // Moved further left to clear damage % space
+
         let texture = character;
         let frame: string | undefined = undefined;
 
-        // Use specific icon if available
         if (scene.textures.exists('fok_icon') && character.includes('fok')) {
             texture = 'fok_icon';
         } else {
-            // Fallback
             texture = character.startsWith('fok') ? 'fok' : character;
             frame = character === 'fok_v3' ? '0_Fok_v3_Idle_000.png' : '0_Fok_Idle_000.png';
         }
 
-        const finalPortraitX = portraitX * sideMult;
-        this.portraitSprite = scene.add.sprite(finalPortraitX, 0, texture, frame);
+        this.portraitSprite = scene.add.sprite(portraitOffset, 0, texture, frame);
 
-        // Flip if on right side
-        if (isRightSide) {
-            this.portraitSprite.setFlipX(true);
-        }
-
-        // Scale portrait to fit height
-        // Target size approx 60x60 within the box
-        const targetSize = height - 10;
-        this.portraitSprite.setScale(1);
-        const scale = targetSize / (this.portraitSprite.width || 256);
+        // Masked Rounded Square
+        const portraitSize = mainH - 12;
+        const scale = portraitSize / (this.portraitSprite.width || 256);
         this.portraitSprite.setScale(scale);
 
-        // Mask for portrait (Rounded Square)
+        // Mask (Rounded)
         const maskShape = scene.make.graphics({ x, y }, false);
         maskShape.fillStyle(0xffffff);
-        // Mask position also needs mirroring
-        maskShape.fillRoundedRect(finalPortraitX - targetSize / 2, -targetSize / 2, targetSize, targetSize, 8);
+        maskShape.fillRoundedRect(portraitOffset - portraitSize / 2, -portraitSize / 2, portraitSize, portraitSize, 12);
         const mask = maskShape.createGeometryMask();
         this.portraitSprite.setMask(mask);
 
+        // Portrait Border (Rounded)
+        const portraitBorder = scene.add.graphics();
+        portraitBorder.lineStyle(2, 0x000000, 1);
+        portraitBorder.strokeRoundedRect(portraitOffset - portraitSize / 2, -portraitSize / 2, portraitSize, portraitSize, 12);
         this.container.add(this.portraitSprite);
+        this.container.add(portraitBorder);
 
-        // --- 4. Damage (Center-Right / Center-Left) ---
-        const finalDamageX = damageX * sideMult;
-        this.damageText = scene.add.text(finalDamageX, -8, '0%', {
-            fontSize: '40px',
-            fontFamily: '"Silkscreen"',
+        // --- 4. Labels (Far Right - The "Lip") ---
+        const tabX = halfW - 30; // Right edge
+        const lipY = -mainH / 2 + 2; // Top edge offset
+
+        const labelContainer = scene.add.container(tabX, lipY);
+
+        // Convert color for hex string
+        const colorHex = '#' + color.toString(16).padStart(6, '0');
+
+        // Draw Lip Background (Rounded Rectangle sticking up/in)
+        const lipW = 34;
+        const lipH = 20;
+        const lipGraphics = scene.add.graphics();
+        lipGraphics.fillStyle(color, 1);
+        // Rounded lip
+        lipGraphics.fillRoundedRect(-lipW / 2, -2, lipW, lipH, 6);
+
+        // P# Text
+        this.nameText = scene.add.text(0, 6, `P${playerIndex + 1}`, {
+            fontSize: '12px',
+            fontFamily: '"Pixeloid Sans"',
+            fontStyle: 'bold',
+            color: '#000000',
+        }).setOrigin(0.5);
+
+        labelContainer.add(lipGraphics);
+        labelContainer.add(this.nameText);
+        this.container.add(labelContainer);
+
+        // Device Icon "D" (Below Lip)
+        const deviceText = scene.add.text(tabX, mainH / 2 - 12, 'D', {
+            fontSize: '12px',
+            fontFamily: '"Pixeloid Sans"',
+            fontStyle: 'bold',
+            color: '#888888',
+        }).setOrigin(0.5);
+        this.container.add(deviceText);
+
+        // --- 5. Damage % (Central - shifted right) ---
+        // Move more to the right to accommodate triple digits and clear portrait
+        // Center is 0. Portrait ends around -60. Lip starts around +100.
+        // Let's move center to +20 or +30.
+
+        this.damageText = scene.add.text(25, 0, '0%', {
+            fontSize: '48px',
+            fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
             color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 5
+            stroke: colorHex,
+            strokeThickness: 0
         }).setOrigin(0.5);
-        this.container.add(this.damageText);
+        this.damageText.setShadow(2, 2, '#000000', 2, true, true); // Soft shadow for rounded style
 
-        // --- 5. Name (Below Damage / Bottom Right) ---
-        this.nameText = scene.add.text(finalDamageX, 22, playerName, {
-            fontSize: '14px',
-            fontFamily: '"Silkscreen"',
-            fontStyle: 'bold',
-            color: '#cccccc'
-        }).setOrigin(0.5);
-        this.container.add(this.nameText);
+        if (this.damageText) {
+            this.container.add(this.damageText);
+        }
+
+        // Remove unused vars
+        void isRightSide;
     }
 
     update(damage: number, stocks: number): void {
@@ -150,16 +190,13 @@ export class PlayerHudSlot {
         this.damageText.setText(`${d}%`);
         this.stocksText.setText(stocks.toString());
 
-        // Color grading
-        let colorObj: Phaser.Types.Display.ColorObject;
-        if (damage < 30) colorObj = { r: 255, g: 255, b: 255, a: 255, color: 0 };
-        else if (damage < 60) colorObj = { r: 255, g: 255, b: 0, a: 255, color: 0 };
-        else if (damage < 100) colorObj = { r: 255, g: 165, b: 0, a: 255, color: 0 };
-        else if (damage < 150) colorObj = { r: 255, g: 0, b: 0, a: 255, color: 0 };
-        else colorObj = { r: 139, g: 0, b: 0, a: 255, color: 0 };
-
-        const colorHex = '#' + ((1 << 24) + (colorObj.r << 16) + (colorObj.g << 8) + colorObj.b).toString(16).slice(1);
-        this.damageText.setColor(colorHex);
+        // Keep damage text white
+        // Apply Scaling Effect for high damage?
+        if (damage > 100) {
+            this.damageText.setScale(1.1);
+        } else {
+            this.damageText.setScale(1.0);
+        }
     }
 
     destroy(): void {
@@ -198,35 +235,35 @@ export class MatchHUD {
         if (this.slots.has(playerId)) return;
 
         const { width, height } = this.scene.cameras.main;
-        const barHeight = 100;
-        const padding = 120;
 
-        let x = padding + 50;
+        // Even spacing 4 players
+        // 4 slots spread across width
+        // Centers: 1/8, 3/8, 5/8, 7/8
+        const segment = width / 4;
 
-        if (playerId === 1) { // P2
-            x = width - padding - 50;
-        } else if (playerId === 2) {
-            x = padding * 2.5;
-        } else if (playerId === 3) {
-            x = width - (padding * 2.5);
-        }
+        // Map Player ID 0-3 to slots (Assuming max 4)
+        // Adjust ID if necessary (players might be 1-based or gap-filled)
+        // Assuming consecutive IDs 0,1,2,3 for simplicity in this logic
+        const slotIndex = playerId % 4; // Simple mapping
 
-        // Vertical position: Centered in bottom bar area (but bar is gone)
-        const y = height - barHeight + 20;
+        const x = (slotIndex * segment) + (segment / 2);
+
+        // Vertical position: Bottom
+        const y = height - 60; // Slightly raised
 
         let display = playerName;
         if (isLocalPlayer) {
-            display = `${playerName} (You)`;
+            // display = `${playerName}`; // Keep names simple for HUD
         }
 
-        const isRightSide = x > width / 2;
+        const isRightSide = x > width / 2; // Kept for logic if needed, but mirroring disabled
 
         const slot = new PlayerHudSlot(
             this.scene,
             x,
             y,
-            240, // Wider for layout
-            80,  // Height
+            240, // Base width
+            80,  // Base height
             display,
             playerId,
             character,

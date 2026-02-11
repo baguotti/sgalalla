@@ -205,12 +205,79 @@ export class GameScene extends Phaser.Scene {
                 // Seal (Projectile) - MISSING. Using Up Sig as placeholder? Or generic?
                 // Fok uses 'Fok_v3_Side Sig_Seal'. Sga has no equivalent.
                 // Leave undefined or map to something safe?
+                // Seal (Projectile) - MISSING. Using Up Sig as placeholder? Or generic?
+                // Fok uses 'Fok_v3_Side Sig_Seal'. Sga has no equivalent.
+                // Leave undefined or map to something safe?
                 // Map to Up Sig for now (safe placeholder)
                 seal: { prefix: 'sga_Up_Sig_', count: 1, suffix: '000', loop: false },
+            },
+            'sgu': {
+                // Sgu specific mappings based on sgu.json (same as Sga but with Sgu prefix)
+
+                // Idle & Run
+                idle: { prefix: 'Sgu_Idle_', count: 12, loop: true },
+                run: { prefix: 'Sgu_Idle_', count: 12, loop: true }, // Run mapped to Idle until dedicated run exists
+
+                // Movement / States
+                charging: { prefix: 'sgu_Charge_', count: 2, loop: true },
+                dash: { prefix: 'sgu_Dash_', count: 1, suffix: '000', loop: false },
+                spot_dodge: { prefix: 'sgu_Dodge_', count: 1, suffix: '000', loop: false },
+
+                // Jump / Fall / Hurt
+                jump: { prefix: 'sgu_Jump_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'Sgu_Fall_', count: 1, suffix: '000', loop: false }, // Note Capital S in Sgu_Fall_
+                hurt: { prefix: 'sgu_Hurt_', count: 1, suffix: '000', loop: false },
+
+                // Utils
+                wall_slide: { prefix: 'sgu_Wall_Slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'sgu_Recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'sgu_Ground_Pound_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'sgu_Dodge_', count: 1, suffix: '000', loop: false },
+
+                // --- LIGHT ATTACKS ---
+                // Neutral Light -> Mapped to Side Light
+                attack_light_neutral: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Side Light
+                attack_light_side: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Up Light -> Mapped to Side Light
+                attack_light_up: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Aerials
+                attack_light_up_air: { prefix: 'sgu_Side_Air_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'sgu_Side_Air_', count: 1, suffix: '000', loop: false },
+
+                // Down Light
+                attack_light_down: { prefix: 'sgu_Down_Light_', count: 1, suffix: '000', loop: false },
+
+                // Run Attack
+                attack_light_run: { prefix: 'sgu_Side_Run_', count: 1, suffix: '000', loop: false },
+
+                // --- HEAVY ATTACKS (SIGS) ---
+                // Neutral Sig -> Mapped to Up Sig
+                attack_heavy_neutral: { prefix: 'sgu_Up_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Up Sig
+                attack_heavy_up: { prefix: 'sgu_Up_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Side Sig -> Mapped to Side Light (Placeholder)
+                attack_heavy_side: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
+
+                // Down Sig -> MISSING. Using Side Light? No, let's map to Up Sig or something visible.
+                // Actually user plan said: "I will map attack_heavy_down to sgu_Side_Sig temporarily"
+                // But wait, sgu_Side_Sig exists in JSON? 
+                // Let's check JSON again. Yes: "filename": "sgu_Side_Sig_000".
+                // Wait, user plan said "sgu_Down_Sig appear to be missing... I will map attack_heavy_down to sgu_Side_Sig"
+                // So attack_heavy_down -> sgu_Side_Sig
+                attack_heavy_down: { prefix: 'sgu_Side_Sig_', count: 1, suffix: '000', loop: false },
+
+                // Seal
+                seal: { prefix: 'sgu_Up_Sig_', count: 1, suffix: '000', loop: false },
             }
         };
 
-        const characters = ['fok_v3', 'sga'];
+        const characters = ['fok_v3', 'sga', 'sgu'];
 
         characters.forEach(char => {
             const config = charConfigs[char as keyof typeof charConfigs];
@@ -661,7 +728,7 @@ export class GameScene extends Phaser.Scene {
         const leftWallText = this.add.text(this.WALL_LEFT_X - 12, 375, 'WALL', {
             fontSize: '18px',
             color: '#8ab4f8',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold'
         });
         leftWallText.setRotation(-Math.PI / 2);
@@ -672,7 +739,7 @@ export class GameScene extends Phaser.Scene {
         const rightWallText = this.add.text(this.WALL_RIGHT_X + 12, 525, 'WALL', {
             fontSize: '18px',
             color: '#8ab4f8',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold'
         });
         rightWallText.setRotation(Math.PI / 2);
@@ -1230,7 +1297,7 @@ export class GameScene extends Phaser.Scene {
 
         const text = this.add.text(width / 2, height / 2, winnerText, {
             fontSize: '64px',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
             color: '#ffffff',
             align: 'center',
@@ -1243,7 +1310,7 @@ export class GameScene extends Phaser.Scene {
 
         const subText = this.add.text(width / 2, height / 2 + 100, "Press SPACE or (A) to Restart", {
             fontSize: '32px',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             color: '#cccccc'
         });
         subText.setOrigin(0.5);

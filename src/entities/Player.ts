@@ -213,7 +213,7 @@ export class Player extends Fighter {
 
         this.nameTag = scene.add.text(0, -100, displayName, {
             fontSize: '18px',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
             stroke: '#000000',
             strokeThickness: 4
@@ -235,7 +235,7 @@ export class Player extends Fighter {
 
         // Refinement Round 9: Wider hitbox for fok_v3 (40px width - +5px each side)
         // Refinement Round 9: Wider hitbox for fok_v3 (40px width - +5px each side)
-        if (this.character === 'fok_v3' || this.character === 'sga') {
+        if (this.character === 'fok_v3' || this.character === 'sga' || this.character === 'sgu') {
             // Refinement Round 17: Shave top 10px, widen 3px each side (40->46)
             this.setSize(46, PhysicsConfig.PLAYER_HEIGHT - 10);
         }

@@ -32,24 +32,25 @@ export class MainMenuScene extends Phaser.Scene {
 
         // Title Text
         this.add.text(width / 2, 200, 'SGALALLA', {
-            fontSize: '120px', fontFamily: '"Silkscreen"', color: '#ffffff'
+            fontSize: '120px', fontFamily: '"Pixeloid Sans"', color: '#ffffff'
         }).setOrigin(0.5);
 
         this.add.text(width / 2, 270, 'Pre-Alpha Build', {
-            fontSize: '24px', fontFamily: '"Silkscreen"', color: '#888888'
+            fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(0.5);
 
         // Version
         this.add.text(10, height - 30, 'v0.10.3', {
             fontSize: '16px',
-            color: '#888888'
+            color: '#888888',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0, 1);
 
         // Menu Items
         const startY = 500;
         this.menuOptions.forEach((opt, index) => {
             const text = this.add.text(width / 2, startY + (index * 100), opt.label, {
-                fontSize: '48px', fontFamily: '"Silkscreen"', color: '#888888'
+                fontSize: '48px', fontFamily: '"Pixeloid Sans"', color: '#888888'
             }).setOrigin(0.5);
             this.menuTexts.push(text);
         });
@@ -57,7 +58,7 @@ export class MainMenuScene extends Phaser.Scene {
         this.updateSelection();
 
         // DEBUG: Gamepad Status
-        this.debugText = this.add.text(10, 10, 'Gamepad: ???', { fontSize: '16px', color: '#00ff00' });
+        this.debugText = this.add.text(10, 10, 'Gamepad: ???', { fontSize: '16px', color: '#00ff00', fontFamily: '"Pixeloid Sans"' });
 
         this.input.gamepad?.on('connected', (pad: Phaser.Input.Gamepad.Gamepad) => {
             console.log('Gamepad connected:', pad.id);

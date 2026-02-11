@@ -17,7 +17,7 @@ export class DebugOverlay {
         this.velocityText = scene.add.text(10, 10, '', {
             fontSize: '14px',
             color: '#00ff00',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             backgroundColor: '#000000',
             padding: { x: 5, y: 3 },
         });
@@ -26,7 +26,7 @@ export class DebugOverlay {
         this.stateText = scene.add.text(10, 35, '', {
             fontSize: '14px',
             color: '#00ff00',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             backgroundColor: '#000000',
             padding: { x: 5, y: 3 },
         });
@@ -35,7 +35,7 @@ export class DebugOverlay {
         this.fpsText = scene.add.text(10, 60, '', {
             fontSize: '14px',
             color: '#00ff00',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             backgroundColor: '#000000',
             padding: { x: 5, y: 3 },
         });
@@ -44,7 +44,7 @@ export class DebugOverlay {
         this.pingText = scene.add.text(10, 85, '', {
             fontSize: '14px',
             color: '#00ff00',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             backgroundColor: '#000000',
             padding: { x: 5, y: 3 },
         });
@@ -53,7 +53,7 @@ export class DebugOverlay {
         this.recoveryText = scene.add.text(10, 110, '', {
             fontSize: '14px',
             color: '#00ff00',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             backgroundColor: '#000000',
             padding: { x: 5, y: 3 },
         });
@@ -62,7 +62,7 @@ export class DebugOverlay {
         this.attackText = scene.add.text(10, 135, '', {
             fontSize: '14px',
             color: '#ffff00',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             backgroundColor: '#000000',
             padding: { x: 5, y: 3 },
         });
@@ -71,7 +71,7 @@ export class DebugOverlay {
         this.gamepadText = scene.add.text(10, 160, '', {
             fontSize: '14px',
             color: '#00ffff',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             backgroundColor: '#000000',
             padding: { x: 5, y: 3 },
         });

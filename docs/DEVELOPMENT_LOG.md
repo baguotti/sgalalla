@@ -542,3 +542,22 @@
     - **Assets**: Added `sga_icon` to the UI and moved asset loading to `preload()` for stability.
 - **[Fix]** **Assets**:
     - **Renaming**: Renamed `logo.jpeg` to `logo.jpg` to resolve 403 Forbidden errors on deployment.
+
+### [2026-02-11] v0.10.4 - HUD Redesign & Sga/Sgu Side Run
+- **[V]** `v0.10.4`
+- **[New]** **HUD Redesign**:
+    - **Style**: Rounded rectangular bars with solid black background and colored borders (Player Color).
+    - **Layout**: Simplified left-to-right flow for all players ([Heart/Stocks] -> [Portrait] -> [Damage %] -> [P# Label]).
+    - **Details**:
+        - **Portrait**: Masked rounded square with border, positioned left-center.
+        - **Damage**: Large centered text (Pixeloid Sans), offset right to prevent overlap with portrait.
+        - **Lip**: Player label (P1, P2) contained in a rounded tab sticking out of the top edge.
+    - **Typography**: Unified all lobby and HUD text to use **"Pixeloid Sans"**.
+- **[New]** **Combat Mechanics**:
+    - **Side Run Attack**: Enabled `light_run_grounded` attack for **Sga** and **Sgu**.
+    - **Logic**: Updated `PlayerCombat.ts` to include Sga/Sgu in the running attack conditional check.
+- **[Fix]** **Fonts**:
+    - **Lobby**: Standardized "TRAINING", "P1", "P2", and instructions to Pixeloid Sans.
+    - **Main Menu**: Validated version and debug text fonts.
+- **[S]** **STATUS**: v0.10.4 Complete. HUD is sleek and readable.
+

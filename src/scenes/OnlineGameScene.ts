@@ -247,10 +247,37 @@ export class OnlineGameScene extends Phaser.Scene {
 
                 // Down Sig 
                 attack_heavy_down: { prefix: 'sga_Down_Sig_', count: 1, suffix: '000', loop: false },
+            },
+            'sgu': {
+                // Sgu specific mappings
+                idle: { prefix: 'Sgu_Idle_', count: 12, loop: true },
+                run: { prefix: 'Sgu_Idle_', count: 12, loop: true },
+                charging: { prefix: 'sgu_Charge_', count: 2, loop: true },
+                dash: { prefix: 'sgu_Dash_', count: 1, suffix: '000', loop: false },
+                spot_dodge: { prefix: 'sgu_Dodge_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'sgu_Jump_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'Sgu_Fall_', count: 1, suffix: '000', loop: false },
+                hurt: { prefix: 'sgu_Hurt_', count: 1, suffix: '000', loop: false },
+                wall_slide: { prefix: 'sgu_Wall_Slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'sgu_Recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'sgu_Ground_Pound_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'sgu_Dodge_', count: 1, suffix: '000', loop: false },
+                attack_light_neutral: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_side: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_up: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_up_air: { prefix: 'sgu_Side_Air_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'sgu_Side_Air_', count: 1, suffix: '000', loop: false },
+                attack_light_down: { prefix: 'sgu_Down_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_run: { prefix: 'sgu_Side_Run_', count: 1, suffix: '000', loop: false },
+                attack_heavy_neutral: { prefix: 'sgu_Up_Sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_up: { prefix: 'sgu_Up_Sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_side: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
+                // Map Down Sig to Side Sig due to missing asset
+                attack_heavy_down: { prefix: 'sgu_Side_Sig_', count: 1, suffix: '000', loop: false },
             }
         };
 
-        const characters = ['fok_v3', 'sga'];
+        const characters = ['fok_v3', 'sga', 'sgu'];
 
         characters.forEach(char => {
             const config = charConfigs[char as keyof typeof charConfigs];
@@ -919,7 +946,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
         const text = this.add.text(width / 2, height / 2 - 50, winnerText, {
             fontSize: '64px',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
             color: '#ffffff',
             align: 'center',
@@ -931,7 +958,7 @@ export class OnlineGameScene extends Phaser.Scene {
         // Rematch Button
         this.rematchButton = this.add.text(width / 2 - 120, height / 2 + 80, 'REMATCH', {
             fontSize: '32px',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
             color: '#00ff00',
             backgroundColor: '#333333',
@@ -944,7 +971,7 @@ export class OnlineGameScene extends Phaser.Scene {
         // Leave Button
         this.leaveButton = this.add.text(width / 2 + 120, height / 2 + 80, 'LEAVE', {
             fontSize: '32px',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
             color: '#ff4444',
             backgroundColor: '#333333',

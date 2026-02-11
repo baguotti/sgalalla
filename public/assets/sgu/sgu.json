@@ -1,0 +1,607 @@
+{
+	"textures": [
+		{
+			"image": "sgu_1_0",
+			"format": "RGBA8888",
+			"size": {
+				"w": 525,
+				"h": 2039
+			},
+			"scale": 1,
+			"frames": [
+				{
+					"filename": "sgu_Up_Sig_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 90,
+						"y": 24,
+						"w": 106,
+						"h": 200
+					},
+					"frame": {
+						"x": 2,
+						"y": 2,
+						"w": 106,
+						"h": 200
+					}
+				},
+				{
+					"filename": "sgu_Jump_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 55,
+						"y": 30,
+						"w": 118,
+						"h": 195
+					},
+					"frame": {
+						"x": 2,
+						"y": 206,
+						"w": 118,
+						"h": 195
+					}
+				},
+				{
+					"filename": "sgu_Recovery_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 99,
+						"y": 33,
+						"w": 82,
+						"h": 190
+					},
+					"frame": {
+						"x": 112,
+						"y": 2,
+						"w": 82,
+						"h": 190
+					}
+				},
+				{
+					"filename": "sgu_Dodge_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 81,
+						"y": 35,
+						"w": 105,
+						"h": 188
+					},
+					"frame": {
+						"x": 2,
+						"y": 405,
+						"w": 105,
+						"h": 188
+					}
+				},
+				{
+					"filename": "sgu_Side_Light_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 73,
+						"y": 42,
+						"w": 183,
+						"h": 187
+					},
+					"frame": {
+						"x": 2,
+						"y": 597,
+						"w": 183,
+						"h": 187
+					}
+				},
+				{
+					"filename": "sgu_Dash_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 69,
+						"y": 41,
+						"w": 158,
+						"h": 184
+					},
+					"frame": {
+						"x": 111,
+						"y": 405,
+						"w": 158,
+						"h": 184
+					}
+				},
+				{
+					"filename": "sgu_Ground_Pound_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 77,
+						"y": 40,
+						"w": 126,
+						"h": 184
+					},
+					"frame": {
+						"x": 124,
+						"y": 196,
+						"w": 126,
+						"h": 184
+					}
+				},
+				{
+					"filename": "Sgu_Idle_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 42,
+						"w": 83,
+						"h": 182
+					},
+					"frame": {
+						"x": 198,
+						"y": 2,
+						"w": 83,
+						"h": 182
+					}
+				},
+				{
+					"filename": "Sgu_Idle_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 42,
+						"w": 83,
+						"h": 182
+					},
+					"frame": {
+						"x": 254,
+						"y": 188,
+						"w": 83,
+						"h": 182
+					}
+				},
+				{
+					"filename": "Sgu_Idle_002",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 42,
+						"w": 83,
+						"h": 182
+					},
+					"frame": {
+						"x": 285,
+						"y": 2,
+						"w": 83,
+						"h": 182
+					}
+				},
+				{
+					"filename": "Sgu_Idle_003",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 42,
+						"w": 83,
+						"h": 182
+					},
+					"frame": {
+						"x": 2,
+						"y": 788,
+						"w": 83,
+						"h": 182
+					}
+				},
+				{
+					"filename": "Sgu_Idle_004",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 42,
+						"w": 83,
+						"h": 182
+					},
+					"frame": {
+						"x": 2,
+						"y": 974,
+						"w": 83,
+						"h": 182
+					}
+				},
+				{
+					"filename": "Sgu_Idle_005",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 42,
+						"w": 83,
+						"h": 182
+					},
+					"frame": {
+						"x": 2,
+						"y": 1160,
+						"w": 83,
+						"h": 182
+					}
+				},
+				{
+					"filename": "Sgu_Idle_006",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 42,
+						"w": 83,
+						"h": 182
+					},
+					"frame": {
+						"x": 2,
+						"y": 1346,
+						"w": 83,
+						"h": 182
+					}
+				},
+				{
+					"filename": "sgu_Charge_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 71,
+						"y": 42,
+						"w": 142,
+						"h": 181
+					},
+					"frame": {
+						"x": 2,
+						"y": 1532,
+						"w": 142,
+						"h": 181
+					}
+				},
+				{
+					"filename": "sgu_Side_Sig_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 98,
+						"y": 42,
+						"w": 108,
+						"h": 181
+					},
+					"frame": {
+						"x": 2,
+						"y": 1717,
+						"w": 108,
+						"h": 181
+					}
+				},
+				{
+					"filename": "sgu_Side_Air_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 77,
+						"y": 49,
+						"w": 122,
+						"h": 135
+					},
+					"frame": {
+						"x": 2,
+						"y": 1902,
+						"w": 122,
+						"h": 135
+					}
+				},
+				{
+					"filename": "sgu_Charge_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 75,
+						"y": 42,
+						"w": 105,
+						"h": 181
+					},
+					"frame": {
+						"x": 114,
+						"y": 1717,
+						"w": 105,
+						"h": 181
+					}
+				},
+				{
+					"filename": "sgu_Down_Light_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 68,
+						"y": 104,
+						"w": 155,
+						"h": 116
+					},
+					"frame": {
+						"x": 128,
+						"y": 1902,
+						"w": 155,
+						"h": 116
+					}
+				},
+				{
+					"filename": "Sgu_Idle_007",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 44,
+						"w": 83,
+						"h": 180
+					},
+					"frame": {
+						"x": 287,
+						"y": 1717,
+						"w": 83,
+						"h": 180
+					}
+				},
+				{
+					"filename": "Sgu_Idle_008",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 44,
+						"w": 83,
+						"h": 180
+					},
+					"frame": {
+						"x": 89,
+						"y": 788,
+						"w": 83,
+						"h": 180
+					}
+				},
+				{
+					"filename": "Sgu_Idle_009",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 44,
+						"w": 83,
+						"h": 180
+					},
+					"frame": {
+						"x": 89,
+						"y": 972,
+						"w": 83,
+						"h": 180
+					}
+				},
+				{
+					"filename": "Sgu_Idle_010",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 44,
+						"w": 83,
+						"h": 180
+					},
+					"frame": {
+						"x": 89,
+						"y": 1156,
+						"w": 83,
+						"h": 180
+					}
+				},
+				{
+					"filename": "Sgu_Idle_011",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 44,
+						"w": 83,
+						"h": 180
+					},
+					"frame": {
+						"x": 89,
+						"y": 1340,
+						"w": 83,
+						"h": 180
+					}
+				},
+				{
+					"filename": "sgu_Wall_Slide_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 44,
+						"w": 115,
+						"h": 176
+					},
+					"frame": {
+						"x": 148,
+						"y": 1524,
+						"w": 115,
+						"h": 176
+					}
+				},
+				{
+					"filename": "sgu_Hurt_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 49,
+						"w": 114,
+						"h": 176
+					},
+					"frame": {
+						"x": 267,
+						"y": 1524,
+						"w": 114,
+						"h": 176
+					}
+				},
+				{
+					"filename": "sgu_Side_Run_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 70,
+						"y": 47,
+						"w": 149,
+						"h": 175
+					},
+					"frame": {
+						"x": 374,
+						"y": 1704,
+						"w": 149,
+						"h": 175
+					}
+				},
+				{
+					"filename": "Sgu_Fall_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 77,
+						"y": 45,
+						"w": 136,
+						"h": 167
+					},
+					"frame": {
+						"x": 176,
+						"y": 788,
+						"w": 136,
+						"h": 167
+					}
+				}
+			]
+		}
+	],
+	"meta": {
+		"app": "http://free-tex-packer.com",
+		"version": "0.6.7"
+	}
+}

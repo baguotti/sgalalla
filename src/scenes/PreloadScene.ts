@@ -9,9 +9,12 @@ export class PreloadScene extends Phaser.Scene {
         this.load.image('logo', 'assets/ui/logo.jpg');
         this.load.image('title_card', 'assets/ui/title_card.jpg');
 
-        // Character Assets
         this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
         this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
+        this.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');
+        this.load.image('fok_icon', 'assets/fok_icon.png');
+        this.load.image('sga_icon', 'assets/sga_icon.png');
+        this.load.image('sgu_icon', 'assets/sgu_icon.png');
     }
 
     create(): void {
@@ -45,15 +48,15 @@ export class PreloadScene extends Phaser.Scene {
         const loadingText = this.add.text(width / 2, height - 100, 'Loading...', {
             fontSize: '32px',
             color: '#ffffff',
-            fontFamily: 'Arial'
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
 
-        // Wait for Silkscreen font to load
+        // Wait for Pixeloid Sans font to load
         // @ts-ignore - document.fonts is not in all TS definitions
-        document.fonts.load('1rem "Silkscreen"').then(() => {
+        document.fonts.load('1rem "Pixeloid Sans"').then(() => {
             console.log('Font loaded');
             loadingText.setText('PRESS START');
-            loadingText.setFontFamily('"Silkscreen"');
+            loadingText.setFontFamily('"Pixeloid Sans"');
             loadingText.setFontSize(48);
 
             // Blink effect

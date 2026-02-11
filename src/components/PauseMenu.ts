@@ -76,7 +76,7 @@ export class PauseMenu {
             fontSize: '64px',
             color: '#ffffff',
             fontStyle: 'bold',
-            fontFamily: '"Silkscreen"'
+            fontFamily: '"Pixeloid Sans"'
         });
         this.titleText.setOrigin(0.5);
         this.titleText.setScrollFactor(0);
@@ -91,7 +91,7 @@ export class PauseMenu {
             const itemText = this.scene.add.text(centerX, startY + (index * spacing), option.label, {
                 fontSize: '32px',
                 color: '#ffffff',
-                fontFamily: '"Silkscreen"'
+                fontFamily: '"Pixeloid Sans"'
             });
             itemText.setOrigin(0.5);
             itemText.setScrollFactor(0);
@@ -117,7 +117,7 @@ export class PauseMenu {
         this.hintText = this.scene.add.text(centerX, 550, '[ESC / START to Resume]', {
             fontSize: '18px',
             color: '#888888',
-            fontFamily: '"Silkscreen"'
+            fontFamily: '"Pixeloid Sans"'
         });
         this.hintText.setOrigin(0.5);
         this.hintText.setScrollFactor(0);
@@ -145,7 +145,7 @@ export class PauseMenu {
             fontSize: '28px',
             color: '#8ab4f8', // Pastel Blue
             fontStyle: 'bold',
-            fontFamily: '"Silkscreen"'
+            fontFamily: '"Pixeloid Sans"'
         });
 
         const inputsText = [
@@ -166,7 +166,7 @@ export class PauseMenu {
         const inputsContent = this.scene.add.text(col1X, contentY, inputsText, {
             fontSize: '18px',
             color: '#cccccc',
-            fontFamily: '"Silkscreen"',
+            fontFamily: '"Pixeloid Sans"',
             lineSpacing: 8
         });
 
@@ -175,7 +175,7 @@ export class PauseMenu {
             fontSize: '28px',
             color: '#f28b82', // Pastel Red
             fontStyle: 'bold',
-            fontFamily: '"Silkscreen"'
+            fontFamily: '"Pixeloid Sans"'
         });
 
         const movesetText = [
@@ -198,7 +198,7 @@ export class PauseMenu {
         const movesetContent = this.scene.add.text(col2X, contentY, movesetText, {
             fontSize: '18px',
             color: '#eeeeee',
-            fontFamily: '"Silkscreen"', // Readable font for text
+            fontFamily: '"Pixeloid Sans"', // Readable font for text
             lineSpacing: 6
         });
 

@@ -147,7 +147,7 @@ export class PlayerCombat {
             // Refinement Round 10: Run-Attack Override (Slide Attack)
             // Any light attack while running becomes a Down Light (Slide) to use momentum
             if (this.player.physics.isRunning && this.player.isGrounded) {
-                if (this.player.character === 'fok_v3') {
+                if (this.player.character === 'fok_v3' || this.player.character === 'sga' || this.player.character === 'sgu') {
                     // Use new Running Light Attack
                     this.startAttack('light_run_grounded');
                     return;
