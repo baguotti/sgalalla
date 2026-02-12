@@ -600,3 +600,9 @@
 - **[Fix]** **Assets**: Renamed all Scrin images to replace spaces with underscores (e.g. `22.36.58.jpg` -> `22.36.58.jpg`) to resolve 404 errors on Linux/Nginx.
 - **[Fix]** **Online**: Updated preload lists in `GameScene` and `OnlineGameScene` to match new filenames.
 - **[S]** **STATUS**: v0.10.7 Released. Images should now load correctly in online mode.
+
+### [2026-02-12] v0.10.8 - Loading Screen Polish
+- **[V]** `v0.10.8`
+- **[Fix]** **Loading Screen**: Removed dimming overlay from `main_title.jpg` (Loading Card) for full brightness.
+- **[Fix]** **Assets**: Synced local asset renames (`scrin_00X`) and removed broken `logo.jpg` reference.
+- **[S]** **STATUS**: v0.10.8 Released. Loading screen is crisp.

@@ -27,9 +27,9 @@ export class MainMenuScene extends Phaser.Scene {
         this.menuTexts = [];
 
         // Visuals
-        // Visuals
         this.add.rectangle(0, 0, width, height, 0x1a1a1a).setOrigin(0);
 
+        // Title Text
         // Title Text
         this.add.text(width / 2, 200, 'SGALALLA', {
             fontSize: '120px', fontFamily: '"Pixeloid Sans"', color: '#ffffff'
@@ -40,7 +40,7 @@ export class MainMenuScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Version
-        this.add.text(10, height - 30, 'v0.10.7', {
+        this.add.text(10, height - 30, 'v0.10.8', {
             fontSize: '16px',
             color: '#888888',
             fontFamily: '"Pixeloid Sans"'

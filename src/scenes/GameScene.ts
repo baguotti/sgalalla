@@ -85,17 +85,13 @@ export class GameScene extends Phaser.Scene {
 
         // Preload scrin images for chest opening
         const scrinFiles = [
-            '2026-02-12_22.36.58.jpg', '2026-02-12_22.37.12.jpg', '2026-02-12_22.37.41.jpg',
-            '2026-02-12_22.37.56.jpg', '2026-02-12_22.38.06.jpg', '2026-02-12_22.38.09.jpg',
-            '2026-02-12_22.38.13.jpg', '2026-02-12_22.38.28.jpg', '2026-02-12_22.38.33.jpg',
-            '2026-02-12_22.38.37.jpg', '2026-02-12_22.38.41.jpg', '2026-02-12_22.38.47.jpg',
-            '2026-02-12_22.38.51.jpg', '2026-02-12_22.38.56.jpg', '2026-02-12_22.39.01.jpg',
-            '2026-02-12_22.39.06.jpg', '2026-02-12_22.39.09.jpg', '2026-02-12_22.39.13.jpg',
-            '2026-02-12_22.39.17.jpg', '2026-02-12_22.39.20.jpg', '2026-02-12_22.39.25.jpg',
-            '2026-02-12_22.39.29.jpg', '2026-02-12_22.39.33.jpg', '2026-02-12_22.39.39.jpg',
-            '2026-02-12_22.39.45.jpg', '2026-02-12_22.39.49.jpg', '2026-02-12_22.39.54.jpg',
-            '2026-02-12_22.39.58.jpg', '2026-02-12_22.40.03.jpg', '2026-02-12_22.40.06.jpg',
-            '2026-02-12_22.40.09.jpg'
+            'scrin_001.jpg', 'scrin_002.jpg', 'scrin_003.jpg', 'scrin_004.jpg', 'scrin_005.jpg',
+            'scrin_006.jpg', 'scrin_007.jpg', 'scrin_008.jpg', 'scrin_009.jpg', 'scrin_0010.jpg',
+            'scrin_0011.jpg', 'scrin_0012.jpg', 'scrin_0013.jpg', 'scrin_0014.jpg', 'scrin_0015.jpg',
+            'scrin_0016.jpg', 'scrin_0017.jpg', 'scrin_0018.jpg', 'scrin_0019.jpg', 'scrin_0020.jpg',
+            'scrin_0021.jpg', 'scrin_0022.jpg', 'scrin_0023.jpg', 'scrin_0024.jpg', 'scrin_0025.jpg',
+            'scrin_0026.jpg', 'scrin_0027.jpg', 'scrin_0028.jpg', 'scrin_0029.jpg', 'scrin_0030.jpg',
+            'scrin_0031.jpg'
         ];
 
         scrinFiles.forEach(file => {

@@ -6,8 +6,8 @@ export class PreloadScene extends Phaser.Scene {
     }
 
     preload(): void {
-        this.load.image('logo', 'assets/ui/logo.jpg');
-        this.load.image('title_card', 'assets/ui/title_card.jpg');
+        // this.load.image('logo', 'assets/ui/logo.jpg'); // Removed as file is deleted
+        this.load.image('title_card', 'assets/ui/main_title.jpg');
 
         this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
         this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
@@ -24,25 +24,26 @@ export class PreloadScene extends Phaser.Scene {
         this.cameras.main.setBackgroundColor('#000000');
 
         // Background Image (Title Card)
+        console.log('Checking title_card texture:', this.textures.exists('title_card'));
         if (this.textures.exists('title_card')) {
             const bg = this.add.image(width / 2, height / 2, 'title_card');
             const scaleX = width / bg.width;
             const scaleY = height / bg.height;
             const scale = Math.max(scaleX, scaleY);
             bg.setScale(scale);
-            // Darken slightly for logo/text contrast
-            this.add.rectangle(0, 0, width, height, 0x000000, 0.3).setOrigin(0);
+            // Darken slightly for logo/text contrast - REMOVED per user request
+            // this.add.rectangle(0, 0, width, height, 0x000000, 0.3).setOrigin(0);
         }
 
-        // Display Logo
-        const logo = this.add.image(width / 2, height / 2, 'logo');
-        logo.setOrigin(0.5);
+        // Display Logo (Removed)
+        // const logo = this.add.image(width / 2, height / 2, 'logo');
+        // logo.setOrigin(0.5);
 
-        // Scale logo to fit within screen with some padding, maintaining aspect ratio
-        const scaleX = (width * 0.8) / logo.width;
-        const scaleY = (height * 0.8) / logo.height;
-        const scale = Math.min(scaleX, scaleY);
-        logo.setScale(scale);
+        // Scale logo logic removed
+        // const scaleX = (width * 0.8) / logo.width;
+        // const scaleY = (height * 0.8) / logo.height;
+        // const scale = Math.min(scaleX, scaleY);
+        // logo.setScale(scale);
 
         // Loading Text
         const loadingText = this.add.text(width / 2, height - 100, 'Loading...', {
