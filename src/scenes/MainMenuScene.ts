@@ -35,16 +35,11 @@ export class MainMenuScene extends Phaser.Scene {
             fontSize: '120px', fontFamily: '"Pixeloid Sans"', color: '#ffffff'
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, 270, 'Pre-Alpha Build', {
+        this.add.text(width / 2, 270, 'Pre-Alpha Build v0.10.9', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(0.5);
 
-        // Version
-        this.add.text(10, height - 30, 'v0.10.8', {
-            fontSize: '16px',
-            color: '#888888',
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0, 1);
+        // Version (Removed - combined with subtitle)
 
         // Menu Items
         const startY = 500;

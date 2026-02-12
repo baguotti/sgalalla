@@ -606,3 +606,10 @@
 - **[Fix]** **Loading Screen**: Removed dimming overlay from `main_title.jpg` (Loading Card) for full brightness.
 - **[Fix]** **Assets**: Synced local asset renames (`scrin_00X`) and removed broken `logo.jpg` reference.
 - **[S]** **STATUS**: v0.10.8 Released. Loading screen is crisp.
+
+### [2026-02-12] v0.10.9 - Online Fixes & UI Tweaks
+- **[V]** `v0.10.9`
+- **[Fix]** **Online Camera**: Synced default zoom to 'CLOSE' (matching Training).
+- **[Fix]** **Online Chests**: Added physics bodies to online platforms so chests don't fall through.
+- **[UI]** **Menu**: Merged version number with subtitle for cleaner look.
+- **[S]** **STATUS**: v0.10.9 Released. Online play should feel much more solid.

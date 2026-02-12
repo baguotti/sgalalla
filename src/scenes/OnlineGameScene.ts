@@ -80,7 +80,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // Camera Settings (matching GameScene)
     // Camera Settings (matching GameScene)
-    private currentZoomLevel: 'CLOSE' | 'NORMAL' | 'WIDE' = 'NORMAL';
+    private currentZoomLevel: 'CLOSE' | 'NORMAL' | 'WIDE' = 'CLOSE';
     private readonly ZOOM_SETTINGS = {
         CLOSE: { padX: 250, padY: 100, minZoom: 0.5, maxZoom: 1.5 }, // Increased padding and range
         NORMAL: { padX: 450, padY: 300, minZoom: 0.5, maxZoom: 1.1 },
@@ -1580,6 +1580,9 @@ export class OnlineGameScene extends Phaser.Scene {
         const mainPlatform = this.add.rectangle(960, 900, 2400, 60, 0x2c3e50);
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
+        // Add Matter body for Chest collision
+        this.matter.world.setGravity(0, 1);
+        this.matter.add.gameObject(mainPlatform, { isStatic: true });
         if (this.uiCamera) this.uiCamera.ignore(mainPlatform);
 
         // Soft platforms (floating HIGHER)
@@ -1588,12 +1591,14 @@ export class OnlineGameScene extends Phaser.Scene {
         softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform1.setAlpha(0.85);
         this.softPlatforms.push(softPlatform1);
+        this.matter.add.gameObject(softPlatform1, { isStatic: true });
 
         // Right - Refinement 12: Pushed right to 1660
         const softPlatform2 = this.add.rectangle(1660, 500, 500, 30, 0x0f3460);
         softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform2.setAlpha(0.85);
         this.softPlatforms.push(softPlatform2);
+        this.matter.add.gameObject(softPlatform2, { isStatic: true });
         if (this.uiCamera) {
             this.uiCamera.ignore(this.platforms);
             this.uiCamera.ignore(this.softPlatforms);
