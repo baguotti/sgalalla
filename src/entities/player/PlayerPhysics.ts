@@ -580,21 +580,32 @@ export class PlayerPhysics {
         }
     }
 
-    public checkWallCollision(leftBound: number, rightBound: number): void {
+    public checkWallCollision(walls: Phaser.Geom.Rectangle[]): void {
         const playerBounds = this.player.getBounds();
 
         this.isTouchingWall = false;
         this.wallDirection = 0;
 
-        if (playerBounds.left <= leftBound) {
-            this.player.x = leftBound + PhysicsConfig.PLAYER_WIDTH / 2;
-            this.isTouchingWall = true;
-            this.wallDirection = -1;
-        }
-        else if (playerBounds.right >= rightBound) {
-            this.player.x = rightBound - PhysicsConfig.PLAYER_WIDTH / 2;
-            this.isTouchingWall = true;
-            this.wallDirection = 1;
+        for (const wall of walls) {
+            if (Phaser.Geom.Rectangle.Overlaps(playerBounds, wall)) {
+                // Resolve Collision
+                const pCx = playerBounds.centerX;
+                const wCx = wall.centerX;
+
+                if (pCx < wCx) {
+                    // Player is Left of Wall Center -> Push Left
+                    this.player.x = wall.left - PhysicsConfig.PLAYER_WIDTH / 2;
+                    this.isTouchingWall = true;
+                    // Wall is to the Right
+                    this.wallDirection = 1;
+                } else {
+                    // Player is Right of Wall Center -> Push Right
+                    this.player.x = wall.right + PhysicsConfig.PLAYER_WIDTH / 2;
+                    this.isTouchingWall = true;
+                    // Wall is to the Left
+                    this.wallDirection = -1;
+                }
+            }
         }
     }
 

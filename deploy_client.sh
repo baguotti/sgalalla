@@ -23,10 +23,10 @@ if [ ! -z "$new_version" ]; then
   git commit -m "Bump version to $new_version"
   git push
   
-  # Rebuild with new version
-  echo "Rebuilding..."
-  npm run build
 fi
+  
+echo "Rebuilding..."
+npm run build
 
 echo "=== Step 1: Uploading dist folder to Droplet ==="
 scp -r $DIST_PATH/* root@$DROPLET_IP:$REMOTE_PATH

@@ -487,8 +487,8 @@ export class Player extends Fighter {
         this.physics.checkPlatformCollision(platform, isSoft);
     }
 
-    public checkWallCollision(left: number, right: number): void {
-        this.physics.checkWallCollision(left, right);
+    public checkWallCollision(walls: Phaser.Geom.Rectangle[]): void {
+        this.physics.checkWallCollision(walls);
     }
 
     public checkLedgeGrab(platforms: Array<{ rect: Phaser.GameObjects.Rectangle; isSoft?: boolean }>): void {

@@ -113,8 +113,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES + 50,
         // Hitbox from Side Light (Effective)
-        hitboxWidth: 81,
-        hitboxHeight: 35,
+        hitboxWidth: 120, // Significantly increased (was 81)
+        hitboxHeight: 70, // Significantly increased (was 35)
         hitboxOffsetX: 60,
         hitboxOffsetY: 0,
     },

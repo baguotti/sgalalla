@@ -40,10 +40,11 @@ export class GameScene extends Phaser.Scene {
     private readonly PLAY_BOUND_RIGHT = this.WALL_RIGHT_X - this.WALL_THICKNESS / 2;
 
     // Blast zone boundaries
-    private readonly BLAST_ZONE_LEFT = -3000; // Extended from -2000
-    private readonly BLAST_ZONE_RIGHT = 5000; // Extended from 4000
-    private readonly BLAST_ZONE_TOP = -2500;
-    private readonly BLAST_ZONE_BOTTOM = 3500;
+    // Blast zone boundaries
+    private readonly BLAST_ZONE_LEFT = -1020; // Extended by 600px
+    private readonly BLAST_ZONE_RIGHT = 2940; // Extended by 600px
+    private readonly BLAST_ZONE_TOP = -600; // Significantly reduced (was -800)
+    private readonly BLAST_ZONE_BOTTOM = 1800;
 
     private uiCamera!: Phaser.Cameras.Scene2D.Camera;
 
@@ -80,6 +81,8 @@ export class GameScene extends Phaser.Scene {
 
         // Load Maps
         this.load.image('background_lake', 'assets/pixel-lake08-sunny-water.jpg');
+        // New Stage Background
+        this.load.image('adria_bg', 'assets/adria_background.webp');
     }
 
     private createAnimations(): void {
@@ -669,9 +672,22 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
+    private wallRects: Phaser.Geom.Rectangle[] = [];
+
     private createStage(): void {
-        // Background gradient to show play area
-        // Background gradient to show play area
+        // Background Image (Adria)
+        this.backgroundImage = this.add.image(this.scale.width / 2, this.scale.height / 2, 'adria_bg');
+        // Scale to cover
+        const bg = this.backgroundImage;
+        const scaleX = this.scale.width / bg.width;
+        const scaleY = this.scale.height / bg.height;
+        const scale = Math.max(scaleX, scaleY);
+        // Refinement: Background Depth Tweak (Parallax 0.1, Scale +10%)
+        bg.setScale(scale * 1.1).setScrollFactor(0.1);
+        bg.setDepth(-100);
+
+        // Remove old gradient graphics
+        /*
         this.background = this.add.graphics();
         // Refinement: Dark Blue Gradient (Deep Navy -> Dark Blue/Grey)
         // Top: 0x0f2027, Bottom: 0x203a43
@@ -679,6 +695,7 @@ export class GameScene extends Phaser.Scene {
         this.background.fillRect(0, 0, this.scale.width, this.scale.height);
         this.background.setScrollFactor(0); // Ensure static relative to camera
         this.background.setDepth(-100); // Ensure behind everything
+        */
 
         // Main platform (centered, wider - Refinement 12)
         // Center: 960. Width 2400 (Was 1800). Y = 900
@@ -712,17 +729,25 @@ export class GameScene extends Phaser.Scene {
         const wallColor = 0x2a3a4e;
         const wallStroke = 0x4a6a8e;
 
-        // Left wall visual
-        const leftWallVisual = this.add.rectangle(this.WALL_LEFT_X, 540, this.WALL_THICKNESS, 1080, wallColor);
+        // Left wall visual (Shortened: Height 540, Y=560)
+        const leftWallVisual = this.add.rectangle(this.WALL_LEFT_X, 560, this.WALL_THICKNESS, 540, wallColor);
         leftWallVisual.setStrokeStyle(4, wallStroke);
         leftWallVisual.setAlpha(0.6);
         leftWallVisual.setDepth(-5);
 
-        // Right wall visual
-        const rightWallVisual = this.add.rectangle(this.WALL_RIGHT_X, 540, this.WALL_THICKNESS, 1080, wallColor);
+        // Right wall visual (Shortened: Height 540, Y=560)
+        const rightWallVisual = this.add.rectangle(this.WALL_RIGHT_X, 560, this.WALL_THICKNESS, 540, wallColor);
         rightWallVisual.setStrokeStyle(4, wallStroke);
         rightWallVisual.setAlpha(0.6);
         rightWallVisual.setDepth(-5);
+
+        // Define Wall Rects for Collision (Top-Left Y = 560 - 270 = 290)
+        this.wallRects = [
+            // Left Wall (x, y, w, h) - Phaser.Geom.Rectangle uses Top-Left Coords
+            new Phaser.Geom.Rectangle(this.WALL_LEFT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540),
+            // Right Wall
+            new Phaser.Geom.Rectangle(this.WALL_RIGHT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540)
+        ];
 
         // Add wall indicators (text labels)
         const leftWallText = this.add.text(this.WALL_LEFT_X - 12, 375, 'WALL', {
@@ -884,7 +909,7 @@ export class GameScene extends Phaser.Scene {
 
 
         // Environment Collisions (Walls)
-        this.players.forEach(p => p.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT));
+        this.players.forEach(p => p.checkWallCollision(this.wallRects));
 
 
         // Combat Hit Checks
@@ -1023,10 +1048,10 @@ export class GameScene extends Phaser.Scene {
             if (!p.active) return false; // Ignore inactive (dead/waiting respawn) players
 
             // Check bounds (using slightly tighter bounds than actual kill box)
-            return p.x > this.BLAST_ZONE_LEFT + 500 &&
-                p.x < this.BLAST_ZONE_RIGHT - 500 &&
-                p.y < this.BLAST_ZONE_BOTTOM - 500 &&
-                p.y > this.BLAST_ZONE_TOP + 500;
+            return p.x > this.BLAST_ZONE_LEFT + 50 &&
+                p.x < this.BLAST_ZONE_RIGHT - 50 &&
+                p.y < this.BLAST_ZONE_BOTTOM - 50 &&
+                p.y > this.BLAST_ZONE_TOP + 50;
         });
 
         if (targets.length === 0) return;

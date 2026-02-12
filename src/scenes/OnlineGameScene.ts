@@ -73,10 +73,10 @@ export class OnlineGameScene extends Phaser.Scene {
     private readonly PLAY_BOUND_RIGHT = this.WALL_RIGHT_X - this.WALL_THICKNESS / 2;
 
     // Blast zone boundaries (matching GameScene)
-    private readonly BLAST_ZONE_LEFT = -3000; // Extended from -2000
-    private readonly BLAST_ZONE_RIGHT = 5000; // Extended from 4000
-    private readonly BLAST_ZONE_TOP = -2500;
-    private readonly BLAST_ZONE_BOTTOM = 3500;
+    private readonly BLAST_ZONE_LEFT = -420; // Tighter to wall
+    private readonly BLAST_ZONE_RIGHT = 2340; // Tighter to wall
+    private readonly BLAST_ZONE_TOP = -800; // Significantly reduced (was -1625)
+    private readonly BLAST_ZONE_BOTTOM = 1800; // Significantly reduced (was 3500)
 
     // Camera Settings (matching GameScene)
     // Camera Settings (matching GameScene)
@@ -110,7 +110,7 @@ export class OnlineGameScene extends Phaser.Scene {
     private selectedCharacter: string = 'fok_v3';
     private opponentCharacter: string = 'fok_v3';
     // Character Selection
-    private availableCharacters: string[] = ['fok_v3', 'sga']; // Refinement: fok_v3 is default
+    private availableCharacters: string[] = ['fok_v3', 'sga', 'sgu']; // Refinement: fok_v3 is default
     private selectedCharIndex: number = 0;
     private isConfirmed: boolean = false;
     private isOpponentConfirmed: boolean = false;
@@ -132,10 +132,15 @@ export class OnlineGameScene extends Phaser.Scene {
 
     preload(): void {
         this.load.image('platform', 'assets/platform.png');
-        this.load.image('background', 'assets/background.png');
+        // New Stage Background
+        this.load.image('adria_bg', 'assets/adria_background.webp');
+        this.load.image('background', 'assets/background.png'); // Keep for fallback?
+
         this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
         this.load.image('fok_icon', 'assets/fok_icon.png'); // Refinement V2
     }
+
+
 
     private createAnimations(): void {
         const charConfigs = {
@@ -473,7 +478,7 @@ export class OnlineGameScene extends Phaser.Scene {
             // Collisions
             this.platforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, false));
             this.softPlatforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, true));
-            this.localPlayer.checkWallCollision(this.PLAY_BOUND_LEFT, this.PLAY_BOUND_RIGHT);
+            this.localPlayer.checkWallCollision(this.wallRects);
 
             this.localPlayer.updateLogic(delta);
 
@@ -1188,7 +1193,7 @@ export class OnlineGameScene extends Phaser.Scene {
                 this.scale.width / 2,
                 this.scale.height / 2,
                 message,
-                { fontSize: '32px', color: '#ffffff', backgroundColor: '#333333', padding: { x: 20, y: 10 } }
+                { fontSize: '32px', color: '#ffffff', backgroundColor: '#333333', padding: { x: 20, y: 10 }, fontFamily: '"Pixeloid Sans"' }
             ).setOrigin(0.5).setDepth(1000);
         } else {
             this.connectionStatusText.setText(message);
@@ -1218,7 +1223,8 @@ export class OnlineGameScene extends Phaser.Scene {
         const title = this.add.text(0, -160, 'SELECT CHARACTER', {
             fontSize: '36px',
             color: '#4a90d9',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(title);
 
@@ -1226,55 +1232,63 @@ export class OnlineGameScene extends Phaser.Scene {
         this.countdownText = this.add.text(0, -100, '10', {
             fontSize: '72px',
             color: '#ffffff',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(this.countdownText);
 
         // My character label
         const myLabel = this.add.text(-120, 20, 'YOU:', {
             fontSize: '24px',
-            color: '#88ff88'
+            color: '#88ff88',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(1, 0.5);
         this.selectionContainer.add(myLabel);
 
         this.myCharacterText = this.add.text(0, 20, this.getCharacterDisplayName(this.selectedCharacter), {
             fontSize: '28px',
             color: '#ffffff',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(this.myCharacterText);
 
         // Left/Right arrows
         const leftArrow = this.add.text(-150, 20, '◀', {
             fontSize: '32px',
-            color: '#4a90d9'
+            color: '#4a90d9',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(leftArrow);
 
         const rightArrow = this.add.text(150, 20, '▶', {
             fontSize: '32px',
-            color: '#4a90d9'
+            color: '#4a90d9',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(rightArrow);
 
         // Opponent character label
         const oppLabel = this.add.text(-120, 80, 'OPP:', {
             fontSize: '24px',
-            color: '#ff8888'
+            color: '#ff8888',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(1, 0.5);
         this.selectionContainer.add(oppLabel);
 
         this.opponentCharacterText = this.add.text(0, 80, this.getCharacterDisplayName(this.opponentCharacter), {
             fontSize: '28px',
             color: '#888888',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(this.opponentCharacterText);
 
         // Instructions
         this.selectionInstructions = this.add.text(0, 150, '← / → to change', {
             fontSize: '18px',
-            color: '#888888'
+            color: '#888888',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(this.selectionInstructions);
 
@@ -1282,7 +1296,8 @@ export class OnlineGameScene extends Phaser.Scene {
         this.confirmInstructions = this.add.text(0, 180, 'Press SPACE / A to Confirm', {
             fontSize: '20px',
             color: '#ffffff',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(this.confirmInstructions);
 
@@ -1291,7 +1306,8 @@ export class OnlineGameScene extends Phaser.Scene {
             fontSize: '16px',
             color: '#00ff00',
             fontStyle: 'bold',
-            backgroundColor: '#004400'
+            backgroundColor: '#004400',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5).setVisible(false);
         this.selectionContainer.add(this.myConfirmText);
 
@@ -1299,7 +1315,8 @@ export class OnlineGameScene extends Phaser.Scene {
             fontSize: '16px',
             color: '#00ff00',
             fontStyle: 'bold',
-            backgroundColor: '#004400'
+            backgroundColor: '#004400',
+            fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5).setVisible(false);
         this.selectionContainer.add(this.opponentConfirmText);
 
@@ -1372,7 +1389,7 @@ export class OnlineGameScene extends Phaser.Scene {
         const spawnPoints = [600, 1200];
         players.forEach((p, idx) => {
             // Validate character against loaded textures. Fallback to 'fok_v3' if invalid.
-            const validChars = ['fok_v3'];
+            const validChars = ['fok_v3', 'sga', 'sgu'];
             const char = validChars.includes(p.character) ? p.character : 'fok_v3';
             console.log(`[OnlineGameScene] Creating player ${p.playerId} with char: ${char} (Server sent: "${p.character}")`);
 
@@ -1460,24 +1477,36 @@ export class OnlineGameScene extends Phaser.Scene {
         this.handleCharacterConfirm(this.localPlayerId);
     }
 
+    private wallRects: Phaser.Geom.Rectangle[] = [];
+
     private createStage(): void {
-        // Background gradient
-        const bg = this.add.graphics();
-        bg.fillGradientStyle(0x0a0a1a, 0x0a0a1a, 0x1a1a2e, 0x1a1a2e, 1);
-        bg.fillRect(0, 0, this.scale.width, this.scale.height);
+        // Background Image (Adria)
+        const bg = this.add.image(this.scale.width / 2, this.scale.height / 2, 'adria_bg');
+        // Scale to cover
+        const scaleX = this.scale.width / bg.width;
+        const scaleY = this.scale.height / bg.height;
+        const scale = Math.max(scaleX, scaleY);
+        // Refinement: Background Depth Tweak (Parallax 0.1, Scale +10%)
+        bg.setScale(scale * 1.1).setScrollFactor(0.1);
         bg.setDepth(-10);
         if (this.uiCamera) this.uiCamera.ignore(bg);
 
-        // Side walls (matching GameScene)
-        const leftWall = this.add.rectangle(this.WALL_LEFT_X, 540, this.WALL_THICKNESS, 1080, 0x2a3a4e);
+        // Side walls (Shortened: Height 540, Y=560)
+        const leftWall = this.add.rectangle(this.WALL_LEFT_X, 560, this.WALL_THICKNESS, 540, 0x2a3a4e);
         leftWall.setStrokeStyle(4, 0x4a6a8e);
         leftWall.setAlpha(0.6);
         leftWall.setDepth(-5);
 
-        const rightWall = this.add.rectangle(this.WALL_RIGHT_X, 540, this.WALL_THICKNESS, 1080, 0x2a3a4e);
+        const rightWall = this.add.rectangle(this.WALL_RIGHT_X, 560, this.WALL_THICKNESS, 540, 0x2a3a4e);
         rightWall.setStrokeStyle(4, 0x4a6a8e);
         rightWall.setAlpha(0.6);
         rightWall.setDepth(-5);
+
+        // Define Wall Rects (Collision) (Top-Left Y = 560 - 270 = 290)
+        this.wallRects = [
+            new Phaser.Geom.Rectangle(this.WALL_LEFT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540),
+            new Phaser.Geom.Rectangle(this.WALL_RIGHT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540)
+        ];
 
         // Main platform (centered, wider - Refinement 12)
         // Center: 960. Width 2400 (Was 1800). Y = 900
@@ -1530,10 +1559,10 @@ export class OnlineGameScene extends Phaser.Scene {
         this.players.forEach((player) => {
             if (!player.active) return; // Ignore inactive (dead/waiting respawn) players
             // Check bounds to filter out dying players
-            if (player.x > this.BLAST_ZONE_LEFT + 500 &&
-                player.x < this.BLAST_ZONE_RIGHT - 500 &&
-                player.y < this.BLAST_ZONE_BOTTOM - 500 &&
-                player.y > this.BLAST_ZONE_TOP + 500) {
+            if (player.x > this.BLAST_ZONE_LEFT + 50 &&
+                player.x < this.BLAST_ZONE_RIGHT - 50 &&
+                player.y < this.BLAST_ZONE_BOTTOM - 50 &&
+                player.y > this.BLAST_ZONE_TOP + 50) {
                 targets.push(player);
             }
         });

@@ -14,13 +14,20 @@ const SMASH_COLORS = [
  * Visuals: Rounded box with stroke, transparent inside.
  * Layout: [Stocks] [Portrait] [Damage] [Name]
  */
+/**
+ * HUD slot for a single player - Diamond Style
+ * Visuals: Diamond portrait, big damage text, gradient name tag.
+ * Layout: [Diamond Portrait] [Big Damage %]
+ *         [       ] [Name Tag]
+ *         [       ] [Stocks]
+ */
 export class PlayerHudSlot {
     private container: Phaser.GameObjects.Container;
-    private damageText: Phaser.GameObjects.Text;
-    private stocksText: Phaser.GameObjects.Text;
+    private bigDamageText: Phaser.GameObjects.Text;
+    private percentText: Phaser.GameObjects.Text;
     private nameText: Phaser.GameObjects.Text;
-    private portraitSprite: Phaser.GameObjects.Sprite;
-    private stockIcon: Phaser.GameObjects.Text;
+    private stocksText: Phaser.GameObjects.Text;
+    private portraitContainer: Phaser.GameObjects.Container;
 
     constructor(
         scene: Phaser.Scene,
@@ -28,71 +35,89 @@ export class PlayerHudSlot {
         y: number,
         width: number,
         height: number,
-        playerName: string,
+        _playerName: string,
         playerIndex: number,
         character: string,
-        isRightSide: boolean = false // New param
+        isRightSide: boolean = false
     ) {
         this.container = scene.add.container(x, y);
         this.container.setScrollFactor(0);
         this.container.setDepth(101);
 
-        const color = SMASH_COLORS[playerIndex % SMASH_COLORS.length];
+        const colorObj = Phaser.Display.Color.ValueToColor(SMASH_COLORS[playerIndex % SMASH_COLORS.length]);
+        const color = colorObj.color;
+        const colorHex = '#' + color.toString(16).padStart(6, '0');
 
-        // --- 1. Background Box ---
-        // Rounded Rectangle again
-        // Longer to accommodate triple digit %
+        // Darker color for top of gradient
+        const darkerColorObj = new Phaser.Display.Color(colorObj.red, colorObj.green, colorObj.blue);
+        darkerColorObj.darken(30); // Darken by 30%
+        const darkerColor = darkerColorObj.color;
 
-        const mainW = width + 80; // Significantly longer (was +40)
-        const mainH = height - 10; // ~70
+        // --- Layout Constants ---
+        const diamondSize = 90;
+        const portraitOffset = -50;
+        const damageX = portraitOffset + (diamondSize / 2) + 35; // Moved 20px right (was +15)
+        const damageY = -15;
 
-        const bgGraphics = scene.add.graphics();
+        // --- 1. Name Tag (Background Layer - Behind Diamond) ---
+        // Moved significantly left to tuck start behind diamond
+        // User requested +30px, then +35px, then +20px more.
+        // Start was -50. -50 + 30 = -20. -20 + 35 = +15. +15 + 20 = +35.
+        const nameX = portraitOffset + 38; // +3px more right (Total +38)
+        const nameY = 35; // -5px up (was 40)
+        const nameW = 180;
+        const nameH = 24;
 
-        // Fill: Black (Rounded)
-        bgGraphics.fillStyle(0x000000, 0.9);
-        bgGraphics.fillRoundedRect(-mainW / 2, -mainH / 2, mainW, mainH, 16);
+        // Gradient Background
+        const nameBg = scene.add.graphics();
+        nameBg.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.8, 0, 0.8, 0);
+        nameBg.fillRect(0, -nameH / 2, nameW, nameH);
+        nameBg.x = nameX - 20; // Moved 20px left as requested (bg only)
+        nameBg.y = nameY;
+        this.container.add(nameBg);
 
-        // Stroke: Player Color, thick (Rounded)
-        bgGraphics.lineStyle(4, color, 1);
-        bgGraphics.strokeRoundedRect(-mainW / 2, -mainH / 2, mainW, mainH, 16);
-
-        this.container.add(bgGraphics);
-
-        // --- Layout Calculation ---
-        const halfW = mainW / 2;
-        // Ignore mirroring: Always standard layout
-        // Layout: [Stocks] [Portrait] -- [Damage] -- [Lip/P1]
-
-        // --- 2. Stocks (Far Left) ---
-        const stockOffset = -halfW + 35; // Slightly more padding
-
-        const stockContainer = scene.add.container(stockOffset, 0);
-
-        // Heart Icon
-        this.stockIcon = scene.add.text(0, -12, '♥', {
-            fontSize: '18px',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 2
-        }).setOrigin(0.5);
-        stockContainer.add(this.stockIcon);
-
-        // Stock Number
-        this.stocksText = scene.add.text(0, 12, '3', {
-            fontSize: '20px',
+        // Name Text
+        let charName = character.split('_')[0].toUpperCase();
+        if (charName === 'FOK') charName = 'FOK';
+        this.nameText = scene.add.text(nameX + 10, nameY, `P${playerIndex + 1} • ${charName}`, {
+            fontSize: '16px',
             fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
-            color: '#ffffff',
+            color: colorHex,
             stroke: '#000000',
             strokeThickness: 2
-        }).setOrigin(0.5);
-        stockContainer.add(this.stocksText);
+        }).setOrigin(0, 0.5);
+        this.container.add(this.nameText);
 
-        this.container.add(stockContainer);
 
-        // --- 3. Portrait (Left-Center) ---
-        const portraitOffset = -halfW + 70; // Moved further left to clear damage % space
+        // --- 2. Diamond Shadow (Middle Layer) ---
+        const shadowGraphics = scene.add.graphics();
+        shadowGraphics.fillStyle(0x000000, 1); // Hard black shadow
+        shadowGraphics.fillRect(-diamondSize / 2, -diamondSize / 2, diamondSize, diamondSize);
+        shadowGraphics.rotation = Phaser.Math.DegToRad(45);
+        shadowGraphics.x = portraitOffset + 5; // Offset X
+        shadowGraphics.y = 5; // Offset Y
+        this.container.add(shadowGraphics);
 
+
+        // --- 3. Diamond Portrait (Front Layer) ---
+        this.portraitContainer = scene.add.container(portraitOffset, 0);
+
+        // A. Diamond Gradient Fill
+        const fillGraphics = scene.add.graphics();
+        fillGraphics.fillGradientStyle(darkerColor, color, color, color, 1, 1, 1, 1);
+        fillGraphics.fillRect(-diamondSize / 2, -diamondSize / 2, diamondSize, diamondSize);
+        fillGraphics.rotation = Phaser.Math.DegToRad(45);
+        this.portraitContainer.add(fillGraphics);
+
+        // B. Portrait Mask
+        const maskGraphics = scene.make.graphics({ x: x + portraitOffset, y: y }, false);
+        maskGraphics.fillStyle(0xffffff);
+        maskGraphics.fillRect(-diamondSize / 2, -diamondSize / 2, diamondSize, diamondSize);
+        maskGraphics.rotation = Phaser.Math.DegToRad(45);
+        const mask = maskGraphics.createGeometryMask();
+
+        // C. Portrait Sprite
         let texture = character;
         let frame: string | undefined = undefined;
 
@@ -103,99 +128,104 @@ export class PlayerHudSlot {
             frame = character === 'fok_v3' ? '0_Fok_v3_Idle_000.png' : '0_Fok_Idle_000.png';
         }
 
-        this.portraitSprite = scene.add.sprite(portraitOffset, 0, texture, frame);
+        const portrait = scene.add.sprite(0, 0, texture, frame);
 
-        // Masked Rounded Square
-        const portraitSize = mainH - 12;
-        const scale = portraitSize / (this.portraitSprite.width || 256);
-        this.portraitSprite.setScale(scale);
+        // User requested -5% smaller (1.35 -> 1.28)
+        const targetSize = diamondSize * 1.15;
+        const scale = targetSize / (portrait.width || 64);
+        portrait.setScale(scale);
 
-        // Mask (Rounded)
-        const maskShape = scene.make.graphics({ x, y }, false);
-        maskShape.fillStyle(0xffffff);
-        maskShape.fillRoundedRect(portraitOffset - portraitSize / 2, -portraitSize / 2, portraitSize, portraitSize, 12);
-        const mask = maskShape.createGeometryMask();
-        this.portraitSprite.setMask(mask);
+        portrait.y = 10; // Push down
 
-        // Portrait Border (Rounded)
-        const portraitBorder = scene.add.graphics();
-        portraitBorder.lineStyle(2, 0x000000, 1);
-        portraitBorder.strokeRoundedRect(portraitOffset - portraitSize / 2, -portraitSize / 2, portraitSize, portraitSize, 12);
-        this.container.add(this.portraitSprite);
-        this.container.add(portraitBorder);
+        portrait.setMask(mask);
+        this.portraitContainer.add(portrait);
 
-        // --- 4. Labels (Far Right - The "Lip") ---
-        const tabX = halfW - 30; // Right edge
-        const lipY = -mainH / 2 + 2; // Top edge offset
+        // D. Border
+        const borderGraphics = scene.add.graphics();
+        borderGraphics.lineStyle(6, color, 1);
+        borderGraphics.strokeRect(-diamondSize / 2, -diamondSize / 2, diamondSize, diamondSize);
+        borderGraphics.rotation = Phaser.Math.DegToRad(45);
+        this.portraitContainer.add(borderGraphics);
 
-        const labelContainer = scene.add.container(tabX, lipY);
+        this.container.add(this.portraitContainer);
 
-        // Convert color for hex string
-        const colorHex = '#' + color.toString(16).padStart(6, '0');
 
-        // Draw Lip Background (Rounded Rectangle sticking up/in)
-        const lipW = 34;
-        const lipH = 20;
-        const lipGraphics = scene.add.graphics();
-        lipGraphics.fillStyle(color, 1);
-        // Rounded lip
-        lipGraphics.fillRoundedRect(-lipW / 2, -2, lipW, lipH, 6);
-
-        // P# Text
-        this.nameText = scene.add.text(0, 6, `P${playerIndex + 1}`, {
-            fontSize: '12px',
+        // --- 4. Big Damage % ---
+        // Bigger Font (60px), Lower Aligned, Hard Shadow
+        this.bigDamageText = scene.add.text(damageX, damageY, '0', {
+            fontSize: '60px', // Bigger
             fontFamily: '"Pixeloid Sans"',
-            fontStyle: 'bold',
-            color: '#000000',
-        }).setOrigin(0.5);
+            fontStyle: 'bold', // Removed italic
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 6
+        }).setOrigin(0, 0.5);
+        // Hard Drop Shadow
+        this.bigDamageText.setShadow(4, 4, '#000000', 0, true, true);
 
-        labelContainer.add(lipGraphics);
-        labelContainer.add(this.nameText);
-        this.container.add(labelContainer);
-
-        // Device Icon "D" (Below Lip)
-        const deviceText = scene.add.text(tabX, mainH / 2 - 12, 'D', {
-            fontSize: '12px',
-            fontFamily: '"Pixeloid Sans"',
-            fontStyle: 'bold',
-            color: '#888888',
-        }).setOrigin(0.5);
-        this.container.add(deviceText);
-
-        // --- 5. Damage % (Central - shifted right) ---
-        // Move more to the right to accommodate triple digits and clear portrait
-        // Center is 0. Portrait ends around -60. Lip starts around +100.
-        // Let's move center to +20 or +30.
-
-        this.damageText = scene.add.text(25, 0, '0%', {
-            fontSize: '48px',
+        this.percentText = scene.add.text(damageX, damageY + 12, '%', {
+            fontSize: '30px',
             fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
             color: '#ffffff',
-            stroke: colorHex,
-            strokeThickness: 0
-        }).setOrigin(0.5);
-        this.damageText.setShadow(2, 2, '#000000', 2, true, true); // Soft shadow for rounded style
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0, 0.5);
+        this.percentText.setShadow(3, 3, '#000000', 0, true, true);
 
-        if (this.damageText) {
-            this.container.add(this.damageText);
-        }
+        this.container.add(this.bigDamageText);
+        this.container.add(this.percentText);
 
-        // Remove unused vars
-        void isRightSide;
+
+        // --- 5. Stocks (Under Name Tag, Split Colors) ---
+        // "Move hearts and lives under name tag"
+        // "Hearts right colors but X number white"
+        const stockX = nameX + 10 - 28; // +7px right (was -43)
+        const stockY = nameY + 25;
+
+        // Heart Icon (Player Color)
+        const heartIcon = scene.add.text(stockX, stockY, '♥', {
+            fontSize: '18px',
+            fontFamily: '"Pixeloid Sans"',
+            color: colorHex,
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0, 0.5);
+        heartIcon.setShadow(2, 2, '#000000', 0, true, true);
+        this.container.add(heartIcon);
+
+        // Stocks Text (White)
+        this.stocksText = scene.add.text(stockX + 22, stockY, 'x 3', {
+            fontSize: '18px',
+            fontFamily: '"Pixeloid Sans"',
+            fontStyle: 'bold',
+            color: '#ffffff', // White
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0, 0.5);
+        this.stocksText.setShadow(2, 2, '#000000', 0, true, true);
+
+        this.container.add(this.stocksText);
+
+        void width; void height; void isRightSide;
     }
 
     update(damage: number, stocks: number): void {
         const d = Math.floor(damage);
-        this.damageText.setText(`${d}%`);
-        this.stocksText.setText(stocks.toString());
+        this.bigDamageText.setText(`${d}`);
+        this.stocksText.setText(`x ${stocks}`);
 
-        // Keep damage text white
-        // Apply Scaling Effect for high damage?
-        if (damage > 100) {
-            this.damageText.setScale(1.1);
+        // Update Position of % symbol to follow number
+        const width = this.bigDamageText.width;
+        this.percentText.x = this.bigDamageText.x + width + 2;
+
+        // Color Grading for Damage
+        if (damage < 50) {
+            this.bigDamageText.setColor('#ffffff');
+        } else if (damage < 100) {
+            this.bigDamageText.setColor('#ffdd44'); // Yellowish
         } else {
-            this.damageText.setScale(1.0);
+            this.bigDamageText.setColor('#ff4444'); // Red
         }
     }
 
@@ -249,7 +279,7 @@ export class MatchHUD {
         const x = (slotIndex * segment) + (segment / 2);
 
         // Vertical position: Bottom
-        const y = height - 60; // Slightly raised
+        const y = height - 90; // Raise to accommodate Diamond height and Stocks below
 
         let display = playerName;
         if (isLocalPlayer) {
