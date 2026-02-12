@@ -65,6 +65,10 @@ rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-enabled/geckos
 ln -sf /etc/nginx/sites-available/sgalalla /etc/nginx/sites-enabled/
 
+# Check permissions for new files
+chown -R www-data:www-data /var/www/sgalalla
+chmod -R 755 /var/www/sgalalla
+
 # Test and restart Nginx
 nginx -t && systemctl restart nginx
 

@@ -618,3 +618,11 @@
 - **[V]** `v0.10.10`
 - **[Fix]** **Assets**: Renamed `assets/scrin` to `assets/scrins` to force correct case-sensitive folder creation on Linux servers and bypass caching issues.
 - **[S]** **STATUS**: v0.10.10 Released. Online images should now definitely load.
+
+### [2026-02-12] v0.10.11 - Online UX Polish
+- **[V]** `v0.10.11`
+- **[Fix]** **Font**: Ensured Pixeloid Sans font is fully loaded before rendering any text in online mode (incognito fix).
+- **[Fix]** **HUD Labels**: Player HUD now shows correct character name (e.g. "P1 FOK", "P2 SGA") instead of always defaulting to "Fok".
+- **[UI]** **ESC Confirmation**: Pressing ESC now shows a "Leave Match?" prompt with YES/NO instead of immediately disconnecting.
+- **[Gameplay]** **Selection Timer**: Character selection timer increased from 10s to 30s.
+- **[S]** **STATUS**: v0.10.11 Released. Online UX significantly improved.

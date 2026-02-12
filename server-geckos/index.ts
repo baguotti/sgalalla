@@ -176,7 +176,7 @@ io.onConnection((channel: ServerChannel) => {
             rematchVotes: new Set(),
             phase: 'WAITING',
             selectionTimer: null,
-            selectionCountdown: 10,
+            selectionCountdown: 30,
             bombs: [],
             nextBombId: 1,
             bombSpawnTimer: 15000 + Math.random() * 10000 // 15-25 seconds initial
@@ -232,9 +232,9 @@ io.onConnection((channel: ServerChannel) => {
     // Start selection phase when 2 players present
     if (room.players.size === 2 && room.phase === 'WAITING') {
         room.phase = 'SELECTING';
-        room.selectionCountdown = 10;
+        room.selectionCountdown = 30;
         console.log('[Server] 2 players connected - starting selection phase');
-        emitToRoom(NetMessageType.SELECTION_START, { countdown: 10 });
+        emitToRoom(NetMessageType.SELECTION_START, { countdown: 30 });
 
         room.selectionTimer = setInterval(() => {
             room.selectionCountdown--;
@@ -379,7 +379,7 @@ io.onConnection((channel: ServerChannel) => {
                 room.selectionTimer = null;
             }
             room.phase = 'WAITING';
-            room.selectionCountdown = 10;
+            room.selectionCountdown = 30;
             room.frame = 0;
         } else if (room.players.size === 1 && room.phase === 'SELECTING') {
             console.log('[Server] Only 1 player left - reverting to WAITING');
@@ -388,7 +388,7 @@ io.onConnection((channel: ServerChannel) => {
                 room.selectionTimer = null;
             }
             room.phase = 'WAITING';
-            room.selectionCountdown = 10;
+            room.selectionCountdown = 30;
         }
     });
 });

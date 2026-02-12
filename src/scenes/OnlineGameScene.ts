@@ -370,6 +370,10 @@ export class OnlineGameScene extends Phaser.Scene {
 
     async create(): Promise<void> {
 
+        // Ensure custom font is loaded before any text rendering
+        // @ts-ignore - document.fonts is not in all TS definitions
+        await document.fonts.load('1rem "Pixeloid Sans"').catch(() => { });
+
         // Create animations first
         this.createAnimations();
 
@@ -1469,7 +1473,8 @@ export class OnlineGameScene extends Phaser.Scene {
 
             // Add to HUD
             const isLocal = p.playerId === this.localPlayerId;
-            this.matchHUD.addPlayer(p.playerId, `Player ${p.playerId + 1}`, isLocal);
+            const charDisplay = this.getCharacterDisplayName(p.character);
+            this.matchHUD.addPlayer(p.playerId, `P${p.playerId + 1} ${charDisplay}`, isLocal, p.character === 'fok_v3' ? 'fok' : p.character);
         });
 
         // Setup collision overlap for hit detection
@@ -1615,11 +1620,79 @@ export class OnlineGameScene extends Phaser.Scene {
         this.cameras.main.centerOn(960, 540);
     }
 
+    private escapePromptVisible: boolean = false;
+    private escapeContainer!: Phaser.GameObjects.Container;
+
     private setupEscapeKey(): void {
         this.input.keyboard?.on('keydown-ESC', () => {
-            this.networkManager.disconnect();
-            this.scene.start('MainMenuScene');
+            if (this.escapePromptVisible) {
+                // If prompt is already open, dismiss it
+                this.dismissEscapePrompt();
+                return;
+            }
+            this.showEscapePrompt();
         });
+    }
+
+    private showEscapePrompt(): void {
+        this.escapePromptVisible = true;
+        const { width, height } = this.scale;
+
+        this.escapeContainer = this.add.container(width / 2, height / 2);
+        this.escapeContainer.setDepth(10000);
+        this.escapeContainer.setScrollFactor(0);
+
+        // Dark overlay
+        const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.7);
+        this.escapeContainer.add(overlay);
+
+        // Prompt box
+        const box = this.add.rectangle(0, 0, 500, 200, 0x1a1a2e, 1);
+        box.setStrokeStyle(3, 0x4a90d9);
+        this.escapeContainer.add(box);
+
+        const title = this.add.text(0, -50, 'Leave Match?', {
+            fontSize: '36px', color: '#ffffff', fontFamily: '"Pixeloid Sans"', fontStyle: 'bold'
+        }).setOrigin(0.5);
+        this.escapeContainer.add(title);
+
+        const yesBtn = this.add.text(-80, 40, 'YES', {
+            fontSize: '28px', color: '#ff4444', fontFamily: '"Pixeloid Sans"', fontStyle: 'bold',
+            backgroundColor: '#333333', padding: { x: 20, y: 8 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        yesBtn.on('pointerdown', () => this.confirmEscape());
+        this.escapeContainer.add(yesBtn);
+
+        const noBtn = this.add.text(80, 40, 'NO', {
+            fontSize: '28px', color: '#00ff00', fontFamily: '"Pixeloid Sans"', fontStyle: 'bold',
+            backgroundColor: '#333333', padding: { x: 20, y: 8 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        noBtn.on('pointerdown', () => this.dismissEscapePrompt());
+        this.escapeContainer.add(noBtn);
+
+        // Keyboard shortcuts: Y = yes, N or ESC again = no
+        this.input.keyboard?.once('keydown-Y', () => {
+            if (this.escapePromptVisible) this.confirmEscape();
+        });
+        this.input.keyboard?.once('keydown-N', () => {
+            if (this.escapePromptVisible) this.dismissEscapePrompt();
+        });
+
+        // Make main camera ignore prompt
+        this.cameras.main.ignore(this.escapeContainer);
+    }
+
+    private dismissEscapePrompt(): void {
+        if (!this.escapePromptVisible) return;
+        this.escapePromptVisible = false;
+        this.escapeContainer?.destroy();
+    }
+
+    private confirmEscape(): void {
+        this.escapePromptVisible = false;
+        this.escapeContainer?.destroy();
+        this.networkManager.disconnect();
+        this.scene.start('MainMenuScene');
     }
 
     /**
