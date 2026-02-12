@@ -39,7 +39,9 @@ export const NetMessageType = {
     BOMB_SPAWN: 'bomb_spawn',
     BOMB_PICKUP: 'bomb_pickup',
     BOMB_THROW: 'bomb_throw',
-    BOMB_EXPLODE: 'bomb_explode'
+    BOMB_EXPLODE: 'bomb_explode',
+    // Chest mechanic
+    CHEST_SPAWN: 'chest_spawn'
 } as const;
 
 // Serialized input for network transmission
@@ -101,6 +103,7 @@ export type SelectionTickCallback = (countdown: number) => void;
 export type CharacterSelectCallback = (playerId: number, character: string) => void;
 export type CharacterConfirmCallback = (playerId: number) => void;
 export type GameStartCallback = (players: { playerId: number; character: string }[]) => void;
+export type ChestSpawnCallback = (x: number) => void;
 
 class NetworkManager {
     private static instance: NetworkManager    // Singleton pattern
@@ -133,6 +136,7 @@ class NetworkManager {
     private onCharacterSelectCallback: CharacterSelectCallback | null = null;
     private onCharacterConfirmCallback: CharacterConfirmCallback | null = null;
     private onGameStartCallback: GameStartCallback | null = null;
+    private onChestSpawnCallback: ChestSpawnCallback | null = null;
 
     // Latency tracking with smoothing
     private lastPingTime: number = 0;
@@ -297,6 +301,12 @@ class NetworkManager {
             console.log('[NetworkManager] Game starting!', players);
             this.onGameStartCallback?.(players);
         });
+
+        // Chest spawn from server
+        this.channel.on(NetMessageType.CHEST_SPAWN, (data: any) => {
+            const { x } = data as { x: number };
+            this.onChestSpawnCallback?.(x);
+        });
     }
 
     /**
@@ -452,6 +462,7 @@ class NetworkManager {
     public onCharacterSelect(callback: CharacterSelectCallback): void { this.onCharacterSelectCallback = callback; }
     public onCharacterConfirm(callback: CharacterConfirmCallback): void { this.onCharacterConfirmCallback = callback; }
     public onGameStart(callback: GameStartCallback): void { this.onGameStartCallback = callback; }
+    public onChestSpawn(callback: ChestSpawnCallback): void { this.onChestSpawnCallback = callback; }
 
     /**
      * Send rematch vote to server

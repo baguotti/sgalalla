@@ -30,7 +30,9 @@ const NetMessageType = {
     BOMB_SPAWN: 'bomb_spawn',
     BOMB_PICKUP: 'bomb_pickup',
     BOMB_THROW: 'bomb_throw',
-    BOMB_EXPLODE: 'bomb_explode'
+    BOMB_EXPLODE: 'bomb_explode',
+    // Chest mechanic
+    CHEST_SPAWN: 'chest_spawn'
 } as const;
 
 interface PlayerState {
@@ -69,6 +71,7 @@ interface GameRoom {
     phase: RoomPhase;
     selectionTimer: ReturnType<typeof setInterval> | null;
     selectionCountdown: number;
+    chestSpawnTimer: number;
     // Bomb mechanic
     bombs: BombState[];
     nextBombId: number;
@@ -177,6 +180,7 @@ io.onConnection((channel: ServerChannel) => {
             phase: 'WAITING',
             selectionTimer: null,
             selectionCountdown: 30,
+            chestSpawnTimer: 30000,
             bombs: [],
             nextBombId: 1,
             bombSpawnTimer: 15000 + Math.random() * 10000 // 15-25 seconds initial
@@ -400,6 +404,17 @@ setInterval(() => {
     rooms.forEach((room) => {
         if (room.phase !== 'PLAYING') return;
         room.frame++;
+
+        // === CHEST SPAWNING ===
+        room.chestSpawnTimer -= TICK_MS;
+        if (room.chestSpawnTimer <= 0) {
+            if (Math.random() < 0.35) {
+                const chestX = 500 + Math.random() * 920; // 500-1420
+                emitToRoom(NetMessageType.CHEST_SPAWN, { x: Math.round(chestX) });
+                console.log(`[Server] Chest spawned at x=${Math.round(chestX)}`);
+            }
+            room.chestSpawnTimer = 30000; // Reset: 30 seconds
+        }
 
         // === BOMB SPAWNING (PAUSED) ===
         /*

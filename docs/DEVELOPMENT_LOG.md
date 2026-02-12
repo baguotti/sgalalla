@@ -633,3 +633,9 @@
 - **[Fix]** **Font Loading**: Switched to `document.fonts.ready` to ensure font is available before rendering any text (fixes initial load glitches).
 - **[Fix]** **Timer**: Timer logic updated. (Requires server restart to apply 30s change).
 - **[S]** **STATUS**: v0.10.12 Released.
+
+### [2026-02-12] v0.10.13 - Server-Synced Chests
+- **[V]** `v0.10.13`
+- **[Fix]** **Online Chests**: Moved chest spawning logic to server (broadcasts `CHEST_SPAWN`). Fixes desync where players saw different chests.
+- **[Fix]** **Font**: Reinforced font loading in selection screen to prevent fallback font usage.
+- **[S]** **STATUS**: v0.10.13 Released. Server restart MANDATORY for chests and timer.

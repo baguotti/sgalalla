@@ -395,6 +395,7 @@ export class OnlineGameScene extends Phaser.Scene {
         this.networkManager.onCharacterSelect((playerId, character) => this.handleOpponentCharacterSelect(playerId, character));
         this.networkManager.onCharacterConfirm((playerId) => this.handleCharacterConfirm(playerId));
         this.networkManager.onGameStart((players) => this.handleGameStart(players));
+        this.networkManager.onChestSpawn((x) => this.spawnChestAt(x));
 
         // Silence unused but maintained state
         void this.selectionCountdown;
@@ -447,17 +448,6 @@ export class OnlineGameScene extends Phaser.Scene {
         this.time.addEvent({
             delay: 2000,
             callback: () => this.networkManager.ping(),
-            loop: true
-        });
-
-        // Chest spawn timer: every 30 seconds, 35% chance
-        this.time.addEvent({
-            delay: 30000,
-            callback: () => {
-                if (Phaser.Math.FloatBetween(0, 1) < 0.35) {
-                    this.spawnChest();
-                }
-            },
             loop: true
         });
     }
@@ -855,14 +845,10 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     /**
-     * Spawn a chest at a random X position at the top of the screen
+     * Spawn a chest at a specific X position (called by server broadcast)
      */
-    private spawnChest(): void {
-        const { width } = this.scale;
-        const padding = 500;
-        const x = Phaser.Math.Between(padding, width - padding);
+    private spawnChestAt(x: number): void {
         const y = 0;
-
         const chest = new Chest(this, x, y);
         if (this.uiCamera) {
             this.uiCamera.ignore(chest);
@@ -1404,6 +1390,13 @@ export class OnlineGameScene extends Phaser.Scene {
         this.connectionStatusText?.setVisible(false);
         this.selectionContainer.setVisible(true);
         this.countdownText.setText(countdown.toString());
+
+        // Force font refresh on all selection UI text elements
+        this.selectionContainer.each((child: Phaser.GameObjects.GameObject) => {
+            if (child instanceof Phaser.GameObjects.Text) {
+                child.setFontFamily('"Pixeloid Sans"');
+            }
+        });
     }
 
     private handleSelectionTick(countdown: number): void {
