@@ -4,6 +4,7 @@ import { MatchHUD } from '../ui/PlayerHUD'; // Import MatchHUD
 import { DebugOverlay } from '../components/DebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
 import { Bomb } from '../entities/Bomb';
+import { Chest } from '../entities/Chest';
 
 export class GameScene extends Phaser.Scene {
     // private player1!: Player;
@@ -13,6 +14,7 @@ export class GameScene extends Phaser.Scene {
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
     public bombs: Bomb[] = [];
+    public chests: Chest[] = [];
     public seals: any[] = []; // Seal projectiles
     private background!: Phaser.GameObjects.Graphics;
     private backgroundImage!: Phaser.GameObjects.Image; // Add class property
@@ -35,9 +37,6 @@ export class GameScene extends Phaser.Scene {
     private readonly WALL_THICKNESS = 45;
     private readonly WALL_LEFT_X = -400; // Refinement 12: Pushed out from -200
     private readonly WALL_RIGHT_X = 2320; // Refinement 12: Pushed out from 2120
-    // Playable area bounds (inner edges of walls)
-    private readonly PLAY_BOUND_LEFT = this.WALL_LEFT_X + this.WALL_THICKNESS / 2;
-    private readonly PLAY_BOUND_RIGHT = this.WALL_RIGHT_X - this.WALL_THICKNESS / 2;
 
     // Blast zone boundaries
     // Blast zone boundaries
@@ -83,6 +82,26 @@ export class GameScene extends Phaser.Scene {
         this.load.image('background_lake', 'assets/pixel-lake08-sunny-water.jpg');
         // New Stage Background
         this.load.image('adria_bg', 'assets/adria_background.webp');
+
+        // Preload scrin images for chest opening
+        const scrinFiles = [
+            '2026-02-12_22.36.58.jpg', '2026-02-12_22.37.12.jpg', '2026-02-12_22.37.41.jpg',
+            '2026-02-12_22.37.56.jpg', '2026-02-12_22.38.06.jpg', '2026-02-12_22.38.09.jpg',
+            '2026-02-12_22.38.13.jpg', '2026-02-12_22.38.28.jpg', '2026-02-12_22.38.33.jpg',
+            '2026-02-12_22.38.37.jpg', '2026-02-12_22.38.41.jpg', '2026-02-12_22.38.47.jpg',
+            '2026-02-12_22.38.51.jpg', '2026-02-12_22.38.56.jpg', '2026-02-12_22.39.01.jpg',
+            '2026-02-12_22.39.06.jpg', '2026-02-12_22.39.09.jpg', '2026-02-12_22.39.13.jpg',
+            '2026-02-12_22.39.17.jpg', '2026-02-12_22.39.20.jpg', '2026-02-12_22.39.25.jpg',
+            '2026-02-12_22.39.29.jpg', '2026-02-12_22.39.33.jpg', '2026-02-12_22.39.39.jpg',
+            '2026-02-12_22.39.45.jpg', '2026-02-12_22.39.49.jpg', '2026-02-12_22.39.54.jpg',
+            '2026-02-12_22.39.58.jpg', '2026-02-12_22.40.03.jpg', '2026-02-12_22.40.06.jpg',
+            '2026-02-12_22.40.09.jpg'
+        ];
+
+        scrinFiles.forEach(file => {
+            const key = file.replace('.jpg', '').replace('.png', '');
+            this.load.image(key, `assets/scrin/${file}`);
+        });
     }
 
     private createAnimations(): void {
@@ -441,6 +460,8 @@ export class GameScene extends Phaser.Scene {
             this.walls = [];
             this.wallTexts = [];
             this.bombs = [];
+            this.chests.forEach(c => c.destroy());
+            this.chests = [];
             this.isGameOver = false;
             this.isPaused = false;
 
@@ -608,6 +629,23 @@ export class GameScene extends Phaser.Scene {
                     this.input.keyboard?.resetKeys();
                 }
             });
+            // Chest spawn timer: every 30 seconds, 35% chance
+            this.time.addEvent({
+                delay: 30000,
+                callback: () => {
+                    if (Phaser.Math.FloatBetween(0, 1) < 0.35) {
+                        this.spawnChest();
+                    }
+                },
+                loop: true
+            });
+
+            // Manual Chest Spawn (Y key)
+            this.input.keyboard?.on('keydown-Y', () => {
+                console.log("Manual Chest Spawn triggered");
+                this.spawnChest();
+            });
+
             console.log("GameScene.create completed successfully");
 
         } catch (e: any) {
@@ -631,6 +669,39 @@ export class GameScene extends Phaser.Scene {
         const bomb = new Bomb(this, x, y);
         if (this.uiCamera) {
             this.uiCamera.ignore(bomb);
+        }
+    }
+
+    private spawnChest(): void {
+        if (this.isPaused) return;
+
+        const { width } = this.scale;
+        const padding = 500;
+        const x = Phaser.Math.Between(padding, width - padding);
+        const y = 0;
+
+        const chest = new Chest(this, x, y);
+        if (this.uiCamera) {
+            this.uiCamera.ignore(chest);
+        }
+    }
+
+    private checkChestInteractions(): void {
+        if (!this.chests || this.chests.length === 0) return;
+
+        const interactRange = 120; // Proximity range to open chest
+
+        for (const player of this.players) {
+            if (!player.isAttacking) continue;
+
+            for (const chest of [...this.chests]) { // Copy array since open() may modify it
+                if (chest.isOpened) continue;
+
+                const dist = Phaser.Math.Distance.Between(player.x, player.y, chest.x, chest.y);
+                if (dist < interactRange) {
+                    chest.open();
+                }
+            }
         }
     }
 
@@ -920,6 +991,9 @@ export class GameScene extends Phaser.Scene {
                 }
             }
         }
+
+        // Chest Interaction (attack near chest to open)
+        this.checkChestInteractions();
 
 
         // Check Blast Zones

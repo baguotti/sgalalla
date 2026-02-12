@@ -12,6 +12,7 @@
 import Phaser from 'phaser';
 import { Player, PlayerState } from '../entities/Player';
 import { Bomb } from '../entities/Bomb';
+import { Chest } from '../entities/Chest';
 import NetworkManager from '../network/NetworkManager';
 import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '../network/NetworkManager';
 
@@ -47,6 +48,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // Bombs (synced from server)
     public bombs: Map<number, Bomb> = new Map();
+    public chests: Chest[] = [];
 
     // UI
     private connectionStatusText!: Phaser.GameObjects.Text;
@@ -69,8 +71,6 @@ export class OnlineGameScene extends Phaser.Scene {
     private readonly WALL_THICKNESS = 45;
     private readonly WALL_LEFT_X = -400; // Refinement 12: Pushed out from -200
     private readonly WALL_RIGHT_X = 2320; // Refinement 12: Pushed out from 2120
-    private readonly PLAY_BOUND_LEFT = this.WALL_LEFT_X + this.WALL_THICKNESS / 2;
-    private readonly PLAY_BOUND_RIGHT = this.WALL_RIGHT_X - this.WALL_THICKNESS / 2;
 
     // Blast zone boundaries (matching GameScene)
     private readonly BLAST_ZONE_LEFT = -420; // Tighter to wall
@@ -138,6 +138,26 @@ export class OnlineGameScene extends Phaser.Scene {
 
         this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
         this.load.image('fok_icon', 'assets/fok_icon.png'); // Refinement V2
+
+        // Preload scrin images for chest opening
+        const scrinFiles = [
+            '2026-02-12_22.36.58.jpg', '2026-02-12_22.37.12.jpg', '2026-02-12_22.37.41.jpg',
+            '2026-02-12_22.37.56.jpg', '2026-02-12_22.38.06.jpg', '2026-02-12_22.38.09.jpg',
+            '2026-02-12_22.38.13.jpg', '2026-02-12_22.38.28.jpg', '2026-02-12_22.38.33.jpg',
+            '2026-02-12_22.38.37.jpg', '2026-02-12_22.38.41.jpg', '2026-02-12_22.38.47.jpg',
+            '2026-02-12_22.38.51.jpg', '2026-02-12_22.38.56.jpg', '2026-02-12_22.39.01.jpg',
+            '2026-02-12_22.39.06.jpg', '2026-02-12_22.39.09.jpg', '2026-02-12_22.39.13.jpg',
+            '2026-02-12_22.39.17.jpg', '2026-02-12_22.39.20.jpg', '2026-02-12_22.39.25.jpg',
+            '2026-02-12_22.39.29.jpg', '2026-02-12_22.39.33.jpg', '2026-02-12_22.39.39.jpg',
+            '2026-02-12_22.39.45.jpg', '2026-02-12_22.39.49.jpg', '2026-02-12_22.39.54.jpg',
+            '2026-02-12_22.39.58.jpg', '2026-02-12_22.40.03.jpg', '2026-02-12_22.40.06.jpg',
+            '2026-02-12_22.40.09.jpg'
+        ];
+
+        scrinFiles.forEach(file => {
+            const key = file.replace('.jpg', '').replace('.png', '');
+            this.load.image(key, `assets/scrin/${file}`);
+        });
     }
 
 
@@ -429,6 +449,17 @@ export class OnlineGameScene extends Phaser.Scene {
             callback: () => this.networkManager.ping(),
             loop: true
         });
+
+        // Chest spawn timer: every 30 seconds, 35% chance
+        this.time.addEvent({
+            delay: 30000,
+            callback: () => {
+                if (Phaser.Math.FloatBetween(0, 1) < 0.35) {
+                    this.spawnChest();
+                }
+            },
+            loop: true
+        });
     }
 
     update(_time: number, delta: number): void {
@@ -516,6 +547,9 @@ export class OnlineGameScene extends Phaser.Scene {
                     this.localPlayer!.checkHitAgainst(target);
                 }
             });
+
+            // Chest Interaction (attack near chest to open)
+            this.checkChestInteractions();
         }
 
         // JITTER BUFFER (Fixed Timeline Interpolation)
@@ -818,6 +852,43 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Destroy Phaser sprite and cleanup
         player.destroy();
+    }
+
+    /**
+     * Spawn a chest at a random X position at the top of the screen
+     */
+    private spawnChest(): void {
+        const { width } = this.scale;
+        const padding = 500;
+        const x = Phaser.Math.Between(padding, width - padding);
+        const y = 0;
+
+        const chest = new Chest(this, x, y);
+        if (this.uiCamera) {
+            this.uiCamera.ignore(chest);
+        }
+    }
+
+    /**
+     * Check if any attacking player is near a chest and open it
+     */
+    private checkChestInteractions(): void {
+        if (!this.chests || this.chests.length === 0) return;
+
+        const interactRange = 120;
+
+        this.players.forEach((player) => {
+            if (!player.isAttacking) return;
+
+            for (const chest of [...this.chests]) {
+                if (chest.isOpened) continue;
+
+                const dist = Phaser.Math.Distance.Between(player.x, player.y, chest.x, chest.y);
+                if (dist < interactRange) {
+                    chest.open();
+                }
+            }
+        });
     }
 
     /**

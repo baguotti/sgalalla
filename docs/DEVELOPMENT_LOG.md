@@ -576,3 +576,27 @@
 - **[Fix]** **Online Sync**:
     - Verified that all local HUD changes automatically apply to Online mode (shared `MatchHUD` class).
 - **[S]** **STATUS**: v0.10.5 Released. HUD is pixel-perfect.
+
+### [2026-02-12] v0.10.6 - Chest Mechanic & Scrin Collection
+- **[V]** `v0.10.6`
+- **[New]** **Chest Mechanic**:
+    - **Spawning**: Rare chests (35% chance) drop from the sky every 30 seconds.
+    - **Damage**: Deals 15% damage + knockback if it lands on a player.
+    - **Interaction**: Players can open chests by attacking them (Light Attack / J).
+    - **Reward**: Displays a random image from the **Scrin Collection** (31 images).
+    - **UI**: Added a dark overlay and legend ("Press J / Ⓑ to close") for better readability.
+- **[New]** **Online Integration**:
+    - **Sync**: Chests now spawn and function identically in **Online 1v1** matches.
+    - **Assets**: Preloaded all 31 Scrin images for smooth online playback.
+- **[Dev]** **Debugging**:
+    - **Manual Spawn**: Added **Y** key shortcut (Local only) to instantly spawn a chest for testing.
+- **[Fix]** **Stability**:
+    - **Double Rendering**: Fixed issue where chest overlay appeared twice (on both main and UI cameras).
+    - **Input Jitter**: Resolved input conflict by properly cleaning up key listeners on overlay close.
+- **[S]** **STATUS**: v0.10.6 Released. Chests add a fun, random element to matches.
+
+### [2026-02-12] v0.10.7 - Hotfix: Online Assets
+- **[V]** `v0.10.7`
+- **[Fix]** **Assets**: Renamed all Scrin images to replace spaces with underscores (e.g. `22.36.58.jpg` -> `22.36.58.jpg`) to resolve 404 errors on Linux/Nginx.
+- **[Fix]** **Online**: Updated preload lists in `GameScene` and `OnlineGameScene` to match new filenames.
+- **[S]** **STATUS**: v0.10.7 Released. Images should now load correctly in online mode.
