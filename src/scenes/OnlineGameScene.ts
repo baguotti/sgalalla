@@ -73,10 +73,10 @@ export class OnlineGameScene extends Phaser.Scene {
     private readonly WALL_RIGHT_X = 2320; // Refinement 12: Pushed out from 2120
 
     // Blast zone boundaries (matching GameScene)
-    private readonly BLAST_ZONE_LEFT = -420; // Tighter to wall
-    private readonly BLAST_ZONE_RIGHT = 2340; // Tighter to wall
-    private readonly BLAST_ZONE_TOP = -800; // Significantly reduced (was -1625)
-    private readonly BLAST_ZONE_BOTTOM = 1800; // Significantly reduced (was 3500)
+    private readonly BLAST_ZONE_LEFT = -1020; // Matching training mode
+    private readonly BLAST_ZONE_RIGHT = 2940; // Matching training mode
+    private readonly BLAST_ZONE_TOP = -600; // Matching training mode
+    private readonly BLAST_ZONE_BOTTOM = 1800;
 
     // Camera Settings (matching GameScene)
     // Camera Settings (matching GameScene)
@@ -372,7 +372,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Ensure custom font is loaded before any text rendering
         // @ts-ignore - document.fonts is not in all TS definitions
-        await document.fonts.load('1rem "Pixeloid Sans"').catch(() => { });
+        await document.fonts.ready;
 
         // Create animations first
         this.createAnimations();
@@ -1767,9 +1767,29 @@ export class OnlineGameScene extends Phaser.Scene {
             this.matchHUD.destroy();
         }
 
-        // Remove keyboard listeners
-        if (this.input.keyboard) {
-            this.input.keyboard.removeAllKeys();
-        }
+        // Destroy escape prompt if open
+        this.escapePromptVisible = false;
+        this.escapeContainer?.destroy();
+
+        // Destroy game over UI
+        this.gameOverContainer?.destroy();
+
+        // Destroy selection UI
+        this.selectionContainer?.destroy();
+
+        // Destroy connection status
+        this.connectionStatusText?.destroy();
+        this.connectionStatusText = null as any;
+
+        // Remove ALL keyboard listeners (prevents stacking on re-entry)
+        this.input.keyboard?.removeAllListeners();
+
+        // Remove all time events
+        this.time.removeAllEvents();
+
+        // Reset phase
+        this.phase = 'WAITING';
+        this.isConnected = false;
+        this.isConfirmed = false;
     }
 }

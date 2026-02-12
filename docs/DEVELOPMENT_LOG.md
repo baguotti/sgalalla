@@ -626,3 +626,10 @@
 - **[UI]** **ESC Confirmation**: Pressing ESC now shows a "Leave Match?" prompt with YES/NO instead of immediately disconnecting.
 - **[Gameplay]** **Selection Timer**: Character selection timer increased from 10s to 30s.
 - **[S]** **STATUS**: v0.10.11 Released. Online UX significantly improved.
+
+### [2026-02-12] v0.10.12 - Stability & Polish
+- **[V]** `v0.10.12`
+- **[Fix]** **Room Freeze**: Fixed game freezing when re-entering a match after quitting (cleaned up all listeners/timers).
+- **[Fix]** **Font Loading**: Switched to `document.fonts.ready` to ensure font is available before rendering any text (fixes initial load glitches).
+- **[Fix]** **Timer**: Timer logic updated. (Requires server restart to apply 30s change).
+- **[S]** **STATUS**: v0.10.12 Released.
