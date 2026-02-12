@@ -152,7 +152,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
         scrinFiles.forEach(file => {
             const key = file.replace('.jpg', '').replace('.png', '');
-            this.load.image(key, `assets/scrin/${file}`);
+            this.load.image(key, `assets/scrins/${file}`);
         });
     }
 

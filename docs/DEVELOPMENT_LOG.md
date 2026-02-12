@@ -613,3 +613,8 @@
 - **[Fix]** **Online Chests**: Added physics bodies to online platforms so chests don't fall through.
 - **[UI]** **Menu**: Merged version number with subtitle for cleaner look.
 - **[S]** **STATUS**: v0.10.9 Released. Online play should feel much more solid.
+
+### [2026-02-12] v0.10.10 - Critical Asset Fix
+- **[V]** `v0.10.10`
+- **[Fix]** **Assets**: Renamed `assets/scrin` to `assets/scrins` to force correct case-sensitive folder creation on Linux servers and bypass caching issues.
+- **[S]** **STATUS**: v0.10.10 Released. Online images should now definitely load.
