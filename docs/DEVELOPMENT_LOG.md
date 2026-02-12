@@ -561,3 +561,18 @@
     - **Main Menu**: Validated version and debug text fonts.
 - **[S]** **STATUS**: v0.10.4 Complete. HUD is sleek and readable.
 
+
+### [2026-02-12] v0.10.5 - Combat Tuning & HUD Polish
+- **[A]** **Combat Tuning**:
+    - **Blast Zones**: Significantly reduced top and bottom blast zones for faster gameplay.
+    - **Wall Height**: Lowered walls to allow more off-stage play.
+    - **Side Run Attack**: Increased hitbox size for `light_run_grounded` (120x70) to improve consistency.
+- **[V]** **Visuals**:
+    - **Stage Background**: Tweaked "Adria" background scroll factor and scale for better depth perception.
+    - **HUD Refinement**: Extensive iterative polish on the Diamond HUD style:
+        - **Icon**: ~1.35x Scale, bottom-aligned.
+        - **Layout**: Tucked name tag behind diamond, moved stocks below name tag.
+        - **Typography**: Removed italics from damage numbers, separated heart icon and stock count.
+- **[Fix]** **Online Sync**:
+    - Verified that all local HUD changes automatically apply to Online mode (shared `MatchHUD` class).
+- **[S]** **STATUS**: v0.10.5 Released. HUD is pixel-perfect.
