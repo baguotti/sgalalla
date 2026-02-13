@@ -112,10 +112,10 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES + 30,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES + 50,
-        // Hitbox from Side Light (Effective)
-        hitboxWidth: 120, // Significantly increased (was 81)
-        hitboxHeight: 70, // Significantly increased (was 35)
-        hitboxOffsetX: 60,
+        // Hitbox covers attacker body + punch reach
+        hitboxWidth: 150, // Extended to include body (was 120)
+        hitboxHeight: 70,
+        hitboxOffsetX: 0, // Starts at player center (was 60)
         hitboxOffsetY: 0,
     },
     'light_up_grounded': {

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 
 // Smash Ultimate Style Colors
-const SMASH_COLORS = [
+export const SMASH_COLORS = [
     0xE63946, // P1 Red
     0x4361EE, // P2 Blue
     0xFF006E, // P3 Pink

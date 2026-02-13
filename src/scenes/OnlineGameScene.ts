@@ -20,7 +20,7 @@ import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '
 type NetPlayerSnapshot = NetPlayerState & { frame: number; serverTime: number };
 import { InputManager } from '../input/InputManager';
 import type { GameSnapshot, PlayerSnapshot } from '../network/StateSnapshot';
-import { MatchHUD } from '../ui/PlayerHUD';
+import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { DebugOverlay } from '../components/DebugOverlay';
 
 export class OnlineGameScene extends Phaser.Scene {
@@ -98,6 +98,9 @@ export class OnlineGameScene extends Phaser.Scene {
     // Game Over State
     private isGameOver: boolean = false;
     private gameOverContainer!: Phaser.GameObjects.Container;
+
+    // Player indicator colors (from PlayerHUD for consistency)
+    private readonly PLAYER_COLORS = SMASH_COLORS;
     private rematchButton!: Phaser.GameObjects.Text;
     private leaveButton!: Phaser.GameObjects.Text;
     private hasVotedRematch: boolean = false;
@@ -371,8 +374,11 @@ export class OnlineGameScene extends Phaser.Scene {
     async create(): Promise<void> {
 
         // Ensure custom font is loaded before any text rendering
-        // @ts-ignore - document.fonts is not in all TS definitions
-        await document.fonts.ready;
+        // Active polling: document.fonts.ready can resolve before CDN stylesheet loads
+        for (let i = 0; i < 50; i++) {
+            if (document.fonts.check('16px "Pixeloid Sans"')) break;
+            await new Promise(r => setTimeout(r, 100));
+        }
 
         // Create animations first
         this.createAnimations();
@@ -1462,6 +1468,25 @@ export class OnlineGameScene extends Phaser.Scene {
 
             if (p.playerId === this.localPlayerId) {
                 this.localPlayer = player;
+
+                // Add small bobbing triangle indicator above local player (matching his color)
+                const triColor = this.PLAYER_COLORS[p.playerId % this.PLAYER_COLORS.length];
+                const tri = this.add.graphics();
+                tri.fillStyle(triColor, 1);
+                tri.fillTriangle(-6, -6, 6, -6, 0, 6); // Downward-pointing
+                tri.setPosition(0, -120); // Above nameTag
+                player.add(tri);
+                this.tweens.add({
+                    targets: tri,
+                    y: tri.y - 5,
+                    duration: 600,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+                if (this.uiCamera) {
+                    this.uiCamera.ignore(tri);
+                }
             }
 
             // Add to HUD

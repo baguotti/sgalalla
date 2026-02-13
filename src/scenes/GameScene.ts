@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { Player, PlayerState } from '../entities/Player';
-import { MatchHUD } from '../ui/PlayerHUD'; // Import MatchHUD
+import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD'; // Import MatchHUD
 import { DebugOverlay } from '../components/DebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
 import { Bomb } from '../entities/Bomb';
@@ -545,19 +545,30 @@ export class GameScene extends Phaser.Scene {
                 });
                 console.log(`Player ${pData.playerId} created.`);
 
-                // Set Color
+                // Set Color (all players use their assigned color)
                 const color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
-
-                // Only tint AI skins
-                if (pData.isAI) {
-                    player.visualColor = color;
-                } else {
-                    player.visualColor = 0xffffff;
-                }
+                player.visualColor = color;
                 player.resetVisuals();
 
                 this.players.push(player);
                 console.log(`Player ${pData.playerId} pushed to array.`);
+
+                // Add small triangle indicator above human players (colored, centered on hitbox)
+                if (!pData.isAI) {
+                    const tri = this.add.graphics();
+                    tri.fillStyle(color, 1);
+                    tri.fillTriangle(-6, -6, 6, -6, 0, 6); // Downward-pointing
+                    tri.setPosition(0, -120); // Above nameTag (y=-100)
+                    player.add(tri);
+                    this.tweens.add({
+                        targets: tri,
+                        y: tri.y - 5,
+                        duration: 600,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut'
+                    });
+                }
 
                 // Add to HUD
                 this.addPlayerToHUD(player);
@@ -841,12 +852,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Player Config
-    private readonly PLAYER_COLORS = [
-        0x8ab4f8, // P1: Pastel Blue
-        0xf28b82, // P2: Pastel Red
-        0xccff90, // P3: Pastel Green
-        0xfdd663  // P4: Pastel Yellow
-    ];
+    // Player colors - using SMASH_COLORS from PlayerHUD for consistency
+    private readonly PLAYER_COLORS = SMASH_COLORS;
 
     private createHUDs(): void {
         // Initialize HUD

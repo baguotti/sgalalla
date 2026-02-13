@@ -639,3 +639,11 @@
 - **[Fix]** **Online Chests**: Moved chest spawning logic to server (broadcasts `CHEST_SPAWN`). Fixes desync where players saw different chests.
 - **[Fix]** **Font**: Reinforced font loading in selection screen to prevent fallback font usage.
 - **[S]** **STATUS**: v0.10.13 Released. Server restart MANDATORY for chests and timer.
+
+### [2026-02-13] v0.10.14 - Player Indicators & Polish
+- **[V]** `v0.10.14`
+- **[Fix]** **Player Colors**: Unified all color arrays to use `SMASH_COLORS` (Red, Blue, Pink, Green). HUD, triangle, and nametag now match.
+- **[Feature]** **Triangle Indicator**: Added colored bobbing triangle above human players (training) and local player (online) for easy identification.
+- **[Fix]** **Font Loading**: Implemented active polling with `document.fonts.check()` to ensure "Pixeloid Sans" loads before rendering.
+- **[Tweak]** **Run Light Punch**: Extended hitbox to cover attacker's body (width 120→150, offsetX 60→0).
+- **[S]** **STATUS**: v0.10.14 Released. Client-only update.
