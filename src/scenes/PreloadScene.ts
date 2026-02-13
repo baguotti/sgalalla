@@ -15,6 +15,10 @@ export class PreloadScene extends Phaser.Scene {
         this.load.image('fok_icon', 'assets/fok_icon.png');
         this.load.image('sga_icon', 'assets/sga_icon.png');
         this.load.image('sgu_icon', 'assets/sgu_icon.png');
+
+        // NEW: Fok Side Sig Ghost Frames
+        this.load.image('fok_ghost_0', 'assets/fok_v3/Fok_v3_Side_Sig_Ghost_000.png');
+        this.load.image('fok_ghost_1', 'assets/fok_v3/Fok_v3_Side_Sig_Ghost_001.png');
     }
 
     create(): void {

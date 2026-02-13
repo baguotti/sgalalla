@@ -88,12 +88,13 @@ export class OnlineGameScene extends Phaser.Scene {
     };
 
     // UI Camera
-    private uiCamera!: Phaser.Cameras.Scene2D.Camera;
+    public uiCamera!: Phaser.Cameras.Scene2D.Camera;
 
     // Debug Overlay
     private debugOverlay!: DebugOverlay;
     private debugVisible: boolean = false;
     private debugToggleKey!: Phaser.Input.Keyboard.Key;
+    private previousSelectPressed: boolean = false;
 
     // Game Over State
     private isGameOver: boolean = false;
@@ -188,8 +189,11 @@ export class OnlineGameScene extends Phaser.Scene {
                 attack_light_side: { prefix: 'Fok_v3_Neutral_Light_', count: 1, suffix: '000', loop: false },
                 attack_light_side_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false },
 
+                // Up Light Air (separate aerial animation)
+                attack_light_up_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false },
 
-                // --- HEAVY ATTACKS (SIGS) ---
+                // Running Light Attack
+                attack_light_run: { prefix: 'Fok_v3_Side_Run_', count: 1, suffix: '000', loop: false },
                 // Neutral Sig -> Mapped to Up Sig (Req 2)
                 attack_heavy_neutral: { prefix: 'Fok_v3_Up_Sig_', count: 1, suffix: '000', loop: false },
 
@@ -338,6 +342,19 @@ export class OnlineGameScene extends Phaser.Scene {
                 });
             });
         });
+
+        // Manual Animation: Fok Side Sig Ghost (from standalone images)
+        if (!this.anims.exists('fok_side_sig_ghost')) {
+            this.anims.create({
+                key: 'fok_side_sig_ghost',
+                frames: [
+                    { key: 'fok_ghost_0' },
+                    { key: 'fok_ghost_1' }
+                ],
+                frameRate: 10,
+                repeat: -1
+            });
+        }
     }
 
     private setupCameras(): void {
@@ -636,7 +653,9 @@ export class OnlineGameScene extends Phaser.Scene {
         }
 
         // Update Debug Overlay
-        if (Phaser.Input.Keyboard.JustDown(this.debugToggleKey)) {
+        const qKeyPressed = Phaser.Input.Keyboard.JustDown(this.debugToggleKey);
+        const gamepadSelectPressed = this.checkGamepadSelect();
+        if (qKeyPressed || gamepadSelectPressed) {
             this.debugVisible = !this.debugVisible;
             this.debugOverlay.setVisible(this.debugVisible);
             this.players.forEach(p => p.setDebug(this.debugVisible));
@@ -780,13 +799,13 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     /**
-     * Handle remote attack events - play animation on remote player
+     * Handle remote attack events - trigger full attack logic on remote player
      */
     private handleAttackEvent(event: NetAttackEvent): void {
         const player = this.players.get(event.playerId);
         if (player) {
-            // Force attack animation on remote player
-            player.playAttackAnimation(event.attackKey);
+            // Trigger full attack (animation + effects like ghost sprites)
+            player.combat.startAttack(event.attackKey);
         }
     }
 
@@ -1803,5 +1822,23 @@ export class OnlineGameScene extends Phaser.Scene {
         this.phase = 'WAITING';
         this.isConnected = false;
         this.isConfirmed = false;
+    }
+
+    private checkGamepadSelect(): boolean {
+        const gamepads = navigator.getGamepads();
+        let currentSelectPressed = false;
+
+        for (let i = 0; i < gamepads.length; i++) {
+            const gamepad = gamepads[i];
+            if (gamepad) {
+                // Button 8 is SELECT/BACK/VIEW on standard gamepads
+                currentSelectPressed = gamepad.buttons[8]?.pressed || false;
+                break;
+            }
+        }
+
+        const justPressed = currentSelectPressed && !this.previousSelectPressed;
+        this.previousSelectPressed = currentSelectPressed;
+        return justPressed;
     }
 }

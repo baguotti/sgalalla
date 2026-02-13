@@ -97,13 +97,17 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
     }
 
     /**
-     * Open the chest: display a random scrin image as a UI overlay.
+     * Open the chest: display a scrin image as a UI overlay.
+     * Image is derived deterministically from chest position to stay synced online.
+     * Optionally accepts an explicit imageIndex for server-driven sync.
      */
-    public open(): void {
+    public open(imageIndex?: number): void {
         if (this.isOpened) return;
         this.isOpened = true;
 
-        const randomKey = SCRIN_IMAGES[Phaser.Math.Between(0, SCRIN_IMAGES.length - 1)];
+        // Deterministic image selection: use spawn X as seed so both clients pick the same image
+        const idx = imageIndex ?? (Math.abs(Math.round(this.x * 7 + this.y * 13)) % SCRIN_IMAGES.length);
+        const randomKey = SCRIN_IMAGES[idx];
         const { width: sw, height: sh } = this.scene.scale;
 
         // Semi-transparent dark overlay behind the image

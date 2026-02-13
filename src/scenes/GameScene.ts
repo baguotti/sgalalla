@@ -45,7 +45,7 @@ export class GameScene extends Phaser.Scene {
     private readonly BLAST_ZONE_TOP = -600; // Significantly reduced (was -800)
     private readonly BLAST_ZONE_BOTTOM = 1800;
 
-    private uiCamera!: Phaser.Cameras.Scene2D.Camera;
+    public uiCamera!: Phaser.Cameras.Scene2D.Camera;
 
     // Camera Settings
     private currentZoomLevel: 'CLOSE' | 'NORMAL' | 'WIDE' = 'CLOSE';
@@ -416,6 +416,19 @@ export class GameScene extends Phaser.Scene {
                 createAlias('dash', 'slide'); // Use slide for dash too (legacy fallback)
             }
         });
+
+        // Manual Animation: Fok Side Sig Ghost (from standalone images)
+        if (!this.anims.exists('fok_side_sig_ghost')) {
+            this.anims.create({
+                key: 'fok_side_sig_ghost',
+                frames: [
+                    { key: 'fok_ghost_0' },
+                    { key: 'fok_ghost_1' }
+                ],
+                frameRate: 10,
+                repeat: -1
+            });
+        }
     }
 
     private players: Player[] = [];

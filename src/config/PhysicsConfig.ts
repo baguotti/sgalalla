@@ -102,7 +102,7 @@ export const PhysicsConfig = {
   DOWN_ATTACK_OFFSET_Y: 150,
 
   // Chargeable heavy attacks
-  CHARGE_MAX_TIME: 1000,
+  CHARGE_MAX_TIME: 1500,
   CHARGE_DAMAGE_MULT: 2.0,
   CHARGE_KNOCKBACK_MULT: 1.8,
 

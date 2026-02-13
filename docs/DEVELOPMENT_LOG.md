@@ -458,6 +458,7 @@
 - **[Perf]** Client: Implemented adaptive buffer based on environment. Local (`localhost`/`127.0.0.1`) uses 60ms, production uses 100ms.
 - **[Note]** Production requires larger buffer due to real internet jitter. 100ms provides stability while maintaining reasonable responsiveness.
 
+
 ### [2026-02-08] v0.9.14 - Reliability Research & Buffer Tuning
 - **[V]** `v0.9.14`
 - **[Research]** Investigated "Head-of-Line Blocking" - turns out Geckos.io **already defaults to `ordered: false`** (unreliable/unordered). Not the stutter cause.
@@ -655,4 +656,21 @@
 - **[Fix]** Lobby Freeze: Fixed freeze when returning to lobby from GameScene by resetting keyboard state and adding input safety delay.
 - **[Pol]** Indicators: Lowered player indicator triangle opacity to 50% for better visibility.
 - **[S]** **STATUS**: v0.10.15 Released. Client-only update.
+
+### [2026-02-13] v0.10.16 - Ghost Sync & Run Attack Fixes
+- **[V]** `v0.10.16`
+- **[Fix]** **Ghost Network Sync**: Fixed critical bug where Side Sig ghost was invisible to opponents.
+    - Added `onAttack` network callback to `startChargedAttack` (was missing, so heavy attacks weren't broadcast).
+    - Added ghost spawn logic to `startChargedAttack`.
+    - Added `fok_side_sig_ghost` animation to `OnlineGameScene`.
+    - Forced immediate ghost spawn in `startAttack` for remote players.
+- **[Fix]** **Run Attack Consistency**:
+    - Relaxed trigger condition in `PlayerCombat.ts` to allow Run Attack based on high velocity (>80% max speed) even if `isRunning` flag is false (e.g. Dash-Attack).
+    - Added missing `attack_light_run` animation to `fok_v3` in `OnlineGameScene`.
+- **[Fix]** **Chest Image Sync**:
+    - Replaced random image selection with deterministic hash based on chest position (`x * 7 + y * 13`).
+    - Ensures both clients see the same image when opening a chest online.
+- **[New]** **Debug Features**:
+    - Added Gamepad SELECT button (Button 8) to toggle debug overlay in `OnlineGameScene`.
+- **[S]** **STATUS**: v0.10.16 Complete. Online ghost attacks and run attacks are synced, chest images are deterministic.
 

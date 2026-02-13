@@ -28,6 +28,7 @@ export class PlayerCombat {
     // Charge Attack System
     public isCharging: boolean = false;
     public chargeTime: number = 0;
+    public lastChargeTime: number = 0; // Snapshot of chargeTime at release (for damage calc)
     public chargeDirection: AttackDirection = AttackDirection.NEUTRAL;
 
     // Throw Charge System
@@ -38,6 +39,10 @@ export class PlayerCombat {
     // private hasSpawnedProjectile: boolean = false; // Removed
 
     private showDebugHitboxes: boolean = false;
+
+    // Ghost Effect State
+    private ghostSprite: Phaser.GameObjects.Sprite | null = null;
+    private hasSpawnedGhost: boolean = false;
 
     constructor(player: Player, scene: Phaser.Scene) {
         this.player = player;
@@ -145,8 +150,9 @@ export class PlayerCombat {
             let direction = this.getInputDirection(input);
 
             // Refinement Round 10: Run-Attack Override (Slide Attack)
-            // Any light attack while running becomes a Down Light (Slide) to use momentum
-            if (this.player.physics.isRunning && this.player.isGrounded) {
+            // Any light attack while running OR moving fast (Dash Attack)
+            const isRunSpeed = Math.abs(this.player.velocity.x) > PhysicsConfig.MAX_SPEED * 0.8;
+            if ((this.player.physics.isRunning || isRunSpeed) && this.player.isGrounded) {
                 if (this.player.character === 'fok_v3' || this.player.character === 'sga' || this.player.character === 'sgu') {
                     // Use new Running Light Attack
                     this.startAttack('light_run_grounded');
@@ -227,10 +233,13 @@ export class PlayerCombat {
         try {
             const facing = this.player.getFacingDirection();
 
+            // Clear any previous ghost before new attack
+            this.clearGhostEffect();
+            this.hasSpawnedGhost = false;
+
             this.currentAttack = new Attack(attackKey, facing);
             this.player.isAttacking = true;
             this.hitTargets.clear();
-            // this.hasSpawnedProjectile = false; // Removed
 
             // Visual feedback
             // this.player.setVisualTint(0xff0000); // Removed red tint
@@ -252,6 +261,14 @@ export class PlayerCombat {
                 // User Request: "a little more sliding"
                 this.player.velocity.x = facing * (PhysicsConfig.SLIDE_ATTACK_SPEED * 1.2);
             }
+
+            // Side Sig Ghost: Spawn immediately so remote players see it
+            // (Remote players don't run combat.update(), so updateGhostEffect() never fires)
+            if (this.currentAttack.data.type === AttackType.HEAVY &&
+                this.currentAttack.data.direction === AttackDirection.SIDE &&
+                this.player.character === 'fok_v3') {
+                this.updateGhostEffect();
+            }
         } catch (e) {
             console.warn('Unknown attack:', attackKey);
         }
@@ -260,10 +277,25 @@ export class PlayerCombat {
     private startChargedAttack(attackKey: string, _chargePercent: number): void {
         try {
             const facing = this.player.getFacingDirection();
+            // Clear any previous ghost before new attack
+            this.clearGhostEffect();
+            this.hasSpawnedGhost = false;
+
             this.currentAttack = new Attack(attackKey, facing); // Removed chargePercent
             this.player.isAttacking = true;
             this.hitTargets.clear();
-            // this.hasSpawnedProjectile = false; // Removed
+
+            // Trigger network callback (was missing — heavy attacks were never broadcast!)
+            if (this.player.onAttack) {
+                this.player.onAttack(attackKey, facing);
+            }
+
+            // Side Sig Ghost: Spawn immediately so remote players see it
+            if (this.currentAttack.data.type === AttackType.HEAVY &&
+                this.currentAttack.data.direction === AttackDirection.SIDE &&
+                this.player.character === 'fok_v3') {
+                this.updateGhostEffect();
+            }
 
             // Set cooldown
             this.attackCooldownTimer = this.currentAttack.data.recoveryDuration;
@@ -278,6 +310,9 @@ export class PlayerCombat {
 
         // Calculate charge multiplier (0 to 1 based on charge time)
         const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
+
+        // Snapshot charge time BEFORE clearing (so damage calc can read it)
+        this.lastChargeTime = this.chargeTime;
 
         // Get attack key and start charged attack
         const attackKey = Attack.getAttackKey(AttackType.HEAVY, direction, isAerial);
@@ -459,6 +494,17 @@ export class PlayerCombat {
             this.deactivateHitbox();
         }
 
+        // Side Sig Ghost Effect (Fok_v3 only)
+        if (this.currentAttack.data.type === AttackType.HEAVY &&
+            this.currentAttack.data.direction === AttackDirection.SIDE &&
+            this.player.character === 'fok_v3') {
+
+            this.updateGhostEffect();
+        } else {
+            // Ensure ghost is cleared if we switch phases or something weird happens
+            this.clearGhostEffect();
+        }
+
         // Visual feedback based on phase
         /*
         if (this.currentAttack.phase === AttackPhase.STARTUP) {
@@ -488,9 +534,22 @@ export class PlayerCombat {
         this.currentAttack = null;
         this.deactivateHitbox();
         this.player.resetVisuals();
+        this.clearGhostEffect();
 
-        // Set cooldown (shorter for light attacks)
-        this.attackCooldownTimer = 100;
+        // Set cooldown — scale recovery with charge for Side Sig
+        if (this.player.character === 'fok_v3' &&
+            this.lastChargeTime > 0) {
+            // Longer charge = longer recovery (punishable)
+            // Base 100ms + up to 600ms based on charge
+            const maxCharge = PhysicsConfig.CHARGE_MAX_TIME;
+            const chargeRatio = Math.min(this.lastChargeTime / maxCharge, 1);
+            this.attackCooldownTimer = 100 + (chargeRatio * 600);
+        } else {
+            this.attackCooldownTimer = 100;
+        }
+
+        // Reset snapshot
+        this.lastChargeTime = 0;
     }
 
     private endGroundPound(): void {
@@ -574,8 +633,27 @@ export class PlayerCombat {
             offset.x += facing * 20; // 10 (prev) + 10 (new)
         }
 
-        const hitboxX = this.player.x + offset.x;
-        const hitboxY = this.player.y + offset.y;
+        let hitboxX = this.player.x + offset.x;
+        let hitboxY = this.player.y + offset.y;
+
+        // Custom Override for Side Sig Ghost (Fok_v3)
+        // Hitbox must follow the ghost sprite
+        if (this.currentAttack.data.type === AttackType.HEAVY &&
+            this.currentAttack.data.direction === AttackDirection.SIDE &&
+            this.player.character === 'fok_v3' &&
+            this.ghostSprite && this.ghostSprite.active) {
+
+            // Override position to match ghost
+            hitboxX = this.ghostSprite.x;
+            hitboxY = this.ghostSprite.y;
+
+            // Override size to match ghost
+            if (this.ghostSprite.width > 0) {
+                // User requested 35% smaller (0.65 scale)
+                width = this.ghostSprite.width * 0.65;
+                height = this.ghostSprite.height * 0.65;
+            }
+        }
 
         this.updateActiveHitbox(hitboxX, hitboxY, width, height);
     }
@@ -583,6 +661,27 @@ export class PlayerCombat {
     public updateRecoveryHitbox(): void {
         // Centered hitbox for recovery - surrounds player (Player is 40x60)
         this.updateActiveHitbox(this.player.x, this.player.y, 60, 60);
+    }
+
+    public calculateCurrentDamage(): number {
+        if (this.currentAttack) {
+            let damage = this.currentAttack.data.damage;
+
+            // Side Sig Damage Scaling (Fok_v3)
+            // Min 6 -> Max 20 based on charge
+            if (this.player.character === 'fok_v3' &&
+                this.currentAttack.data.type === AttackType.HEAVY &&
+                this.currentAttack.data.direction === AttackDirection.SIDE) {
+
+                const maxCharge = PhysicsConfig.CHARGE_MAX_TIME;
+                const chargeRatio = Math.min(this.lastChargeTime / maxCharge, 1);
+                damage = 6 + (chargeRatio * 14); // 6 to 20
+            }
+            return Math.floor(damage);
+        } else if (this.player.physics.isRecovering) {
+            return 8; // Hardcoded recovery damage
+        }
+        return 0;
     }
 
     private updateActiveHitbox(x: number, y: number, width: number, height: number): void {
@@ -610,14 +709,15 @@ export class PlayerCombat {
                     padding: { x: 2, y: 2 }
                 });
                 this.debugDamageText.setDepth(100);
+
+                // Fix Double Render Glitch (Ignore in UI Camera)
+                const scene = this.scene as any;
+                if (scene.uiCamera) {
+                    scene.uiCamera.ignore(this.debugDamageText);
+                }
             }
 
-            let damage = 0;
-            if (this.currentAttack) {
-                damage = this.currentAttack.data.damage;
-            } else if (this.player.physics.isRecovering) {
-                damage = 8; // Hardcoded recovery damage
-            }
+            const damage = this.calculateCurrentDamage();
 
             this.debugDamageText.setText(`${damage}`);
             this.debugDamageText.setPosition(x, y - height / 2 - 20); // Place above hitbox
@@ -665,16 +765,27 @@ export class PlayerCombat {
 
         if (this.currentAttack) {
             const data = this.currentAttack.data;
-            damage = data.damage;
+            damage = this.calculateCurrentDamage();
             // knockback = data.knockback; // Legacy removed
             baseKnockback = data.baseKnockback || 150;
             knockbackGrowth = data.knockbackGrowth || 5;
             knockbackAngle = data.knockbackAngle;
             isHeavy = data.type === AttackType.HEAVY;
+
+            // Side Sig Knockback Scaling (Fok_v3) — reward for risky full charge
+            if (this.player.character === 'fok_v3' &&
+                data.type === AttackType.HEAVY &&
+                data.direction === AttackDirection.SIDE) {
+
+                const maxCharge = PhysicsConfig.CHARGE_MAX_TIME;
+                const chargeRatio = Math.min(this.lastChargeTime / maxCharge, 1);
+                // Scale knockback: 1.0x at no charge -> 1.5x at full charge
+                baseKnockback = baseKnockback * (1.0 + (chargeRatio * 0.5));
+                knockbackGrowth = knockbackGrowth * (1.0 + (chargeRatio * 0.3));
+            }
         } else if (this.player.physics.isRecovering) {
             // Recovery Hit Data
             damage = 8;
-            // knockback = 500; // Legacy removed
             baseKnockback = 250;
             knockbackGrowth = 8;
             knockbackAngle = 80; // Upwards
@@ -729,5 +840,92 @@ export class PlayerCombat {
 
         // Visual Effects for Down Air (Spike)
         // Removed down arrow visual
+    }
+
+    private updateGhostEffect(): void {
+        // If already spawned, do not update (Fire and Forget)
+        if (this.hasSpawnedGhost) return;
+
+        const facing = this.player.getFacingDirection();
+
+        // Create Ghost Sprite
+        const ghost = this.scene.add.sprite(this.player.x, this.player.y, 'fok_ghost_0');
+        ghost.setDepth(this.player.depth - 1); // Behind player
+        ghost.play('fok_side_sig_ghost');
+        // Faint glow effect (Diffused White)
+        let glowFx: Phaser.FX.Glow | null = null;
+        if (ghost.preFX) {
+            // Color: White (0xffffff), Strength: 2, Quality: 0.1, Distance: 90 (very soft/diffused)
+            glowFx = ghost.preFX.addGlow(0xffffff, 2, 0, false, 0.1, 90);
+        }
+
+        // Fix Double Sprite Glitch (Ignore in UI Camera)
+        const scene = this.scene as any;
+        if (scene.uiCamera) {
+            scene.uiCamera.ignore(ghost);
+        }
+
+        // Initial Position: Player X + (15 * facing)
+        const startX = this.player.x + (15 * facing);
+        ghost.setPosition(startX, this.player.y);
+
+        this.hasSpawnedGhost = true;
+        // Restore reference for Hitbox tracking
+        this.ghostSprite = ghost;
+
+        // Flip logic: Use scaleX to ensure correct orientation
+        // If firing left (-1), scaleX becomes -1 (flipped)
+        // If firing right (1), scaleX becomes 1 (normal)
+        ghost.setScale(facing, 1);
+
+        // Tween 1: Propel forward — distance scales with charge (110px min, 145px max)
+        const maxChg = PhysicsConfig.CHARGE_MAX_TIME;
+        const chgRatio = Math.min(this.lastChargeTime / maxChg, 1);
+        const travelDist = 110 + (chgRatio * 35); // 110 to 145
+
+        this.scene.tweens.add({
+            targets: ghost,
+            x: startX + (travelDist * facing),
+            duration: 300,
+            ease: 'Cubic.easeOut'
+        });
+
+        // Calculate ghost linger time to match recovery window
+        // Recovery = 100 + chargeRatio * 600  (from endAttack)
+        const maxCharge = PhysicsConfig.CHARGE_MAX_TIME;
+        const chargeRatio = Math.min(this.lastChargeTime / maxCharge, 1);
+        const recoveryTime = 100 + (chargeRatio * 600);
+        // Ghost stays solid during movement (300ms), then visible for remaining recovery
+        const fadeDelay = Math.max(recoveryTime - 300, 50); // At least 50ms delay
+
+        // Tween 2: Fade Out after recovery-scaled delay
+        this.scene.tweens.add({
+            targets: ghost,
+            alpha: 0,
+            delay: fadeDelay,
+            duration: 600, // Even smoother fade (was 500)
+            onComplete: () => {
+                if (ghost && ghost.active) {
+                    ghost.destroy();
+                }
+            }
+        });
+
+        // Tween 3: Fade Glow Strength (starts slightly earlier or with alpha)
+        if (glowFx) {
+            this.scene.tweens.add({
+                targets: glowFx,
+                outerStrength: 0,
+                delay: fadeDelay,
+                duration: 600,
+            });
+        }
+    }
+
+    private clearGhostEffect(): void {
+        // Do NOT destroy the ghost here. Let it fade out naturally via tween.
+        // Just reset the flag so we can spawn a new one next attack.
+        this.hasSpawnedGhost = false;
+        this.ghostSprite = null; // Forget reference
     }
 }
