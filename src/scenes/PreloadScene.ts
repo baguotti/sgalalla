@@ -24,57 +24,66 @@ export class PreloadScene extends Phaser.Scene {
         this.cameras.main.setBackgroundColor('#000000');
 
         // Background Image (Title Card)
-        console.log('Checking title_card texture:', this.textures.exists('title_card'));
         if (this.textures.exists('title_card')) {
             const bg = this.add.image(width / 2, height / 2, 'title_card');
             const scaleX = width / bg.width;
             const scaleY = height / bg.height;
             const scale = Math.max(scaleX, scaleY);
             bg.setScale(scale);
-            // Darken slightly for logo/text contrast - REMOVED per user request
-            // this.add.rectangle(0, 0, width, height, 0x000000, 0.3).setOrigin(0);
         }
 
-        // Display Logo (Removed)
-        // const logo = this.add.image(width / 2, height / 2, 'logo');
-        // logo.setOrigin(0.5);
-
-        // Scale logo logic removed
-        // const scaleX = (width * 0.8) / logo.width;
-        // const scaleY = (height * 0.8) / logo.height;
-        // const scale = Math.min(scaleX, scaleY);
-        // logo.setScale(scale);
-
-        // Loading Text
+        // Loading Text (uses system font initially - will switch once Pixeloid is confirmed)
         const loadingText = this.add.text(width / 2, height - 100, 'Loading...', {
             fontSize: '32px',
             color: '#ffffff',
-            fontFamily: '"Pixeloid Sans"'
+            fontFamily: 'sans-serif'
         }).setOrigin(0.5);
 
-        // Wait for Pixeloid Sans font to load
-        // @ts-ignore - document.fonts is not in all TS definitions
-        document.fonts.load('1rem "Pixeloid Sans"').then(() => {
-            console.log('Font loaded');
-            loadingText.setText('PRESS START');
-            loadingText.setFontFamily('"Pixeloid Sans"');
-            loadingText.setFontSize(48);
+        // ===== ROBUST FONT LOADING =====
+        // Kick off a font load request (tells browser to start downloading)
+        // @ts-ignore
+        document.fonts.load('1rem "Pixeloid Sans"').catch(() => { });
 
-            // Blink effect
-            this.tweens.add({
-                targets: loadingText,
-                alpha: 0,
-                duration: 500,
-                yoyo: true,
-                repeat: -1
-            });
+        // Active polling: wait until the font is ACTUALLY rendered and available
+        // This is more reliable than document.fonts.ready or .load() promise
+        const maxAttempts = 100; // 10 seconds max
+        let attempts = 0;
 
-            this.setupInput();
-        }).catch((err: any) => {
-            console.error('Font loading failed:', err);
-            // Fallback
-            loadingText.setText('PRESS START');
-            this.setupInput();
+        const fontPollTimer = this.time.addEvent({
+            delay: 100,
+            loop: true,
+            callback: () => {
+                attempts++;
+                // @ts-ignore
+                const fontReady = document.fonts.check('16px "Pixeloid Sans"');
+
+                if (fontReady || attempts >= maxAttempts) {
+                    fontPollTimer.destroy();
+
+                    if (fontReady) {
+                        console.log(`[PreloadScene] Font "Pixeloid Sans" confirmed loaded after ${attempts} polls`);
+                    } else {
+                        console.warn(`[PreloadScene] Font polling timed out after ${maxAttempts} attempts, proceeding with fallback`);
+                    }
+
+                    // Now show PRESS START with the confirmed font
+                    loadingText.setFontFamily('"Pixeloid Sans"');
+                    loadingText.setText('PRESS START');
+                    loadingText.setFontSize(48);
+
+                    // Blink effect
+                    this.tweens.add({
+                        targets: loadingText,
+                        alpha: 0,
+                        duration: 500,
+                        yoyo: true,
+                        repeat: -1
+                    });
+
+                    // Only now accept input (font is ready for all downstream scenes)
+                    this.setupInput();
+                }
+            }
         });
     }
 

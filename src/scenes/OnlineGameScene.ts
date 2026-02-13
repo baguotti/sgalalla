@@ -372,13 +372,7 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     async create(): Promise<void> {
-
-        // Ensure custom font is loaded before any text rendering
-        // Active polling: document.fonts.ready can resolve before CDN stylesheet loads
-        for (let i = 0; i < 50; i++) {
-            if (document.fonts.check('16px "Pixeloid Sans"')) break;
-            await new Promise(r => setTimeout(r, 100));
-        }
+        // Font is pre-loaded in PreloadScene (active polling ensures it's ready)
 
         // Create animations first
         this.createAnimations();
@@ -1472,7 +1466,7 @@ export class OnlineGameScene extends Phaser.Scene {
                 // Add small bobbing triangle indicator above local player (matching his color)
                 const triColor = this.PLAYER_COLORS[p.playerId % this.PLAYER_COLORS.length];
                 const tri = this.add.graphics();
-                tri.fillStyle(triColor, 1);
+                tri.fillStyle(triColor, 0.5);
                 tri.fillTriangle(-6, -6, 6, -6, 0, 6); // Downward-pointing
                 tri.setPosition(0, -120); // Above nameTag
                 player.add(tri);

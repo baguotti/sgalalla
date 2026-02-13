@@ -10,6 +10,7 @@ export class MainMenuScene extends Phaser.Scene {
     private selectedIndex: number = 0;
     private menuOptions = [
         { label: 'TRAINING', mode: 'training' },
+        { label: 'BOTTE IN LOCALE', mode: 'versus' },
         { label: '1v1', mode: 'online' }
     ];
     private menuTexts: Phaser.GameObjects.Text[] = [];
@@ -35,16 +36,16 @@ export class MainMenuScene extends Phaser.Scene {
             fontSize: '120px', fontFamily: '"Pixeloid Sans"', color: '#ffffff'
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, 270, 'Pre-Alpha Build v0.10.14', {
+        this.add.text(width / 2, 270, 'Pre-Alpha Build v0.10.15', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(0.5);
 
         // Version (Removed - combined with subtitle)
 
         // Menu Items
-        const startY = 500;
+        const startY = 420;
         this.menuOptions.forEach((opt, index) => {
-            const text = this.add.text(width / 2, startY + (index * 100), opt.label, {
+            const text = this.add.text(width / 2, startY + (index * 90), opt.label, {
                 fontSize: '48px', fontFamily: '"Pixeloid Sans"', color: '#888888'
             }).setOrigin(0.5);
             this.menuTexts.push(text);

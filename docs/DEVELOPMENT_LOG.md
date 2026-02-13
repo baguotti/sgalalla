@@ -647,3 +647,12 @@
 - **[Fix]** **Font Loading**: Implemented active polling with `document.fonts.check()` to ensure "Pixeloid Sans" loads before rendering.
 - **[Tweak]** **Run Light Punch**: Extended hitbox to cover attacker's body (width 120→150, offsetX 60→0).
 - **[S]** **STATUS**: v0.10.14 Released. Client-only update.
+### [2026-02-13] v0.10.15 - Botte in Locale & Polish
+- **[V]** `v0.10.15`
+- **[New]** Botte in Locale: Local multiplayer support for up to 4 players via "BOTTE IN LOCALE" menu option.
+- **[M]** `LobbyScene.ts`: Expanded versus mode to 4 slots, added dynamic UI centering, and enforced strict input isolation (1 keyboard / 1 gamepad per player).
+- **[Fix]** Font Glitch: Moved font loading to `PreloadScene` with active polling (`document.fonts.check()`) to guarantee fonts are ready before scene transitions.
+- **[Fix]** Lobby Freeze: Fixed freeze when returning to lobby from GameScene by resetting keyboard state and adding input safety delay.
+- **[Pol]** Indicators: Lowered player indicator triangle opacity to 50% for better visibility.
+- **[S]** **STATUS**: v0.10.15 Released. Client-only update.
+

@@ -556,7 +556,7 @@ export class GameScene extends Phaser.Scene {
                 // Add small triangle indicator above human players (colored, centered on hitbox)
                 if (!pData.isAI) {
                     const tri = this.add.graphics();
-                    tri.fillStyle(color, 1);
+                    tri.fillStyle(color, 0.5);
                     tri.fillTriangle(-6, -6, 6, -6, 0, 6); // Downward-pointing
                     tri.setPosition(0, -120); // Above nameTag (y=-100)
                     player.add(tri);
@@ -610,9 +610,11 @@ export class GameScene extends Phaser.Scene {
                         console.log("Switching to LobbyScene");
                         // Infer mode from playerData (if dummy exists, it's training)
                         const isTraining = this.playerData.some((p: any) => p.isTrainingDummy);
+                        const p1Data = this.playerData.find((p: any) => p.playerId === 0);
                         this.scene.start('LobbyScene', {
                             mode: isTraining ? 'training' : 'versus',
-                            // Don't pass old slots - let LobbyScene.create reset fresh
+                            inputType: p1Data?.input?.type || 'KEYBOARD',
+                            gamepadIndex: p1Data?.input?.gamepadIndex ?? null,
                         });
                     } catch (e) {
                         console.error("Failed to start LobbyScene:", e);

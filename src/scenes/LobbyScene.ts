@@ -17,7 +17,6 @@ export interface PlayerSelection {
 
 export class LobbyScene extends Phaser.Scene {
     private slots: PlayerSelection[] = [];
-    private maxPlayers = 4;
     private mode: 'versus' | 'training' = 'versus';
     private initialInputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD';
     private initialGamepadIndex: number | null = null;
@@ -78,7 +77,7 @@ export class LobbyScene extends Phaser.Scene {
         // Reset state
         this.lastInputTime.clear();
         this.joinTime.clear();
-        this.canInput = true; // Enable immediately to debug freeze
+        this.canInput = false; // Will be enabled after safety delay in create()
         this.frameInputs = { space: false, enter: false };
         this.prevGamepadSelect = false;
         this.sceneStartTime = Date.now();
@@ -104,7 +103,7 @@ export class LobbyScene extends Phaser.Scene {
         this.add.rectangle(0, 0, width, height, 0x1a1a2e).setOrigin(0);
 
         // Title
-        const titleText = this.mode === 'training' ? 'TRAINING MODE' : 'CHARACTER SELECT';
+        const titleText = this.mode === 'training' ? 'TRAINING MODE' : 'BOTTE IN LOCALE';
         this.add.text(width / 2, 60, titleText, {
             fontSize: '48px',
             color: '#ffffff',
@@ -128,23 +127,18 @@ export class LobbyScene extends Phaser.Scene {
             repeat: -1
         });
 
-        // Initialize Slots (need at least 2 for training mode)
-        this.slots = [
-            {
-                playerId: 0,
+        // Initialize Slots
+        const slotCount = this.mode === 'versus' ? 4 : 2;
+        this.slots = [];
+        for (let i = 0; i < slotCount; i++) {
+            this.slots.push({
+                playerId: i,
                 joined: false,
                 ready: false,
                 input: { type: 'KEYBOARD', gamepadIndex: null },
                 character: 'fok_v3'
-            },
-            {
-                playerId: 1,
-                joined: false,
-                ready: false,
-                input: { type: 'KEYBOARD', gamepadIndex: null },
-                character: 'fok_v3'
-            }
-        ];
+            });
+        }
 
 
         this.createSlotUI();
@@ -154,7 +148,11 @@ export class LobbyScene extends Phaser.Scene {
             this.setupTrainingMode();
         }
 
-        // Initialize Keys
+        // CRITICAL: Reset keyboard state before adding keys
+        // This prevents stale key states from previous scene causing freeze
+        this.input.keyboard!.resetKeys();
+
+        // Initialize Keys (fresh after reset)
         this.keys = {
             left: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),
             right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
@@ -170,9 +168,11 @@ export class LobbyScene extends Phaser.Scene {
 
         this.backKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
-        // Input safety delay removed, canInput set in initKeyboard Join (Only active after safety delay)
-        // We handle joins in update loop now to respect canInput easily, or add checks here.
-        // Let's stick to update loop for consistency or add checks.
+        // Input safety delay: prevent ghost inputs from previous scene
+        this.canInput = false;
+        this.time.delayedCall(300, () => {
+            this.canInput = true;
+        });
     }
 
     private selectionPhase: 'P1' | 'CPU' = 'P1';
@@ -197,11 +197,13 @@ export class LobbyScene extends Phaser.Scene {
 
     private createSlotUI(): void {
         const { width } = this.scale;
-        const startX = width / 2 - 450;
-        const spacing = 300;
+        const count = this.slots.length;
+        const spacing = count <= 2 ? 400 : 300;
+        const totalWidth = (count - 1) * spacing;
+        const startX = width / 2 - totalWidth / 2;
         const startY = 300;
 
-        for (let i = 0; i < this.maxPlayers; i++) {
+        for (let i = 0; i < count; i++) {
             const container = this.add.container(startX + (i * spacing), startY);
 
             // BG Panel
@@ -470,14 +472,19 @@ export class LobbyScene extends Phaser.Scene {
 
     private checkAllReady(): void {
         const joinedSlots = this.slots.filter(s => s.joined);
-        if (joinedSlots.length > 0 && joinedSlots.every(s => s.ready)) {
+        const minPlayers = this.mode === 'versus' ? 2 : 1;
+        if (joinedSlots.length >= minPlayers && joinedSlots.every(s => s.ready)) {
             console.log('All players ready! Starting game...');
             // Start Game
             this.time.delayedCall(500, () => {
                 this.scene.start('GameScene', { playerData: joinedSlots });
             });
         } else {
-            console.log('Not all players ready yet:', joinedSlots.map(s => `${s.playerId}: ${s.ready}`));
+            if (joinedSlots.length < minPlayers) {
+                console.log(`Need at least ${minPlayers} players (have ${joinedSlots.length})`);
+            } else {
+                console.log('Not all players ready yet:', joinedSlots.map(s => `${s.playerId}: ${s.ready}`));
+            }
         }
     }
 
