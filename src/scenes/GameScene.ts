@@ -35,8 +35,8 @@ export class GameScene extends Phaser.Scene {
 
     // Wall configuration
     private readonly WALL_THICKNESS = 45;
-    private readonly WALL_LEFT_X = -400; // Refinement 12: Pushed out from -200
-    private readonly WALL_RIGHT_X = 2320; // Refinement 12: Pushed out from 2120
+    private readonly WALL_LEFT_X = 200; // Refinement 13: Pushed in from -400
+    private readonly WALL_RIGHT_X = 1720; // Refinement 13: Pushed in from 2320
 
     // Blast zone boundaries
     // Blast zone boundaries
@@ -779,36 +779,25 @@ export class GameScene extends Phaser.Scene {
         bg.setScale(scale * 1.1).setScrollFactor(0.1);
         bg.setDepth(-100);
 
-        // Remove old gradient graphics
-        /*
-        this.background = this.add.graphics();
-        // Refinement: Dark Blue Gradient (Deep Navy -> Dark Blue/Grey)
-        // Top: 0x0f2027, Bottom: 0x203a43
-        this.background.fillGradientStyle(0x0f2027, 0x0f2027, 0x203a43, 0x203a43, 1);
-        this.background.fillRect(0, 0, this.scale.width, this.scale.height);
-        this.background.setScrollFactor(0); // Ensure static relative to camera
-        this.background.setDepth(-100); // Ensure behind everything
-        */
-
-        // Main platform (centered, wider - Refinement 12)
-        // Center: 960. Width 2400 (Was 1800). Y = 900
-        const mainPlatform = this.add.rectangle(960, 900, 2400, 60, 0x2c3e50);
+        // Main platform (centered, smaller - Refinement 13)
+        // Center: 960. Width 1200 (Was 2400). Y = 900
+        const mainPlatform = this.add.rectangle(960, 900, 1200, 60, 0x2c3e50);
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
         // Add Matter body for Bomb collision
         this.matter.add.gameObject(mainPlatform, { isStatic: true });
 
-        // Soft platform 1 (left, floating HIGHER)
-        // Refinement 12: Pushed left to 260 (Was 460)
-        const softPlatform1 = this.add.rectangle(260, 500, 500, 30, 0x0f3460);
+        // Soft platform 1 (left, closer)
+        // Refinement 13: Pushed in to 610 (Was 260)
+        const softPlatform1 = this.add.rectangle(610, 500, 500, 30, 0x0f3460);
         softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform1.setAlpha(0.85);
         this.softPlatforms.push(softPlatform1);
         this.matter.add.gameObject(softPlatform1, { isStatic: true });
 
-        // Soft platform 2 (right, floating HIGHER)
-        // Refinement 12: Pushed right to 1660 (Was 1460)
-        const softPlatform2 = this.add.rectangle(1660, 500, 500, 30, 0x0f3460);
+        // Soft platform 2 (right, closer)
+        // Refinement 13: Pushed in to 1310 (Was 1660)
+        const softPlatform2 = this.add.rectangle(1310, 500, 500, 30, 0x0f3460);
         softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform2.setAlpha(0.85);
         this.softPlatforms.push(softPlatform2);

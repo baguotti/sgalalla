@@ -409,7 +409,7 @@ setInterval(() => {
         room.chestSpawnTimer -= TICK_MS;
         if (room.chestSpawnTimer <= 0) {
             if (Math.random() < 0.35) {
-                const chestX = 500 + Math.random() * 920; // 500-1420
+                const chestX = 400 + Math.random() * 1120; // 400-1520
                 emitToRoom(NetMessageType.CHEST_SPAWN, { x: Math.round(chestX) });
                 console.log(`[Server] Chest spawned at x=${Math.round(chestX)}`);
             }
@@ -421,7 +421,7 @@ setInterval(() => {
         room.bombSpawnTimer -= TICK_MS;
         if (room.bombSpawnTimer <= 0) {
             // Spawn a bomb at random position
-            const bombX = 500 + Math.random() * 920; // 500-1420 (central area)
+            const bombX = 400 + Math.random() * 1120; // 400-1520 (central area)
             const bombY = 100; // Drop from top
 
             const bomb: BombState = {

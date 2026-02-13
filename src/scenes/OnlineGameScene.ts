@@ -69,8 +69,8 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // Wall configuration (matching GameScene)
     private readonly WALL_THICKNESS = 45;
-    private readonly WALL_LEFT_X = -400; // Refinement 12: Pushed out from -200
-    private readonly WALL_RIGHT_X = 2320; // Refinement 12: Pushed out from 2120
+    private readonly WALL_LEFT_X = 200; // Refinement 13: Pushed in from -400
+    private readonly WALL_RIGHT_X = 1720; // Refinement 13: Pushed in from 2320
 
     // Blast zone boundaries (matching GameScene)
     private readonly BLAST_ZONE_LEFT = -1020; // Matching training mode
@@ -1595,6 +1595,35 @@ export class OnlineGameScene extends Phaser.Scene {
         if (this.uiCamera) this.uiCamera.ignore(bg);
 
         // Side walls (Shortened: Height 540, Y=560)
+        bg.setDepth(-100);
+
+        // Main platform (centered, smaller - Refinement 13)
+        // Center: 960. Width 1200 (Was 2400). Y = 900
+        const mainPlatform = this.add.rectangle(960, 900, 1200, 60, 0x2c3e50);
+        mainPlatform.setStrokeStyle(3, 0x3a506b);
+        // Important: Add to physics world but as static (no body needed for player collision unless using matter bodies for ground?)
+        // In this game, ground collision is custom (y check).
+        // BUT bombs use matter bodies.
+        this.platforms.push(mainPlatform);
+        this.matter.add.gameObject(mainPlatform, { isStatic: true });
+
+        // Soft platform 1 (left, closer)
+        // Refinement 13: Pushed in to 610 (Was 260)
+        const softPlatform1 = this.add.rectangle(610, 500, 500, 30, 0x0f3460);
+        softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
+        softPlatform1.setAlpha(0.85);
+        this.softPlatforms.push(softPlatform1);
+        this.matter.add.gameObject(softPlatform1, { isStatic: true });
+
+        // Soft platform 2 (right, closer)
+        // Refinement 13: Pushed in to 1310 (Was 1660)
+        const softPlatform2 = this.add.rectangle(1310, 500, 500, 30, 0x0f3460);
+        softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
+        softPlatform2.setAlpha(0.85);
+        this.softPlatforms.push(softPlatform2);
+        this.matter.add.gameObject(softPlatform2, { isStatic: true });
+
+        // Walls
         const leftWall = this.add.rectangle(this.WALL_LEFT_X, 560, this.WALL_THICKNESS, 540, 0x2a3a4e);
         leftWall.setStrokeStyle(4, 0x4a6a8e);
         leftWall.setAlpha(0.6);
@@ -1605,50 +1634,48 @@ export class OnlineGameScene extends Phaser.Scene {
         rightWall.setAlpha(0.6);
         rightWall.setDepth(-5);
 
-        // Define Wall Rects (Collision) (Top-Left Y = 560 - 270 = 290)
+        // Wall Collision Rects
         this.wallRects = [
+            // Left Wall
             new Phaser.Geom.Rectangle(this.WALL_LEFT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540),
+            // Right Wall
             new Phaser.Geom.Rectangle(this.WALL_RIGHT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540)
         ];
 
-        // Main platform (centered, wider - Refinement 12)
-        // Center: 960. Width 2400 (Was 1800). Y = 900
-        const mainPlatform = this.add.rectangle(960, 900, 2400, 60, 0x2c3e50);
-        mainPlatform.setStrokeStyle(3, 0x3a506b);
-        this.platforms.push(mainPlatform);
-        // Add Matter body for Chest collision
-        this.matter.world.setGravity(0, 1);
-        this.matter.add.gameObject(mainPlatform, { isStatic: true });
-        if (this.uiCamera) this.uiCamera.ignore(mainPlatform);
+        // Wall Text
+        const leftWallText = this.add.text(this.WALL_LEFT_X - 12, 375, 'WALL', {
+            fontSize: '18px',
+            color: '#8ab4f8',
+            fontFamily: '"Pixeloid Sans"',
+            fontStyle: 'bold'
+        });
+        leftWallText.setRotation(-Math.PI / 2);
+        leftWallText.setAlpha(0.5);
+        leftWallText.setDepth(-4);
 
-        // Soft platforms (floating HIGHER)
-        // Left - Refinement 12: Pushed left to 260
-        const softPlatform1 = this.add.rectangle(260, 500, 500, 30, 0x0f3460);
-        softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
-        softPlatform1.setAlpha(0.85);
-        this.softPlatforms.push(softPlatform1);
-        this.matter.add.gameObject(softPlatform1, { isStatic: true });
-
-        // Right - Refinement 12: Pushed right to 1660
-        const softPlatform2 = this.add.rectangle(1660, 500, 500, 30, 0x0f3460);
-        softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
-        softPlatform2.setAlpha(0.85);
-        this.softPlatforms.push(softPlatform2);
-        this.matter.add.gameObject(softPlatform2, { isStatic: true });
-        if (this.uiCamera) {
-            this.uiCamera.ignore(this.platforms);
-            this.uiCamera.ignore(this.softPlatforms);
-            this.uiCamera.ignore(bg);
-            // Also ignore walls which are locally created in block above
-            // (Manually ignore them here as they aren't in array yet... wait walls are local consts)
-            // Ideally we track walls in array like GameScene, but here they are local var.
-            // But we can just use the scene display list ignore if needed, OR just ensure UI camera ignores everything except UI.
-            // Better: Add walls to array or ignore explicitly.
-        }
+        const rightWallText = this.add.text(this.WALL_RIGHT_X + 12, 525, 'WALL', {
+            fontSize: '18px',
+            color: '#8ab4f8',
+            fontFamily: '"Pixeloid Sans"',
+            fontStyle: 'bold'
+        });
+        rightWallText.setRotation(Math.PI / 2);
+        rightWallText.setAlpha(0.5);
+        rightWallText.setDepth(-4);
 
         // Initial camera center
         this.cameras.main.setZoom(1); // Start at 1x
         this.cameras.main.centerOn(960, 540);
+
+        if (this.uiCamera) {
+            this.uiCamera.ignore(this.platforms);
+            this.uiCamera.ignore(this.softPlatforms);
+            this.uiCamera.ignore(bg);
+            this.uiCamera.ignore(leftWall);
+            this.uiCamera.ignore(rightWall);
+            this.uiCamera.ignore(leftWallText);
+            this.uiCamera.ignore(rightWallText);
+        }
     }
 
     private escapePromptVisible: boolean = false;

@@ -674,3 +674,13 @@
     - Added Gamepad SELECT button (Button 8) to toggle debug overlay in `OnlineGameScene`.
 - **[S]** **STATUS**: v0.10.16 Complete. Online ghost attacks and run attacks are synced, chest images are deterministic.
 
+
+### [2026-02-13] v0.10.17 - Stage Layout Adjustment
+- **[V]** `v0.10.17`
+- **[Map]** **Stage Adjustment**:
+    - **Floor**: Reduced main platform width from **2400px** to **1200px** (Half size).
+    - **Platforms**: Moved soft platforms closer to center (`x=610` and `x=1310`, ~350px offset).
+    - **Walls**: Moved side walls inward to match new floor (`x=200` and `x=1720`).
+- **[Server]** **Spawn Logic**:
+    - Updated Chest and Bomb spawn ranges (`400-1520`) to stay within the new safe stage boundaries.
+- **[S]** **STATUS**: v0.10.17 Released. Stage is more compact for faster paced combat.
