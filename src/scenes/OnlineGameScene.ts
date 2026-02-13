@@ -52,16 +52,23 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // UI
     private connectionStatusText!: Phaser.GameObjects.Text;
+    private connectionStatusBg!: Phaser.GameObjects.Rectangle;
     private matchHUD!: MatchHUD;
 
     // Rollback netcode
     private localFrame: number = 0;
 
     // Network throttling
+    private lastStateTime: number = 0;
+    private readonly STATE_RATE_LIMIT = 50; // Max 20 updates/sec
     private stateThrottleCounter: number = 0;
     private readonly STATE_SEND_INTERVAL: number = 1; // sendState every frame (60Hz)
     private inputThrottleCounter: number = 0;
     private readonly INPUT_SEND_INTERVAL: number = 1; // sendInput every frame (~60Hz)
+
+    // Selection UI Visuals
+    private myCharacterSprite!: Phaser.GameObjects.Sprite;
+    private opponentCharacterSprite!: Phaser.GameObjects.Sprite;
 
     // Remote player target state for smooth interpolation
     private remoteTargets: Map<number, NetPlayerState> = new Map();
@@ -69,8 +76,8 @@ export class OnlineGameScene extends Phaser.Scene {
 
     // Wall configuration (matching GameScene)
     private readonly WALL_THICKNESS = 45;
-    private readonly WALL_LEFT_X = 200; // Refinement 13: Pushed in from -400
-    private readonly WALL_RIGHT_X = 1720; // Refinement 13: Pushed in from 2320
+    private readonly WALL_LEFT_X = 0; // Refinement 14: Pushed out to 0 (Was 200)
+    private readonly WALL_RIGHT_X = 1920; // Refinement 14: Pushed out to 1920 (Was 1720)
 
     // Blast zone boundaries (matching GameScene)
     private readonly BLAST_ZONE_LEFT = -1020; // Matching training mode
@@ -124,8 +131,6 @@ export class OnlineGameScene extends Phaser.Scene {
     private countdownText!: Phaser.GameObjects.Text;
     private myCharacterText!: Phaser.GameObjects.Text;
     private opponentCharacterText!: Phaser.GameObjects.Text;
-    private selectionInstructions!: Phaser.GameObjects.Text;
-    private confirmInstructions!: Phaser.GameObjects.Text;
     private myConfirmText!: Phaser.GameObjects.Text;
     private opponentConfirmText!: Phaser.GameObjects.Text;
 
@@ -1264,6 +1269,15 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private showConnectionStatus(message: string): void {
+        if (!this.connectionStatusBg) {
+            this.connectionStatusBg = this.add.rectangle(
+                this.scale.width / 2, this.scale.height / 2,
+                this.scale.width, this.scale.height, 0x000000, 0.95
+            ).setDepth(999);
+            if (this.uiCamera) this.cameras.main.ignore(this.connectionStatusBg);
+        }
+        this.connectionStatusBg.setVisible(true);
+
         if (!this.connectionStatusText) {
             this.connectionStatusText = this.add.text(
                 this.scale.width / 2,
@@ -1271,13 +1285,17 @@ export class OnlineGameScene extends Phaser.Scene {
                 message,
                 { fontSize: '32px', color: '#ffffff', backgroundColor: '#333333', padding: { x: 20, y: 10 }, fontFamily: '"Pixeloid Sans"' }
             ).setOrigin(0.5).setDepth(1000);
+            if (this.uiCamera) this.cameras.main.ignore(this.connectionStatusText);
         } else {
             this.connectionStatusText.setText(message);
         }
+        this.connectionStatusText.setVisible(true);
     }
 
     private createUI(): void {
-        this.connectionStatusText?.setVisible(false);
+        // Destroy connection status UI
+        if (this.connectionStatusText) { this.connectionStatusText.destroy(); this.connectionStatusText = null as any; }
+        if (this.connectionStatusBg) { this.connectionStatusBg.destroy(); this.connectionStatusBg = null as any; }
         // Ping/FPS display is handled by MatchHUD (centered)
     }
 
@@ -1290,13 +1308,21 @@ export class OnlineGameScene extends Phaser.Scene {
         this.selectionContainer.setDepth(500);
         this.selectionContainer.setVisible(false);
 
-        // Background overlay
-        const bg = this.add.rectangle(0, 0, 600, 400, 0x000000, 0.85);
-        bg.setStrokeStyle(3, 0x4a90d9);
+
+        // Background overlay (Fullscreen, Dark)
+        const bg = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.95);
         this.selectionContainer.add(bg);
 
-        // Title
-        const title = this.add.text(0, -160, 'SELECT CHARACTER', {
+        // Main Box (Rounded, Stroked)
+        const box = this.add.graphics();
+        box.lineStyle(4, 0x4a90d9); // Light Blue Stroke
+        box.fillStyle(0x000000, 0.5); // Semi-transparent fill
+        box.fillRoundedRect(-300, -150, 600, 350, 20); // Rounded Rect
+        box.strokeRoundedRect(-300, -150, 600, 350, 20);
+        this.selectionContainer.add(box);
+
+        // Title (Outside box, Top) - Moved up 25px (was -220)
+        const title = this.add.text(0, -245, 'SELECT CHARACTER', {
             fontSize: '36px',
             color: '#4a90d9',
             fontStyle: 'bold',
@@ -1304,81 +1330,87 @@ export class OnlineGameScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.selectionContainer.add(title);
 
-        // Countdown timer
-        this.countdownText = this.add.text(0, -100, '10', {
-            fontSize: '72px',
+        // Countdown timer (Outside box, Below Title) - Moved up 25px (was -170)
+        this.countdownText = this.add.text(0, -195, '10', {
+            fontSize: '48px', // Slightly smaller
             color: '#ffffff',
             fontStyle: 'bold',
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(this.countdownText);
 
-        // My character label
-        const myLabel = this.add.text(-120, 20, 'YOU:', {
-            fontSize: '24px',
+        // --- P1 (Local) Left Side ---
+        // Label "YOU:" - Lowered 5px (was 96 -> 101)
+        const myLabel = this.add.text(-80, 101, 'YOU', {
+            fontSize: '20px',
             color: '#88ff88',
             fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(1, 0.5);
+        }).setOrigin(0.5);
         this.selectionContainer.add(myLabel);
 
-        this.myCharacterText = this.add.text(0, 20, this.getCharacterDisplayName(this.selectedCharacter), {
-            fontSize: '28px',
+        // Name - Lowered 5px (was 131 -> 136)
+        this.myCharacterText = this.add.text(-80, 136, this.getCharacterDisplayName(this.selectedCharacter), {
+            fontSize: '24px',
             color: '#ffffff',
             fontStyle: 'bold',
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(this.myCharacterText);
 
-        // Left/Right arrows
-        const leftArrow = this.add.text(-150, 20, '◀', {
+        // Left/Right arrows (Around P1 Name/Sprite Area)
+        const leftArrow = this.add.text(-160, 0, '◀', {
             fontSize: '32px',
             color: '#4a90d9',
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(leftArrow);
 
-        const rightArrow = this.add.text(150, 20, '▶', {
+        const rightArrow = this.add.text(-10, 0, '▶', {
             fontSize: '32px',
             color: '#4a90d9',
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(rightArrow);
 
-        // Opponent character label
-        const oppLabel = this.add.text(-120, 80, 'OPP:', {
-            fontSize: '24px',
+        // --- P2 (Remote) Right Side ---
+        // Label "OPP:" - Lowered 5px (was 96 -> 101)
+        const oppLabel = this.add.text(80, 101, 'OPP', {
+            fontSize: '20px',
             color: '#ff8888',
             fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(1, 0.5);
+        }).setOrigin(0.5);
         this.selectionContainer.add(oppLabel);
 
-        this.opponentCharacterText = this.add.text(0, 80, this.getCharacterDisplayName(this.opponentCharacter), {
-            fontSize: '28px',
+        // Name - Lowered 5px (was 131 -> 136)
+        this.opponentCharacterText = this.add.text(80, 136, this.getCharacterDisplayName(this.opponentCharacter), {
+            fontSize: '24px',
             color: '#888888',
             fontStyle: 'bold',
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(this.opponentCharacterText);
 
-        // Instructions
-        this.selectionInstructions = this.add.text(0, 150, '← / → to change', {
-            fontSize: '18px',
-            color: '#888888',
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0.5);
-        this.selectionContainer.add(this.selectionInstructions);
+        // Instructions removed as per request.
 
-        // Confirm Instructions
-        this.confirmInstructions = this.add.text(0, 180, 'Press SPACE / A to Confirm', {
-            fontSize: '20px',
-            color: '#ffffff',
-            fontStyle: 'bold',
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0.5);
-        this.selectionContainer.add(this.confirmInstructions);
+        // Make UI camera render this on top
+        if (this.uiCamera) {
+            this.cameras.main.ignore(this.selectionContainer);
+        }
 
-        // Confirmation Status Labels (Hidden initially)
-        this.myConfirmText = this.add.text(0, 50, 'READY', {
+        // Add Character Sprites (Side-by-Side)
+        // Local Player (Left side)
+        this.myCharacterSprite = this.add.sprite(-80, -10, 'fok_v3', 'fok_v3_idle_000');
+        this.myCharacterSprite.setScale(1); // 1:1 Scale
+        this.selectionContainer.add(this.myCharacterSprite);
+
+        // Opponent (Right side)
+        this.opponentCharacterSprite = this.add.sprite(80, -10, 'fok_v3', 'fok_v3_idle_000'); // Default
+        this.opponentCharacterSprite.setScale(1); // 1:1 Scale
+        this.opponentCharacterSprite.setFlipX(true); // Face left
+        this.selectionContainer.add(this.opponentCharacterSprite);
+
+        // Confirmation Status Labels - Added AFTER sprites so they render on top
+        this.myConfirmText = this.add.text(-80, -10, 'READY', { // Centered on P1 Sprite
             fontSize: '16px',
             color: '#00ff00',
             fontStyle: 'bold',
@@ -1387,7 +1419,7 @@ export class OnlineGameScene extends Phaser.Scene {
         }).setOrigin(0.5).setVisible(false);
         this.selectionContainer.add(this.myConfirmText);
 
-        this.opponentConfirmText = this.add.text(0, 110, 'READY', {
+        this.opponentConfirmText = this.add.text(80, -10, 'READY', { // Centered on P2 Sprite
             fontSize: '16px',
             color: '#00ff00',
             fontStyle: 'bold',
@@ -1396,9 +1428,24 @@ export class OnlineGameScene extends Phaser.Scene {
         }).setOrigin(0.5).setVisible(false);
         this.selectionContainer.add(this.opponentConfirmText);
 
-        // Make UI camera render this on top
-        if (this.uiCamera) {
-            this.cameras.main.ignore(this.selectionContainer);
+        // Initial update
+        this.updateSelectionVisuals();
+    }
+
+    private updateSelectionVisuals(): void {
+        // Update Local Character
+        if (this.myCharacterSprite) {
+            const charKey = this.selectedCharacter;
+            // Handle naming convention differences
+            const idleAnim = charKey === 'fok_v3' ? 'fok_v3_idle' : `${charKey}_idle`;
+            this.myCharacterSprite.play(idleAnim, true);
+        }
+
+        // Update Opponent Character
+        if (this.opponentCharacterSprite) {
+            const charKey = this.opponentCharacter;
+            const idleAnim = charKey === 'fok_v3' ? 'fok_v3_idle' : `${charKey}_idle`;
+            this.opponentCharacterSprite.play(idleAnim, true);
         }
     }
 
@@ -1406,7 +1453,10 @@ export class OnlineGameScene extends Phaser.Scene {
         console.log(`[OnlineGameScene] Selection phase started: ${countdown}s`);
         this.phase = 'SELECTING';
         this.selectionCountdown = countdown;
-        this.connectionStatusText?.setVisible(false);
+        // Destroy connection status UI completely
+        if (this.connectionStatusText) { this.connectionStatusText.destroy(); this.connectionStatusText = null as any; }
+        if (this.connectionStatusBg) { this.connectionStatusBg.destroy(); this.connectionStatusBg = null as any; }
+
         this.selectionContainer.setVisible(true);
         this.countdownText.setText(countdown.toString());
 
@@ -1435,13 +1485,13 @@ export class OnlineGameScene extends Phaser.Scene {
         if (this.opponentCharacterText) {
             this.opponentCharacterText.setText(this.getCharacterDisplayName(character));
         }
+        this.updateSelectionVisuals();
     }
 
     private handleCharacterConfirm(playerId: number): void {
         if (playerId === this.localPlayerId) {
             this.isConfirmed = true;
             this.myConfirmText.setVisible(true);
-            this.confirmInstructions.setText('Waiting for opponent...');
         } else {
             this.isOpponentConfirmed = true;
             this.opponentConfirmText.setVisible(true);
@@ -1518,6 +1568,7 @@ export class OnlineGameScene extends Phaser.Scene {
         this.selectedCharIndex = (this.selectedCharIndex + direction + this.availableCharacters.length) % this.availableCharacters.length;
         this.selectedCharacter = this.availableCharacters[this.selectedCharIndex];
         this.myCharacterText.setText(this.getCharacterDisplayName(this.selectedCharacter));
+        this.updateSelectionVisuals();
 
         // Send to server
         this.networkManager.sendCharacterSelect(this.selectedCharacter);

@@ -684,3 +684,17 @@
 - **[Server]** **Spawn Logic**:
     - Updated Chest and Bomb spawn ranges (`400-1520`) to stay within the new safe stage boundaries.
 - **[S]** **STATUS**: v0.10.17 Released. Stage is more compact for faster paced combat.
+
+### [2026-02-13] v0.10.18 - Lobby Polish & Reliability
+- **[V]** `v0.10.18`
+- **[UI]** **Lobby Refinement**:
+    - **Layout**: Implemented clean side-by-side character selection layout with centered names.
+    - **Visuals**: Added idle animations for characters in the lobby.
+    - **Fix**: Resolved "Connected as Player" text persistency and duplication bugs.
+    - **Polish**: Centered "READY" confirmation text directly over character sprites.
+- **[Fix]** **Font System**:
+    - **Self-Hosting**: Removed CDN dependency for "Pixeloid Sans" (now served locally).
+    - **Preload**: Updated `PreloadScene` to use `document.fonts.ready` promise, guaranteeing fonts load before any text renders.
+- **[Fix]** **Characters**:
+    - **Sga**: Fixed animation mapping issues for Sga in online play.
+- **[S]** **STATUS**: v0.10.18 Released. Lobby is polished and fonts are bulletproof.

@@ -35,8 +35,8 @@ export class GameScene extends Phaser.Scene {
 
     // Wall configuration
     private readonly WALL_THICKNESS = 45;
-    private readonly WALL_LEFT_X = 200; // Refinement 13: Pushed in from -400
-    private readonly WALL_RIGHT_X = 1720; // Refinement 13: Pushed in from 2320
+    private readonly WALL_LEFT_X = 0; // Refinement 14: Pushed out to 0 (Was 200)
+    private readonly WALL_RIGHT_X = 1920; // Refinement 14: Pushed out to 1920 (Was 1720)
 
     // Blast zone boundaries
     // Blast zone boundaries
@@ -816,12 +816,14 @@ export class GameScene extends Phaser.Scene {
         leftWallVisual.setStrokeStyle(4, wallStroke);
         leftWallVisual.setAlpha(0.6);
         leftWallVisual.setDepth(-5);
+        this.walls.push(leftWallVisual);
 
         // Right wall visual (Shortened: Height 540, Y=560)
         const rightWallVisual = this.add.rectangle(this.WALL_RIGHT_X, 560, this.WALL_THICKNESS, 540, wallColor);
         rightWallVisual.setStrokeStyle(4, wallStroke);
         rightWallVisual.setAlpha(0.6);
         rightWallVisual.setDepth(-5);
+        this.walls.push(rightWallVisual);
 
         // Define Wall Rects for Collision (Top-Left Y = 560 - 270 = 290)
         this.wallRects = [
@@ -853,6 +855,9 @@ export class GameScene extends Phaser.Scene {
         rightWallText.setAlpha(0.5);
         rightWallText.setDepth(-4);
         this.wallTexts.push(rightWallText);
+
+        // Update camera exclusions now that stage is created
+        this.configureCameraExclusions();
     }
 
     // Player Config

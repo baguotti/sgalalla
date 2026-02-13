@@ -43,51 +43,38 @@ export class PreloadScene extends Phaser.Scene {
             fontFamily: 'sans-serif'
         }).setOrigin(0.5);
 
-        // ===== ROBUST FONT LOADING =====
-        // Kick off a font load request (tells browser to start downloading)
+        // ===== FONT LOADING =====
+        // Self-hosted font with font-display: block ensures browser blocks until loaded.
+        // Explicitly preload both weights, then wait for document.fonts.ready
+        // before transitioning to scenes that create canvas text.
+        Promise.all([
+            // @ts-ignore
+            document.fonts.load('400 1rem "Pixeloid Sans"'),
+            // @ts-ignore
+            document.fonts.load('700 1rem "Pixeloid Sans"'),
+        ]).catch((err: any) => {
+            console.warn('[PreloadScene] Font loading error (proceeding anyway):', err);
+        });
+
+        // Wait for ALL fonts to be ready before accepting input
         // @ts-ignore
-        document.fonts.load('1rem "Pixeloid Sans"').catch(() => { });
+        document.fonts.ready.then(() => {
+            console.log('[PreloadScene] All document fonts ready');
+            loadingText.setFontFamily('"Pixeloid Sans"');
+            loadingText.setText('PRESS START');
+            loadingText.setFontSize(48);
 
-        // Active polling: wait until the font is ACTUALLY rendered and available
-        // This is more reliable than document.fonts.ready or .load() promise
-        const maxAttempts = 100; // 10 seconds max
-        let attempts = 0;
+            // Blink effect
+            this.tweens.add({
+                targets: loadingText,
+                alpha: 0,
+                duration: 500,
+                yoyo: true,
+                repeat: -1
+            });
 
-        const fontPollTimer = this.time.addEvent({
-            delay: 100,
-            loop: true,
-            callback: () => {
-                attempts++;
-                // @ts-ignore
-                const fontReady = document.fonts.check('16px "Pixeloid Sans"');
-
-                if (fontReady || attempts >= maxAttempts) {
-                    fontPollTimer.destroy();
-
-                    if (fontReady) {
-                        console.log(`[PreloadScene] Font "Pixeloid Sans" confirmed loaded after ${attempts} polls`);
-                    } else {
-                        console.warn(`[PreloadScene] Font polling timed out after ${maxAttempts} attempts, proceeding with fallback`);
-                    }
-
-                    // Now show PRESS START with the confirmed font
-                    loadingText.setFontFamily('"Pixeloid Sans"');
-                    loadingText.setText('PRESS START');
-                    loadingText.setFontSize(48);
-
-                    // Blink effect
-                    this.tweens.add({
-                        targets: loadingText,
-                        alpha: 0,
-                        duration: 500,
-                        yoyo: true,
-                        repeat: -1
-                    });
-
-                    // Only now accept input (font is ready for all downstream scenes)
-                    this.setupInput();
-                }
-            }
+            // Only now accept input (font is ready for all downstream scenes)
+            this.setupInput();
         });
     }
 
