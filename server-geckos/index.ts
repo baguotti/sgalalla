@@ -188,10 +188,10 @@ io.onConnection((channel: ServerChannel) => {
     }
     const room = rooms.get(roomId)!;
 
-    // Enforce 1v1 limit
-    if (room.players.size >= 2) {
-        console.log(`[Server] Connection rejected: Room full (2/2 players).`);
-        channel.emit('error', 'Room is full (1v1 only).');
+    // Enforce 4-player limit
+    if (room.players.size >= 4) {
+        console.log(`[Server] Connection rejected: Room full (4/4 players).`);
+        channel.emit('error', 'Room is full (4 max).');
         channel.close();
         totalConnectedPlayers--;
         return;
@@ -207,8 +207,8 @@ io.onConnection((channel: ServerChannel) => {
     console.log(`[Server] Player ${playerId} connected (${channelId})`);
 
     // Initialize player state
-    const spawnPoints = [600, 1200];
-    const spawnX = spawnPoints[playerId % 2];
+    const spawnPoints = [400, 1520, 800, 1120];
+    const spawnX = spawnPoints[playerId % 4];
     const playerState: PlayerState = {
         playerId,
         x: spawnX,
@@ -234,30 +234,47 @@ io.onConnection((channel: ServerChannel) => {
     });
 
     // Start selection phase when 2 players present
-    if (room.players.size === 2 && room.phase === 'WAITING') {
+    if (room.players.size >= 2 && room.phase === 'WAITING') {
         room.phase = 'SELECTING';
         room.selectionCountdown = 30;
-        console.log('[Server] 2 players connected - starting selection phase');
+        console.log('[Server] Minimum 2 players connected - starting selection phase');
         emitToRoom(NetMessageType.SELECTION_START, { countdown: 30 });
 
-        room.selectionTimer = setInterval(() => {
-            room.selectionCountdown--;
-            if (room.selectionCountdown > 0) {
-                emitToRoom(NetMessageType.SELECTION_TICK, { countdown: room.selectionCountdown });
-            } else {
-                if (room.selectionTimer) {
-                    clearInterval(room.selectionTimer);
-                    room.selectionTimer = null;
+        // Start countdown timer if not already running
+        if (!room.selectionTimer) {
+            room.selectionTimer = setInterval(() => {
+                room.selectionCountdown--;
+                if (room.selectionCountdown > 0) {
+                    emitToRoom(NetMessageType.SELECTION_TICK, { countdown: room.selectionCountdown });
+                } else {
+                    if (room.selectionTimer) {
+                        clearInterval(room.selectionTimer);
+                        room.selectionTimer = null;
+                    }
+                    room.phase = 'PLAYING';
+                    const playerCharacters = Array.from(room.players.values()).map(p => ({
+                        playerId: p.playerId,
+                        character: p.character
+                    }));
+                    console.log('[Server] Selection complete - starting game', playerCharacters);
+                    emitToRoom(NetMessageType.GAME_START, { players: playerCharacters });
                 }
-                room.phase = 'PLAYING';
-                const playerCharacters = Array.from(room.players.values()).map(p => ({
-                    playerId: p.playerId,
-                    character: p.character
-                }));
-                console.log('[Server] Selection complete - starting game', playerCharacters);
-                emitToRoom(NetMessageType.GAME_START, { players: playerCharacters });
+            }, 1000);
+        }
+    } else if (room.phase === 'SELECTING') {
+        // Late joiner during selection: send them current state so they can catch up
+        console.log(`[Server] Player ${playerId} joined mid-selection. Sending current state.`);
+        channel.emit(NetMessageType.SELECTION_START, { countdown: room.selectionCountdown });
+
+        // Send existing players' character selections and confirmations
+        room.players.forEach((p) => {
+            if (p.playerId !== playerId) {
+                channel.emit(NetMessageType.CHARACTER_SELECT, { playerId: p.playerId, character: p.character });
+                if (p.isConfirmed) {
+                    channel.emit(NetMessageType.CHARACTER_CONFIRM, { playerId: p.playerId });
+                }
             }
-        }, 1000);
+        });
     }
 
     // Character selection
@@ -281,7 +298,8 @@ io.onConnection((channel: ServerChannel) => {
         let allConfirmed = true;
         room.players.forEach(p => { if (!p.isConfirmed) allConfirmed = false; });
 
-        if (room.players.size === 2 && allConfirmed) {
+        // Start if 2+ players are present and ALL are confirmed
+        if (room.players.size >= 2 && allConfirmed) {
             console.log('[Server] All confirmed - starting game');
             if (room.selectionTimer) {
                 clearInterval(room.selectionTimer);
@@ -346,10 +364,10 @@ io.onConnection((channel: ServerChannel) => {
 
         if (room.rematchVotes.size >= room.players.size && room.players.size >= 2) {
             console.log('[Server] All voted - rematching');
-            const spawnPoints = [600, 1200];
+            const spawnPoints = [400, 1520, 800, 1120];
             let idx = 0;
             room.players.forEach((p) => {
-                p.x = spawnPoints[idx % 2];
+                p.x = spawnPoints[idx % spawnPoints.length];
                 p.y = 780;
                 p.velocityX = 0;
                 p.velocityY = 0;

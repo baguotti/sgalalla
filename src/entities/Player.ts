@@ -25,6 +25,7 @@ export type PlayerState = typeof PlayerState[keyof typeof PlayerState];
 
 export class Player extends Fighter {
     private sprite!: Phaser.GameObjects.Sprite;
+
     public physics: PlayerPhysics; // Public for debugging/GameScene access if needed
 
     // Combat system delegated to PlayerCombat
@@ -191,23 +192,16 @@ export class Player extends Fighter {
         const scale = 1;
         this.sprite.setScale(scale);
 
+        this.sprite.setScale(scale);
         this.add(this.sprite);
-
-        // Visual distinction
-        // Visual distinction
-        // REMOVED: Legacy tinting (red for AI, green for P2) caused persistent visual bugs.
-        // Players should spawn with natural colors.
-        // if (this.isAI) { ... }
 
 
 
         // Create Name Tag (Player Indicator)
-        // Logic: specific name for human (FOK), CPU N for AI
         let displayName = '';
         if (this.isAI) {
             displayName = `CPU ${this.playerId + 1}`;
         } else {
-            // Use character name in uppercase
             displayName = this.character.toUpperCase();
         }
 
@@ -220,7 +214,7 @@ export class Player extends Fighter {
         });
         this.nameTag.setOrigin(0.5);
         this.add(this.nameTag);
-        this.nameTag.setVisible(false); // Hidden by default, shown in debug mode
+        this.nameTag.setVisible(false);
 
         // Initialize Components
         this.physics = new PlayerPhysics(this);
@@ -271,6 +265,16 @@ export class Player extends Fighter {
         scene.add.existing(this);
     }
 
+    /**
+     * Override destroy to clean up external shadow object
+     */
+    public destroy(fromScene?: boolean): void {
+        if (this.inputManager) {
+            this.inputManager.destroy();
+        }
+        super.destroy(fromScene);
+    }
+
     public setDamage(percent: number): void {
         this.damagePercent = percent;
         this.updateDamageDisplay();
@@ -314,6 +318,7 @@ export class Player extends Fighter {
         this.updateAnimation();
         this.updateDamageDisplay();
         this.updateHeldItemPosition();
+
     }
 
     // Legacy update for safety (deprecate?)
@@ -330,6 +335,7 @@ export class Player extends Fighter {
         this.updateTimers(delta);
         this.updateDamageDisplay();
         this.updateHeldItemPosition();
+
     }
 
     private updateTimers(delta: number): void {
@@ -759,10 +765,11 @@ export class Player extends Fighter {
 
     getBounds(): Phaser.Geom.Rectangle {
         // Reuse pooled rectangle to avoid per-frame allocations
-        this._boundsRect.x = this.x - PhysicsConfig.PLAYER_WIDTH / 2;
-        this._boundsRect.y = this.y - PhysicsConfig.PLAYER_HEIGHT / 2;
-        this._boundsRect.width = PhysicsConfig.PLAYER_WIDTH;
-        this._boundsRect.height = PhysicsConfig.PLAYER_HEIGHT;
+        // Use this.width/height which are set in constructor (e.g. 46x174)
+        this._boundsRect.x = this.x - this.width / 2;
+        this._boundsRect.y = this.y - this.height / 2;
+        this._boundsRect.width = this.width;
+        this._boundsRect.height = this.height;
         return this._boundsRect;
     }
 
@@ -786,10 +793,10 @@ export class Player extends Fighter {
         }
         this.isDodging = false;
         this.resetVisuals();
-
         // Trigger subtle damage flash
         this.flashDamageColor(this.damagePercent);
     }
+
 
     public respawn(): void {
         this.velocity.set(0, 0);
@@ -900,8 +907,5 @@ export class Player extends Fighter {
         this.sprite.setPosition(this.x, this.y);
     }
 
-    destroy(fromScene?: boolean): void {
-        if (this.inputManager) this.inputManager.destroy();
-        super.destroy(fromScene);
-    }
+
 }

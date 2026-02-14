@@ -65,17 +65,20 @@ export class OnlineGameScene extends Phaser.Scene {
     private readonly INPUT_SEND_INTERVAL: number = 1; // sendInput every frame (~60Hz)
 
     // Selection UI Visuals
-    private myCharacterSprite!: Phaser.GameObjects.Sprite;
-    private opponentCharacterSprite!: Phaser.GameObjects.Sprite;
+    private playerSelectionSprites: Map<number, Phaser.GameObjects.Sprite> = new Map();
+    private playerSelectionTexts: Map<number, Phaser.GameObjects.Text> = new Map();
+    private playerConfirmTexts: Map<number, Phaser.GameObjects.Text> = new Map();
 
     // Remote player target state for smooth interpolation
     private remoteTargets: Map<number, NetPlayerState> = new Map();
     private playerCharacters: Map<number, string> = new Map(); // Store character selections
+    private confirmedPlayers: Set<number> = new Set();
 
     // Wall configuration (matching GameScene)
     private readonly WALL_THICKNESS = 45;
     private readonly WALL_LEFT_X = 0; // Refinement 14: Pushed out to 0 (Was 200)
     private readonly WALL_RIGHT_X = 1920; // Refinement 14: Pushed out to 1920 (Was 1720)
+    public walls: Phaser.Geom.Rectangle[] = []; // Renamed from wallRects for consistency with Player.ts
 
     // Blast zone boundaries (matching GameScene)
     private readonly BLAST_ZONE_LEFT = -1020; // Matching training mode
@@ -117,20 +120,14 @@ export class OnlineGameScene extends Phaser.Scene {
     private phase: 'WAITING' | 'SELECTING' | 'PLAYING' = 'WAITING';
     private selectionCountdown: number = 10;
     private selectedCharacter: string = 'fok_v3';
-    private opponentCharacter: string = 'fok_v3';
     // Character Selection
     private availableCharacters: string[] = ['fok_v3', 'sga', 'sgu']; // Refinement: fok_v3 is default
     private selectedCharIndex: number = 0;
-    private isConfirmed: boolean = false;
-    private isOpponentConfirmed: boolean = false;
 
     // Selection UI Elements
     private selectionContainer!: Phaser.GameObjects.Container;
     private countdownText!: Phaser.GameObjects.Text;
-    private myCharacterText!: Phaser.GameObjects.Text;
-    private opponentCharacterText!: Phaser.GameObjects.Text;
-    private myConfirmText!: Phaser.GameObjects.Text;
-    private opponentConfirmText!: Phaser.GameObjects.Text;
+    // Maps defined above replace individual text fields
 
     constructor() {
         super({ key: 'OnlineGameScene' });
@@ -419,7 +416,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Silence unused but maintained state
         void this.selectionCountdown;
-        void this.isOpponentConfirmed;
+
 
         // Try to connect
         this.showConnectionStatus('Connecting...');
@@ -519,7 +516,7 @@ export class OnlineGameScene extends Phaser.Scene {
             // Collisions
             this.platforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, false));
             this.softPlatforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, true));
-            this.localPlayer.checkWallCollision(this.wallRects);
+            this.localPlayer.checkWallCollision(this.walls);
 
             this.localPlayer.updateLogic(delta);
 
@@ -1306,39 +1303,9 @@ export class OnlineGameScene extends Phaser.Scene {
         this.selectionContainer.setDepth(500);
         this.selectionContainer.setVisible(false);
 
-
         // Background overlay (Fullscreen, Dark)
         const bg = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.95);
         this.selectionContainer.add(bg);
-
-        // Per-Player Cards (Rounded Rectangles with Player-Colored Strokes)
-        const cardWidth = 180;
-        const cardHeight = 300;
-        const cardY = -20; // Vertical center offset
-        const p1X = -130; // Left card center
-        const p2X = 130;  // Right card center
-
-        // Determine labels: local player gets their actual P# based on join order
-        const myPlayerNum = this.localPlayerId + 1; // 1-based
-        const oppPlayerNum = myPlayerNum === 1 ? 2 : 1;
-        const myColorIdx = this.localPlayerId;       // 0 for P1, 1 for P2
-        const oppColorIdx = myColorIdx === 0 ? 1 : 0;
-
-        // P1 Card (Left = local player)
-        const p1Card = this.add.graphics();
-        p1Card.lineStyle(3, this.PLAYER_COLORS[myColorIdx]);
-        p1Card.fillStyle(0x000000, 0.4);
-        p1Card.fillRoundedRect(p1X - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight, 16);
-        p1Card.strokeRoundedRect(p1X - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight, 16);
-        this.selectionContainer.add(p1Card);
-
-        // P2 Card (Right = opponent)
-        const p2Card = this.add.graphics();
-        p2Card.lineStyle(3, this.PLAYER_COLORS[oppColorIdx]);
-        p2Card.fillStyle(0x000000, 0.4);
-        p2Card.fillRoundedRect(p2X - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight, 16);
-        p2Card.strokeRoundedRect(p2X - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight, 16);
-        this.selectionContainer.add(p2Card);
 
         // Title
         const title = this.add.text(0, -245, 'SELECT CHARACTER', {
@@ -1358,113 +1325,190 @@ export class OnlineGameScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.selectionContainer.add(this.countdownText);
 
-        // --- Local Player (Left Side) ---
-        // Convert player color to hex string for text
-        const myColorHex = '#' + this.PLAYER_COLORS[myColorIdx].toString(16).padStart(6, '0');
-        const oppColorHex = '#' + this.PLAYER_COLORS[oppColorIdx].toString(16).padStart(6, '0');
+        // --- Dynamic Card Creation ---
+        // Support up to 4 players
+        const maxPlayers = 4;
+        const cardWidth = 180;
+        const cardHeight = 300;
+        const cardY = -20;
+        const spacing = 220;
+        const totalWidth = (maxPlayers - 1) * spacing;
+        const startX = -totalWidth / 2;
 
-        const myLabel = this.add.text(p1X, 75, `P${myPlayerNum}`, {
+        // Clear existing maps
+        this.playerSelectionSprites.clear();
+        this.playerSelectionTexts.clear();
+        this.playerConfirmTexts.clear();
+
+        for (let i = 0; i < maxPlayers; i++) {
+            const playerId = i;
+            const x = startX + (i * spacing);
+
+            // Determine color
+            const colorIdx = playerId % this.PLAYER_COLORS.length;
+            const color = this.PLAYER_COLORS[colorIdx];
+            const colorHex = '#' + color.toString(16).padStart(6, '0');
+
+            // Card Background (Gradient with Mask)
+            const gradient = this.add.graphics();
+            // Gradient: Top=Color, Bottom=Black. Alpha 0.2.
+            gradient.fillGradientStyle(color, color, 0x000000, 0x000000, 0.2, 0.2, 0.2, 0.2);
+            gradient.fillRect(x - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight);
+
+            // Mask for the gradient (Rounded Rect)
+            const maskGraphics = this.make.graphics({});
+            maskGraphics.fillStyle(0xffffff);
+            // Mask coordinates must be absolute (Global Space)
+            // Container is at (centerX, centerY). 'x' is relative. 'cardY' is relative.
+            const absX = centerX + x;
+            const absY = centerY + cardY;
+            maskGraphics.fillRoundedRect(absX - cardWidth / 2, absY - cardHeight / 2, cardWidth, cardHeight, 16);
+            gradient.setMask(maskGraphics.createGeometryMask());
+            this.selectionContainer.add(gradient);
+
+            // Card Border
+            const card = this.add.graphics();
+            card.lineStyle(3, color);
+            // Keep the faint black tint behind to make text readable? 
+            // User asked for "bottom black to Player's color". 
+            // The gradient overlay does that. We can keep a base fill or remove it.
+            // Let's keep a very base fill for readability if needed, or rely on the gradient.
+            // User said "20% opacity". That's faint.
+            // Let's add a solid black base at 0.4 to keep it distinct from the background, then the gradient on top.
+            card.fillStyle(0x000000, 0.4);
+            card.fillRoundedRect(x - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight, 16);
+            card.strokeRoundedRect(x - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight, 16);
+            this.selectionContainer.add(card);
+
+            // Shadow (Circle under feet)
+            // Sprite is at (x, -45). Assume feet at ~ +50y relative to sprite center?
+            const shadow = this.add.ellipse(x, -45 + 55, 80, 20, 0x000000, 0.5);
+            this.selectionContainer.add(shadow);
+
+            // P# Label
+            const label = this.add.text(x, 75, `P${playerId + 1}`, {
+                fontSize: '20px',
+                color: colorHex,
+                fontFamily: '"Pixeloid Sans"'
+            }).setOrigin(0.5);
+            this.selectionContainer.add(label);
+
+            // Character Name Text
+            const charText = this.add.text(x, 105, '...', {
+                fontSize: '24px',
+                color: '#888888',
+                fontStyle: 'bold',
+                fontFamily: '"Pixeloid Sans"'
+            }).setOrigin(0.5);
+            this.playerSelectionTexts.set(playerId, charText);
+            this.selectionContainer.add(charText);
+
+            // Character Sprite
+            // Create a sprite but update texture later. Default to 'fok_v3' idle.
+            const sprite = this.add.sprite(x, -45, 'fok_v3', 'fok_v3_idle_000');
+            sprite.setScale(1);
+            // Flip sprites on the right side if desired, or alternate.
+            // Let's standardise: P2 and P4 face left.
+            if (playerId % 2 !== 0) sprite.setFlipX(true);
+
+            sprite.setVisible(false); // Hide until connected/selected
+            this.playerSelectionSprites.set(playerId, sprite);
+            this.selectionContainer.add(sprite);
+
+            // Confirmation Text (Ready)
+            const confirmText = this.add.text(x, -45, 'READY', {
+                fontSize: '24px',
+                color: '#00ff00',
+                fontStyle: 'bold',
+                backgroundColor: '#004400',
+                fontFamily: '"Pixeloid Sans"'
+            }).setOrigin(0.5).setVisible(false);
+            this.playerConfirmTexts.set(playerId, confirmText);
+            this.selectionContainer.add(confirmText);
+
+            // Local Player Controls (Arrows)
+            if (playerId === this.localPlayerId) {
+                // Highlight local player
+                card.lineStyle(5, color);
+                card.strokeRoundedRect(x - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight, 16);
+
+                charText.setColor('#ffffff');
+                sprite.setVisible(true);
+
+                const leftArrow = this.add.text(x - 70, cardY, '◀', {
+                    fontSize: '32px',
+                    color: colorHex,
+                    fontFamily: '"Pixeloid Sans"'
+                }).setOrigin(0.5);
+                this.selectionContainer.add(leftArrow);
+
+                const rightArrow = this.add.text(x + 70, cardY, '▶', {
+                    fontSize: '32px',
+                    color: colorHex,
+                    fontFamily: '"Pixeloid Sans"'
+                }).setOrigin(0.5);
+                this.selectionContainer.add(rightArrow);
+            }
+        }
+
+        // Instructions
+        const instr = this.add.text(0, 180, 'Waiting for players...', {
             fontSize: '20px',
-            color: myColorHex,
+            color: '#aaaaaa',
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
-        this.selectionContainer.add(myLabel);
+        this.selectionContainer.add(instr);
 
-        this.myCharacterText = this.add.text(p1X, 105, this.getCharacterDisplayName(this.selectedCharacter), {
-            fontSize: '24px',
-            color: '#ffffff',
-            fontStyle: 'bold',
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0.5);
-        this.selectionContainer.add(this.myCharacterText);
-
-        // Left/Right arrows
-        const leftArrow = this.add.text(p1X - 70, cardY, '◀', {
-            fontSize: '32px',
-            color: myColorHex,
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0.5);
-        this.selectionContainer.add(leftArrow);
-
-        const rightArrow = this.add.text(p1X + 70, cardY, '▶', {
-            fontSize: '32px',
-            color: myColorHex,
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0.5);
-        this.selectionContainer.add(rightArrow);
-
-        // --- Opponent (Right Side) ---
-        const oppLabel = this.add.text(p2X, 75, `P${oppPlayerNum}`, {
-            fontSize: '20px',
-            color: oppColorHex,
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0.5);
-        this.selectionContainer.add(oppLabel);
-
-        this.opponentCharacterText = this.add.text(p2X, 105, this.getCharacterDisplayName(this.opponentCharacter), {
-            fontSize: '24px',
-            color: '#888888',
-            fontStyle: 'bold',
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0.5);
-        this.selectionContainer.add(this.opponentCharacterText);
-
-        // Instructions removed as per request.
 
         // Make UI camera render this on top
         if (this.uiCamera) {
             this.cameras.main.ignore(this.selectionContainer);
         }
 
-        // Add Character Sprites (Side-by-Side)
-        // Local Player (Left side)
-        this.myCharacterSprite = this.add.sprite(p1X, -45, 'fok_v3', 'fok_v3_idle_000');
-        this.myCharacterSprite.setScale(1);
-        this.selectionContainer.add(this.myCharacterSprite);
-
-        // Opponent (Right side)
-        this.opponentCharacterSprite = this.add.sprite(p2X, -45, 'fok_v3', 'fok_v3_idle_000');
-        this.opponentCharacterSprite.setScale(1);
-        this.opponentCharacterSprite.setFlipX(true);
-        this.selectionContainer.add(this.opponentCharacterSprite);
-
-        // Confirmation Status Labels - Added AFTER sprites so they render on top
-        this.myConfirmText = this.add.text(p1X, -45, 'READY', {
-            fontSize: '16px',
-            color: '#00ff00',
-            fontStyle: 'bold',
-            backgroundColor: '#004400',
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0.5).setVisible(false);
-        this.selectionContainer.add(this.myConfirmText);
-
-        this.opponentConfirmText = this.add.text(p2X, -45, 'READY', {
-            fontSize: '16px',
-            color: '#00ff00',
-            fontStyle: 'bold',
-            backgroundColor: '#004400',
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0.5).setVisible(false);
-        this.selectionContainer.add(this.opponentConfirmText);
-
-        // Initial update
+        // Ensure visuals are updated initially
         this.updateSelectionVisuals();
     }
 
-    private updateSelectionVisuals(): void {
-        // Update Local Character
-        if (this.myCharacterSprite) {
-            const charKey = this.selectedCharacter;
-            // Handle naming convention differences
-            const idleAnim = charKey === 'fok_v3' ? 'fok_v3_idle' : `${charKey}_idle`;
-            this.myCharacterSprite.play(idleAnim, true);
-        }
 
-        // Update Opponent Character
-        if (this.opponentCharacterSprite) {
-            const charKey = this.opponentCharacter;
-            const idleAnim = charKey === 'fok_v3' ? 'fok_v3_idle' : `${charKey}_idle`;
-            this.opponentCharacterSprite.play(idleAnim, true);
+    private updateSelectionVisuals(): void {
+        // Iterate over all potential players
+        for (let i = 0; i < 4; i++) {
+            const sprite = this.playerSelectionSprites.get(i);
+            const text = this.playerSelectionTexts.get(i);
+
+            // Check if we have data for this player
+            let charKey = this.playerCharacters.get(i);
+
+            // If it's local player, ensure we show current selection
+            if (i === this.localPlayerId) {
+                charKey = this.selectedCharacter;
+                // Also update text immediately for local player
+                if (text) {
+                    text.setText(this.getCharacterDisplayName(charKey));
+                    text.setColor('#ffffff');
+                }
+            }
+
+            if (sprite && charKey) {
+                sprite.setVisible(true);
+                // Handle naming convention differences
+                const idleAnim = charKey === 'fok_v3' ? 'fok_v3_idle' : `${charKey}_idle`;
+                sprite.play(idleAnim, true);
+
+                if (text) {
+                    text.setText(this.getCharacterDisplayName(charKey));
+                    // Update color if it's an opponent to show they are "active"
+                    if (i !== this.localPlayerId) {
+                        text.setColor('#dddddd'); // Connected/Selected
+                    }
+                }
+            } else if (sprite) {
+                // No character data yet (maybe not connected)
+                sprite.setVisible(false);
+                if (text && i !== this.localPlayerId) {
+                    text.setText('...');
+                }
+            }
         }
     }
 
@@ -1479,12 +1523,27 @@ export class OnlineGameScene extends Phaser.Scene {
         this.selectionContainer.setVisible(true);
         this.countdownText.setText(countdown.toString());
 
+        // Reset confirmations
+        this.confirmedPlayers.clear();
+        this.playerConfirmTexts.forEach(t => t.setVisible(false));
+
         // Force font refresh on all selection UI text elements
         this.selectionContainer.each((child: Phaser.GameObjects.GameObject) => {
             if (child instanceof Phaser.GameObjects.Text) {
                 child.setFontFamily('"Pixeloid Sans"');
             }
         });
+
+        // Ensure UI is built if it wasn't or rebuild if needed?
+        // Let's safe-check: if sprites map is empty, we must build
+        if (this.playerSelectionSprites.size === 0) {
+            this.selectionContainer.removeAll(true);
+            this.createSelectionUI();
+        } else {
+            // Just update visuals
+            this.updateSelectionVisuals();
+        }
+        this.selectionContainer.setVisible(true);
     }
 
     private handleSelectionTick(countdown: number): void {
@@ -1499,21 +1558,26 @@ export class OnlineGameScene extends Phaser.Scene {
 
     private handleOpponentCharacterSelect(playerId: number, character: string): void {
         console.log(`[OnlineGameScene] Opponent ${playerId} selected ${character}`);
-        this.opponentCharacter = character;
         this.playerCharacters.set(playerId, character);
-        if (this.opponentCharacterText) {
-            this.opponentCharacterText.setText(this.getCharacterDisplayName(character));
+        // Note: opponentCharacter property removed, use Map
+        if (this.playerSelectionTexts.has(playerId)) {
+            const text = this.playerSelectionTexts.get(playerId);
+            if (text) text.setText(this.getCharacterDisplayName(character));
         }
         this.updateSelectionVisuals();
     }
 
     private handleCharacterConfirm(playerId: number): void {
-        if (playerId === this.localPlayerId) {
-            this.isConfirmed = true;
-            this.myConfirmText.setVisible(true);
-        } else {
-            this.isOpponentConfirmed = true;
-            this.opponentConfirmText.setVisible(true);
+        this.confirmedPlayers.add(playerId);
+        const confirmText = this.playerConfirmTexts.get(playerId);
+        if (confirmText) {
+            confirmText.setVisible(true);
+            this.tweens.add({
+                targets: confirmText,
+                scale: { from: 1.5, to: 1 },
+                duration: 200,
+                ease: 'Back.out'
+            });
         }
     }
 
@@ -1527,10 +1591,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Hide selection UI
         this.selectionContainer.setVisible(false);
-        this.isConfirmed = false;
-        this.isOpponentConfirmed = false;
-        this.myConfirmText.setVisible(false);
-        this.opponentConfirmText.setVisible(false);
+        // Legacy flags removed as container visibility handles it
 
         // Create MatchHUD
         this.createUI();
@@ -1538,14 +1599,16 @@ export class OnlineGameScene extends Phaser.Scene {
         this.matchHUD.addToCameraIgnore(this.cameras.main);
 
         // Spawn players with their selected characters
-        const spawnPoints = [600, 1200];
-        players.forEach((p, idx) => {
+        // Updated for 4-player spawn points
+        const spawnPoints = [400, 1520, 800, 1120];
+        players.forEach(p => {
             // Validate character against loaded textures. Fallback to 'fok_v3' if invalid.
             const validChars = ['fok_v3', 'sga', 'sgu'];
             const char = validChars.includes(p.character) ? p.character : 'fok_v3';
             console.log(`[OnlineGameScene] Creating player ${p.playerId} with char: ${char} (Server sent: "${p.character}")`);
 
-            const player = this.createPlayer(p.playerId, spawnPoints[idx % 2], 780, char);
+            const spawnX = spawnPoints[p.playerId % spawnPoints.length];
+            const player = this.createPlayer(p.playerId, spawnX, 780, char);
             this.players.set(p.playerId, player);
 
             if (p.playerId === this.localPlayerId) {
@@ -1580,13 +1643,14 @@ export class OnlineGameScene extends Phaser.Scene {
         // Setup collision overlap for hit detection
         // ... (existing collision code)
     }
-
     private cycleCharacter(direction: number): void {
         if (this.phase !== 'SELECTING') return;
 
         this.selectedCharIndex = (this.selectedCharIndex + direction + this.availableCharacters.length) % this.availableCharacters.length;
         this.selectedCharacter = this.availableCharacters[this.selectedCharIndex];
-        this.myCharacterText.setText(this.getCharacterDisplayName(this.selectedCharacter));
+
+        // Update local map as well for visual consistency
+        this.playerCharacters.set(this.localPlayerId, this.selectedCharacter);
         this.updateSelectionVisuals();
 
         // Send to server
@@ -1602,7 +1666,7 @@ export class OnlineGameScene extends Phaser.Scene {
     private selectionInputHeld: boolean = false;
 
     private pollSelectionInput(): void {
-        if (this.isConfirmed) return; // Input locked when confirmed
+        if (this.confirmedPlayers.has(this.localPlayerId)) return; // Input locked when confirmed
 
         // Check keyboard
         const cursors = this.input.keyboard?.createCursorKeys();
@@ -1642,7 +1706,7 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private confirmCharacterSelection(): void {
-        if (this.phase !== 'SELECTING' || this.isConfirmed) return;
+        if (this.phase !== 'SELECTING' || this.confirmedPlayers.has(this.localPlayerId)) return;
 
         console.log('[OnlineGameScene] Confirmed selection');
         this.networkManager.sendCharacterConfirm();
@@ -1650,7 +1714,7 @@ export class OnlineGameScene extends Phaser.Scene {
         this.handleCharacterConfirm(this.localPlayerId);
     }
 
-    private wallRects: Phaser.Geom.Rectangle[] = [];
+
 
     private createStage(): void {
         // Background Image (Adria)
@@ -1705,7 +1769,7 @@ export class OnlineGameScene extends Phaser.Scene {
         rightWall.setDepth(-5);
 
         // Wall Collision Rects
-        this.wallRects = [
+        this.walls = [
             // Left Wall
             new Phaser.Geom.Rectangle(this.WALL_LEFT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540),
             // Right Wall
@@ -1925,7 +1989,7 @@ export class OnlineGameScene extends Phaser.Scene {
         // Reset phase
         this.phase = 'WAITING';
         this.isConnected = false;
-        this.isConfirmed = false;
+        this.confirmedPlayers.clear();
     }
 
     private checkGamepadSelect(): boolean {

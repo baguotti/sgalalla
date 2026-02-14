@@ -240,6 +240,24 @@ export class LobbyScene extends Phaser.Scene {
             const playerColor = SMASH_COLORS[i % SMASH_COLORS.length];
             const colorHex = '#' + playerColor.toString(16).padStart(6, '0');
 
+            // Gradient Background with Mask
+            const gradient = this.add.graphics();
+            gradient.fillGradientStyle(playerColor, playerColor, 0x000000, 0x000000, 0.2, 0.2, 0.2, 0.2);
+            gradient.fillRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
+
+            const maskGraphics = this.make.graphics({});
+            maskGraphics.fillStyle(0xffffff);
+            const absX = cx; // Container is at cx, centerY. Local 0,0 is center.
+            const absY = centerY;
+            maskGraphics.fillRoundedRect(absX - cardWidth / 2, absY - cardHeight / 2, cardWidth, cardHeight, 16);
+            gradient.setMask(maskGraphics.createGeometryMask());
+            container.add(gradient);
+
+            // Shadow (Circle under feet)
+            const shadow = this.add.ellipse(0, -45 + 55, 80, 20, 0x000000, 0.5);
+            shadow.setVisible(false); // Hidden by default
+            container.add(shadow);
+
             // Rounded Card Background
             const card = this.add.graphics();
             card.lineStyle(3, playerColor);
@@ -296,6 +314,7 @@ export class LobbyScene extends Phaser.Scene {
             container.setData('arrows', [leftArrow, rightArrow]);
             container.setData('charSprite', charSprite);
             container.setData('playerColor', playerColor);
+            container.setData('shadow', shadow);
 
             this.slotContainers.push(container);
         }
@@ -586,6 +605,7 @@ export class LobbyScene extends Phaser.Scene {
             const arrows = container.getData('arrows') as Phaser.GameObjects.Text[];
             const charSprite = container.getData('charSprite') as Phaser.GameObjects.Sprite;
             const playerColor = container.getData('playerColor') as number;
+            const shadow = container.getData('shadow') as Phaser.GameObjects.Ellipse;
 
             const cardWidth = 180;
             const cardHeight = 300;
@@ -600,6 +620,7 @@ export class LobbyScene extends Phaser.Scene {
 
                 // Show sprite & play idle
                 charSprite.setVisible(true);
+                shadow.setVisible(true);
                 const charKey = slot.character as string;
                 const idleAnim = charKey === 'fok_v3' ? 'fok_v3_idle' : `${charKey}_idle`;
                 if (charSprite.anims.currentAnim?.key !== idleAnim) {
@@ -663,6 +684,7 @@ export class LobbyScene extends Phaser.Scene {
                 stateText.setBackgroundColor('');
                 charText.setVisible(false);
                 charSprite.setVisible(false);
+                shadow.setVisible(false);
                 arrows.forEach(a => a.setVisible(false));
             }
         });
