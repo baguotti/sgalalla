@@ -738,3 +738,15 @@
         - **Gamepad Back**: Pressing **B/Circle** (Button 1) now returns to Main Menu (same as ESC).
         - **Title Position**: Moved title to ~50px above cards for better framing.
 - **[S]** **STATUS**: v0.11.0 Released. Major visual rebranding and lobby consistency update.
+
+### [2026-02-14] v0.11.1 - Chest Visuals & Local 6-Player Support
+- **[V]** `v0.11.1`
+- **[New]** **Local Support**:
+    - **6-Player Lobby**: Expanded "BOTTE IN LOCALE" mode to support up to 6 players.
+    - **UI**: Added new HUD colors (Orange/Cyan) and dynamic layout scaling for 5-6 players.
+    - **Spawns**: Added 6 default spawn points for larger local matches.
+- **[Pol]** **Chest Visuals**:
+    - **Opening Animation**: Added shake, blur, and "Pokemon Pack" reveal effect.
+    - **Interaction**: Added heavy physics (fast fall, thud) and high damage/knockback on collision.
+    - **UX**: Improved "Press J/B to close" legend visibility.
+- **[S]** **STATUS**: v0.11.1 Released. Polished chest mechanic and expanded local play.

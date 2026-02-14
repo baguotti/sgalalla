@@ -6,7 +6,9 @@ export const SMASH_COLORS = [
     0xE63946, // P1 Red
     0x4361EE, // P2 Blue
     0xFF006E, // P3 Pink
-    0x06D6A0  // P4 Green
+    0x06D6A0, // P4 Green
+    0xFF9F1C, // P5 Orange
+    0x2EC4B6  // P6 Cyan
 ];
 
 /**
@@ -266,15 +268,16 @@ export class MatchHUD {
 
         const { width, height } = this.scene.cameras.main;
 
-        // Even spacing 4 players
-        // 4 slots spread across width
-        // Centers: 1/8, 3/8, 5/8, 7/8
-        const segment = width / 4;
+        // Dynamic spacing: Use total player count from scene data if available, or default to 4 (growing if needed)
+        // GameScene stores playerData array.
+        let totalSlots = 4;
+        const scene: any = this.scene;
+        if (scene.playerData && Array.isArray(scene.playerData)) {
+            totalSlots = Math.max(scene.playerData.length, 4);
+        }
 
-        // Map Player ID 0-3 to slots (Assuming max 4)
-        // Adjust ID if necessary (players might be 1-based or gap-filled)
-        // Assuming consecutive IDs 0,1,2,3 for simplicity in this logic
-        const slotIndex = playerId % 4; // Simple mapping
+        const segment = width / totalSlots;
+        const slotIndex = playerId; // 0-based index
 
         const x = (slotIndex * segment) + (segment / 2);
 

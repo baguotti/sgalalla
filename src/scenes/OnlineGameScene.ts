@@ -1758,6 +1758,13 @@ export class OnlineGameScene extends Phaser.Scene {
                 this.dismissEscapePrompt();
                 return;
             }
+
+            // Check if any chest overlay is open
+            const isChestOverlayOpen = this.chests.some(chest => chest.isOverlayOpen);
+            if (isChestOverlayOpen) {
+                return; // Let chest handle the ESC key
+            }
+
             this.showEscapePrompt();
         });
     }

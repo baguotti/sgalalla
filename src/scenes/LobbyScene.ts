@@ -131,7 +131,7 @@ export class LobbyScene extends Phaser.Scene {
         });
 
         // Initialize Slots
-        const slotCount = this.mode === 'versus' ? 4 : 2;
+        const slotCount = this.mode === 'versus' ? 6 : 2; // Support 6 players in versus
         this.slots = [];
         for (let i = 0; i < slotCount; i++) {
             this.slots.push({
@@ -202,10 +202,29 @@ export class LobbyScene extends Phaser.Scene {
         const { width } = this.scale;
         const count = this.slots.length;
 
-        // Card dimensions (matching online lobby)
-        const cardWidth = 180;
-        const cardHeight = 300;
-        const spacing = count <= 2 ? 260 : 200;
+        // Dynamic Card Dimensions and Spacing
+        let cardWidth = 180;
+        let cardHeight = 300;
+        let spacing = 200;
+
+        // If 6 players, scale down slightly to fit comfortably
+        if (count > 4) {
+            // 1920 width. 6 cards.
+            // Max width per card+gap = 1920 / 6 = 320.
+            // With 200 spacing, total width = 5 * 200 = 1000.  (Wait, spacing logic was (i * spacing))
+            // Old logic: startX + (i * spacing). Total width assumed (count-1)*spacing.
+            // 5 * 200 = 1000. StartX = 1920/2 - 500 = 460.
+            // Last card at 460 + 1000 = 1460.
+            // Card width 180. Right edge at 1460 + 90 = 1550.
+            // Fits easily. 6 players fits without resizing.
+            spacing = 260; // Spread them out more if space allows?
+            // Actually, 6 * 260 = 1560 total width. Start 960 - 780 = 180. Ends 180 + 1300 = 1480. Fits.
+            // Let's keep strict spacing to avoid overlapping if we had even more.
+            spacing = count <= 2 ? 300 : 220;
+        } else {
+            spacing = count <= 2 ? 260 : 200;
+        }
+
         const totalWidth = (count - 1) * spacing;
         const startX = width / 2 - totalWidth / 2;
         const centerY = this.scale.height / 2 + 20;

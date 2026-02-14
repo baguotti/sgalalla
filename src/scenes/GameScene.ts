@@ -523,12 +523,14 @@ export class GameScene extends Phaser.Scene {
             // Create Players
             this.players = [];
 
-            // Default Spawn Points
+            // Default Spawn Points (Supported up to 6)
             let spawnPoints = [
-                { x: 450, y: 300 },
-                { x: 1470, y: 300 },
-                { x: 960, y: 200 },
-                { x: 960, y: 400 }
+                { x: 400, y: 300 },   // P1 (Left Soft)
+                { x: 1520, y: 300 },  // P2 (Right Soft)
+                { x: 800, y: 200 },   // P3 (Main Center-Left)
+                { x: 1120, y: 200 },  // P4 (Main Center-Right)
+                { x: 600, y: 400 },   // P5 (Low Left)
+                { x: 1320, y: 400 }   // P6 (Low Right)
             ];
 
             // DUMMY MODE OVERRIDE: Spawn closer together at center
@@ -923,7 +925,10 @@ export class GameScene extends Phaser.Scene {
         const pauseKeyPressed = Phaser.Input.Keyboard.JustDown(this.pauseKey);
         const gamepadPausePressed = this.checkGamepadPause();
 
-        if (pauseKeyPressed || gamepadPausePressed) {
+        // Check if any chest overlay is open
+        const isChestOverlayOpen = this.chests.some(chest => chest.isOverlayOpen);
+
+        if ((pauseKeyPressed || gamepadPausePressed) && !isChestOverlayOpen) {
             this.togglePause();
         }
 
