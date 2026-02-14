@@ -59,8 +59,6 @@ export class OnlineGameScene extends Phaser.Scene {
     private localFrame: number = 0;
 
     // Network throttling
-    private lastStateTime: number = 0;
-    private readonly STATE_RATE_LIMIT = 50; // Max 20 updates/sec
     private stateThrottleCounter: number = 0;
     private readonly STATE_SEND_INTERVAL: number = 1; // sendState every frame (60Hz)
     private inputThrottleCounter: number = 0;
