@@ -4,6 +4,12 @@
 
 ---
 
+### [2026-02-14] v0.11.2 - Visual Polish & Ledge Fix
+- **[V]** `v0.11.2`
+- **[R]** Removed player shadows completely for cleaner visuals.
+- **[F]** Fixed ledge floating issue by correcting `getBounds()` width (was 120px, now matches 46px physics body).
+
+
 ### [2026-01-29] Baseline Restoration
 - **[R]** Restoring core feel; existing physics was unstable.
 - **[M]** Restricted Brawlhalla mechanics: Run, Dodge, Recovery, Platform Drop.
