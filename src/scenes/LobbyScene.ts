@@ -104,8 +104,10 @@ export class LobbyScene extends Phaser.Scene {
         this.add.rectangle(0, 0, width, height, 0x000000).setOrigin(0);
 
         // Title
+        const centerY = height / 2 + 20;
+        const titleY = centerY - 150 - 50;
         const titleText = this.mode === 'training' ? 'TRAINING MODE' : 'BOTTE IN LOCALE';
-        this.add.text(width / 2, 60, titleText, {
+        this.add.text(width / 2, titleY, titleText, {
             fontSize: '48px',
             color: '#ffffff',
             fontFamily: '"Pixeloid Sans"',
@@ -315,7 +317,19 @@ export class LobbyScene extends Phaser.Scene {
         this.handleKeyboardJoin(); // Poll for join if not event-based
         this.handlePlayerInput(time);
 
-        if (Phaser.Input.Keyboard.JustDown(this.backKey)) {
+        let goBack = Phaser.Input.Keyboard.JustDown(this.backKey);
+        if (!goBack) {
+            const gamepads = navigator.getGamepads();
+            for (let i = 0; i < gamepads.length; i++) {
+                const pad = gamepads[i];
+                if (pad && pad.buttons[1] && pad.buttons[1].pressed) {
+                    goBack = true;
+                    break;
+                }
+            }
+        }
+
+        if (goBack) {
             this.scene.start('MainMenuScene');
         }
 

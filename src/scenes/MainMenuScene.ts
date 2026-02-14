@@ -28,17 +28,19 @@ export class MainMenuScene extends Phaser.Scene {
         this.menuTexts = [];
 
         // Visuals
-        this.add.rectangle(0, 0, width, height, 0x1a1a1a).setOrigin(0);
+        this.add.rectangle(0, 0, width, height, 0x000000).setOrigin(0);
 
         // Title Text
-        // Title Text
-        this.add.text(width / 2, 200, 'SGALALLA', {
-            fontSize: '120px', fontFamily: '"Pixeloid Sans"', color: '#ffffff'
+        this.add.text(width / 2, 200, 'SUPER SMASH FIOI', {
+            fontSize: '80px', fontFamily: '"Pixeloid Sans"', color: '#ffffff'
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, 270, 'Pre-Alpha Build v0.10.19', {
+
+
+        this.add.text(width / 2, 270, 'Pre-Alpha Build v0.11.0', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(0.5);
+
 
         // Version (Removed - combined with subtitle)
 
@@ -48,6 +50,9 @@ export class MainMenuScene extends Phaser.Scene {
             const text = this.add.text(width / 2, startY + (index * 90), opt.label, {
                 fontSize: '48px', fontFamily: '"Pixeloid Sans"', color: '#888888'
             }).setOrigin(0.5);
+
+
+
             this.menuTexts.push(text);
         });
 
@@ -55,6 +60,7 @@ export class MainMenuScene extends Phaser.Scene {
 
         // DEBUG: Gamepad Status
         this.debugText = this.add.text(10, 10, 'Gamepad: ???', { fontSize: '16px', color: '#00ff00', fontFamily: '"Pixeloid Sans"' });
+
 
         this.input.gamepad?.on('connected', (pad: Phaser.Input.Gamepad.Gamepad) => {
             console.log('Gamepad connected:', pad.id);
@@ -145,9 +151,10 @@ export class MainMenuScene extends Phaser.Scene {
         this.menuTexts.forEach((text, index) => {
             if (index === this.selectedIndex) {
                 text.setColor('#ffffff');
-                text.setFontSize(64);
+                text.setAlpha(1);
             } else {
                 text.setColor('#888888');
+                text.setAlpha(0.5);
                 text.setFontSize(48);
             }
         });

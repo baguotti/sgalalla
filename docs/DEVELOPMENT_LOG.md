@@ -716,4 +716,25 @@
     - **Visual Polish**:
         - **READY Text**: Now overlays the character sprite with a dark green background for maximum visibility.
         - **Sgu Animation**: Corrected idle animation mapping for Sgu in local lobby.
-- **[S]** **STATUS**: v0.10.19 Released. Online lobby now matches the clean, modern aesthetic of the HUD.
+        - **CPU Ready**: Fixed text to show "READY!" instead of "SELECT CPU" when confirmed.
+- **[S]** **STATUS**: v0.10.19 Polish applied.
+
+### [2026-02-14] v0.11.0 - The "Super Smash Fioi" Update
+- **[V]** `v0.11.0`
+- **[UI]** **Main Menu Overhaul**:
+    - **Rebranding**: Title changed to **"SUPER SMASH FIOI"**.
+    - **Visuals**:
+        - Background set to **Pure Black**.
+        - Removed font scaling on selection.
+        - Implemented **Dim/Bright** text selection (Grey/White).
+        - Added **Soft Glow** (Strength 2, Distance 20) to Title and Menu Options (removed in final polish).
+        - *Final Logic*: Clean, no-glow, high-contrast text.
+- **[UI]** **Local Lobby & Training**:
+    - **Card Layout**: Ported the card-based design from Online Lobby to Local/Training.
+        - Black background, rounded cards, S/M/L spacing.
+        - **Idle Animations**: Characters now play their idle animation in the lobby.
+        - **READY Overlay**: "READY!" text overlays the character sprite for clear confirmation.
+    - **Navigation**:
+        - **Gamepad Back**: Pressing **B/Circle** (Button 1) now returns to Main Menu (same as ESC).
+        - **Title Position**: Moved title to ~50px above cards for better framing.
+- **[S]** **STATUS**: v0.11.0 Released. Major visual rebranding and lobby consistency update.
