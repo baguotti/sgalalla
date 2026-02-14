@@ -1313,43 +1313,66 @@ export class OnlineGameScene extends Phaser.Scene {
         const bg = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.95);
         this.selectionContainer.add(bg);
 
-        // Main Box (Rounded, Stroked)
-        const box = this.add.graphics();
-        box.lineStyle(4, 0x4a90d9); // Light Blue Stroke
-        box.fillStyle(0x000000, 0.5); // Semi-transparent fill
-        box.fillRoundedRect(-300, -150, 600, 350, 20); // Rounded Rect
-        box.strokeRoundedRect(-300, -150, 600, 350, 20);
-        this.selectionContainer.add(box);
+        // Per-Player Cards (Rounded Rectangles with Player-Colored Strokes)
+        const cardWidth = 180;
+        const cardHeight = 300;
+        const cardY = -20; // Vertical center offset
+        const p1X = -130; // Left card center
+        const p2X = 130;  // Right card center
 
-        // Title (Outside box, Top) - Moved up 25px (was -220)
+        // Determine labels: local player gets their actual P# based on join order
+        const myPlayerNum = this.localPlayerId + 1; // 1-based
+        const oppPlayerNum = myPlayerNum === 1 ? 2 : 1;
+        const myColorIdx = this.localPlayerId;       // 0 for P1, 1 for P2
+        const oppColorIdx = myColorIdx === 0 ? 1 : 0;
+
+        // P1 Card (Left = local player)
+        const p1Card = this.add.graphics();
+        p1Card.lineStyle(3, this.PLAYER_COLORS[myColorIdx]);
+        p1Card.fillStyle(0x000000, 0.4);
+        p1Card.fillRoundedRect(p1X - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight, 16);
+        p1Card.strokeRoundedRect(p1X - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight, 16);
+        this.selectionContainer.add(p1Card);
+
+        // P2 Card (Right = opponent)
+        const p2Card = this.add.graphics();
+        p2Card.lineStyle(3, this.PLAYER_COLORS[oppColorIdx]);
+        p2Card.fillStyle(0x000000, 0.4);
+        p2Card.fillRoundedRect(p2X - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight, 16);
+        p2Card.strokeRoundedRect(p2X - cardWidth / 2, cardY - cardHeight / 2, cardWidth, cardHeight, 16);
+        this.selectionContainer.add(p2Card);
+
+        // Title
         const title = this.add.text(0, -245, 'SELECT CHARACTER', {
             fontSize: '36px',
-            color: '#4a90d9',
+            color: '#ffffff',
             fontStyle: 'bold',
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(title);
 
-        // Countdown timer (Outside box, Below Title) - Moved up 25px (was -170)
+        // Countdown timer
         this.countdownText = this.add.text(0, -195, '10', {
-            fontSize: '48px', // Slightly smaller
+            fontSize: '48px',
             color: '#ffffff',
             fontStyle: 'bold',
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(this.countdownText);
 
-        // --- P1 (Local) Left Side ---
-        // Label "YOU:" - Lowered 5px (was 96 -> 101)
-        const myLabel = this.add.text(-80, 101, 'YOU', {
+        // --- Local Player (Left Side) ---
+        // Convert player color to hex string for text
+        const myColorHex = '#' + this.PLAYER_COLORS[myColorIdx].toString(16).padStart(6, '0');
+        const oppColorHex = '#' + this.PLAYER_COLORS[oppColorIdx].toString(16).padStart(6, '0');
+
+        const myLabel = this.add.text(p1X, 75, `P${myPlayerNum}`, {
             fontSize: '20px',
-            color: '#88ff88',
+            color: myColorHex,
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(myLabel);
 
-        // Name - Lowered 5px (was 131 -> 136)
-        this.myCharacterText = this.add.text(-80, 136, this.getCharacterDisplayName(this.selectedCharacter), {
+        this.myCharacterText = this.add.text(p1X, 105, this.getCharacterDisplayName(this.selectedCharacter), {
             fontSize: '24px',
             color: '#ffffff',
             fontStyle: 'bold',
@@ -1357,32 +1380,30 @@ export class OnlineGameScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.selectionContainer.add(this.myCharacterText);
 
-        // Left/Right arrows (Around P1 Name/Sprite Area)
-        const leftArrow = this.add.text(-160, 0, '◀', {
+        // Left/Right arrows
+        const leftArrow = this.add.text(p1X - 70, cardY, '◀', {
             fontSize: '32px',
-            color: '#4a90d9',
+            color: myColorHex,
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(leftArrow);
 
-        const rightArrow = this.add.text(-10, 0, '▶', {
+        const rightArrow = this.add.text(p1X + 70, cardY, '▶', {
             fontSize: '32px',
-            color: '#4a90d9',
+            color: myColorHex,
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(rightArrow);
 
-        // --- P2 (Remote) Right Side ---
-        // Label "OPP:" - Lowered 5px (was 96 -> 101)
-        const oppLabel = this.add.text(80, 101, 'OPP', {
+        // --- Opponent (Right Side) ---
+        const oppLabel = this.add.text(p2X, 75, `P${oppPlayerNum}`, {
             fontSize: '20px',
-            color: '#ff8888',
+            color: oppColorHex,
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
         this.selectionContainer.add(oppLabel);
 
-        // Name - Lowered 5px (was 131 -> 136)
-        this.opponentCharacterText = this.add.text(80, 136, this.getCharacterDisplayName(this.opponentCharacter), {
+        this.opponentCharacterText = this.add.text(p2X, 105, this.getCharacterDisplayName(this.opponentCharacter), {
             fontSize: '24px',
             color: '#888888',
             fontStyle: 'bold',
@@ -1399,18 +1420,18 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Add Character Sprites (Side-by-Side)
         // Local Player (Left side)
-        this.myCharacterSprite = this.add.sprite(-80, -10, 'fok_v3', 'fok_v3_idle_000');
-        this.myCharacterSprite.setScale(1); // 1:1 Scale
+        this.myCharacterSprite = this.add.sprite(p1X, -45, 'fok_v3', 'fok_v3_idle_000');
+        this.myCharacterSprite.setScale(1);
         this.selectionContainer.add(this.myCharacterSprite);
 
         // Opponent (Right side)
-        this.opponentCharacterSprite = this.add.sprite(80, -10, 'fok_v3', 'fok_v3_idle_000'); // Default
-        this.opponentCharacterSprite.setScale(1); // 1:1 Scale
-        this.opponentCharacterSprite.setFlipX(true); // Face left
+        this.opponentCharacterSprite = this.add.sprite(p2X, -45, 'fok_v3', 'fok_v3_idle_000');
+        this.opponentCharacterSprite.setScale(1);
+        this.opponentCharacterSprite.setFlipX(true);
         this.selectionContainer.add(this.opponentCharacterSprite);
 
         // Confirmation Status Labels - Added AFTER sprites so they render on top
-        this.myConfirmText = this.add.text(-80, -10, 'READY', { // Centered on P1 Sprite
+        this.myConfirmText = this.add.text(p1X, -45, 'READY', {
             fontSize: '16px',
             color: '#00ff00',
             fontStyle: 'bold',
@@ -1419,7 +1440,7 @@ export class OnlineGameScene extends Phaser.Scene {
         }).setOrigin(0.5).setVisible(false);
         this.selectionContainer.add(this.myConfirmText);
 
-        this.opponentConfirmText = this.add.text(80, -10, 'READY', { // Centered on P2 Sprite
+        this.opponentConfirmText = this.add.text(p2X, -45, 'READY', {
             fontSize: '16px',
             color: '#00ff00',
             fontStyle: 'bold',

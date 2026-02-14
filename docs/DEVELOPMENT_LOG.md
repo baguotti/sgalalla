@@ -698,3 +698,19 @@
 - **[Fix]** **Characters**:
     - **Sga**: Fixed animation mapping issues for Sga in online play.
 - **[S]** **STATUS**: v0.10.18 Released. Lobby is polished and fonts are bulletproof.
+
+### [2026-02-14] v0.10.19 - Online Lobby Redesign
+- **[V]** `v0.10.19`
+- **[UI]** **Online Lobby Overhaul**:
+    - **Card Design**: Replaced the previous single container box with **individual rounded character cards** (180x300px) for each player.
+    - **Color Coding**: 
+        - **P1 (Red)**: Card stroke, labels, and arrows use standard Red (`#E63946`).
+        - **P2 (Blue)**: Card stroke, labels, and arrows use standard Blue (`#4361EE`).
+    - **Dynamic Labels**: Replaced static "YOU/OPP" text with absolute **P1/P2** indicators that respect join order (Server ID).
+        - If you join 2nd, you are P2 (Blue) and see P1 (Red) as opponent.
+    - **Layout Tuning**:
+        - Increased card spacing to **260px** (from 160px) to prevent crowding.
+        - Moved character sprites up (-45px) to create breathing room for names.
+        - Positioned "P#" label and Character Name clearly within the bottom section of the card.
+        - Centered selection arrows vertically on the card to frame the character.
+- **[S]** **STATUS**: v0.10.19 Released. Online lobby now matches the clean, modern aesthetic of the HUD.
