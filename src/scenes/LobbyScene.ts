@@ -607,10 +607,10 @@ export class LobbyScene extends Phaser.Scene {
                 charText.setVisible(true);
 
                 if (slot.isTrainingDummy) {
-                    if (this.selectionPhase === 'CPU') {
-                        stateText.setText('SELECT CPU');
-                    } else if (slot.ready) {
+                    if (slot.ready) {
                         stateText.setText('READY!');
+                    } else if (this.selectionPhase === 'CPU') {
+                        stateText.setText('SELECT CPU');
                     } else {
                         stateText.setText('DUMMY');
                     }
