@@ -713,4 +713,7 @@
         - Moved character sprites up (-45px) to create breathing room for names.
         - Positioned "P#" label and Character Name clearly within the bottom section of the card.
         - Centered selection arrows vertically on the card to frame the character.
+    - **Visual Polish**:
+        - **READY Text**: Now overlays the character sprite with a dark green background for maximum visibility.
+        - **Sgu Animation**: Corrected idle animation mapping for Sgu in local lobby.
 - **[S]** **STATUS**: v0.10.19 Released. Online lobby now matches the clean, modern aesthetic of the HUD.

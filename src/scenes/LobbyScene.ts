@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { SMASH_COLORS } from '../ui/PlayerHUD';
 
 type CharacterType = 'fok_v3' | 'dummy';
 
@@ -100,7 +101,7 @@ export class LobbyScene extends Phaser.Scene {
         const { width, height } = this.scale;
 
         // Background
-        this.add.rectangle(0, 0, width, height, 0x1a1a2e).setOrigin(0);
+        this.add.rectangle(0, 0, width, height, 0x000000).setOrigin(0);
 
         // Title
         const titleText = this.mode === 'training' ? 'TRAINING MODE' : 'BOTTE IN LOCALE';
@@ -198,53 +199,108 @@ export class LobbyScene extends Phaser.Scene {
     private createSlotUI(): void {
         const { width } = this.scale;
         const count = this.slots.length;
-        const spacing = count <= 2 ? 400 : 300;
+
+        // Card dimensions (matching online lobby)
+        const cardWidth = 180;
+        const cardHeight = 300;
+        const spacing = count <= 2 ? 260 : 200;
         const totalWidth = (count - 1) * spacing;
         const startX = width / 2 - totalWidth / 2;
-        const startY = 300;
+        const centerY = this.scale.height / 2 + 20;
+
+        // Ensure idle animations exist
+        this.ensureIdleAnimations();
 
         for (let i = 0; i < count; i++) {
-            const container = this.add.container(startX + (i * spacing), startY);
+            const cx = startX + (i * spacing);
+            const container = this.add.container(cx, centerY);
 
-            // BG Panel
-            const panel = this.add.rectangle(0, 0, 280, 400, 0x333333);
-            panel.setStrokeStyle(4, 0x000000);
+            // Player color for this slot
+            const playerColor = SMASH_COLORS[i % SMASH_COLORS.length];
+            const colorHex = '#' + playerColor.toString(16).padStart(6, '0');
 
-            // Player Label
-            const pLabel = this.add.text(0, -180, `P${i + 1}`, {
-                fontSize: '32px',
+            // Rounded Card Background
+            const card = this.add.graphics();
+            card.lineStyle(3, playerColor);
+            card.fillStyle(0x000000, 0.4);
+            card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
+            card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
+
+            // Player Label ("P1", "P2", etc.) at top of card
+            const pLabel = this.add.text(0, 75, `P${i + 1}`, {
+                fontSize: '20px',
                 fontStyle: 'bold',
                 fontFamily: '"Pixeloid Sans"',
-                color: '#aaaaaa'
+                color: colorHex
             }).setOrigin(0.5);
 
-            // State Text
-            const stateText = this.add.text(0, 0, 'Press Button\nto Join', {
-                fontSize: '24px',
+            // State Text (Join / Select / Ready) - Moved to y=-45 to overlay sprite
+            const stateText = this.add.text(0, -45, 'Press Button\nto Join', {
+                fontSize: '22px',
                 color: '#888888',
                 fontFamily: '"Pixeloid Sans"',
                 align: 'center'
             }).setOrigin(0.5);
 
-            // Character Name
-            const charText = this.add.text(0, 150, '', {
-                fontSize: '28px',
+            // Character Name (below label)
+            const charText = this.add.text(0, 105, '', {
+                fontSize: '22px',
                 color: '#ffffff',
                 fontFamily: '"Pixeloid Sans"',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
 
-            // Selection Arrows
-            const leftArrow = this.add.text(-100, 150, '<', { fontSize: '32px', fontFamily: '"Pixeloid Sans"', color: '#ffdd00' }).setOrigin(0.5).setVisible(false);
-            const rightArrow = this.add.text(100, 150, '>', { fontSize: '32px', fontFamily: '"Pixeloid Sans"', color: '#ffdd00' }).setOrigin(0.5).setVisible(false);
+            // Selection Arrows (centered on card Y midpoint, equidistant from borders)
+            const leftArrow = this.add.text(-70, 0, '◀', {
+                fontSize: '28px',
+                fontFamily: '"Pixeloid Sans"',
+                color: colorHex
+            }).setOrigin(0.5).setVisible(false);
 
-            container.add([panel, pLabel, stateText, charText, leftArrow, rightArrow]);
-            container.setData('panel', panel);
+            const rightArrow = this.add.text(70, 0, '▶', {
+                fontSize: '28px',
+                fontFamily: '"Pixeloid Sans"',
+                color: colorHex
+            }).setOrigin(0.5).setVisible(false);
+
+            // Character Sprite (idle animation, centered above label area)
+            const charSprite = this.add.sprite(0, -45, 'fok_v3', 'fok_v3_idle_000');
+            charSprite.setScale(1);
+            charSprite.setVisible(false);
+
+            container.add([card, pLabel, charText, leftArrow, rightArrow, charSprite, stateText]);
+            container.setData('card', card);
             container.setData('stateText', stateText);
             container.setData('charText', charText);
             container.setData('arrows', [leftArrow, rightArrow]);
+            container.setData('charSprite', charSprite);
+            container.setData('playerColor', playerColor);
 
             this.slotContainers.push(container);
+        }
+    }
+
+    private ensureIdleAnimations(): void {
+        const animConfigs: Record<string, { prefix: string; count: number }> = {
+            'fok_v3': { prefix: 'Fok_v3_Idle_', count: 12 },
+            'sga': { prefix: 'Sga_Idle_', count: 12 },
+            'sgu': { prefix: 'Sgu_Idle_', count: 12 },
+        };
+
+        for (const [charKey, cfg] of Object.entries(animConfigs)) {
+            const animKey = `${charKey}_idle`;
+            if (!this.anims.exists(animKey)) {
+                const frames: { key: string; frame: string }[] = [];
+                for (let f = 0; f < cfg.count; f++) {
+                    frames.push({ key: charKey, frame: `${cfg.prefix}${String(f).padStart(3, '0')}` });
+                }
+                this.anims.create({
+                    key: animKey,
+                    frames,
+                    frameRate: 10,
+                    repeat: -1
+                });
+            }
         }
     }
 
@@ -491,38 +547,57 @@ export class LobbyScene extends Phaser.Scene {
     private updateUI(): void {
         this.slots.forEach((slot, i) => {
             const container = this.slotContainers[i];
-            const panel = container.getData('panel') as Phaser.GameObjects.Rectangle;
+            const card = container.getData('card') as Phaser.GameObjects.Graphics;
             const stateText = container.getData('stateText') as Phaser.GameObjects.Text;
             const charText = container.getData('charText') as Phaser.GameObjects.Text;
             const arrows = container.getData('arrows') as Phaser.GameObjects.Text[];
+            const charSprite = container.getData('charSprite') as Phaser.GameObjects.Sprite;
+            const playerColor = container.getData('playerColor') as number;
+
+            const cardWidth = 180;
+            const cardHeight = 300;
 
             if (slot.joined) {
-                // Color panel based on ready
-                panel.setFillStyle(0x444444);
-                panel.setStrokeStyle(4, slot.ready ? 0x00ff00 : 0xffff00);
+                // Redraw card with player color (brighter when ready)
+                card.clear();
+                card.lineStyle(3, slot.ready ? 0x00ff00 : playerColor);
+                card.fillStyle(0x000000, 0.4);
+                card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
+                card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
+
+                // Show sprite & play idle
+                charSprite.setVisible(true);
+                const charKey = slot.character as string;
+                const idleAnim = charKey === 'fok_v3' ? 'fok_v3_idle' : `${charKey}_idle`;
+                if (charSprite.anims.currentAnim?.key !== idleAnim) {
+                    charSprite.setTexture(charKey);
+                    if (this.anims.exists(idleAnim)) {
+                        charSprite.play(idleAnim, true);
+                    }
+                }
 
                 if (slot.ready) {
                     stateText.setText('READY!');
                     stateText.setColor('#00ff00');
-                    stateText.setFontSize(40);
+                    stateText.setFontSize(36);
+                    stateText.setBackgroundColor('#004400'); // Overlay style
                     arrows.forEach(a => a.setVisible(false));
                 } else {
                     if (this.mode === 'training' && i === 1 && this.selectionPhase === 'P1') {
-                        // CPU Waiting for P1
-                        stateText.setText('Waiting for P1...');
+                        stateText.setText('Waiting...');
                         stateText.setColor('#888888');
-                        stateText.setFontSize(24);
+                        stateText.setFontSize(20);
+                        stateText.setBackgroundColor(''); // Clear bg
                         arrows.forEach(a => a.setVisible(false));
                     } else if (this.mode === 'training' && i === 1 && this.selectionPhase === 'CPU') {
-                        // CPU Selection Active
                         stateText.setText('SELECT CPU');
                         stateText.setColor('#ffff00');
-                        stateText.setFontSize(24);
+                        stateText.setFontSize(20);
+                        stateText.setBackgroundColor('');
                         arrows.forEach(a => a.setVisible(true));
                     } else {
-                        stateText.setText('Select Character');
-                        stateText.setColor('#ffff00');
-                        stateText.setFontSize(24);
+                        stateText.setText('');
+                        stateText.setBackgroundColor('');
                         arrows.forEach(a => a.setVisible(true));
                     }
                 }
@@ -532,25 +607,29 @@ export class LobbyScene extends Phaser.Scene {
                 charText.setVisible(true);
 
                 if (slot.isTrainingDummy) {
-                    // Update: Override "TRAINING DUMMY" text with state if selecting
                     if (this.selectionPhase === 'CPU') {
                         stateText.setText('SELECT CPU');
                     } else if (slot.ready) {
                         stateText.setText('READY!');
                     } else {
-                        // Default
-                        stateText.setText('TRAINING DUMMY');
+                        stateText.setText('DUMMY');
                     }
                 }
 
             } else {
-                panel.setFillStyle(0x222222);
-                panel.setStrokeStyle(4, 0x000000);
+                // Empty slot
+                card.clear();
+                card.lineStyle(2, 0x333333);
+                card.fillStyle(0x000000, 0.2);
+                card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
+                card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
 
-                stateText.setText('Press Button\nto Join');
-                stateText.setColor('#888888');
-                stateText.setFontSize(24);
+                stateText.setText('Press\nto Join');
+                stateText.setColor('#555555');
+                stateText.setFontSize(20);
+                stateText.setBackgroundColor('');
                 charText.setVisible(false);
+                charSprite.setVisible(false);
                 arrows.forEach(a => a.setVisible(false));
             }
         });
