@@ -766,4 +766,5 @@
 - **[Phys]** **Wall Slide**: Restored original behavior where horizontal movement is blocked during wall slide (prevents jitter).
 - **[Map]** **Floor Extension**: Extended the main platform downwards to the blast zone bottom (`y=1800`) to prevent players from going underneath.
 - **[Map]** **Wall Slide**: Added invisible wall colliders to the extended platform sides (`x=360` / `x=1560`) to allow deep wall slides.
+- **[Fix]** **Assets**: Switched to using `00_fok_icon` from `fok_v4` atlas for Player Icon, removing the standalone `fok_icon.png`.
 - **[S]** **STATUS**: v0.11.3 Released. Wall slide is fully functional and consistent.
