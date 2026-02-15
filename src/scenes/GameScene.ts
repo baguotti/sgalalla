@@ -47,6 +47,7 @@ export class GameScene extends Phaser.Scene {
     private readonly BLAST_ZONE_BOTTOM = 1800;
 
     public uiCamera!: Phaser.Cameras.Scene2D.Camera;
+    private debugText!: Phaser.GameObjects.Text; // Added compilation fix
 
     // Camera Settings
     private currentZoomLevel: 'CLOSE' | 'NORMAL' | 'WIDE' = 'CLOSE';
