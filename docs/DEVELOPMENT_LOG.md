@@ -768,3 +768,11 @@
 - **[Map]** **Wall Slide**: Added invisible wall colliders to the extended platform sides (`x=360` / `x=1560`) to allow deep wall slides.
 - **[Fix]** **Assets**: Switched to using `00_fok_icon` from `fok_v4` atlas for Player Icon, removing the standalone `fok_icon.png`.
 - **[S]** **STATUS**: v0.11.3 Released. Wall slide is fully functional and consistent.
+
+### [2026-02-15] v0.11.4 - Online Parity
+- **[V]** `v0.11.4`
+- **[Fix]** **Online Map**: Updated `OnlineGameScene.ts` to match local map geometry.
+    - Extended main platform to bottom of blast zone (`y=1800`).
+    - Added invisible wall colliders to main platform sides to enable wall sliding online.
+- **[S]** **STATUS**: v0.11.4 Released. Online mode is now fully synced with local mechanics.
+
