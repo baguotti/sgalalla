@@ -4,20 +4,6 @@
 
 ---
 
-### [2026-02-15] v0.11.3 - Wall Slide Fix & Floor Extension
-- **[V]** `v0.11.3`
-- **[Fix]** **Wall Slide**: Fixed critical bug where wall slide wouldn't trigger.
-    - **Root Cause**: `getBounds()` was updated to use `this.width` (46px) in a previous update, but `checkWallCollision` still used `PhysicsConfig.PLAYER_WIDTH` (120px) for snap positioning, creating a 37px gap that prevented overlap.
-    - **Resolution**: Updated `checkWallCollision` to use `this.player.width` for accurate snap positioning.
-- **[Phys]** **Wall Slide**: Restored original behavior where horizontal movement is blocked during wall slide (prevents jitter).
-- **[Map]** **Floor Extension**: Extended the main platform downwards to the blast zone bottom (`y=1800`) to prevent players from going underneath.
-- **[Map]** **Wall Slide**: Added invisible wall colliders to the extended platform sides (`x=360` / `x=1560`) to allow deep wall slides.
-- **[S]** **STATUS**: v0.11.3 Released. Wall slide is fully functional and consistent.
-
-### [2026-02-14] v0.11.2 - Visual Polish & Ledge Fix
-- **[V]** `v0.11.2`
-- **[R]** Removed player shadows completely for cleaner visuals.
-- **[F]** Fixed ledge floating issue by correcting `getBounds()` width (was 120px, now matches 46px physics body).
 
 
 ### [2026-01-29] Baseline Restoration
@@ -766,3 +752,18 @@
     - **Interaction**: Added heavy physics (fast fall, thud) and high damage/knockback on collision.
     - **UX**: Improved "Press J/B to close" legend visibility.
 - **[S]** **STATUS**: v0.11.1 Released. Polished chest mechanic and expanded local play.
+
+### [2026-02-14] v0.11.2 - Visual Polish & Ledge Fix
+- **[V]** `v0.11.2`
+- **[R]** Removed player shadows completely for cleaner visuals.
+- **[F]** Fixed ledge floating issue by correcting `getBounds()` width (was 120px, now matches 46px physics body).
+
+### [2026-02-15] v0.11.3 - Wall Slide Fix & Floor Extension
+- **[V]** `v0.11.3`
+- **[Fix]** **Wall Slide**: Fixed critical bug where wall slide wouldn't trigger.
+    - **Root Cause**: `getBounds()` was updated to use `this.width` (46px) in a previous update, but `checkWallCollision` still used `PhysicsConfig.PLAYER_WIDTH` (120px) for snap positioning, creating a 37px gap that prevented overlap.
+    - **Resolution**: Updated `checkWallCollision` to use `this.player.width` for accurate snap positioning.
+- **[Phys]** **Wall Slide**: Restored original behavior where horizontal movement is blocked during wall slide (prevents jitter).
+- **[Map]** **Floor Extension**: Extended the main platform downwards to the blast zone bottom (`y=1800`) to prevent players from going underneath.
+- **[Map]** **Wall Slide**: Added invisible wall colliders to the extended platform sides (`x=360` / `x=1560`) to allow deep wall slides.
+- **[S]** **STATUS**: v0.11.3 Released. Wall slide is fully functional and consistent.
