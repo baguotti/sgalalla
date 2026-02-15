@@ -1736,8 +1736,9 @@ export class OnlineGameScene extends Phaser.Scene {
         bg.setDepth(-100);
 
         // Main platform (centered, smaller - Refinement 13)
-        // Center: 960. Width 1200 (Was 2400). Y = 900
-        const mainPlatform = this.add.rectangle(960, 900, 1200, 60, 0x2c3e50);
+        // Center: 960. Width 1200. Y changed to extend to blast zone (930 height, y=1335)
+        // Top Y = 1335 - 465 = 870. Bottom Y = 1335 + 465 = 1800 (BLAST_ZONE_BOTTOM)
+        const mainPlatform = this.add.rectangle(960, 1335, 1200, 930, 0x2c3e50);
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         // Important: Add to physics world but as static (no body needed for player collision unless using matter bodies for ground?)
         // In this game, ground collision is custom (y check).
@@ -1777,7 +1778,11 @@ export class OnlineGameScene extends Phaser.Scene {
             // Left Wall
             new Phaser.Geom.Rectangle(this.WALL_LEFT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540),
             // Right Wall
-            new Phaser.Geom.Rectangle(this.WALL_RIGHT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540)
+            new Phaser.Geom.Rectangle(this.WALL_RIGHT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540),
+
+            // Main Platform Walls (For Wall Sliding on the deep floor)
+            new Phaser.Geom.Rectangle(360 - 20, 890, 40, 910), // Left Side of Main Plat
+            new Phaser.Geom.Rectangle(1560 - 20, 890, 40, 910) // Right Side of Main Plat
         ];
 
         // Wall Text
