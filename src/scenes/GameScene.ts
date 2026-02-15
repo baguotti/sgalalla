@@ -1011,6 +1011,11 @@ export class GameScene extends Phaser.Scene {
         };
 
         this.players.forEach(p => checkPlayer(p, p.playerId));
+
+        // Debug Text
+        this.debugText = this.add.text(10, 10, `Debug: ${this.VERSION}`, { font: '16px "Pixeloid Sans"', color: '#00ff00' });
+        this.debugText.setScrollFactor(0);
+        this.debugText.setDepth(1000);
     }
 
     private respawnPlayer(player: Player, playerId: number): void {
