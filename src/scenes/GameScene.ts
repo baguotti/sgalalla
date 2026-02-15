@@ -76,7 +76,7 @@ export class GameScene extends Phaser.Scene {
 
     private loadCharacterAssets(): void {
         this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
-        this.load.image('fok_icon', 'assets/fok_icon.png'); // Refinement V2
+
 
         // Load Maps
         this.load.image('background_lake', 'assets/pixel-lake08-sunny-water.jpg');

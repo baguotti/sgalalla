@@ -141,7 +141,7 @@ export class OnlineGameScene extends Phaser.Scene {
         this.load.image('background', 'assets/background.png'); // Keep for fallback?
 
         this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
-        this.load.image('fok_icon', 'assets/fok_icon.png'); // Refinement V2
+
 
         // Preload scrin images for chest opening
         const scrinFiles = [

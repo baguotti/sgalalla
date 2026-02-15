@@ -12,7 +12,6 @@ export class PreloadScene extends Phaser.Scene {
         this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
         this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
         this.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');
-        this.load.image('fok_icon', 'assets/fok_icon.png');
         this.load.image('sga_icon', 'assets/sga_icon.png');
         this.load.image('sgu_icon', 'assets/sgu_icon.png');
     }
