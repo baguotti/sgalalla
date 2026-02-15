@@ -6,6 +6,18 @@
 
 
 
+### [2026-02-15] v0.11.6 - Sga Implementation & Fixes
+- **[V]** `v0.11.6`
+- **[New]** Added **Sga** character (mirrored from Fok v4 structure).
+- **[Fix]** **Sga Animation Mappings**:
+    - Fixed `idle` animation in Lobby (was missing form pre-loader).
+    - Fixed `attack_light_side` key mapping.
+    - Added `attack_light_run` mapped to `sga_side_run_`.
+    - Mapped `attack_light_neutral` -> `sga_side_light_` (Matches Fok).
+    - Mapped `attack_light_up_air` -> `sga_side_air_` (Matches Fok).
+- **[Fix]** **Sga Hitboxes**: Enabled Sga to use Fok/Sgu standard hitboxes in `Player.ts`.
+- **[S]** **STATUS**: Sga fully playable locally and online.
+
 ### [2026-01-29] Baseline Restoration
 - **[R]** Restoring core feel; existing physics was unstable.
 - **[M]** Restricted Brawlhalla mechanics: Run, Dodge, Recovery, Platform Drop.

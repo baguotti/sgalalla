@@ -34,6 +34,7 @@ export class GameScene extends Phaser.Scene {
 
 
     // Wall configuration
+    private readonly VERSION = 'v0.11.6';
     private readonly WALL_THICKNESS = 45;
     private readonly WALL_LEFT_X = 0; // Refinement 14: Pushed out to 0 (Was 200)
     private readonly WALL_RIGHT_X = 1920; // Refinement 14: Pushed out to 1920 (Was 1720)
