@@ -140,7 +140,6 @@ export class GameScene extends Phaser.Scene {
                 // --- HEAVY ATTACKS (SIGS) ---
 
                 // Neutral Sig -> Mapped to Up Sig (Placeholder)
-                this.debugText = this.add.text(10, 10, `Debug: ${this.VERSION}`, { font: '16px "Pixeloid Sans"', color: '#00ff00' });
                 attack_heavy_neutral: { prefix: 'fok_up_sig_', count: 1, suffix: '000', loop: false },
 
                 // Up Sig
