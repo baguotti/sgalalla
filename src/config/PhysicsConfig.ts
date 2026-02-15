@@ -111,6 +111,7 @@ export const PhysicsConfig = {
   WALL_JUMP_FORCE_X: 1600, // Reduced from 1800
   WALL_JUMP_FORCE_Y: -1050, // Refinement 15: Reduced from -1750 to match regular jump height (-990)
   WALL_FRICTION: 0.7,
+  WALL_COYOTE_TIME: 200, // Grace period for wall jumps and wall slide stability
 
   // Edge grab mechanics
   EDGE_GRAB_HORIZONTAL_RANGE: 60,

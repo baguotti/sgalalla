@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { SMASH_COLORS } from '../ui/PlayerHUD';
 
-type CharacterType = 'fok_v3' | 'dummy';
+type CharacterType = 'fok' | 'dummy';
 
 export interface PlayerSelection {
     playerId: number;
@@ -27,7 +27,7 @@ export class LobbyScene extends Phaser.Scene {
     private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character Data
-    private characters: CharacterType[] = ['fok_v3', 'sga', 'sgu'] as any;
+    private characters: CharacterType[] = ['fok', 'sga', 'sgu'] as any;
     private charLabels: string[] = ['Fok', 'Sga', 'Sgu'];
     // P1_KEYS removed (unused in Lobby)
 
@@ -85,7 +85,7 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     preload(): void {
-        this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
+        this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
         this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
         this.load.image('fok_icon', 'assets/fok_icon.png'); // Refinement V2
         this.load.image('sga_icon', 'assets/sga_icon.png');
@@ -139,7 +139,7 @@ export class LobbyScene extends Phaser.Scene {
                 joined: false,
                 ready: false,
                 input: { type: 'KEYBOARD', gamepadIndex: null },
-                character: 'fok_v3'
+                character: 'fok'
             });
         }
 
@@ -195,7 +195,7 @@ export class LobbyScene extends Phaser.Scene {
         p2.isAI = true;
         p2.isTrainingDummy = true;
         p2.ready = false; // Dummy starts NOT ready (waiting for selection)
-        p2.character = 'fok_v3'; // Use valid character (dummy behavior is from isTrainingDummy flag)
+        p2.character = 'fok'; // Use valid character (dummy behavior is from isTrainingDummy flag)
     }
 
     private createSlotUI(): void {
@@ -303,7 +303,7 @@ export class LobbyScene extends Phaser.Scene {
             }).setOrigin(0.5).setVisible(false);
 
             // Character Sprite (idle animation, centered above label area)
-            const charSprite = this.add.sprite(0, -45, 'fok_v3', 'fok_v3_idle_000');
+            const charSprite = this.add.sprite(0, -45, 'fok', 'fok_idle_000');
             charSprite.setScale(1);
             charSprite.setVisible(false);
 
@@ -322,7 +322,7 @@ export class LobbyScene extends Phaser.Scene {
 
     private ensureIdleAnimations(): void {
         const animConfigs: Record<string, { prefix: string; count: number }> = {
-            'fok_v3': { prefix: 'Fok_v3_Idle_', count: 12 },
+            'fok': { prefix: 'fok_idle_', count: 12 },
             'sga': { prefix: 'Sga_Idle_', count: 12 },
             'sgu': { prefix: 'Sgu_Idle_', count: 12 },
         };
@@ -414,7 +414,7 @@ export class LobbyScene extends Phaser.Scene {
             slot.joined = true;
             slot.input.type = type;
             slot.input.gamepadIndex = index;
-            slot.character = 'fok_v3';
+            slot.character = 'fok';
 
             // Prevent immediate "Ready" input in the same frame
             // Set input time to now so the debounce check in handlePlayerInput fails
@@ -622,7 +622,7 @@ export class LobbyScene extends Phaser.Scene {
                 charSprite.setVisible(true);
                 shadow.setVisible(true);
                 const charKey = slot.character as string;
-                const idleAnim = charKey === 'fok_v3' ? 'fok_v3_idle' : `${charKey}_idle`;
+                const idleAnim = `${charKey}_idle`;
                 if (charSprite.anims.currentAnim?.key !== idleAnim) {
                     charSprite.setTexture(charKey);
                     if (this.anims.exists(idleAnim)) {

@@ -30,12 +30,10 @@ export class PlayerPhysics {
     public isTouchingWall: boolean = false;
     public wallTouchesExhausted: boolean = false;
     public lastWallTouchFrame: boolean = false;
+    public lastWallTouchTimer: number = 0;
+    public lastWallDirection: number = 0;
 
-    // Ledge Mechanics
-    public isLedgeHanging: boolean = false;
-    public ledgeGrabPlatform: any = null;
-    public ledgeDirection: number = 0;
-    public ledgeHangPosition: { x: number, y: number } = { x: 0, y: 0 };
+    // Ledge mechanics removed (User Request)
 
     // Dodge State
     public isDodging: boolean = false;
@@ -72,25 +70,21 @@ export class PlayerPhysics {
         this.acceleration.set(0, PhysicsConfig.GRAVITY);
 
         // 2. Handle Mechanics
-        if (!this.player.isHitStunned && !this.isLedgeHanging) {
-            this.handleWallMechanics(input);
-            this.handleHorizontalMovement(input);
-            this.handleJump(delta, input);
-            this.handleFastFall(input);
-            this.handleDodgeInput(input);
-        }
-
-        // 3. Ledge Hang Logic
-        if (this.isLedgeHanging) {
-            this.updateLedgeHang(input);
-            return; // Skip physics application
-        }
+        this.handleWallMechanics(input);
+        this.handleHorizontalMovement(input);
+        this.handleJump(delta, input);
+        this.handleFastFall(input);
+        this.handleDodgeInput(input);
 
         // 4. Apply Physics (Integration)
         this.applyPhysics(deltaSeconds);
     }
 
     private updateTimers(delta: number): void {
+        if (this.lastWallTouchTimer > 0) {
+            this.lastWallTouchTimer -= delta;
+        }
+
         if (this.dodgeCooldownTimer > 0) {
             this.dodgeCooldownTimer -= delta;
         }
@@ -355,10 +349,14 @@ export class PlayerPhysics {
 
     public performJump(): void {
         // Wall Jump
-        if (this.isWallSliding || (this.isTouchingWall && !this.player.isGrounded)) {
+        // Use timer for coyote time, allowing jump shortly after leaving wall
+        if (this.isWallSliding || (this.lastWallTouchTimer > 0 && !this.player.isGrounded)) {
             this.wallJump();
             return;
+        } else if (this.isTouchingWall) {
+            console.log('[Physics] performJump -> Touching wall but grounded? Grounded:', this.player.isGrounded);
         }
+
 
         // Ground Jump
         if (this.player.isGrounded) {
@@ -397,7 +395,11 @@ export class PlayerPhysics {
 
     private wallJump(): void {
         this.player.velocity.y = PhysicsConfig.WALL_JUMP_FORCE_Y;
-        this.player.velocity.x = -this.wallDirection * PhysicsConfig.WALL_JUMP_FORCE_X;
+
+        // Use lastWallDirection if current is 0 (coyote time)
+        const dir = this.wallDirection !== 0 ? this.wallDirection : this.lastWallDirection;
+        this.player.velocity.x = -dir * PhysicsConfig.WALL_JUMP_FORCE_X;
+
         this.isWallSliding = false;
         this.airActionCounter++;
     }
@@ -516,32 +518,7 @@ export class PlayerPhysics {
         }
     }
 
-    private updateLedgeHang(input: InputState): void {
-        if (input.moveDown) {
-            this.dropFromLedge();
-        } else if (input.moveUp) {
-            this.climbFromLedge();
-        } else if (input.jump) {
-            this.jumpFromLedge();
-        }
-    }
 
-    public dropFromLedge(): void {
-        this.isLedgeHanging = false;
-        this.ledgeGrabPlatform = null;
-    }
-
-    public climbFromLedge(): void {
-        this.isLedgeHanging = false;
-        this.player.velocity.y = PhysicsConfig.LEDGE_CLIMB_SPEED;
-        this.player.x += this.ledgeDirection * 20;
-    }
-
-    public jumpFromLedge(): void {
-        this.isLedgeHanging = false;
-        this.player.velocity.y = PhysicsConfig.LEDGE_JUMP_Y;
-        this.player.velocity.x = this.ledgeDirection * -1 * 200;
-    }
 
     public checkPlatformCollision(platform: Phaser.GameObjects.Rectangle, isSoft: boolean = false): void {
         const playerBounds = this.player.getBounds();
@@ -563,6 +540,13 @@ export class PlayerPhysics {
             if (playerBounds.bottom > platBounds.top + 45) {
                 return;
             }
+        } else {
+            // Hard platform: Only ground if player is near the top surface, not beside it
+            // This prevents the tall main platform from grounding players who are wall sliding alongside it
+            if (this.player.velocity.y < 0) return; // Moving upward, skip
+            if (playerBounds.bottom > platBounds.top + 45) {
+                return; // Player is too far below the surface — they're beside the platform, not on top
+            }
         }
 
         if (this.player.velocity.y >= 0) {
@@ -582,45 +566,34 @@ export class PlayerPhysics {
 
     public checkWallCollision(walls: Phaser.Geom.Rectangle[]): void {
         const playerBounds = this.player.getBounds();
+        const halfW = this.player.width / 2;
 
         this.isTouchingWall = false;
         this.wallDirection = 0;
 
         for (const wall of walls) {
             if (Phaser.Geom.Rectangle.Overlaps(playerBounds, wall)) {
-                // Resolve Collision
                 const pCx = playerBounds.centerX;
                 const wCx = wall.centerX;
 
                 if (pCx < wCx) {
-                    // Player is Left of Wall Center -> Push Left
-                    this.player.x = wall.left - PhysicsConfig.PLAYER_WIDTH / 2;
+                    this.player.x = wall.left - halfW;
                     this.isTouchingWall = true;
-                    // Wall is to the Right
+                    this.lastWallTouchTimer = PhysicsConfig.WALL_COYOTE_TIME;
                     this.wallDirection = 1;
+                    this.lastWallDirection = 1;
                 } else {
-                    // Player is Right of Wall Center -> Push Right
-                    this.player.x = wall.right + PhysicsConfig.PLAYER_WIDTH / 2;
+                    this.player.x = wall.right + halfW;
                     this.isTouchingWall = true;
-                    // Wall is to the Left
+                    this.lastWallTouchTimer = PhysicsConfig.WALL_COYOTE_TIME;
                     this.wallDirection = -1;
+                    this.lastWallDirection = -1;
                 }
             }
         }
     }
 
-    public checkLedgeGrab(_platforms: Array<{ rect: Phaser.GameObjects.Rectangle; isSoft?: boolean }>): void {
-        if (this.player.isGrounded || this.player.isAttacking || this.isLedgeHanging || this.player.isDodging) {
-            return;
-        }
 
-        if (this.player.velocity.y <= 0) {
-            return;
-        }
-
-        // Implementation usually requires loop over platforms checking bounds near ledge
-        // Placeholder for now
-    }
 
     public resetOnGround(): void {
         this.player.isGrounded = true;

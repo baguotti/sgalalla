@@ -119,9 +119,9 @@ export class OnlineGameScene extends Phaser.Scene {
     // Character Selection State
     private phase: 'WAITING' | 'SELECTING' | 'PLAYING' = 'WAITING';
     private selectionCountdown: number = 10;
-    private selectedCharacter: string = 'fok_v3';
+    private selectedCharacter: string = 'fok';
     // Character Selection
-    private availableCharacters: string[] = ['fok_v3', 'sga', 'sgu']; // Refinement: fok_v3 is default
+    private availableCharacters: string[] = ['fok', 'sga', 'sgu']; // Refinement: fok is default
     private selectedCharIndex: number = 0;
 
     // Selection UI Elements
@@ -140,7 +140,7 @@ export class OnlineGameScene extends Phaser.Scene {
         this.load.image('adria_bg', 'assets/adria_background.webp');
         this.load.image('background', 'assets/background.png'); // Keep for fallback?
 
-        this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
+        this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
         this.load.image('fok_icon', 'assets/fok_icon.png'); // Refinement V2
 
         // Preload scrin images for chest opening
@@ -164,58 +164,62 @@ export class OnlineGameScene extends Phaser.Scene {
 
     private createAnimations(): void {
         const charConfigs = {
-            'fok_v3': {
-                idle: { prefix: 'Fok_v3_Idle_', count: 12, loop: true },
-                run: { prefix: 'Fok_v3_Run_', count: 9, loop: true },
-                charging: { prefix: 'Fok_v3_Charge_', count: 2, loop: true },
+            'fok': {
+                idle: { prefix: 'fok_idle_', count: 12, loop: true },
+                run: { prefix: 'fok_run_', count: 9, loop: true },
+                charging: { prefix: 'fok_charge_', count: 2, loop: true },
 
-                // Dash (New)
-                dash: { prefix: 'Fok_v3_Dash_', count: 1, suffix: '000', loop: false },
+                // Dash
+                dash: { prefix: 'fok_dash_', count: 1, suffix: '000', loop: false },
 
                 // Spot Dodge
-                spot_dodge: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false },
+                spot_dodge: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false },
+
+                // Side Sig Ghost
+                side_sig_ghost: { prefix: 'fok_side_sig_ghost_', count: 2, loop: true }, // Mapped to ghost frames in atlas
 
                 // --- LIGHT ATTACKS ---
-                // Neutral Light
-                attack_light_neutral: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false },
 
-                // Up Light -> Mapped to Side Light (Req 1 swap)
-                attack_light_up: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false },
+                // Neutral Light -> Mapped to Side Light (Placeholder)
+                attack_light_neutral: { prefix: 'fok_side_light_', count: 1, suffix: '000', loop: false },
+
+                // Up Light -> Mapped to Side Light (Placeholder)
+                attack_light_up: { prefix: 'fok_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_up_air: { prefix: 'fok_side_air_', count: 1, suffix: '000', loop: false },
 
                 // Down Light
-                attack_light_down: { prefix: 'Fok_v3_Down_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_down: { prefix: 'fok_down_light_', count: 1, suffix: '000', loop: false },
 
-                // Side Light -> Mapped to Neutral Light (Req 1 swap)
-                attack_light_side: { prefix: 'Fok_v3_Neutral_Light_', count: 1, suffix: '000', loop: false },
-                attack_light_side_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false },
-
-                // Up Light Air (separate aerial animation)
-                attack_light_up_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false },
+                // Side Light
+                attack_light_side: { prefix: 'fok_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'fok_side_air_', count: 1, suffix: '000', loop: false },
 
                 // Running Light Attack
-                attack_light_run: { prefix: 'Fok_v3_Side_Run_', count: 1, suffix: '000', loop: false },
-                // Neutral Sig -> Mapped to Up Sig (Req 2)
-                attack_heavy_neutral: { prefix: 'Fok_v3_Up_Sig_', count: 1, suffix: '000', loop: false },
+                attack_light_run: { prefix: 'fok_side_run_', count: 1, suffix: '000', loop: false },
+
+                // --- HEAVY ATTACKS (SIGS) ---
+
+                // Neutral Sig -> Mapped to Up Sig (Placeholder)
+                attack_heavy_neutral: { prefix: 'fok_up_sig_', count: 1, suffix: '000', loop: false },
 
                 // Up Sig
-                attack_heavy_up: { prefix: 'Fok_v3_Up_Sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_up: { prefix: 'fok_up_sig_', count: 1, suffix: '000', loop: false },
 
-                // Side Sig (Req 3)
-                attack_heavy_side: { prefix: 'Fok_v3_Side_Sig_', count: 1, suffix: '000', loop: false },
+                // Side Sig
+                attack_heavy_side: { prefix: 'fok_side_sig_', count: 1, suffix: '000', loop: false },
 
-                // Down Sig 
-                attack_heavy_down: { prefix: 'Fok_v3_Down_Sig_', count: 1, suffix: '000', loop: false },
-
+                // Down Sig -> Mapped to Side Sig (Placeholder)
+                attack_heavy_down: { prefix: 'fok_side_sig_', count: 1, suffix: '000', loop: false },
 
                 // Utilities
-                wall_slide: { prefix: 'Fok_v3_Wall_Slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'Fok_v3_Recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'Fok_v3_Ground_Pound_', count: 1, suffix: '000', loop: false },
+                wall_slide: { prefix: 'fok_wall_slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'fok_recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'fok_ground_pound_', count: 1, suffix: '000', loop: false },
 
-                hurt: { prefix: 'Fok_v3_Hurt_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'Fok_v3_Fall_', count: 1, suffix: '000', loop: false },
-                jump: { prefix: 'Fok_v3_Jump_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false }
+                hurt: { prefix: 'fok_hurt_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'fok_fall_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'fok_jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false }
             },
             'sga': {
                 // Sga specific mappings based on sga.json
@@ -305,7 +309,7 @@ export class OnlineGameScene extends Phaser.Scene {
             }
         };
 
-        const characters = ['fok_v3', 'sga', 'sgu'];
+        const characters = ['fok', 'sga', 'sgu'];
 
         characters.forEach(char => {
             const config = charConfigs[char as keyof typeof charConfigs];
@@ -325,7 +329,7 @@ export class OnlineGameScene extends Phaser.Scene {
                     });
                 } else {
                     // Sequence 0 to count-1
-                    // Note: fok_v3 uses 3 digit zero pad for all? json shows "000", "001" etc.
+                    // fok uses 3 digit zero pad
                     frames = this.anims.generateFrameNames(char, {
                         prefix: animData.prefix,
                         start: 0,
@@ -1211,7 +1215,7 @@ export class OnlineGameScene extends Phaser.Scene {
 
     }
 
-    private createPlayer(playerId: number, x: number, y: number, character: string = 'fok_v3'): Player {
+    private createPlayer(playerId: number, x: number, y: number, character: string = 'fok'): Player {
         const isLocal = playerId === this.localPlayerId;
 
         const player = new Player(this, x, y, {
@@ -1219,7 +1223,7 @@ export class OnlineGameScene extends Phaser.Scene {
             isAI: false,
             useKeyboard: isLocal,
             gamepadIndex: isLocal ? 0 : null, // All local players try to use index 0 (gated by focus)
-            character: character as 'fok_v3'
+            character: character
         });
 
         // Network hooks for local player
@@ -1404,8 +1408,8 @@ export class OnlineGameScene extends Phaser.Scene {
             this.selectionContainer.add(charText);
 
             // Character Sprite
-            // Create a sprite but update texture later. Default to 'fok_v3' idle.
-            const sprite = this.add.sprite(x, -45, 'fok_v3', 'fok_v3_idle_000');
+            // Create a sprite but update texture later. Default to 'fok' idle.
+            const sprite = this.add.sprite(x, -45, 'fok', 'fok_idle_000');
             sprite.setScale(1);
             // Flip sprites on the right side if desired, or alternate.
             // Let's standardise: P2 and P4 face left.
@@ -1492,7 +1496,7 @@ export class OnlineGameScene extends Phaser.Scene {
             if (sprite && charKey) {
                 sprite.setVisible(true);
                 // Handle naming convention differences
-                const idleAnim = charKey === 'fok_v3' ? 'fok_v3_idle' : `${charKey}_idle`;
+                const idleAnim = charKey === 'fok' ? 'fok_idle' : `${charKey}_idle`;
                 sprite.play(idleAnim, true);
 
                 if (text) {
@@ -1603,8 +1607,8 @@ export class OnlineGameScene extends Phaser.Scene {
         const spawnPoints = [400, 1520, 800, 1120];
         players.forEach(p => {
             // Validate character against loaded textures. Fallback to 'fok_v3' if invalid.
-            const validChars = ['fok_v3', 'sga', 'sgu'];
-            const char = validChars.includes(p.character) ? p.character : 'fok_v3';
+            const validChars = ['fok', 'sga', 'sgu'];
+            const char = validChars.includes(p.character) ? p.character : 'fok';
             console.log(`[OnlineGameScene] Creating player ${p.playerId} with char: ${char} (Server sent: "${p.character}")`);
 
             const spawnX = spawnPoints[p.playerId % spawnPoints.length];
@@ -1637,7 +1641,7 @@ export class OnlineGameScene extends Phaser.Scene {
             // Add to HUD
             const isLocal = p.playerId === this.localPlayerId;
             const charDisplay = this.getCharacterDisplayName(p.character);
-            this.matchHUD.addPlayer(p.playerId, `P${p.playerId + 1} ${charDisplay}`, isLocal, p.character === 'fok_v3' ? 'fok' : p.character);
+            this.matchHUD.addPlayer(p.playerId, `P${p.playerId + 1} ${charDisplay}`, isLocal, p.character);
         });
 
         // Setup collision overlap for hit detection
@@ -1658,7 +1662,7 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private getCharacterDisplayName(charKey: string): string {
-        if (charKey === 'fok_v3') return 'FOK';
+        if (charKey === 'fok') return 'FOK';
         return charKey.toUpperCase();
     }
 

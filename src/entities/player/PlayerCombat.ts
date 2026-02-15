@@ -153,7 +153,7 @@ export class PlayerCombat {
             // Any light attack while running OR moving fast (Dash Attack)
             const isRunSpeed = Math.abs(this.player.velocity.x) > PhysicsConfig.MAX_SPEED * 0.8;
             if ((this.player.physics.isRunning || isRunSpeed) && this.player.isGrounded) {
-                if (this.player.character === 'fok_v3' || this.player.character === 'sga' || this.player.character === 'sgu') {
+                if (this.player.character === 'fok' || this.player.character === 'sga' || this.player.character === 'sgu') {
                     // Use new Running Light Attack
                     this.startAttack('light_run_grounded');
                     return;
@@ -193,7 +193,13 @@ export class PlayerCombat {
             // All other heavy attacks (including grounded neutral sig): Start charging
             this.isCharging = true;
             this.chargeTime = 0;
-            this.chargeDirection = direction;
+
+            // Remap Grounded Down Sig -> Side Sig (User Request)
+            if (direction === AttackDirection.DOWN && !isAerial) {
+                this.chargeDirection = AttackDirection.SIDE;
+            } else {
+                this.chargeDirection = direction;
+            }
 
             // Create charge glow effect
             // Removed charge glow
@@ -266,7 +272,7 @@ export class PlayerCombat {
             // (Remote players don't run combat.update(), so updateGhostEffect() never fires)
             if (this.currentAttack.data.type === AttackType.HEAVY &&
                 this.currentAttack.data.direction === AttackDirection.SIDE &&
-                this.player.character === 'fok_v3') {
+                this.player.character === 'fok') {
                 this.updateGhostEffect();
             }
         } catch (e) {
@@ -293,7 +299,7 @@ export class PlayerCombat {
             // Side Sig Ghost: Spawn immediately so remote players see it
             if (this.currentAttack.data.type === AttackType.HEAVY &&
                 this.currentAttack.data.direction === AttackDirection.SIDE &&
-                this.player.character === 'fok_v3') {
+                this.player.character === 'fok') {
                 this.updateGhostEffect();
             }
 
@@ -494,10 +500,10 @@ export class PlayerCombat {
             this.deactivateHitbox();
         }
 
-        // Side Sig Ghost Effect (Fok_v3 only)
+        // Side Sig Ghost Effect (Fok only)
         if (this.currentAttack.data.type === AttackType.HEAVY &&
             this.currentAttack.data.direction === AttackDirection.SIDE &&
-            this.player.character === 'fok_v3') {
+            this.player.character === 'fok') {
 
             this.updateGhostEffect();
         } else {
@@ -537,7 +543,7 @@ export class PlayerCombat {
         this.clearGhostEffect();
 
         // Set cooldown — scale recovery with charge for Side Sig
-        if (this.player.character === 'fok_v3' &&
+        if (this.player.character === 'fok' &&
             this.lastChargeTime > 0) {
             // Longer charge = longer recovery (punishable)
             // Base 100ms + up to 600ms based on charge
@@ -636,11 +642,11 @@ export class PlayerCombat {
         let hitboxX = this.player.x + offset.x;
         let hitboxY = this.player.y + offset.y;
 
-        // Custom Override for Side Sig Ghost (Fok_v3)
+        // Custom Override for Side Sig Ghost (Fok)
         // Hitbox must follow the ghost sprite
         if (this.currentAttack.data.type === AttackType.HEAVY &&
             this.currentAttack.data.direction === AttackDirection.SIDE &&
-            this.player.character === 'fok_v3' &&
+            this.player.character === 'fok' &&
             this.ghostSprite && this.ghostSprite.active) {
 
             // Override position to match ghost
@@ -667,9 +673,9 @@ export class PlayerCombat {
         if (this.currentAttack) {
             let damage = this.currentAttack.data.damage;
 
-            // Side Sig Damage Scaling (Fok_v3)
+            // Side Sig Damage Scaling (Fok)
             // Min 6 -> Max 20 based on charge
-            if (this.player.character === 'fok_v3' &&
+            if (this.player.character === 'fok' &&
                 this.currentAttack.data.type === AttackType.HEAVY &&
                 this.currentAttack.data.direction === AttackDirection.SIDE) {
 
@@ -772,8 +778,8 @@ export class PlayerCombat {
             knockbackAngle = data.knockbackAngle;
             isHeavy = data.type === AttackType.HEAVY;
 
-            // Side Sig Knockback Scaling (Fok_v3) — reward for risky full charge
-            if (this.player.character === 'fok_v3' &&
+            // Side Sig Knockback Scaling (Fok) — reward for risky full charge
+            if (this.player.character === 'fok' &&
                 data.type === AttackType.HEAVY &&
                 data.direction === AttackDirection.SIDE) {
 
@@ -849,7 +855,8 @@ export class PlayerCombat {
         const facing = this.player.getFacingDirection();
 
         // Create Ghost Sprite
-        const ghost = this.scene.add.sprite(this.player.x, this.player.y, 'fok_ghost_0');
+        // Use 'fok' atlas and the first frame of the ghost animation
+        const ghost = this.scene.add.sprite(this.player.x, this.player.y, 'fok', 'fok_side_sig_ghost_000');
         ghost.setDepth(this.player.depth - 1); // Behind player
         ghost.play('fok_side_sig_ghost');
         // Faint glow effect (Diffused White)

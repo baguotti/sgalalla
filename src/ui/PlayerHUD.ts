@@ -127,7 +127,15 @@ export class PlayerHudSlot {
             texture = 'fok_icon';
         } else {
             texture = character.startsWith('fok') ? 'fok' : character;
-            frame = character === 'fok_v3' ? '0_Fok_v3_Idle_000.png' : '0_Fok_Idle_000.png';
+            frame = character === 'fok' ? 'fok_idle_000' : `${character}_Idle_000.png`; // Fallback to Title case for sga/sgu if specific frame needed
+            if (character !== 'fok') {
+                // Sga/Sgu use atlas frame names directly which might be needed?
+                // Actually they use animation frames. 0_Sga_Idle_000.png might not exist if it's an atlas frame not an image.
+                // Atlas frames don't have .png usually in Phaser generateFrameNames unless specified.
+                // Let's assume standard format: sga_idle_000 or Sga_Idle_000
+                // Based on GameScene: sga uses 'Sga_Idle_', sgu uses 'Sgu_Idle_'
+                frame = `${character === 'sga' ? 'Sga' : 'Sgu'}_Idle_000`;
+            }
         }
 
         const portrait = scene.add.sprite(0, 0, texture, frame);

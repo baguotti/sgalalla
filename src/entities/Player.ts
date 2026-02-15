@@ -82,7 +82,7 @@ export class Player extends Fighter {
 
     // Character Type
     // Character config
-    public character: 'fok_v3' = 'fok_v3';
+    public character: string = 'fok';
     private animPrefix: string = 'alchemist';
     private debugRect!: Phaser.GameObjects.Rectangle;
 
@@ -171,7 +171,7 @@ export class Player extends Fighter {
         }
     }
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: 'fok_v3' } = {}) {
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: string } = {}) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
@@ -179,12 +179,21 @@ export class Player extends Fighter {
         this.playerId = config.playerId || 0;
 
         // Character Selection
-        this.character = config.character || 'fok_v3'; // Default is fok_v3
+        this.character = config.character || 'fok'; // Default is fok
         this.animPrefix = this.character;
 
         // Create player sprite
-        const initialFrame = 'Fok_v3_Idle_000';
-        this.sprite = scene.add.sprite(0, 7, this.character, initialFrame); // Adjusted offset (7) to ground sprite after height increase
+        // Update initial frame to match new atlas: fok_idle_000
+        // NOTE: sga/sgu use Title Case prefixes (Sga_Idle_000), handled by GameScene ensureAnim but here we need direct frame?
+        // Actually, Player constructor receives character key.
+        // Let's use a safe default or build it.
+        // For 'fok', it's 'fok_idle_000'.
+
+        let startFrame = 'fok_idle_000';
+        if (this.character === 'sga') startFrame = 'Sga_Idle_000';
+        if (this.character === 'sgu') startFrame = 'Sgu_Idle_000';
+
+        this.sprite = scene.add.sprite(0, 7, this.character, startFrame); // Adjusted offset (7) to ground sprite after height increase
 
 
 
@@ -227,9 +236,9 @@ export class Player extends Fighter {
         // Explicitly set size (BEFORE Debug Hitbox creation)
         this.setSize(60, 120); // Default size
 
-        // Refinement Round 9: Wider hitbox for fok_v3 (40px width - +5px each side)
-        // Refinement Round 9: Wider hitbox for fok_v3 (40px width - +5px each side)
-        if (this.character === 'fok_v3' || this.character === 'sga' || this.character === 'sgu') {
+        // Refinement Round 9: Wider hitbox for fok (40px width - +5px each side)
+        // Refinement Round 9: Wider hitbox for fok (40px width - +5px each side)
+        if (this.character === 'fok' || this.character === 'sga' || this.character === 'sgu') {
             // Refinement Round 17: Shave top 10px, widen 3px each side (40->46)
             this.setSize(46, PhysicsConfig.PLAYER_HEIGHT - 10);
         }
@@ -497,9 +506,7 @@ export class Player extends Fighter {
         this.physics.checkWallCollision(walls);
     }
 
-    public checkLedgeGrab(platforms: Array<{ rect: Phaser.GameObjects.Rectangle; isSoft?: boolean }>): void {
-        this.physics.checkLedgeGrab(platforms);
-    }
+
 
     public checkHitAgainst(target: Player): void {
         this.combat.checkAttackCollision(target);
@@ -693,7 +700,7 @@ export class Player extends Fighter {
         this.sprite.x = 0;
         // this.sprite.y = 0; // If we ever need Y offset
 
-        if (this.character === 'fok_v3') {
+        if (this.character === 'fok') {
             if (anim.key.includes('wall_slide')) {
                 // Refinement 8: Offset towards the wall by 7px (User requested even more visibility)
                 // Use facingDirection (which is guaranteed to be away from wall during slide)
@@ -701,10 +708,6 @@ export class Player extends Fighter {
                 // If facing Left (-1), wall is Right (1). Offset should be 7 (Right).
                 // So: -facingDirection * 7
                 this.sprite.x = -this.getFacingDirection() * 7;
-            }
-            else if (anim.key.includes('attack_heavy_side')) {
-                // Refinement Round 7: Offset animation further (was 80 -> 130)
-                this.sprite.x = this.getFacingDirection() * 130;
             }
         }
     }

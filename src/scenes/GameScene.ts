@@ -75,7 +75,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     private loadCharacterAssets(): void {
-        this.load.atlas('fok_v3', 'assets/fok_v3/fok_v3.png', 'assets/fok_v3/fok_v3.json');
+        this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
         this.load.image('fok_icon', 'assets/fok_icon.png'); // Refinement V2
 
         // Load Maps
@@ -102,64 +102,65 @@ export class GameScene extends Phaser.Scene {
 
     private createAnimations(): void {
         const charConfigs = {
-            'fok_v3': {
-                idle: { prefix: 'Fok_v3_Idle_', count: 12, loop: true },
-                run: { prefix: 'Fok_v3_Run_', count: 9, loop: true },
-                charging: { prefix: 'Fok_v3_Charge_', count: 2, loop: true },
+            'fok': {
+                idle: { prefix: 'fok_idle_', count: 12, loop: true },
+                run: { prefix: 'fok_run_', count: 9, loop: true },
+                charging: { prefix: 'fok_charge_', count: 2, loop: true },
 
-                // Dash (New)
-                dash: { prefix: 'Fok_v3_Dash_', count: 1, suffix: '000', loop: false },
+                // Dash
+                dash: { prefix: 'fok_dash_', count: 1, suffix: '000', loop: false },
 
                 // Spot Dodge
-                spot_dodge: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false },
+                spot_dodge: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false },
 
-                // Seal Summon (Side Sig Projectile)
-                seal: { prefix: 'Fok_v3_Side Sig_Seal', count: 9, loop: true },
+                // Side Sig Ghost
+                side_sig_ghost: { prefix: 'fok_side_sig_ghost_', count: 2, loop: true }, // Mapped to ghost frames in atlas
 
                 // --- LIGHT ATTACKS ---
 
-                // Neutral Light
-                attack_light_neutral: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false },
+                // Neutral Light -> Mapped to Side Light (Placeholder)
+                attack_light_neutral: { prefix: 'fok_side_light_', count: 1, suffix: '000', loop: false },
 
-                // Up Light -> Mapped to Side Light (Req 1 swap)
-                attack_light_up: { prefix: 'Fok_v3_Side_Light_', count: 1, suffix: '000', loop: false },
-                attack_light_up_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false }, // New: Separate Air Up
+                // Up Light -> Mapped to Side Light (Placeholder)
+                attack_light_up: { prefix: 'fok_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_up_air: { prefix: 'fok_side_air_', count: 1, suffix: '000', loop: false },
 
                 // Down Light
-                attack_light_down: { prefix: 'Fok_v3_Down_Light_', count: 1, suffix: '000', loop: false },
+                attack_light_down: { prefix: 'fok_down_light_', count: 1, suffix: '000', loop: false },
 
-                // Side Light -> Mapped to Neutral Light (Req 1 swap)
-                attack_light_side: { prefix: 'Fok_v3_Neutral_Light_', count: 1, suffix: '000', loop: false },
-                attack_light_side_air: { prefix: 'Fok_v3_Side_Air_', count: 1, suffix: '000', loop: false },
+                // Side Light
+                attack_light_side: { prefix: 'fok_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'fok_side_air_', count: 1, suffix: '000', loop: false },
 
-                // Running Light Attack (New)
-                attack_light_run: { prefix: 'Fok_v3_Side_Run_', count: 1, suffix: '000', loop: false },
+                // Running Light Attack -> New asset
+                attack_light_run: { prefix: 'fok_side_run_', count: 1, suffix: '000', loop: false },
 
 
                 // --- HEAVY ATTACKS (SIGS) ---
 
-                // Neutral Sig -> Mapped to Up Sig (Req 2)
-                attack_heavy_neutral: { prefix: 'Fok_v3_Up_Sig_', count: 1, suffix: '000', loop: false },
+                // Neutral Sig -> Mapped to Up Sig (Placeholder)
+                attack_heavy_neutral: { prefix: 'fok_up_sig_', count: 1, suffix: '000', loop: false },
 
                 // Up Sig
-                attack_heavy_up: { prefix: 'Fok_v3_Up_Sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_up: { prefix: 'fok_up_sig_', count: 1, suffix: '000', loop: false },
 
-                // Side Sig (Req 3)
-                attack_heavy_side: { prefix: 'Fok_v3_Side_Sig_', count: 1, suffix: '000', loop: false },
+                // Side Sig
+                attack_heavy_side: { prefix: 'fok_side_sig_', count: 1, suffix: '000', loop: false },
 
-                // Down Sig 
-                attack_heavy_down: { prefix: 'Fok_v3_Down_Sig_', count: 1, suffix: '000', loop: false },
+                // Down Sig -> Mapped to something visible, maybe Side Sig or Ground Pound?
+                // Using Side Sig for now as per previous pattern
+                attack_heavy_down: { prefix: 'fok_side_sig_', count: 1, suffix: '000', loop: false },
 
 
                 // Utilities
-                wall_slide: { prefix: 'Fok_v3_Wall_Slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'Fok_v3_Recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'Fok_v3_Ground_Pound_', count: 1, suffix: '000', loop: false },
+                wall_slide: { prefix: 'fok_wall_slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'fok_recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'fok_ground_pound_', count: 1, suffix: '000', loop: false },
 
-                hurt: { prefix: 'Fok_v3_Hurt_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'Fok_v3_Fall_', count: 1, suffix: '000', loop: false },
-                jump: { prefix: 'Fok_v3_Jump_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'Fok_v3_Dodge_', count: 1, suffix: '000', loop: false }
+                hurt: { prefix: 'fok_hurt_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'fok_fall_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'fok_jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false }
             },
             'sga': {
                 // Sga specific mappings based on sga.json
@@ -295,7 +296,7 @@ export class GameScene extends Phaser.Scene {
             }
         };
 
-        const characters = ['fok_v3', 'sga', 'sgu'];
+        const characters = ['fok', 'sga', 'sgu'];
 
         characters.forEach(char => {
             const config = charConfigs[char as keyof typeof charConfigs];
@@ -315,7 +316,7 @@ export class GameScene extends Phaser.Scene {
                     });
                 } else {
                     // Sequence 0 to count-1
-                    // Note: fok_v3 uses 3 digit zero pad for all? json shows "000", "001" etc.
+                    // fok (v4) uses 3 digit zero pad
                     frames = this.anims.generateFrameNames(char, {
                         prefix: animData.prefix,
                         start: 0,
@@ -344,11 +345,11 @@ export class GameScene extends Phaser.Scene {
                 }
             };
 
-            if (char === 'fok_v3') {
-                ensureAnim(`${char}_attack_light_0`, 'Fok_v3_Neutral_Light_', 0);
-                ensureAnim(`${char}_attack_light_1`, 'Fok_v3_Neutral_Light_', 1);
-                ensureAnim(`${char}_dodge`, 'Fok_v3_Dodge_', 0);
-                ensureAnim(`${char}_jump_start`, 'Fok_v3_Jump_', 0);
+            if (char === 'fok') {
+                ensureAnim(`${char}_attack_light_0`, 'fok_side_light_', 0);
+                ensureAnim(`${char}_attack_light_1`, 'fok_side_light_', 0);
+                ensureAnim(`${char}_dodge`, 'fok_dodge_', 0);
+                ensureAnim(`${char}_jump_start`, 'fok_jump_', 0);
             } else {
                 // Original mappings
                 if (!this.anims.exists(`${char}_attack_light_0`)) {
@@ -442,7 +443,7 @@ export class GameScene extends Phaser.Scene {
         } else {
             // Fallback defaults
             this.playerData = [
-                { playerId: 0, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok_v3' },
+                { playerId: 0, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok' },
                 { playerId: 1, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok', isAI: true, isTrainingDummy: true }
             ];
         }
@@ -782,8 +783,9 @@ export class GameScene extends Phaser.Scene {
         bg.setDepth(-100);
 
         // Main platform (centered, smaller - Refinement 13)
-        // Center: 960. Width 1200 (Was 2400). Y = 900
-        const mainPlatform = this.add.rectangle(960, 900, 1200, 60, 0x2c3e50);
+        // Center: 960. Width 1200. Y changed to extend to blast zone (930 height, y=1335)
+        // Top Y = 1335 - 465 = 870. Bottom Y = 1335 + 465 = 1800 (BLAST_ZONE_BOTTOM)
+        const mainPlatform = this.add.rectangle(960, 1335, 1200, 930, 0x2c3e50);
         mainPlatform.setStrokeStyle(3, 0x3a506b);
         this.platforms.push(mainPlatform);
         // Add Matter body for Bomb collision
@@ -832,7 +834,16 @@ export class GameScene extends Phaser.Scene {
             // Left Wall (x, y, w, h) - Phaser.Geom.Rectangle uses Top-Left Coords
             new Phaser.Geom.Rectangle(this.WALL_LEFT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540),
             // Right Wall
-            new Phaser.Geom.Rectangle(this.WALL_RIGHT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540)
+            new Phaser.Geom.Rectangle(this.WALL_RIGHT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540),
+
+            // Main Platform Walls (For Wall Sliding on the deep floor)
+            // Left Face: x=360. Center wall on 360? Or just inside/outside?
+            // Detection bounds are +10px. If wall is at 360, player (width 120) at 300 (right=360) touches.
+            // Wall thickness 40. Left=360-20=340. Right=380.
+            // Player at 300 (right 360) -> Overlaps 340-360 range?
+            // Top Y = 870 + 20 (padding) = 890. Height = 1800 - 890 = 910.
+            new Phaser.Geom.Rectangle(360 - 20, 890, 40, 910), // Left Side of Main Plat
+            new Phaser.Geom.Rectangle(1560 - 20, 890, 40, 910) // Right Side of Main Plat
         ];
 
         // Add wall indicators (text labels)
@@ -995,8 +1006,7 @@ export class GameScene extends Phaser.Scene {
         // 3. Update Logic (Anim)
         this.players.forEach(p => p.updateLogic(delta));
 
-
-        // Environment Collisions (Walls)
+        // 4. Wall Collisions (end of frame — sets isTouchingWall for next frame)
         this.players.forEach(p => p.checkWallCollision(this.wallRects));
 
 
@@ -1290,7 +1300,7 @@ export class GameScene extends Phaser.Scene {
             joined: true,
             ready: true,
             input: { type: 'KEYBOARD', gamepadIndex: null },
-            character: 'fok_v3' as const,
+            character: 'fok' as const,
             isAI: true,
             isTrainingDummy: true
         };
@@ -1309,7 +1319,7 @@ export class GameScene extends Phaser.Scene {
             playerId: playerId,
             gamepadIndex: null,
             useKeyboard: false,
-            character: 'fok_v3',
+            character: 'fok',
             isAI: true
         });
 
