@@ -123,14 +123,14 @@ export class PlayerHudSlot {
         let texture = character;
         let frame: string | undefined = undefined;
 
-        if (character.toLowerCase().startsWith('fok')) {
-            texture = 'fok';
-            frame = '00_fok_icon';
+        // Standardized Icon Retrieval for Fok (v4 Atlas Style)
+        if (character.toLowerCase() === 'fok') {
+            texture = character.toLowerCase(); // Texture key is 'fok'
+            frame = `00_${character.toLowerCase()}_icon`;
         } else {
+            // Fallback for legacy/other characters
             texture = character;
-            frame = `${character}_Idle_000.png`; // Fallback/Standard for others
-            if (character === 'sga') frame = 'Sga_Idle_000';
-            if (character === 'sgu') frame = 'Sgu_Idle_000';
+            frame = `${character}_Idle_000.png`;
         }
 
         const portrait = scene.add.sprite(0, 0, texture, frame);

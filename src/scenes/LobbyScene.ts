@@ -27,8 +27,8 @@ export class LobbyScene extends Phaser.Scene {
     private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character Data
-    private characters: CharacterType[] = ['fok', 'sga', 'sgu'] as any;
-    private charLabels: string[] = ['Fok', 'Sga', 'Sgu'];
+    private characters: CharacterType[] = ['fok'] as any;
+    private charLabels: string[] = ['Fok'];
     // P1_KEYS removed (unused in Lobby)
 
     // Input debounce & Safety
@@ -86,9 +86,7 @@ export class LobbyScene extends Phaser.Scene {
 
     preload(): void {
         this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
-        this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
-        this.load.image('sga_icon', 'assets/sga_icon.png');
-        this.load.image('sgu_icon', 'assets/sgu_icon.png');
+
     }
 
 
@@ -322,8 +320,6 @@ export class LobbyScene extends Phaser.Scene {
     private ensureIdleAnimations(): void {
         const animConfigs: Record<string, { prefix: string; count: number }> = {
             'fok': { prefix: 'fok_idle_', count: 12 },
-            'sga': { prefix: 'Sga_Idle_', count: 12 },
-            'sgu': { prefix: 'Sgu_Idle_', count: 12 },
         };
 
         for (const [charKey, cfg] of Object.entries(animConfigs)) {

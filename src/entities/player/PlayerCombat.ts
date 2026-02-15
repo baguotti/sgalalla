@@ -153,7 +153,7 @@ export class PlayerCombat {
             // Any light attack while running OR moving fast (Dash Attack)
             const isRunSpeed = Math.abs(this.player.velocity.x) > PhysicsConfig.MAX_SPEED * 0.8;
             if ((this.player.physics.isRunning || isRunSpeed) && this.player.isGrounded) {
-                if (this.player.character === 'fok' || this.player.character === 'sga' || this.player.character === 'sgu') {
+                if (this.player.character === 'fok') {
                     // Use new Running Light Attack
                     this.startAttack('light_run_grounded');
                     return;

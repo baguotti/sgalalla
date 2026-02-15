@@ -162,141 +162,9 @@ export class GameScene extends Phaser.Scene {
                 jump: { prefix: 'fok_jump_', count: 1, suffix: '000', loop: false },
                 slide: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false }
             },
-            'sga': {
-                // Sga specific mappings based on sga.json
-                // Note mixed capitalization in source assets
-
-                // Idle & Run (Run mapped to Idle)
-                idle: { prefix: 'Sga_Idle_', count: 12, loop: true },
-                run: { prefix: 'Sga_Idle_', count: 12, loop: true },
-
-                // Movement / States
-                charging: { prefix: 'sga_Charge_', count: 2, loop: true }, // lowercase sga
-                dash: { prefix: 'sga_Dash_', count: 1, suffix: '000', loop: false },
-                spot_dodge: { prefix: 'sga_Dodge_', count: 1, suffix: '000', loop: false },
-
-                // Jump / Fall / Hurt
-                jump: { prefix: 'sga_Jump_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'sga_Fall_', count: 1, suffix: '000', loop: false },
-                hurt: { prefix: 'sga_Hurt_', count: 1, suffix: '000', loop: false },
-
-                // Utils
-                wall_slide: { prefix: 'sga_Wall_Slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'sga_Recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'sga_Ground_Pound_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'sga_Dodge_', count: 1, suffix: '000', loop: false }, // Reused Dodge
-
-                // --- LIGHT ATTACKS ---
-                // Neutral Light -> Mapped to Side Light (Match Fok logic, but using sga_Side_Light)
-                attack_light_neutral: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Side Light -> Mapped to Side Light (Source has sga_Side_Light)
-                attack_light_side: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Up Light -> Mapped to Side Light (Match Fok)
-                attack_light_up: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Aerials
-                attack_light_up_air: { prefix: 'sga_Side_Air_', count: 1, suffix: '000', loop: false }, // sga_Side_Air
-                attack_light_side_air: { prefix: 'sga_Side_Air_', count: 1, suffix: '000', loop: false },
-
-                // Down Light
-                attack_light_down: { prefix: 'sga_Down_Light_', count: 1, suffix: '000', loop: false },
-
-                // Run Attack
-                attack_light_run: { prefix: 'sga_Side_Run_', count: 1, suffix: '000', loop: false },
-
-
-                // --- HEAVY ATTACKS (SIGS) ---
-                // Neutral Sig -> Mapped to Up Sig (Match Fok)
-                attack_heavy_neutral: { prefix: 'sga_Up_Sig_', count: 1, suffix: '000', loop: false },
-
-                // Up Sig
-                attack_heavy_up: { prefix: 'sga_Up_Sig_', count: 1, suffix: '000', loop: false },
-
-                // Side Sig -> MISSING in JSON. Mapping to Side Light or Up Sig?
-                // Using Side Light as placeholder to prevent invisible sprite
-                attack_heavy_side: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Down Sig 
-                attack_heavy_down: { prefix: 'sga_Down_Sig_', count: 1, suffix: '000', loop: false },
-
-                // Seal (Projectile) - MISSING. Using Up Sig as placeholder? Or generic?
-                // Fok uses 'Fok_v3_Side Sig_Seal'. Sga has no equivalent.
-                // Leave undefined or map to something safe?
-                // Seal (Projectile) - MISSING. Using Up Sig as placeholder? Or generic?
-                // Fok uses 'Fok_v3_Side Sig_Seal'. Sga has no equivalent.
-                // Leave undefined or map to something safe?
-                // Map to Up Sig for now (safe placeholder)
-                seal: { prefix: 'sga_Up_Sig_', count: 1, suffix: '000', loop: false },
-            },
-            'sgu': {
-                // Sgu specific mappings based on sgu.json (same as Sga but with Sgu prefix)
-
-                // Idle & Run
-                idle: { prefix: 'Sgu_Idle_', count: 12, loop: true },
-                run: { prefix: 'Sgu_Idle_', count: 12, loop: true }, // Run mapped to Idle until dedicated run exists
-
-                // Movement / States
-                charging: { prefix: 'sgu_Charge_', count: 2, loop: true },
-                dash: { prefix: 'sgu_Dash_', count: 1, suffix: '000', loop: false },
-                spot_dodge: { prefix: 'sgu_Dodge_', count: 1, suffix: '000', loop: false },
-
-                // Jump / Fall / Hurt
-                jump: { prefix: 'sgu_Jump_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'Sgu_Fall_', count: 1, suffix: '000', loop: false }, // Note Capital S in Sgu_Fall_
-                hurt: { prefix: 'sgu_Hurt_', count: 1, suffix: '000', loop: false },
-
-                // Utils
-                wall_slide: { prefix: 'sgu_Wall_Slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'sgu_Recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'sgu_Ground_Pound_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'sgu_Dodge_', count: 1, suffix: '000', loop: false },
-
-                // --- LIGHT ATTACKS ---
-                // Neutral Light -> Mapped to Side Light
-                attack_light_neutral: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Side Light
-                attack_light_side: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Up Light -> Mapped to Side Light
-                attack_light_up: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Aerials
-                attack_light_up_air: { prefix: 'sgu_Side_Air_', count: 1, suffix: '000', loop: false },
-                attack_light_side_air: { prefix: 'sgu_Side_Air_', count: 1, suffix: '000', loop: false },
-
-                // Down Light
-                attack_light_down: { prefix: 'sgu_Down_Light_', count: 1, suffix: '000', loop: false },
-
-                // Run Attack
-                attack_light_run: { prefix: 'sgu_Side_Run_', count: 1, suffix: '000', loop: false },
-
-                // --- HEAVY ATTACKS (SIGS) ---
-                // Neutral Sig -> Mapped to Up Sig
-                attack_heavy_neutral: { prefix: 'sgu_Up_Sig_', count: 1, suffix: '000', loop: false },
-
-                // Up Sig
-                attack_heavy_up: { prefix: 'sgu_Up_Sig_', count: 1, suffix: '000', loop: false },
-
-                // Side Sig -> Mapped to Side Light (Placeholder)
-                attack_heavy_side: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Down Sig -> MISSING. Using Side Light? No, let's map to Up Sig or something visible.
-                // Actually user plan said: "I will map attack_heavy_down to sgu_Side_Sig temporarily"
-                // But wait, sgu_Side_Sig exists in JSON? 
-                // Let's check JSON again. Yes: "filename": "sgu_Side_Sig_000".
-                // Wait, user plan said "sgu_Down_Sig appear to be missing... I will map attack_heavy_down to sgu_Side_Sig"
-                // So attack_heavy_down -> sgu_Side_Sig
-                attack_heavy_down: { prefix: 'sgu_Side_Sig_', count: 1, suffix: '000', loop: false },
-
-                // Seal
-                seal: { prefix: 'sgu_Up_Sig_', count: 1, suffix: '000', loop: false },
-            }
         };
 
-        const characters = ['fok', 'sga', 'sgu'];
+        const characters = ['fok'];
 
         characters.forEach(char => {
             const config = charConfigs[char as keyof typeof charConfigs];
@@ -325,6 +193,8 @@ export class GameScene extends Phaser.Scene {
                     });
                 }
 
+
+
                 this.anims.create({
                     key: animKey,
                     frames: frames,
@@ -345,77 +215,41 @@ export class GameScene extends Phaser.Scene {
                 }
             };
 
-            if (char === 'fok') {
-                ensureAnim(`${char}_attack_light_0`, 'fok_side_light_', 0);
-                ensureAnim(`${char}_attack_light_1`, 'fok_side_light_', 0);
-                ensureAnim(`${char}_dodge`, 'fok_dodge_', 0);
-                ensureAnim(`${char}_jump_start`, 'fok_jump_', 0);
-            } else {
-                // Original mappings
-                if (!this.anims.exists(`${char}_attack_light_0`)) {
+            ensureAnim(`${char}_attack_light_0`, 'fok_side_light_', 0);
+            ensureAnim(`${char}_attack_light_1`, 'fok_side_light_', 0);
+            ensureAnim(`${char}_dodge`, 'fok_dodge_', 0);
+            ensureAnim(`${char}_jump_start`, 'fok_jump_', 0);
+
+            // COMPATIBILITY ALIASING for 'fok'
+            // Alias new specific keys to existing legacy ones
+            const createAlias = (newSuffix: string, existingSuffix: string) => {
+                const newKey = `${char}_${newSuffix}`;
+                const existingKey = `${char}_${existingSuffix}`;
+                if (!this.anims.exists(newKey) && this.anims.exists(existingKey)) {
+                    const existingAnim = this.anims.get(existingKey);
+                    const frames = existingAnim.frames.map(f => ({ key: f.textureKey, frame: f.textureFrame }));
                     this.anims.create({
-                        key: `${char}_attack_light_0`,
-                        frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
+                        key: newKey,
+                        frames: frames,
                         frameRate: 10,
                         repeat: 0
                     });
                 }
-                if (!this.anims.exists(`${char}_attack_light_1`)) {
-                    this.anims.create({
-                        key: `${char}_attack_light_1`,
-                        frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_AttackLight_', start: 0, end: 0, zeroPad: 3 }),
-                        frameRate: 10,
-                        repeat: 0
-                    });
-                }
-                if (!this.anims.exists(`${char}_dodge`)) {
-                    this.anims.create({
-                        key: `${char}_dodge`,
-                        frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_Sliding_', start: 0, end: 0, zeroPad: 3 }),
-                        frameRate: 10,
-                        repeat: 0
-                    });
-                }
-                if (!this.anims.exists(`${char}_jump_start`)) {
-                    this.anims.create({
-                        key: `${char}_jump_start`,
-                        frames: this.anims.generateFrameNames(char, { prefix: '0_Fok_Jump_', start: 0, end: 0, zeroPad: 3 }),
-                        frameRate: 10,
-                        repeat: 0
-                    });
-                }
+            };
 
-                // COMPATIBILITY ALIASING for 'fok'/'fok_alt'
-                // Alias new specific keys to existing legacy ones
-                const createAlias = (newSuffix: string, existingSuffix: string) => {
-                    const newKey = `${char}_${newSuffix}`;
-                    const existingKey = `${char}_${existingSuffix}`;
-                    if (!this.anims.exists(newKey) && this.anims.exists(existingKey)) {
-                        const existingAnim = this.anims.get(existingKey);
-                        const frames = existingAnim.frames.map(f => ({ key: f.textureKey, frame: f.textureFrame }));
-                        this.anims.create({
-                            key: newKey,
-                            frames: frames,
-                            frameRate: 10,
-                            repeat: 0
-                        });
-                    }
-                };
+            createAlias('attack_light_neutral', 'attack_light');
+            createAlias('attack_light_up', 'attack_up');
+            createAlias('attack_light_down', 'attack_down');
+            createAlias('attack_light_side', 'attack_side');
+            createAlias('attack_light_side_air', 'attack_side');
 
-                createAlias('attack_light_neutral', 'attack_light');
-                createAlias('attack_light_up', 'attack_up');
-                createAlias('attack_light_down', 'attack_down');
-                createAlias('attack_light_side', 'attack_side');
-                createAlias('attack_light_side_air', 'attack_side');
+            createAlias('attack_heavy_neutral', 'attack_heavy');
+            createAlias('attack_heavy_up', 'attack_up');
+            createAlias('attack_heavy_side', 'attack_side');
+            createAlias('attack_heavy_down', 'attack_down');
 
-                createAlias('attack_heavy_neutral', 'attack_heavy');
-                createAlias('attack_heavy_up', 'attack_up');
-                createAlias('attack_heavy_side', 'attack_side');
-                createAlias('attack_heavy_down', 'attack_down');
-
-                createAlias('spot_dodge', 'slide');
-                createAlias('dash', 'slide'); // Use slide for dash too (legacy fallback)
-            }
+            createAlias('spot_dodge', 'slide');
+            createAlias('dash', 'slide'); // Use slide for dash too (legacy fallback)
         });
 
         // Manual Animation: Fok Side Sig Ghost (from standalone images)

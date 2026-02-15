@@ -184,14 +184,7 @@ export class Player extends Fighter {
 
         // Create player sprite
         // Update initial frame to match new atlas: fok_idle_000
-        // NOTE: sga/sgu use Title Case prefixes (Sga_Idle_000), handled by GameScene ensureAnim but here we need direct frame?
-        // Actually, Player constructor receives character key.
-        // Let's use a safe default or build it.
-        // For 'fok', it's 'fok_idle_000'.
-
         let startFrame = 'fok_idle_000';
-        if (this.character === 'sga') startFrame = 'Sga_Idle_000';
-        if (this.character === 'sgu') startFrame = 'Sgu_Idle_000';
 
         this.sprite = scene.add.sprite(0, 7, this.character, startFrame); // Adjusted offset (7) to ground sprite after height increase
 
@@ -200,9 +193,9 @@ export class Player extends Fighter {
         // Base size is 256 for both characters (User confirmed 1:1 scale)
         const scale = 1;
         this.sprite.setScale(scale);
-
-        this.sprite.setScale(scale);
         this.add(this.sprite);
+
+        // console.log(`[Player ${this.playerId}] Created character: ${this.character}, StartFrame: ${startFrame}, Scale: ${scale}`);
 
 
 
@@ -238,7 +231,7 @@ export class Player extends Fighter {
 
         // Refinement Round 9: Wider hitbox for fok (40px width - +5px each side)
         // Refinement Round 9: Wider hitbox for fok (40px width - +5px each side)
-        if (this.character === 'fok' || this.character === 'sga' || this.character === 'sgu') {
+        if (this.character === 'fok') {
             // Refinement Round 17: Shave top 10px, widen 3px each side (40->46)
             this.setSize(46, PhysicsConfig.PLAYER_HEIGHT - 10);
         }
@@ -718,6 +711,13 @@ export class Player extends Fighter {
         // Opt-out if already playing to avoid resetting visual offsets (like shake)
         if (ignoreIfPlaying && this.sprite.anims.currentAnim && this.sprite.anims.currentAnim.key === fullKey) {
             return;
+        }
+
+        if (!this.scene.anims.exists(fullKey)) {
+            console.warn(`[Player ${this.playerId}] Animation MISSING: ${fullKey} (Prefix: ${this.animPrefix}, Key: ${key})`);
+            return; // Don't play if missing
+        } else {
+            // console.log(`[Player ${this.playerId}] Playing: ${fullKey}`);
         }
 
         this.sprite.anims.play(fullKey, ignoreIfPlaying);

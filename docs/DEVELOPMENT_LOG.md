@@ -776,3 +776,10 @@
     - Added invisible wall colliders to main platform sides to enable wall sliding online.
 - **[S]** **STATUS**: v0.11.4 Released. Online mode is now fully synced with local mechanics.
 
+
+### [2026-02-15] v0.11.5 - Sga/Sgu Cleanup & Scale Revert
+- **[V]** `v0.11.5`
+- **[R]** Removed Sga and Sgu characters completely to start fresh.
+- **[Fix]** Reverted character scaling to 1.0 (was 0.7) for proper visual size.
+- **[Fix]** Deep cleaned all Sga/Sgu references in code and assets to prevent crashes and bloat.
+- **[Fix]** Repaired `GameScene.ts` animation logic to be robust and focused on 'fok'.

@@ -121,7 +121,7 @@ export class OnlineGameScene extends Phaser.Scene {
     private selectionCountdown: number = 10;
     private selectedCharacter: string = 'fok';
     // Character Selection
-    private availableCharacters: string[] = ['fok', 'sga', 'sgu']; // Refinement: fok is default
+    private availableCharacters: string[] = ['fok']; // Refinement: fok is default
     private selectedCharIndex: number = 0;
 
     // Selection UI Elements
@@ -220,96 +220,10 @@ export class OnlineGameScene extends Phaser.Scene {
                 fall: { prefix: 'fok_fall_', count: 1, suffix: '000', loop: false },
                 jump: { prefix: 'fok_jump_', count: 1, suffix: '000', loop: false },
                 slide: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false }
-            },
-            'sga': {
-                // Sga specific mappings based on sga.json
-                // Note mixed capitalization in source assets
-
-                // Idle & Run (Run mapped to Idle)
-                idle: { prefix: 'Sga_Idle_', count: 12, loop: true },
-                run: { prefix: 'Sga_Idle_', count: 12, loop: true },
-
-                // Movement / States
-                charging: { prefix: 'sga_Charge_', count: 2, loop: true }, // lowercase sga
-                dash: { prefix: 'sga_Dash_', count: 1, suffix: '000', loop: false },
-                spot_dodge: { prefix: 'sga_Dodge_', count: 1, suffix: '000', loop: false },
-
-                // Jump / Fall / Hurt
-                jump: { prefix: 'sga_Jump_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'sga_Fall_', count: 1, suffix: '000', loop: false },
-                hurt: { prefix: 'sga_Hurt_', count: 1, suffix: '000', loop: false },
-
-                // Utils
-                wall_slide: { prefix: 'sga_Wall_Slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'sga_Recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'sga_Ground_Pound_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'sga_Dodge_', count: 1, suffix: '000', loop: false }, // Reused Dodge
-
-                // --- LIGHT ATTACKS ---
-                // Neutral Light -> Mapped to Side Light (Match Fok logic, but using sga_Side_Light)
-                attack_light_neutral: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Side Light -> Mapped to Side Light (Source has sga_Side_Light)
-                attack_light_side: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Up Light -> Mapped to Side Light (Match Fok)
-                attack_light_up: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Aerials
-                attack_light_up_air: { prefix: 'sga_Side_Air_', count: 1, suffix: '000', loop: false }, // sga_Side_Air
-                attack_light_side_air: { prefix: 'sga_Side_Air_', count: 1, suffix: '000', loop: false },
-
-                // Down Light
-                attack_light_down: { prefix: 'sga_Down_Light_', count: 1, suffix: '000', loop: false },
-
-                // Run Attack
-                attack_light_run: { prefix: 'sga_Side_Run_', count: 1, suffix: '000', loop: false },
-
-
-                // --- HEAVY ATTACKS (SIGS) ---
-                // Neutral Sig -> Mapped to Up Sig (Match Fok)
-                attack_heavy_neutral: { prefix: 'sga_Up_Sig_', count: 1, suffix: '000', loop: false },
-
-                // Up Sig
-                attack_heavy_up: { prefix: 'sga_Up_Sig_', count: 1, suffix: '000', loop: false },
-
-                // Side Sig -> MISSING in JSON. Mapping to Side Light or Up Sig?
-                // Using Side Light as placeholder to prevent invisible sprite
-                attack_heavy_side: { prefix: 'sga_Side_Light_', count: 1, suffix: '000', loop: false },
-
-                // Down Sig 
-                attack_heavy_down: { prefix: 'sga_Down_Sig_', count: 1, suffix: '000', loop: false },
-            },
-            'sgu': {
-                // Sgu specific mappings
-                idle: { prefix: 'Sgu_Idle_', count: 12, loop: true },
-                run: { prefix: 'Sgu_Idle_', count: 12, loop: true },
-                charging: { prefix: 'sgu_Charge_', count: 2, loop: true },
-                dash: { prefix: 'sgu_Dash_', count: 1, suffix: '000', loop: false },
-                spot_dodge: { prefix: 'sgu_Dodge_', count: 1, suffix: '000', loop: false },
-                jump: { prefix: 'sgu_Jump_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'Sgu_Fall_', count: 1, suffix: '000', loop: false },
-                hurt: { prefix: 'sgu_Hurt_', count: 1, suffix: '000', loop: false },
-                wall_slide: { prefix: 'sgu_Wall_Slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'sgu_Recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'sgu_Ground_Pound_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'sgu_Dodge_', count: 1, suffix: '000', loop: false },
-                attack_light_neutral: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
-                attack_light_side: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
-                attack_light_up: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
-                attack_light_up_air: { prefix: 'sgu_Side_Air_', count: 1, suffix: '000', loop: false },
-                attack_light_side_air: { prefix: 'sgu_Side_Air_', count: 1, suffix: '000', loop: false },
-                attack_light_down: { prefix: 'sgu_Down_Light_', count: 1, suffix: '000', loop: false },
-                attack_light_run: { prefix: 'sgu_Side_Run_', count: 1, suffix: '000', loop: false },
-                attack_heavy_neutral: { prefix: 'sgu_Up_Sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_up: { prefix: 'sgu_Up_Sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_side: { prefix: 'sgu_Side_Light_', count: 1, suffix: '000', loop: false },
-                // Map Down Sig to Side Sig due to missing asset
-                attack_heavy_down: { prefix: 'sgu_Side_Sig_', count: 1, suffix: '000', loop: false },
             }
         };
 
-        const characters = ['fok', 'sga', 'sgu'];
+        const characters = ['fok'];
 
         characters.forEach(char => {
             const config = charConfigs[char as keyof typeof charConfigs];
@@ -1607,7 +1521,7 @@ export class OnlineGameScene extends Phaser.Scene {
         const spawnPoints = [400, 1520, 800, 1120];
         players.forEach(p => {
             // Validate character against loaded textures. Fallback to 'fok_v3' if invalid.
-            const validChars = ['fok', 'sga', 'sgu'];
+            const validChars = ['fok'];
             const char = validChars.includes(p.character) ? p.character : 'fok';
             console.log(`[OnlineGameScene] Creating player ${p.playerId} with char: ${char} (Server sent: "${p.character}")`);
 
