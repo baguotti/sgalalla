@@ -153,7 +153,7 @@ export class PlayerCombat {
             // Any light attack while running OR moving fast (Dash Attack)
             const isRunSpeed = Math.abs(this.player.velocity.x) > PhysicsConfig.MAX_SPEED * 0.8;
             if ((this.player.physics.isRunning || isRunSpeed) && this.player.isGrounded) {
-                if (this.player.character === 'fok') {
+                if (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga') {
                     // Use new Running Light Attack
                     this.startAttack('light_run_grounded');
                     return;
@@ -246,6 +246,8 @@ export class PlayerCombat {
             this.currentAttack = new Attack(attackKey, facing);
             this.player.isAttacking = true;
             this.hitTargets.clear();
+
+            console.log(`[Combat] startAttack: ${attackKey} (Char: ${this.player.character})`);
 
             // Visual feedback
             // this.player.setVisualTint(0xff0000); // Removed red tint

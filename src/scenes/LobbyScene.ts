@@ -27,8 +27,8 @@ export class LobbyScene extends Phaser.Scene {
     private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character Data
-    private characters: CharacterType[] = ['fok'] as any;
-    private charLabels: string[] = ['Fok'];
+    private characters: CharacterType[] = ['fok', 'sgu', 'sga'] as any;
+    private charLabels: string[] = ['Fok', 'Sgu', 'Sga'];
     // P1_KEYS removed (unused in Lobby)
 
     // Input debounce & Safety
@@ -320,6 +320,8 @@ export class LobbyScene extends Phaser.Scene {
     private ensureIdleAnimations(): void {
         const animConfigs: Record<string, { prefix: string; count: number }> = {
             'fok': { prefix: 'fok_idle_', count: 12 },
+            'sgu': { prefix: 'sgu_idle_', count: 17 },
+            'sga': { prefix: 'sga_idle_', count: 15 },
         };
 
         for (const [charKey, cfg] of Object.entries(animConfigs)) {

@@ -162,9 +162,87 @@ export class GameScene extends Phaser.Scene {
                 jump: { prefix: 'fok_jump_', count: 1, suffix: '000', loop: false },
                 slide: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false }
             },
+            'sgu': {
+                idle: { prefix: 'sgu_idle_', count: 17, loop: true },
+                run: { prefix: 'sgu_run__', count: 9, loop: true },
+                charging: { prefix: 'sgu_charge_', count: 2, loop: true },
+
+                // Dash
+                dash: { prefix: 'sgu_dash_', count: 1, suffix: '000', loop: false },
+
+                // Spot Dodge
+                spot_dodge: { prefix: 'sgu_dodge_', count: 1, suffix: '000', loop: false },
+
+                // Side Sig Ghost - Skipped (Missing)
+
+                // --- LIGHT ATTACKS ---
+                attack_light_neutral: { prefix: 'sgu_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_up: { prefix: 'sgu_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_up_air: { prefix: 'sgu_side_air_', count: 1, suffix: '000', loop: false },
+                attack_light_down: { prefix: 'sgu_down_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side: { prefix: 'sgu_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'sgu_side_air_', count: 1, suffix: '000', loop: false },
+                attack_light_run: { prefix: 'sgu_side_run_', count: 1, suffix: '000', loop: false },
+
+                // --- HEAVY ATTACKS (SIGS) ---
+                attack_heavy_neutral: { prefix: 'sgu_up_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_up: { prefix: 'sgu_up_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_side: { prefix: 'sgu_side_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_down: { prefix: 'sgu_side_sig_', count: 1, suffix: '000', loop: false },
+
+                // Utilities
+                wall_slide: { prefix: 'sgu_wall_slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'sgu_recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'sgu_ground_pound_', count: 1, suffix: '000', loop: false },
+
+                hurt: { prefix: 'sgu_hurt_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'sgu_fall_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'sgu_jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'sgu_dodge_', count: 1, suffix: '000', loop: false }
+            },
+            'sga': {
+                idle: { prefix: 'sga_idle_', count: 15, loop: true },
+                run: { prefix: 'sga_run_', count: 9, loop: true },
+                charging: { prefix: 'sga_charge_', count: 2, loop: true },
+
+                // Dash
+                dash: { prefix: 'sga_dash_', count: 1, suffix: '000', loop: false },
+
+                // Spot Dodge
+                spot_dodge: { prefix: 'sga_dodge_', count: 1, suffix: '000', loop: false },
+
+                // Side Sig Ghost - Skipped (Missing)
+
+                // --- LIGHT ATTACKS ---
+                attack_light_neutral: { prefix: 'sga_side_light_', count: 1, suffix: '000', loop: false }, // Match Fok
+                attack_light_side: { prefix: 'sga_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'sga_side_air_', count: 1, suffix: '000', loop: false },
+                attack_light_run: { prefix: 'sga_side_run_', count: 1, suffix: '000', loop: false },
+
+                attack_light_down: { prefix: 'sga_down_light_', count: 1, suffix: '000', loop: false },
+
+                attack_light_up: { prefix: 'sga_side_light_', count: 1, suffix: '000', loop: false }, // Placeholder mapping
+                attack_light_up_air: { prefix: 'sga_side_air_', count: 1, suffix: '000', loop: false }, // Match Fok
+
+                // --- HEAVY ATTACKS (SIGS) ---
+                attack_heavy_neutral: { prefix: 'sga_up_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_side: { prefix: 'sga_side_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_down: { prefix: 'sga_side_sig_', count: 1, suffix: '000', loop: false },
+
+                // Utilities
+                wall_slide: { prefix: 'sga_wall_slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'sga_recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'sga_ground_pound_', count: 1, suffix: '000', loop: false },
+
+                // Hurt/Fall/Jump/Slide
+                hurt: { prefix: 'sga_hurt_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'sga_fall_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'sga_jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'sga_dodge_', count: 1, suffix: '000', loop: false }
+            }
         };
 
-        const characters = ['fok'];
+        const characters = ['fok', 'sgu', 'sga'];
 
         characters.forEach(char => {
             const config = charConfigs[char as keyof typeof charConfigs];

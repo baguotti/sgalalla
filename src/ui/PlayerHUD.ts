@@ -123,9 +123,9 @@ export class PlayerHudSlot {
         let texture = character;
         let frame: string | undefined = undefined;
 
-        // Standardized Icon Retrieval for Fok (v4 Atlas Style)
-        if (character.toLowerCase() === 'fok') {
-            texture = character.toLowerCase(); // Texture key is 'fok'
+        // Standardized Icon Retrieval for Fok and Sgu
+        if (['fok', 'sgu', 'sga'].includes(character.toLowerCase())) {
+            texture = character.toLowerCase(); // Texture key is 'fok', 'sgu'
             frame = `00_${character.toLowerCase()}_icon`;
         } else {
             // Fallback for legacy/other characters

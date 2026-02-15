@@ -121,7 +121,7 @@ export class OnlineGameScene extends Phaser.Scene {
     private selectionCountdown: number = 10;
     private selectedCharacter: string = 'fok';
     // Character Selection
-    private availableCharacters: string[] = ['fok']; // Refinement: fok is default
+    private availableCharacters: string[] = ['fok', 'sgu', 'sga']; // Refinement: fok is default
     private selectedCharIndex: number = 0;
 
     // Selection UI Elements
@@ -220,10 +220,50 @@ export class OnlineGameScene extends Phaser.Scene {
                 fall: { prefix: 'fok_fall_', count: 1, suffix: '000', loop: false },
                 jump: { prefix: 'fok_jump_', count: 1, suffix: '000', loop: false },
                 slide: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false }
+            },
+            'sga': {
+                idle: { prefix: 'sga_idle_', count: 15, loop: true },
+                run: { prefix: 'sga_run_', count: 9, loop: true },
+                charging: { prefix: 'sga_charge_', count: 2, loop: true },
+
+                // Dash
+                dash: { prefix: 'sga_dash_', count: 1, suffix: '000', loop: false },
+
+                // Spot Dodge
+                spot_dodge: { prefix: 'sga_dodge_', count: 1, suffix: '000', loop: false },
+
+                // Side Sig Ghost - Skipped (Missing)
+
+                // --- LIGHT ATTACKS ---
+                attack_light_neutral: { prefix: 'sga_side_light_', count: 1, suffix: '000', loop: false }, // Match Fok
+                attack_light_side: { prefix: 'sga_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'sga_side_air_', count: 1, suffix: '000', loop: false },
+                attack_light_run: { prefix: 'sga_side_run_', count: 1, suffix: '000', loop: false },
+
+                attack_light_down: { prefix: 'sga_down_light_', count: 1, suffix: '000', loop: false },
+
+                attack_light_up: { prefix: 'sga_side_light_', count: 1, suffix: '000', loop: false }, // Placeholder mapping
+                attack_light_up_air: { prefix: 'sga_side_air_', count: 1, suffix: '000', loop: false }, // Match Fok
+
+                // --- HEAVY ATTACKS (SIGS) ---
+                attack_heavy_neutral: { prefix: 'sga_up_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_side: { prefix: 'sga_side_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_down: { prefix: 'sga_side_sig_', count: 1, suffix: '000', loop: false },
+
+                // Utilities
+                wall_slide: { prefix: 'sga_wall_slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'sga_recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'sga_ground_pound_', count: 1, suffix: '000', loop: false },
+
+                // Hurt/Fall/Jump/Slide
+                hurt: { prefix: 'sga_hurt_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'sga_fall_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'sga_jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'sga_dodge_', count: 1, suffix: '000', loop: false }
             }
         };
 
-        const characters = ['fok'];
+        const characters = ['fok', 'sgu', 'sga'];
 
         characters.forEach(char => {
             const config = charConfigs[char as keyof typeof charConfigs];
@@ -1521,7 +1561,7 @@ export class OnlineGameScene extends Phaser.Scene {
         const spawnPoints = [400, 1520, 800, 1120];
         players.forEach(p => {
             // Validate character against loaded textures. Fallback to 'fok_v3' if invalid.
-            const validChars = ['fok'];
+            const validChars = ['fok', 'sgu', 'sga'];
             const char = validChars.includes(p.character) ? p.character : 'fok';
             console.log(`[OnlineGameScene] Creating player ${p.playerId} with char: ${char} (Server sent: "${p.character}")`);
 
