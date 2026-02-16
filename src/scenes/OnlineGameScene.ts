@@ -18,6 +18,7 @@ import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '
 import { charConfigs, ALL_CHARACTERS, ANIM_FRAME_RATES } from '../config/CharacterConfig';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
+import { createStage as createSharedStage } from '../stages/StageFactory';
 
 // Define a snapshot type that includes reconstructed server timestamp for fixed-timeline interpolation
 type NetPlayerSnapshot = NetPlayerState & { frame: number; serverTime: number };
@@ -1551,100 +1552,20 @@ export class OnlineGameScene extends Phaser.Scene {
 
 
     private createStage(): void {
-        // Background Image (Adria)
-        const bg = this.add.image(this.scale.width / 2, this.scale.height / 2, 'adria_bg');
-        // Scale to cover
-        const scaleX = this.scale.width / bg.width;
-        const scaleY = this.scale.height / bg.height;
-        const scale = Math.max(scaleX, scaleY);
-        bg.setScale(scale * 1.1).setScrollFactor(0.1);
-        bg.setDepth(-10);
-        if (this.uiCamera) this.uiCamera.ignore(bg);
+        const stage = createSharedStage(this);
 
-        // Side walls (Shortened: Height 540, Y=560)
-        bg.setDepth(-100);
+        // Store references
+        this.platforms.push(stage.mainPlatform);
+        this.softPlatforms.push(...stage.softPlatforms);
+        this.walls = stage.wallCollisionRects;
 
-        // Main platform (centered, smaller)
-        // Center: 960. Width 1200. Y changed to extend to blast zone (930 height, y=1335)
-        // Top Y = 1335 - 465 = 870. Bottom Y = 1335 + 465 = 1800 (BLAST_ZONE_BOTTOM)
-        const mainPlatform = this.add.rectangle(960, 1335, 1200, 930, 0x2c3e50);
-        mainPlatform.setStrokeStyle(3, 0x3a506b);
-        // Important: Add to physics world but as static (no body needed for player collision unless using matter bodies for ground?)
-        // In this game, ground collision is custom (y check).
-        // BUT bombs use matter bodies.
-        this.platforms.push(mainPlatform);
-        this.matter.add.gameObject(mainPlatform, { isStatic: true });
-
-        // Soft platform 1 (left, closer)
-        const softPlatform1 = this.add.rectangle(610, 500, 500, 30, 0x0f3460);
-        softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
-        softPlatform1.setAlpha(0.85);
-        this.softPlatforms.push(softPlatform1);
-        this.matter.add.gameObject(softPlatform1, { isStatic: true });
-
-        // Soft platform 2 (right, closer)
-        const softPlatform2 = this.add.rectangle(1310, 500, 500, 30, 0x0f3460);
-        softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
-        softPlatform2.setAlpha(0.85);
-        this.softPlatforms.push(softPlatform2);
-        this.matter.add.gameObject(softPlatform2, { isStatic: true });
-
-        // Walls
-        const leftWall = this.add.rectangle(MapConfig.WALL_LEFT_X, 560, MapConfig.WALL_THICKNESS, 540, 0x2a3a4e);
-        leftWall.setStrokeStyle(4, 0x4a6a8e);
-        leftWall.setAlpha(0.6);
-        leftWall.setDepth(-5);
-
-        const rightWall = this.add.rectangle(MapConfig.WALL_RIGHT_X, 560, MapConfig.WALL_THICKNESS, 540, 0x2a3a4e);
-        rightWall.setStrokeStyle(4, 0x4a6a8e);
-        rightWall.setAlpha(0.6);
-        rightWall.setDepth(-5);
-
-        // Wall Collision Rects
-        this.walls = [
-            // Left Wall
-            new Phaser.Geom.Rectangle(MapConfig.WALL_LEFT_X - MapConfig.WALL_THICKNESS / 2, 290, MapConfig.WALL_THICKNESS, 540),
-            // Right Wall
-            new Phaser.Geom.Rectangle(MapConfig.WALL_RIGHT_X - MapConfig.WALL_THICKNESS / 2, 290, MapConfig.WALL_THICKNESS, 540),
-
-            // Main Platform Walls (For Wall Sliding on the deep floor)
-            new Phaser.Geom.Rectangle(360 - 20, 890, 40, 910), // Left Side of Main Plat
-            new Phaser.Geom.Rectangle(1560 - 20, 890, 40, 910) // Right Side of Main Plat
-        ];
-
-        // Wall Text
-        const leftWallText = this.add.text(MapConfig.WALL_LEFT_X - 12, 375, 'WALL', {
-            fontSize: '18px',
-            color: '#8ab4f8',
-            fontFamily: '"Pixeloid Sans"',
-            fontStyle: 'bold'
-        });
-        leftWallText.setRotation(-Math.PI / 2);
-        leftWallText.setAlpha(0.5);
-        leftWallText.setDepth(-4);
-
-        const rightWallText = this.add.text(MapConfig.WALL_RIGHT_X + 12, 525, 'WALL', {
-            fontSize: '18px',
-            color: '#8ab4f8',
-            fontFamily: '"Pixeloid Sans"',
-            fontStyle: 'bold'
-        });
-        rightWallText.setRotation(Math.PI / 2);
-        rightWallText.setAlpha(0.5);
-        rightWallText.setDepth(-4);
-
-        // Initial camera center
-        this.cameras.main.setZoom(1); // Start at 1x
-        this.cameras.main.centerOn(960, 540);
-
+        // Camera exclusions
         if (this.uiCamera) {
+            this.uiCamera.ignore(stage.background);
             this.uiCamera.ignore(this.platforms);
             this.uiCamera.ignore(this.softPlatforms);
-            this.uiCamera.ignore(bg);
-            this.uiCamera.ignore(leftWall);
-            this.uiCamera.ignore(rightWall);
-            this.uiCamera.ignore(leftWallText);
-            this.uiCamera.ignore(rightWallText);
+            this.uiCamera.ignore(stage.wallVisuals);
+            this.uiCamera.ignore(stage.wallTexts);
         }
     }
 

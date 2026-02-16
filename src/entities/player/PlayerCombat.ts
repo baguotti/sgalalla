@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Player } from '../Player';
+import type { GameSceneInterface } from '../../scenes/GameSceneInterface';
 import { Fighter } from '../Fighter';
 import { Attack, AttackType, AttackDirection } from '../../combat/Attack';
 import { Hitbox } from '../../combat/Hitbox';
@@ -694,7 +695,7 @@ export class PlayerCombat {
                 this.debugDamageText.setDepth(100);
 
                 // Fix Double Render Glitch (Ignore in UI Camera)
-                const scene = this.scene as any;
+                const scene = this.scene as unknown as GameSceneInterface;
                 if (scene.uiCamera) {
                     scene.uiCamera.ignore(this.debugDamageText);
                 }
@@ -844,7 +845,7 @@ export class PlayerCombat {
         }
 
         // Fix Double Sprite Glitch (Ignore in UI Camera)
-        const scene = this.scene as any;
+        const scene = this.scene as unknown as GameSceneInterface;
         if (scene.uiCamera) {
             scene.uiCamera.ignore(ghost);
         }

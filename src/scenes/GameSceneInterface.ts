@@ -17,4 +17,7 @@ export interface GameSceneInterface extends Phaser.Scene {
 
     /** Active bombs in the scene (GameScene only; unused in OnlineGameScene) */
     bombs: Bomb[];
+
+    /** UI camera (separate from main game camera, used for HUD) */
+    uiCamera: Phaser.Cameras.Scene2D.Camera | null;
 }

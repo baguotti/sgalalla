@@ -8,6 +8,7 @@ import { Chest } from '../entities/Chest';
 import { charConfigs, ALL_CHARACTERS, ANIM_FRAME_RATES } from '../config/CharacterConfig';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
+import { createStage as createSharedStage } from '../stages/StageFactory';
 
 export class GameScene extends Phaser.Scene {
     // private player1!: Player;
@@ -515,100 +516,15 @@ export class GameScene extends Phaser.Scene {
     private wallRects: Phaser.Geom.Rectangle[] = [];
 
     private createStage(): void {
-        // Background Image (Adria)
-        this.backgroundImage = this.add.image(this.scale.width / 2, this.scale.height / 2, 'adria_bg');
-        // Scale to cover
-        const bg = this.backgroundImage;
-        const scaleX = this.scale.width / bg.width;
-        const scaleY = this.scale.height / bg.height;
-        const scale = Math.max(scaleX, scaleY);
-        bg.setScale(scale * 1.1).setScrollFactor(0.1);
-        bg.setDepth(-100);
+        const stage = createSharedStage(this);
 
-        // Main platform (centered, smaller)
-        // Center: 960. Width 1200. Y changed to extend to blast zone (930 height, y=1335)
-        // Top Y = 1335 - 465 = 870. Bottom Y = 1335 + 465 = 1800 (BLAST_ZONE_BOTTOM)
-        const mainPlatform = this.add.rectangle(960, 1335, 1200, 930, 0x2c3e50);
-        mainPlatform.setStrokeStyle(3, 0x3a506b);
-        this.platforms.push(mainPlatform);
-        // Add Matter body for Bomb collision
-        this.matter.add.gameObject(mainPlatform, { isStatic: true });
-
-        // Soft platform 1 (left, closer)
-        const softPlatform1 = this.add.rectangle(610, 500, 500, 30, 0x0f3460);
-        softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
-        softPlatform1.setAlpha(0.85);
-        this.softPlatforms.push(softPlatform1);
-        this.matter.add.gameObject(softPlatform1, { isStatic: true });
-
-        // Soft platform 2 (right, closer)
-        const softPlatform2 = this.add.rectangle(1310, 500, 500, 30, 0x0f3460);
-        softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
-        softPlatform2.setAlpha(0.85);
-        this.softPlatforms.push(softPlatform2);
-        this.matter.add.gameObject(softPlatform2, { isStatic: true });
-
-        // Camera Zoom
-        this.cameras.main.setZoom(1);
-        this.cameras.main.centerOn(960, 540);
-
-        // VISIBLE SIDE WALLS
-        const wallColor = 0x2a3a4e;
-        const wallStroke = 0x4a6a8e;
-
-        // Left wall visual (Shortened: Height 540, Y=560)
-        const leftWallVisual = this.add.rectangle(MapConfig.WALL_LEFT_X, 560, MapConfig.WALL_THICKNESS, 540, wallColor);
-        leftWallVisual.setStrokeStyle(4, wallStroke);
-        leftWallVisual.setAlpha(0.6);
-        leftWallVisual.setDepth(-5);
-        this.walls.push(leftWallVisual);
-
-        // Right wall visual (Shortened: Height 540, Y=560)
-        const rightWallVisual = this.add.rectangle(MapConfig.WALL_RIGHT_X, 560, MapConfig.WALL_THICKNESS, 540, wallColor);
-        rightWallVisual.setStrokeStyle(4, wallStroke);
-        rightWallVisual.setAlpha(0.6);
-        rightWallVisual.setDepth(-5);
-        this.walls.push(rightWallVisual);
-
-        // Define Wall Rects for Collision (Top-Left Y = 560 - 270 = 290)
-        this.wallRects = [
-            // Left Wall (x, y, w, h) - Phaser.Geom.Rectangle uses Top-Left Coords
-            new Phaser.Geom.Rectangle(MapConfig.WALL_LEFT_X - MapConfig.WALL_THICKNESS / 2, 290, MapConfig.WALL_THICKNESS, 540),
-            // Right Wall
-            new Phaser.Geom.Rectangle(MapConfig.WALL_RIGHT_X - MapConfig.WALL_THICKNESS / 2, 290, MapConfig.WALL_THICKNESS, 540),
-
-            // Main Platform Walls (For Wall Sliding on the deep floor)
-            // Left Face: x=360. Center wall on 360? Or just inside/outside?
-            // Detection bounds are +10px. If wall is at 360, player (width 120) at 300 (right=360) touches.
-            // Wall thickness 40. Left=360-20=340. Right=380.
-            // Player at 300 (right 360) -> Overlaps 340-360 range?
-            // Top Y = 870 + 20 (padding) = 890. Height = 1800 - 890 = 910.
-            new Phaser.Geom.Rectangle(360 - 20, 890, 40, 910), // Left Side of Main Plat
-            new Phaser.Geom.Rectangle(1560 - 20, 890, 40, 910) // Right Side of Main Plat
-        ];
-
-        // Add wall indicators (text labels)
-        const leftWallText = this.add.text(MapConfig.WALL_LEFT_X - 12, 375, 'WALL', {
-            fontSize: '18px',
-            color: '#8ab4f8',
-            fontFamily: '"Pixeloid Sans"',
-            fontStyle: 'bold'
-        });
-        leftWallText.setRotation(-Math.PI / 2);
-        leftWallText.setAlpha(0.5);
-        leftWallText.setDepth(-4);
-        this.wallTexts.push(leftWallText);
-
-        const rightWallText = this.add.text(MapConfig.WALL_RIGHT_X + 12, 525, 'WALL', {
-            fontSize: '18px',
-            color: '#8ab4f8',
-            fontFamily: '"Pixeloid Sans"',
-            fontStyle: 'bold'
-        });
-        rightWallText.setRotation(Math.PI / 2);
-        rightWallText.setAlpha(0.5);
-        rightWallText.setDepth(-4);
-        this.wallTexts.push(rightWallText);
+        // Store references
+        this.backgroundImage = stage.background;
+        this.platforms.push(stage.mainPlatform);
+        this.softPlatforms.push(...stage.softPlatforms);
+        this.walls.push(...stage.wallVisuals);
+        this.wallRects = stage.wallCollisionRects;
+        this.wallTexts.push(...stage.wallTexts);
 
         // Update camera exclusions now that stage is created
         this.configureCameraExclusions();

@@ -1,8 +1,6 @@
 # Sgalalla - Development Log
 
-**Total Time Logged:** 12.0 Hours
-
----
+Part 2
 
 ### [2026-02-16] v0.12.0 - Refactoring & Technical Debt Cleanup
 - **[V]** `v0.12.0`
