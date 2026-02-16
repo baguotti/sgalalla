@@ -124,7 +124,8 @@ export class PlayerHudSlot {
         let frame: string | undefined = undefined;
 
         // Standardized Icon Retrieval for Fok and Sgu
-        if (['fok', 'sgu', 'sga'].includes(character.toLowerCase())) {
+        // Standardized Icon Retrieval for Fok and Sgu
+        if (['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'].includes(character.toLowerCase())) {
             texture = character.toLowerCase(); // Texture key is 'fok', 'sgu'
             frame = `00_${character.toLowerCase()}_icon`;
         } else {

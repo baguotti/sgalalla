@@ -4,6 +4,12 @@
 
 ---
 
+### [2026-02-16] v0.11.8 - Debug Cleanup & Codebase Audit
+- **[V]** `v0.11.8`
+- **[Fix]** **Debug UI**: Removed persistent "Pre-Alpha Build" version text from `GameScene` overlay.
+- **[Audit]** **Codebase Review**: Conducted deep audit of `GameScene`, `OnlineGameScene`, `Player`, and `NetworkManager`. Identified key refactoring targets (Logic Duplication, Magic Numbers).
+- **[Refactor]** **Dead Code**: Identified multiple unused variables and commented-out blocks for future cleanup.
+- **[S]** **STATUS**: Debug overlay cleaner; Audit complete.
 
 
 ### [2026-02-15] v0.11.6 - Sga Implementation & Fixes

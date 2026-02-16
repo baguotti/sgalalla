@@ -34,7 +34,7 @@ export class GameScene extends Phaser.Scene {
 
 
     // Wall configuration
-    private readonly VERSION = 'v0.11.6';
+    private readonly VERSION = 'v0.11.8';
     private readonly WALL_THICKNESS = 45;
     private readonly WALL_LEFT_X = 0; // Refinement 14: Pushed out to 0 (Was 200)
     private readonly WALL_RIGHT_X = 1920; // Refinement 14: Pushed out to 1920 (Was 1720)
@@ -241,10 +241,124 @@ export class GameScene extends Phaser.Scene {
                 fall: { prefix: 'sga_fall_', count: 1, suffix: '000', loop: false },
                 jump: { prefix: 'sga_jump_', count: 1, suffix: '000', loop: false },
                 slide: { prefix: 'sga_dodge_', count: 1, suffix: '000', loop: false }
+            },
+            'pe': {
+                idle: { prefix: 'pe_idle_', count: 17, loop: true },
+                run: { prefix: 'pe_run_', count: 9, loop: true },
+                charging: { prefix: 'pe_charge_', count: 2, loop: true },
+
+                // Dash
+                dash: { prefix: 'pe_dash_', count: 1, suffix: '000', loop: false },
+
+                // Spot Dodge
+                spot_dodge: { prefix: 'pe_dodge_', count: 1, suffix: '000', loop: false },
+
+                // --- LIGHT ATTACKS ---
+                attack_light_neutral: { prefix: 'pe_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side: { prefix: 'pe_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'pe_side_air_', count: 1, suffix: '000', loop: false },
+                attack_light_run: { prefix: 'pe_side_run_', count: 1, suffix: '000', loop: false },
+
+                attack_light_down: { prefix: 'pe_down_light_', count: 1, suffix: '000', loop: false },
+
+                attack_light_up: { prefix: 'pe_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_up_air: { prefix: 'pe_side_air_', count: 1, suffix: '000', loop: false },
+
+                // --- HEAVY ATTACKS (SIGS) ---
+                attack_heavy_neutral: { prefix: 'pe_up_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_side: { prefix: 'pe_side_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_down: { prefix: 'pe_side_sig_', count: 1, suffix: '000', loop: false },
+
+                // Utilities
+                wall_slide: { prefix: 'pe_wall_slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'pe_recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'pe_ground_pound_', count: 1, suffix: '000', loop: false },
+
+                // Hurt/Fall/Jump/Slide
+                hurt: { prefix: 'pe_hurt_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'pe_fall_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'pe_jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'pe_dodge_', count: 1, suffix: '000', loop: false }
+            },
+            'nock': {
+                idle: { prefix: 'nock_idle_', count: 17, loop: true },
+                run: { prefix: 'nick_run_', count: 9, loop: true }, // Special case: nick_run
+                charging: { prefix: 'nock_charge_', count: 2, loop: true },
+
+                // Dash
+                dash: { prefix: 'nock_dash_', count: 1, suffix: '000', loop: false },
+
+                // Spot Dodge
+                spot_dodge: { prefix: 'nock_dodge_', count: 1, suffix: '000', loop: false },
+
+                // --- LIGHT ATTACKS ---
+                attack_light_neutral: { prefix: 'nock_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side: { prefix: 'nock_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'nock_side_air_', count: 1, suffix: '000', loop: false },
+                attack_light_run: { prefix: 'nock_side_run_', count: 1, suffix: '000', loop: false },
+
+                attack_light_down: { prefix: 'nock_down_light_', count: 1, suffix: '000', loop: false },
+
+                attack_light_up: { prefix: 'nock_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_up_air: { prefix: 'nock_side_air_', count: 1, suffix: '000', loop: false },
+
+                // --- HEAVY ATTACKS (SIGS) ---
+                attack_heavy_neutral: { prefix: 'nock_up_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_side: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_down: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
+
+                // Utilities
+                wall_slide: { prefix: 'nock_wall_slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'nock_recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'nock_ground_pound_', count: 1, suffix: '000', loop: false },
+
+                // Hurt/Fall/Jump/Slide
+                hurt: { prefix: 'nock_hurt_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'nock_fall_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'nock_jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'nock_dodge_', count: 1, suffix: '000', loop: false }
+            },
+            'greg': {
+                idle: { prefix: 'greg_idle_', count: 17, loop: true },
+                run: { prefix: 'greg_run_', count: 9, loop: true },
+                charging: { prefix: 'greg_charge_', count: 2, loop: true },
+
+                // Dash
+                dash: { prefix: 'greg_dash_', count: 1, suffix: '000', loop: false },
+
+                // Spot Dodge
+                spot_dodge: { prefix: 'greg_dodge_', count: 1, suffix: '000', loop: false },
+
+                // --- LIGHT ATTACKS ---
+                attack_light_neutral: { prefix: 'greg_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side: { prefix: 'greg_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_side_air: { prefix: 'greg_side_air_', count: 1, suffix: '000', loop: false },
+                attack_light_run: { prefix: 'greg_side_run_', count: 1, suffix: '000', loop: false },
+
+                attack_light_down: { prefix: 'greg_down_light_', count: 1, suffix: '000', loop: false },
+
+                attack_light_up: { prefix: 'greg_side_light_', count: 1, suffix: '000', loop: false },
+                attack_light_up_air: { prefix: 'greg_side_air_', count: 1, suffix: '000', loop: false },
+
+                // --- HEAVY ATTACKS (SIGS) ---
+                attack_heavy_neutral: { prefix: 'greg_up_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_side: { prefix: 'greg_side_sig_', count: 1, suffix: '000', loop: false },
+                attack_heavy_down: { prefix: 'greg_side_sig_', count: 1, suffix: '000', loop: false },
+
+                // Utilities
+                wall_slide: { prefix: 'greg_wall_slide_', count: 1, suffix: '000', loop: false },
+                recovery: { prefix: 'greg_recovery_', count: 1, suffix: '000', loop: false },
+                ground_pound: { prefix: 'greg_ground_pound_', count: 1, suffix: '000', loop: false },
+
+                // Hurt/Fall/Jump/Slide
+                hurt: { prefix: 'greg_hurt_', count: 1, suffix: '000', loop: false },
+                fall: { prefix: 'greg_fall_', count: 1, suffix: '000', loop: false },
+                jump: { prefix: 'greg_jump_', count: 1, suffix: '000', loop: false },
+                slide: { prefix: 'greg_dodge_', count: 1, suffix: '000', loop: false }
             }
         };
 
-        const characters = ['fok', 'sgu', 'sga'];
+        const characters = ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'];
 
         characters.forEach(char => {
             const config = charConfigs[char as keyof typeof charConfigs];
@@ -959,8 +1073,7 @@ export class GameScene extends Phaser.Scene {
                     displayPlayer.getState(),
                     displayPlayer.getRecoveryAvailable(),
                     attackInfo,
-                    displayPlayer.isGamepadConnected(),
-                    0 // Ping (Offline)
+                    displayPlayer.isGamepadConnected()
                 );
                 this.debugOverlay.setVisible(true);
             } else {
@@ -1014,9 +1127,9 @@ export class GameScene extends Phaser.Scene {
         this.players.forEach(p => checkPlayer(p, p.playerId));
 
         // Debug Text
-        this.debugText = this.add.text(10, 10, `Debug: ${this.VERSION}`, { font: '16px "Pixeloid Sans"', color: '#00ff00' });
-        this.debugText.setScrollFactor(0);
-        this.debugText.setDepth(1000);
+        // this.debugText = this.add.text(10, 10, `Debug: ${this.VERSION}`, { font: '16px "Pixeloid Sans"', color: '#00ff00' });
+        // this.debugText.setScrollFactor(0);
+        // this.debugText.setDepth(1000);
     }
 
     private respawnPlayer(player: Player, playerId: number): void {
