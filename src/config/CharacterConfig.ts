@@ -59,12 +59,15 @@ export const charConfigs: Record<string, CharacterAnimations> = {
         slide: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false }
     },
     'sgu': {
-        idle: { prefix: 'sgu_idle_', count: 17, loop: true },
-        run: { prefix: 'sgu_run__', count: 9, loop: true },
+        idle: { prefix: 'sgu_idle_', count: 12, loop: true },
+        run: { prefix: 'sgu_run_', count: 9, loop: true },
         charging: { prefix: 'sgu_charge_', count: 2, loop: true },
 
         dash: { prefix: 'sgu_dash_', count: 1, suffix: '000', loop: false },
         spot_dodge: { prefix: 'sgu_dodge_', count: 1, suffix: '000', loop: false },
+
+        // Side Sig Ghost
+        side_sig_ghost: { prefix: 'sgu_side_sig_ghost_', count: 3, loop: false },
 
         // --- LIGHT ATTACKS ---
         attack_light_neutral: { prefix: 'sgu_side_light_', count: 1, suffix: '000', loop: false },
@@ -97,6 +100,9 @@ export const charConfigs: Record<string, CharacterAnimations> = {
 
         dash: { prefix: 'sga_dash_', count: 1, suffix: '000', loop: false },
         spot_dodge: { prefix: 'sga_dodge_', count: 1, suffix: '000', loop: false },
+
+        // Side Sig Ghost
+        side_sig_ghost: { prefix: 'sga_side_sig_ghost_', count: 2, loop: true },
 
         // --- LIGHT ATTACKS ---
         attack_light_neutral: { prefix: 'sga_side_light_', count: 1, suffix: '000', loop: false },

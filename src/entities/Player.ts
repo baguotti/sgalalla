@@ -187,9 +187,8 @@ export class Player extends Fighter {
         this.character = config.character || 'fok'; // Default is fok
         this.animPrefix = this.character;
 
-        // Create player sprite
-        // Update initial frame to match new atlas: fok_idle_000
-        let startFrame = 'fok_idle_000';
+        // Create player sprite — use character-specific idle frame
+        const startFrame = `${this.character}_idle_000`;
 
         this.sprite = scene.add.sprite(0, 7, this.character, startFrame); // Adjusted offset (7) to ground sprite after height increase
 

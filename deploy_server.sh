@@ -15,7 +15,9 @@ cd sgalalla
 
 # Pull latest changes
 echo "⬇️ Pulling latest changes from git..."
+git stash
 git pull
+
 
 # Install dependencies if package.json changed
 echo "📦 Installing server dependencies..."

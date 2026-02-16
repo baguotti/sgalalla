@@ -50,3 +50,17 @@ Part 2
 - **[Fix]** **Stability**:
     - **Bomb Logic**: Fixed potential crashes in `OnlineGameScene` due to data structure mismatches.
     - **Collision**: Fixed `Chest` collision logic to safely identify players.
+
+---
+
+### [2026-02-16] v0.12.4 - Asset Pipeline & Character Integrity
+- **[V]** `v0.12.4`
+- **[Feature]** **Asset Pipeline**:
+    - **Atlas Generation**: Implemented `pack_sgu.cjs` and `pack_pe.cjs` to generate optimized texture atlases.
+    - **Format**: Standardized on Phaser 3 Array Format (`{ textures: [ ... ] }`).
+- **[Fix]** **Sgu Character**:
+    - **Idle Animation**: Fixed "Ghost Raccoon" glitch by correcting atlas frame count (11 -> 12).
+    - **Integrity**: Refactored `LobbyScene.ts` to use `CharacterConfig.ts` as single source of truth.
+- **[WIP]** **Pe Character**:
+    - **Integration**: Generated new atlas with 43 frames (Idle, Run, Attacks).
+    - **Status**: Idle works. Run/Ghost animations pending debug.

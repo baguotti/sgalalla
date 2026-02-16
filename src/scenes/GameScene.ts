@@ -41,10 +41,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
 
     // Wall configuration
-    private readonly VERSION = 'v0.12.2';
 
     public uiCamera!: Phaser.Cameras.Scene2D.Camera;
-    private debugText!: Phaser.GameObjects.Text; // Added compilation fix
 
     // Camera Settings
     private currentZoomLevel: ZoomLevel = 'CLOSE';
@@ -70,6 +68,16 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     private loadCharacterAssets(): void {
         this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
+
+        // Sgu Ghost Frames (Standalone)
+        // NOTE: These are now in the 'sgu' atlas.
+
+        // Greg Run Frames (Standalone - Atlas Missing)
+        ['greg'].forEach(char => {
+            for (let i = 0; i <= 8; i++) {
+                this.load.image(`${char}_run_00${i}`, `assets/${char}/${char}_run_00${i}.png`);
+            }
+        });
 
 
         // Load Maps
@@ -104,7 +112,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 if (this.anims.exists(animKey)) return;
 
                 let frames;
-                if (animData.count === 1 && animData.suffix) {
+                // Special handling for Sgu Ghost (Standalone Frames)
+                if (animName === 'run' && ['greg', 'pe'].includes(char)) {
+                    // Greg/Pe/Sga Run (Standalone Frames)
+                    frames = [];
+                    for (let i = 0; i <= 8; i++) {
+                        frames.push({ key: `${char}_run_00${i}` });
+                    }
+                } else if (animData.count === 1 && animData.suffix) {
                     frames = this.anims.generateFrameNames(char, {
                         prefix: animData.prefix,
                         start: parseInt(animData.suffix),
@@ -126,6 +141,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     frameRate: animName === 'run' ? ANIM_FRAME_RATES.RUN : ANIM_FRAME_RATES.DEFAULT,
                     repeat: animData.loop ? -1 : 0
                 });
+
+
+                if (char === 'pe') {
+                    // Debug logging removed
+                }
             });
 
             // Special cases / Extra mappings to ensure all keys exist

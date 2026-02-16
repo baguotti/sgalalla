@@ -158,6 +158,12 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
         this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
 
+        // Greg Run Frames (Standalone - Atlas Missing)
+        ['greg'].forEach(char => {
+            for (let i = 0; i <= 8; i++) {
+                this.load.image(`${char}_run_00${i}`, `assets/${char}/${char}_run_00${i}.png`);
+            }
+        });
 
         // Preload scrin images for chest opening
         const scrinFiles = [
@@ -188,7 +194,13 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 if (this.anims.exists(animKey)) return;
 
                 let frames;
-                if (animData.count === 1 && animData.suffix) {
+                if (animName === 'run' && ['greg', 'pe'].includes(char)) {
+                    // Greg/Pe Run (Standalone Frames)
+                    frames = [];
+                    for (let i = 0; i <= 8; i++) {
+                        frames.push({ key: `${char}_run_00${i}` });
+                    }
+                } else if (animData.count === 1 && animData.suffix) {
                     frames = this.anims.generateFrameNames(char, {
                         prefix: animData.prefix,
                         start: parseInt(animData.suffix),

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SMASH_COLORS } from '../ui/PlayerHUD';
+import { charConfigs } from '../config/CharacterConfig';
 
 type CharacterType = 'fok' | 'dummy';
 
@@ -316,18 +317,10 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private ensureIdleAnimations(): void {
-        const animConfigs: Record<string, { prefix: string; count: number }> = {
-            'fok': { prefix: 'fok_idle_', count: 12 },
-            'sgu': { prefix: 'sgu_idle_', count: 17 },
-            'sga': { prefix: 'sga_idle_', count: 15 },
-            'pe': { prefix: 'pe_idle_', count: 17 },
-            'nock': { prefix: 'nock_idle_', count: 17 },
-            'greg': { prefix: 'greg_idle_', count: 17 },
-        };
-
-        for (const [charKey, cfg] of Object.entries(animConfigs)) {
+        for (const [charKey, config] of Object.entries(charConfigs)) {
             const animKey = `${charKey}_idle`;
-            if (!this.anims.exists(animKey)) {
+            if (!this.anims.exists(animKey) && config.idle) {
+                const cfg = config.idle;
                 const frames: { key: string; frame: string }[] = [];
                 for (let f = 0; f < cfg.count; f++) {
                     frames.push({ key: charKey, frame: `${cfg.prefix}${String(f).padStart(3, '0')}` });

@@ -158,12 +158,9 @@ export class PlayerCombat {
             // Any light attack while running OR moving fast (Dash Attack)
             const isRunSpeed = Math.abs(this.player.velocity.x) > PhysicsConfig.MAX_SPEED * 0.8;
             if ((this.player.physics.isRunning || isRunSpeed) && this.player.isGrounded) {
-                if (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga') {
-                    // Use new Running Light Attack
-                    this.startAttack('light_run_grounded');
-                    return;
-                }
-                direction = AttackDirection.DOWN;
+                // Use new Running Light Attack for all characters (Assets Verified)
+                this.startAttack('light_run_grounded');
+                return;
             }
 
             const isAerial = !this.player.isGrounded;
@@ -307,7 +304,7 @@ export class PlayerCombat {
             // Side Sig Ghost: Spawn immediately so remote players see it
             if (this.currentAttack.data.type === AttackType.HEAVY &&
                 this.currentAttack.data.direction === AttackDirection.SIDE &&
-                this.player.character === 'fok') {
+                (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga')) {
                 this.updateGhostEffect();
             }
 
@@ -508,10 +505,10 @@ export class PlayerCombat {
             this.deactivateHitbox();
         }
 
-        // Side Sig Ghost Effect (Fok only)
+        // Side Sig Ghost Effect (Fok & Sgu)
         if (this.currentAttack.data.type === AttackType.HEAVY &&
             this.currentAttack.data.direction === AttackDirection.SIDE &&
-            this.player.character === 'fok') {
+            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga')) {
 
             this.updateGhostEffect();
         } else {
@@ -628,11 +625,11 @@ export class PlayerCombat {
         let hitboxX = this.player.x + offset.x;
         let hitboxY = this.player.y + offset.y;
 
-        // Custom Override for Side Sig Ghost (Fok)
+        // Custom Override for Side Sig Ghost (Fok & Sgu)
         // Hitbox must follow the ghost sprite
         if (this.currentAttack.data.type === AttackType.HEAVY &&
             this.currentAttack.data.direction === AttackDirection.SIDE &&
-            this.player.character === 'fok' &&
+            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga') &&
             this.ghostSprite && this.ghostSprite.active) {
 
             // Override position to match ghost
@@ -658,9 +655,9 @@ export class PlayerCombat {
         if (this.currentAttack) {
             let damage = this.currentAttack.data.damage;
 
-            // Side Sig Damage Scaling (Fok)
+            // Side Sig Damage Scaling (Fok & Sgu)
             // Min 6 -> Max 20 based on charge
-            if (this.player.character === 'fok' &&
+            if ((this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga') &&
                 this.currentAttack.data.type === AttackType.HEAVY &&
                 this.currentAttack.data.direction === AttackDirection.SIDE) {
 
@@ -838,12 +835,20 @@ export class PlayerCombat {
         if (this.hasSpawnedGhost) return;
 
         const facing = this.player.getFacingDirection();
+        const char = this.player.character; // 'fok' or 'sgu'
 
         // Create Ghost Sprite
-        // Use 'fok' atlas and the first frame of the ghost animation
-        const ghost = this.scene.add.sprite(this.player.x, this.player.y, 'fok', 'fok_side_sig_ghost_000');
+        // Use character atlas (Fok, Sgu, Sga)
+        const initialFrame = `${char}_side_sig_ghost_000`;
+        const animKey = `${char}_side_sig_ghost`;
+
+        let ghost: Phaser.GameObjects.Sprite;
+
+        // All characters now use atlas
+        ghost = this.scene.add.sprite(this.player.x, this.player.y, char, initialFrame);
+
         ghost.setDepth(this.player.depth - 1); // Behind player
-        ghost.play('fok_side_sig_ghost');
+        ghost.play(animKey);
         // Faint glow effect (Diffused White)
         let glowFx: Phaser.FX.Glow | null = null;
         if (ghost.preFX) {

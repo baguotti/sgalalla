@@ -1,11 +1,11 @@
 {
 	"textures": [
 		{
-			"image": "sgu_2",
+			"image": "sgu",
 			"format": "RGBA8888",
 			"size": {
-				"w": 634,
-				"h": 2048
+				"w": 746,
+				"h": 1969
 			},
 			"scale": 1,
 			"frames": [
@@ -24,8 +24,8 @@
 						"h": 241
 					},
 					"frame": {
-						"x": 2,
-						"y": 2,
+						"x": 3,
+						"y": 3,
 						"w": 228,
 						"h": 241
 					}
@@ -45,8 +45,8 @@
 						"h": 200
 					},
 					"frame": {
-						"x": 2,
-						"y": 247,
+						"x": 3,
+						"y": 250,
 						"w": 106,
 						"h": 200
 					}
@@ -66,8 +66,8 @@
 						"h": 195
 					},
 					"frame": {
-						"x": 2,
-						"y": 451,
+						"x": 3,
+						"y": 456,
 						"w": 118,
 						"h": 195
 					}
@@ -87,31 +87,10 @@
 						"h": 190
 					},
 					"frame": {
-						"x": 112,
-						"y": 247,
+						"x": 115,
+						"y": 250,
 						"w": 82,
 						"h": 190
-					}
-				},
-				{
-					"filename": "sgu_dodge_000",
-					"rotated": false,
-					"trimmed": true,
-					"sourceSize": {
-						"w": 256,
-						"h": 256
-					},
-					"spriteSourceSize": {
-						"x": 81,
-						"y": 35,
-						"w": 105,
-						"h": 188
-					},
-					"frame": {
-						"x": 2,
-						"y": 650,
-						"w": 105,
-						"h": 188
 					}
 				},
 				{
@@ -129,8 +108,8 @@
 						"h": 187
 					},
 					"frame": {
-						"x": 2,
-						"y": 842,
+						"x": 3,
+						"y": 657,
 						"w": 141,
 						"h": 187
 					}
@@ -150,8 +129,8 @@
 						"h": 184
 					},
 					"frame": {
-						"x": 111,
-						"y": 650,
+						"x": 127,
+						"y": 446,
 						"w": 158,
 						"h": 184
 					}
@@ -171,8 +150,8 @@
 						"h": 184
 					},
 					"frame": {
-						"x": 124,
-						"y": 441,
+						"x": 203,
+						"y": 250,
 						"w": 126,
 						"h": 184
 					}
@@ -192,8 +171,8 @@
 						"h": 183
 					},
 					"frame": {
-						"x": 198,
-						"y": 247,
+						"x": 291,
+						"y": 3,
 						"w": 83,
 						"h": 183
 					}
@@ -213,8 +192,8 @@
 						"h": 183
 					},
 					"frame": {
-						"x": 254,
-						"y": 434,
+						"x": 335,
+						"y": 192,
 						"w": 83,
 						"h": 183
 					}
@@ -234,8 +213,8 @@
 						"h": 183
 					},
 					"frame": {
-						"x": 234,
-						"y": 2,
+						"x": 380,
+						"y": 3,
 						"w": 83,
 						"h": 183
 					}
@@ -255,8 +234,8 @@
 						"h": 181
 					},
 					"frame": {
-						"x": 285,
-						"y": 189,
+						"x": 3,
+						"y": 850,
 						"w": 142,
 						"h": 181
 					}
@@ -276,8 +255,8 @@
 						"h": 181
 					},
 					"frame": {
-						"x": 321,
-						"y": 2,
+						"x": 150,
+						"y": 636,
 						"w": 108,
 						"h": 181
 					}
@@ -297,8 +276,8 @@
 						"h": 181
 					},
 					"frame": {
-						"x": 2,
-						"y": 1033,
+						"x": 3,
+						"y": 1037,
 						"w": 105,
 						"h": 181
 					}
@@ -318,8 +297,8 @@
 						"h": 181
 					},
 					"frame": {
-						"x": 2,
-						"y": 1218,
+						"x": 3,
+						"y": 1224,
 						"w": 83,
 						"h": 181
 					}
@@ -339,8 +318,8 @@
 						"h": 181
 					},
 					"frame": {
-						"x": 2,
-						"y": 1403,
+						"x": 3,
+						"y": 1411,
 						"w": 83,
 						"h": 181
 					}
@@ -360,8 +339,8 @@
 						"h": 181
 					},
 					"frame": {
-						"x": 2,
-						"y": 1588,
+						"x": 3,
+						"y": 1598,
 						"w": 83,
 						"h": 181
 					}
@@ -381,8 +360,8 @@
 						"h": 181
 					},
 					"frame": {
-						"x": 2,
-						"y": 1773,
+						"x": 3,
+						"y": 1785,
 						"w": 83,
 						"h": 181
 					}
@@ -402,8 +381,8 @@
 						"h": 181
 					},
 					"frame": {
-						"x": 89,
-						"y": 1218,
+						"x": 92,
+						"y": 1224,
 						"w": 83,
 						"h": 181
 					}
@@ -418,15 +397,15 @@
 					},
 					"spriteSourceSize": {
 						"x": 87,
-						"y": 44,
+						"y": 43,
 						"w": 83,
-						"h": 180
+						"h": 181
 					},
 					"frame": {
-						"x": 111,
-						"y": 1033,
+						"x": 114,
+						"y": 1037,
 						"w": 83,
-						"h": 180
+						"h": 181
 					}
 				},
 				{
@@ -439,15 +418,15 @@
 					},
 					"spriteSourceSize": {
 						"x": 87,
-						"y": 44,
+						"y": 43,
 						"w": 83,
-						"h": 180
+						"h": 181
 					},
 					"frame": {
-						"x": 176,
-						"y": 838,
+						"x": 181,
+						"y": 823,
 						"w": 83,
-						"h": 180
+						"h": 181
 					}
 				},
 				{
@@ -460,19 +439,19 @@
 					},
 					"spriteSourceSize": {
 						"x": 87,
-						"y": 44,
+						"y": 43,
 						"w": 83,
-						"h": 180
+						"h": 181
 					},
 					"frame": {
-						"x": 198,
-						"y": 1022,
+						"x": 264,
+						"y": 636,
 						"w": 83,
-						"h": 180
+						"h": 181
 					}
 				},
 				{
-					"filename": "sgu_idle_011",
+					"filename": "sgu_dodge_000",
 					"rotated": false,
 					"trimmed": true,
 					"sourceSize": {
@@ -480,125 +459,20 @@
 						"h": 256
 					},
 					"spriteSourceSize": {
-						"x": 87,
+						"x": 83,
 						"y": 44,
-						"w": 83,
+						"w": 101,
 						"h": 180
 					},
 					"frame": {
-						"x": 263,
-						"y": 838,
-						"w": 83,
+						"x": 291,
+						"y": 440,
+						"w": 101,
 						"h": 180
 					}
 				},
 				{
-					"filename": "sgu_idle_012",
-					"rotated": false,
-					"trimmed": true,
-					"sourceSize": {
-						"w": 256,
-						"h": 256
-					},
-					"spriteSourceSize": {
-						"x": 87,
-						"y": 44,
-						"w": 83,
-						"h": 180
-					},
-					"frame": {
-						"x": 273,
-						"y": 621,
-						"w": 83,
-						"h": 180
-					}
-				},
-				{
-					"filename": "sgu_idle_013",
-					"rotated": false,
-					"trimmed": true,
-					"sourceSize": {
-						"w": 256,
-						"h": 256
-					},
-					"spriteSourceSize": {
-						"x": 87,
-						"y": 44,
-						"w": 83,
-						"h": 180
-					},
-					"frame": {
-						"x": 350,
-						"y": 374,
-						"w": 83,
-						"h": 180
-					}
-				},
-				{
-					"filename": "sgu_idle_014",
-					"rotated": false,
-					"trimmed": true,
-					"sourceSize": {
-						"w": 256,
-						"h": 256
-					},
-					"spriteSourceSize": {
-						"x": 87,
-						"y": 44,
-						"w": 83,
-						"h": 180
-					},
-					"frame": {
-						"x": 431,
-						"y": 187,
-						"w": 83,
-						"h": 180
-					}
-				},
-				{
-					"filename": "sgu_idle_015",
-					"rotated": false,
-					"trimmed": true,
-					"sourceSize": {
-						"w": 256,
-						"h": 256
-					},
-					"spriteSourceSize": {
-						"x": 87,
-						"y": 44,
-						"w": 83,
-						"h": 180
-					},
-					"frame": {
-						"x": 437,
-						"y": 2,
-						"w": 83,
-						"h": 180
-					}
-				},
-				{
-					"filename": "sgu_idle_016",
-					"rotated": false,
-					"trimmed": true,
-					"sourceSize": {
-						"w": 256,
-						"h": 256
-					},
-					"spriteSourceSize": {
-						"x": 87,
-						"y": 44,
-						"w": 83,
-						"h": 180
-					},
-					"frame": {
-						"x": 524,
-						"y": 2,
-						"w": 83,
-						"h": 180
-					}
-				},
-				{
-					"filename": "sgu_run__002",
+					"filename": "sgu_run_002",
 					"rotated": false,
 					"trimmed": true,
 					"sourceSize": {
@@ -612,14 +486,14 @@
 						"h": 177
 					},
 					"frame": {
-						"x": 89,
-						"y": 1403,
+						"x": 92,
+						"y": 1411,
 						"w": 115,
 						"h": 177
 					}
 				},
 				{
-					"filename": "sgu_run__000",
+					"filename": "sgu_run_000",
 					"rotated": false,
 					"trimmed": true,
 					"sourceSize": {
@@ -633,14 +507,14 @@
 						"h": 177
 					},
 					"frame": {
-						"x": 176,
-						"y": 1217,
+						"x": 181,
+						"y": 1224,
 						"w": 105,
 						"h": 177
 					}
 				},
 				{
-					"filename": "sgu_run__005",
+					"filename": "sgu_run_005",
 					"rotated": false,
 					"trimmed": true,
 					"sourceSize": {
@@ -654,8 +528,8 @@
 						"h": 177
 					},
 					"frame": {
-						"x": 89,
-						"y": 1584,
+						"x": 213,
+						"y": 1010,
 						"w": 105,
 						"h": 177
 					}
@@ -675,8 +549,8 @@
 						"h": 176
 					},
 					"frame": {
-						"x": 89,
-						"y": 1765,
+						"x": 292,
+						"y": 823,
 						"w": 115,
 						"h": 176
 					}
@@ -696,8 +570,8 @@
 						"h": 176
 					},
 					"frame": {
-						"x": 198,
-						"y": 1584,
+						"x": 353,
+						"y": 626,
 						"w": 114,
 						"h": 176
 					}
@@ -717,14 +591,14 @@
 						"h": 175
 					},
 					"frame": {
-						"x": 208,
-						"y": 1398,
+						"x": 413,
+						"y": 381,
 						"w": 149,
 						"h": 175
 					}
 				},
 				{
-					"filename": "sgu_run__007",
+					"filename": "sgu_run_007",
 					"rotated": false,
 					"trimmed": true,
 					"sourceSize": {
@@ -738,14 +612,14 @@
 						"h": 175
 					},
 					"frame": {
-						"x": 208,
-						"y": 1764,
+						"x": 424,
+						"y": 192,
 						"w": 110,
 						"h": 175
 					}
 				},
 				{
-					"filename": "sgu_run__004",
+					"filename": "sgu_run_004",
 					"rotated": false,
 					"trimmed": true,
 					"sourceSize": {
@@ -759,14 +633,14 @@
 						"h": 175
 					},
 					"frame": {
-						"x": 316,
-						"y": 1577,
+						"x": 473,
+						"y": 3,
 						"w": 84,
 						"h": 175
 					}
 				},
 				{
-					"filename": "sgu_run__008",
+					"filename": "sgu_run_008",
 					"rotated": false,
 					"trimmed": true,
 					"sourceSize": {
@@ -780,14 +654,14 @@
 						"h": 173
 					},
 					"frame": {
-						"x": 322,
-						"y": 1756,
+						"x": 563,
+						"y": 3,
 						"w": 95,
 						"h": 173
 					}
 				},
 				{
-					"filename": "sgu_run__003",
+					"filename": "sgu_run_003",
 					"rotated": false,
 					"trimmed": true,
 					"sourceSize": {
@@ -801,35 +675,14 @@
 						"h": 170
 					},
 					"frame": {
-						"x": 421,
-						"y": 1756,
+						"x": 540,
+						"y": 184,
 						"w": 88,
 						"h": 170
 					}
 				},
 				{
-					"filename": "sgu_down_light_000",
-					"rotated": false,
-					"trimmed": true,
-					"sourceSize": {
-						"w": 256,
-						"h": 256
-					},
-					"spriteSourceSize": {
-						"x": 68,
-						"y": 104,
-						"w": 155,
-						"h": 116
-					},
-					"frame": {
-						"x": 421,
-						"y": 1930,
-						"w": 155,
-						"h": 116
-					}
-				},
-				{
-					"filename": "sgu_run__006",
+					"filename": "sgu_run_006",
 					"rotated": false,
 					"trimmed": true,
 					"sourceSize": {
@@ -843,14 +696,14 @@
 						"h": 168
 					},
 					"frame": {
-						"x": 513,
-						"y": 1756,
+						"x": 92,
+						"y": 1594,
 						"w": 119,
 						"h": 168
 					}
 				},
 				{
-					"filename": "sgu_run__001",
+					"filename": "sgu_run_001",
 					"rotated": false,
 					"trimmed": true,
 					"sourceSize": {
@@ -864,8 +717,8 @@
 						"h": 168
 					},
 					"frame": {
-						"x": 285,
-						"y": 1022,
+						"x": 213,
+						"y": 1407,
 						"w": 116,
 						"h": 168
 					}
@@ -885,8 +738,8 @@
 						"h": 167
 					},
 					"frame": {
-						"x": 285,
-						"y": 1194,
+						"x": 292,
+						"y": 1193,
 						"w": 136,
 						"h": 167
 					}
@@ -906,10 +759,115 @@
 						"h": 158
 					},
 					"frame": {
-						"x": 361,
-						"y": 1365,
+						"x": 335,
+						"y": 1005,
 						"w": 143,
 						"h": 158
+					}
+				},
+				{
+					"filename": "sgu_side_sig_ghost_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 45,
+						"y": 50,
+						"w": 176,
+						"h": 157
+					},
+					"frame": {
+						"x": 484,
+						"y": 1005,
+						"w": 176,
+						"h": 157
+					}
+				},
+				{
+					"filename": "sgu_side_sig_ghost_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 83,
+						"y": 60,
+						"w": 117,
+						"h": 143
+					},
+					"frame": {
+						"x": 413,
+						"y": 808,
+						"w": 117,
+						"h": 143
+					}
+				},
+				{
+					"filename": "sgu_side_sig_ghost_002",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 70,
+						"w": 207,
+						"h": 128
+					},
+					"frame": {
+						"x": 536,
+						"y": 808,
+						"w": 207,
+						"h": 128
+					}
+				},
+				{
+					"filename": "sgu_down_light_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 68,
+						"y": 104,
+						"w": 155,
+						"h": 116
+					},
+					"frame": {
+						"x": 473,
+						"y": 562,
+						"w": 155,
+						"h": 116
+					}
+				},
+				{
+					"filename": "sgu_idle_011",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 87,
+						"y": 43,
+						"w": 83,
+						"h": 181
+					},
+					"frame": {
+						"x": 264,
+						"y": 636,
+						"w": 83,
+						"h": 181
 					}
 				}
 			]
