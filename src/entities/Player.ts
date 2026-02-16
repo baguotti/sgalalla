@@ -3,6 +3,7 @@ import { PhysicsConfig } from '../config/PhysicsConfig';
 
 import { InputManager } from '../input/InputManager';
 import type { InputState } from '../input/InputManager';
+import { InputBuffer } from '../input/InputBuffer';
 import { Fighter } from './Fighter';
 import { PlayerPhysics } from './player/PlayerPhysics';
 import { PlayerCombat } from './player/PlayerCombat';
@@ -59,6 +60,7 @@ export class Player extends Fighter {
     // Unified input system (keyboard + gamepad)
     private inputManager!: InputManager;
     private currentInput!: InputState;
+    public inputBuffer: InputBuffer = new InputBuffer(100);
 
     // Network input injection
     public useExternalInput: boolean = false; // When true, updatePhysics skips internal polling
@@ -289,6 +291,9 @@ export class Player extends Fighter {
         } else {
             this.currentInput = this.inputManager.poll();
         }
+
+        // Update Input Buffer (stores recent presses for ~100ms)
+        this.inputBuffer.update(this.currentInput, delta);
 
         // Update Physics Component (Resets isGrounded, Applies Gravity & Move)
         this.physics.update(delta, this.currentInput);

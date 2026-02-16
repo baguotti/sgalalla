@@ -299,8 +299,13 @@ export class PlayerPhysics {
             }
         }
 
+        // Use buffered jump input
+        const buffer = this.player.inputBuffer;
+        const jumpRequested = buffer.has('jump');
+
         // Platform Drop: Down + Jump
-        if (input.moveDown && input.jump && this.currentPlatform) {
+        if (input.moveDown && jumpRequested && this.currentPlatform) {
+            buffer.consume('jump');
             this.handlePlatformDrop();
             return; // Skip normal jump
         }
@@ -312,8 +317,9 @@ export class PlayerPhysics {
             this.jumpHoldTime = 0;
         }
 
-        // New Jump Input
-        if (input.jump && !this.wasJumpHeld) {
+        // New Jump Input (buffered)
+        if (jumpRequested && !this.wasJumpHeld) {
+            buffer.consume('jump');
             this.performJump();
         }
         this.wasJumpHeld = input.jumpHeld;
@@ -415,7 +421,8 @@ export class PlayerPhysics {
             }
         }
 
-        if (!input.dodge) return;
+        // Use buffered dodge input
+        if (!this.player.inputBuffer.consume('dodge')) return;
 
         this.startDodge(input);
     }

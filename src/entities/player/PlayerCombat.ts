@@ -118,6 +118,8 @@ export class PlayerCombat {
         // Use player.isDodging which is synced from Physics
         if (this.player.isDodging || this.player.isHitStunned || this.player.isAttacking) return;
 
+        const buffer = this.player.inputBuffer;
+
         // --- Throw Charge Handling ---
         if (this.isThrowCharging) {
             if (!input.lightAttackHeld) {
@@ -133,10 +135,11 @@ export class PlayerCombat {
         // Character cannot attack while carrying a bomb
         const isHolding = !!this.player.heldItem;
 
-        // Light attack - Grab / Start Throw Charge / Attack
-        if (input.lightAttack) {
+        // Light attack - Grab / Start Throw Charge / Attack (buffered)
+        if (buffer.has('lightAttack')) {
             if (isHolding) {
                 // 1. Start Charge Throw
+                buffer.consume('lightAttack');
                 this.isThrowCharging = true;
                 this.throwChargeTime = 0;
                 return;
@@ -144,10 +147,12 @@ export class PlayerCombat {
 
             // 2. Try to Pickup Item
             if (this.player.checkItemPickup()) {
+                buffer.consume('lightAttack');
                 return; // Picked up item, skip attack
             }
 
             // 3. Normal Attack
+            buffer.consume('lightAttack');
             let direction = this.getInputDirection(input);
 
             // Any light attack while running OR moving fast (Dash Attack)
@@ -168,12 +173,14 @@ export class PlayerCombat {
         }
 
         // Prevent heavy attacks if holding item
-        if (isHolding && (input.heavyAttack || this.isCharging)) {
+        if (isHolding && (buffer.has('heavyAttack') || this.isCharging)) {
+            buffer.consume('heavyAttack'); // Consume to prevent stale buffer
             return;
         }
 
-        // Heavy attack - chargeable (except for aerial down = ground pound, and aerial up/neutral = recovery)
-        if (input.heavyAttack && !this.isCharging) {
+        // Heavy attack - chargeable (buffered)
+        if (buffer.has('heavyAttack') && !this.isCharging) {
+            buffer.consume('heavyAttack');
             const direction = this.getInputDirection(input);
             const isAerial = !this.player.isGrounded;
 
