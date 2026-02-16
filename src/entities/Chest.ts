@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 
 // List of scrin image filenames (loaded in GameScene preload)
 const SCRIN_IMAGES = [
@@ -53,7 +54,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
 
         scene.add.existing(this);
 
-        const gameScene = scene as any;
+        const gameScene = scene as GameSceneInterface;
         if (gameScene.chests) {
             gameScene.chests.push(this);
         }
@@ -73,25 +74,21 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
 
         // DEBUG LOGGING
         // confirm collision happened
-        // console.log('Chest Collision:', data);
 
         let player: any = null;
 
         for (const b of [bodyA, bodyB]) {
             const go = b.gameObject;
-            // console.log('Body inspection:', b.label, go ? go.constructor.name : 'null');
 
             if (go && go !== this) {
                 // Check if it has damagePercent
                 if ((go as any).damagePercent !== undefined) {
                     player = go;
-                    // console.log('Player Found via damagePercent!');
                     break;
                 }
                 // Check parent container
                 if (go.parentContainer && (go.parentContainer as any).damagePercent !== undefined) {
                     player = go.parentContainer;
-                    // console.log('Player Found via parentContainer!');
                     break;
                 }
             }
@@ -249,7 +246,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
         });
 
         // Make main camera ignore these UI elements (prevents double rendering)
-        const gameScene = this.scene as any;
+        const gameScene = this.scene as GameSceneInterface;
         if (gameScene.cameras && gameScene.cameras.main) {
             gameScene.cameras.main.ignore([darkBg, scrinImage, legend]);
         }
@@ -309,7 +306,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
 
     destroy(fromScene?: boolean): void {
         if (this.scene) {
-            const chests = (this.scene as any).chests as Chest[];
+            const chests = (this.scene as GameSceneInterface).chests;
             if (chests) {
                 const index = chests.indexOf(this);
                 if (index > -1) {

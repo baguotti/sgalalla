@@ -195,7 +195,6 @@ export class Player extends Fighter {
         this.sprite.setScale(scale);
         this.add(this.sprite);
 
-        // console.log(`[Player ${this.playerId}] Created character: ${this.character}, StartFrame: ${startFrame}, Scale: ${scale}`);
 
 
 
@@ -229,11 +228,7 @@ export class Player extends Fighter {
         // Explicitly set size (BEFORE Debug Hitbox creation)
         this.setSize(60, 120); // Default size
 
-        // Refinement Round 9: Wider hitbox for fok (40px width - +5px each side)
-        // Refinement Round 9: Wider hitbox for fok (40px width - +5px each side)
-        // Refinement Round 9: Wider hitbox for fok (40px width - +5px each side)
         if (this.character === 'fok' || this.character === 'sgu' || this.character === 'sga' || this.character === 'pe' || this.character === 'nock' || this.character === 'greg') {
-            // Refinement Round 17: Shave top 10px, widen 3px each side (40->46)
             this.setSize(46, PhysicsConfig.PLAYER_HEIGHT - 10);
         }
 
@@ -251,7 +246,6 @@ export class Player extends Fighter {
         // STRICT ROUTING: enableGamepad only when gamepadIndex is explicitly assigned
         const enableGamepad = gamepadIdx !== null;
 
-        console.log(`[Player ${this.playerId}] Input Config: useKeyboard=${useKeyboard}, gamepadIndex=${gamepadIdx}, enableGamepad=${enableGamepad}, config.gamepadIndex=${config.gamepadIndex}`);
 
 
         // Physics Body Creation happens in PlayerPhysics using this.width/height
@@ -510,14 +504,13 @@ export class Player extends Fighter {
         // onFloor removed (unused)
         const velocity = this.velocity;
 
-        // Dynamic Run Speed (Refinement Round 5)
+        // Dynamic Run Speed
         // Aggressively separate Walk vs Run using physics state
         if (this.sprite.anims.currentAnim && this.sprite.anims.currentAnim.key.includes('run')) {
             const speed = Math.abs(velocity.x);
 
             if (this.physics.isRunning) {
                 // RUNNING: Fast playback logic
-                // Refinement Round 6: User says "running slides", so reducing speed again
                 // Previous: 1.2 + (speed / 2000)
                 // New: 0.8 + (speed / 3000) -> Matches ground speed better
                 const normalizedSpeed = 0.8 + (speed / 3000);
@@ -650,9 +643,7 @@ export class Player extends Fighter {
         }
 
         // Grounded
-        // Refinement 13: Increased threshold from 10 to 100 to stop run animation earlier
         // This prevents the "slide completely into stop" look
-        // Refinement Round 4: Keeping this high threshold (100) but combining with low friction
         if (Math.abs(this.velocity.x) > 20) { // Reverted to 20 per request (user says "sliding")
             this.animationKey = 'run';
             this.playAnim('run', true);
@@ -665,26 +656,7 @@ export class Player extends Fighter {
         this.updateSpriteOffset();
     }
 
-    // Add recovery to updateAnimation?
-    // Wait, let's look at updateAnimation again. Where is RECOVERING handled?
-    // It's part of !isGrounded usually?
-    // Ah, logic:
-    // ...
-    // Airborne
-    // if (!this.isGrounded) {
-    //     if (this.physics.isWallSliding) ...
-    //     if (this.velocity.y < 0) ...
-    // }
-    //
-    // Recovery is an airborne state initiated by Up Special usually.
-    // If PlayerState.RECOVERING is true (this.physics.isRecovering), we should play it.
-    // But isRecovering is a flag in Physics.
-    // Let's Insert it before general airborne check.
 
-    /* 
-        Correct insertion point:
-        Inside updateAnimation(), before or inside '!this.isGrounded' check.
-    */
 
     private updateSpriteOffset(): void {
         const anim = this.sprite.anims.currentAnim;
@@ -696,7 +668,6 @@ export class Player extends Fighter {
 
         if (this.character === 'fok') {
             if (anim.key.includes('wall_slide')) {
-                // Refinement 8: Offset towards the wall by 7px (User requested even more visibility)
                 // Use facingDirection (which is guaranteed to be away from wall during slide)
                 // If facing Right (1), wall is Left (-1). Offset should be -7 (Left).
                 // If facing Left (-1), wall is Right (1). Offset should be 7 (Right).
@@ -718,7 +689,6 @@ export class Player extends Fighter {
             console.warn(`[Player ${this.playerId}] Animation MISSING: ${fullKey} (Prefix: ${this.animPrefix}, Key: ${key})`);
             return; // Don't play if missing
         } else {
-            // console.log(`[Player ${this.playerId}] Playing: ${fullKey}`);
         }
 
         this.sprite.anims.play(fullKey, ignoreIfPlaying);
@@ -849,7 +819,6 @@ export class Player extends Fighter {
     }
 
     public playHurtAnimation(): void {
-        console.log(`[Player ${this.playerId}] playHurtAnimation called, setting animationKey='hurt'`);
         this.animationKey = 'hurt';
         this.playAnim('hurt', true);
         // Use hitStunTimer for proper timing (200ms = 0.2s * 1000)

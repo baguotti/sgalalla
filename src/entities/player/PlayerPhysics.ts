@@ -134,9 +134,7 @@ export class PlayerPhysics {
         velocity.y += this.acceleration.y * deltaSeconds;
 
         // Apply friction
-        // Refinement Round 13: More floaty air movement (requested)
-        // Ground uses Config.FRICTION (0.6) for crisp stops. Air uses 0.91 for floaty drift (was 0.85).
-        let friction: number = this.player.isGrounded ? PhysicsConfig.FRICTION : 0.91;
+        let friction: number = this.player.isGrounded ? PhysicsConfig.FRICTION : PhysicsConfig.AIR_FRICTION;
 
         // Dynamic Friction: Check momentum
         const isHighSpeed = Math.abs(velocity.x) > PhysicsConfig.MAX_SPEED * 1.2;
@@ -147,29 +145,29 @@ export class PlayerPhysics {
 
         // BRAWLHALLA STYLE: Sig Charging stops momentum (Ground & Air)
         if (this.player.combat.isCharging) {
-            friction = 0.2; // Massive friction to stop quickly
-            // Also counteract gravity to hang in air briefly (Gravity Cancel feel)
+            friction = PhysicsConfig.CHARGE_FRICTION;
+            // Counteract gravity to hang in air briefly (Gravity Cancel feel)
             if (!this.player.isGrounded) {
-                velocity.y *= 0.5; // Slow down falling significantly
+                velocity.y *= PhysicsConfig.CHARGE_GRAVITY_CANCEL;
             }
         }
         else if (this.player.isAttacking) {
             // Check if we're in recovery phase
             const currentAttack = this.player.getCurrentAttack();
             if (currentAttack && currentAttack.phase === AttackPhase.RECOVERY) {
-                friction = 0.75; // Higher friction during recovery to prevent sliding
+                friction = PhysicsConfig.ATTACK_RECOVERY_FRICTION;
             } else {
-                friction = 0.95; // Slide slightly during startup/active frames
+                friction = PhysicsConfig.ATTACK_ACTIVE_FRICTION;
 
                 // Aerial Stall for Flurry Attacks
                 if (!this.player.isGrounded && currentAttack?.data.shouldStallInAir) {
-                    velocity.y *= 0.6; // Strong gravity dampening (like charging)
-                    velocity.x *= 0.9; // Extra horizontal friction
+                    velocity.y *= PhysicsConfig.AERIAL_STALL_GRAVITY_DAMP;
+                    velocity.x *= PhysicsConfig.AERIAL_STALL_HORIZONTAL_DAMP;
                 }
             }
         }
         else if (this.player.isHitStunned) {
-            friction = 0.95; // Low friction during hitstun to allow long knockback travel
+            friction = PhysicsConfig.HITSTUN_FRICTION;
         }
 
         velocity.x *= friction;
@@ -239,12 +237,8 @@ export class PlayerPhysics {
             }
         }
 
-        // Floor collision (simplified fallback)
-        if (this.player.y > 600 && velocity.y > 0) {
-            // Let the game scene kill mechanic handle falling off screen
-        }
 
-        // Refinement: Reset grounded state at end of physics update
+
         // Movement has been applied using the previous frame's grounded state (friction etc)
         // Now we reset it so GameScene collision checks can determine if we are still grounded
         this.player.isGrounded = false;
@@ -261,7 +255,6 @@ export class PlayerPhysics {
         if (this.player.isAttacking) {
             const currentAttack = this.player.getCurrentAttack();
 
-            // Refinement: Lock movement entirely for Heavy Attacks (Sigs) to prevent sliding
             if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
                 this.isRunning = false; // Force sprint off
                 return;
@@ -277,12 +270,11 @@ export class PlayerPhysics {
         // Disable movement if dodging (unless it's a directional dodge which carries momentum, implemented in startDodge)
         if (this.isDodging) return;
 
-        // Run Mechanic: Default movement is RUN (Refinement 11)
+        // Run Mechanic: Default movement is RUN
         // Dash input (dodgeHeld) triggers dash (handled in handleDodgeInput), but running is always on if moving.
         const isMoving = input.moveLeft || input.moveRight;
         const inRecovery = this.player.isAttacking;
 
-        // Refinement 11: Remove input.dodgeHeld requirement. 
         // If grounded and moving, we are running.
         this.isRunning = this.player.isGrounded && isMoving && !inRecovery;
 
@@ -300,7 +292,6 @@ export class PlayerPhysics {
     private handleJump(delta: number, input: InputState): void {
         if (this.isDodging) return; // No jumping while dodging
 
-        // Refinement: Lock Jumping during Heavy Attacks (Sigs)
         if (this.player.isAttacking) {
             const currentAttack = this.player.getCurrentAttack();
             if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
@@ -329,7 +320,7 @@ export class PlayerPhysics {
 
         // Short Hop Check
         if (!input.jumpHeld && this.player.velocity.y < 0 && this.player.velocity.y > PhysicsConfig.SHORT_HOP_FORCE) {
-            this.player.velocity.y *= 0.5;
+            this.player.velocity.y *= PhysicsConfig.SHORT_HOP_VELOCITY_DAMP;
         }
     }
 
@@ -354,7 +345,6 @@ export class PlayerPhysics {
             this.wallJump();
             return;
         } else if (this.isTouchingWall) {
-            console.log('[Physics] performJump -> Touching wall but grounded? Grounded:', this.player.isGrounded);
         }
 
 
@@ -418,7 +408,6 @@ export class PlayerPhysics {
     private handleDodgeInput(input: InputState): void {
         if (this.dodgeCooldownTimer > 0) return;
 
-        // Refinement: Disable Dodge during Heavy Attacks (Sigs)
         if (this.player.isAttacking) {
             const currentAttack = this.player.getCurrentAttack();
             if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {

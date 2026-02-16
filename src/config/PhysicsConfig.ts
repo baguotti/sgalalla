@@ -4,32 +4,31 @@
  */
 export const PhysicsConfig = {
   // Gravity - high value for fast, heavy feel (like Brawlhalla)
-  // Refinement Round 11: "Floaty" jump requested. Reduced significantly from 3800.
   GRAVITY: 2200,
 
   // Movement - acceleration-based for responsive feel with slight slide
   MOVE_ACCEL: 6500,
   GLOBAL_KNOCKBACK_SCALING: 5.0, // Increased from 0.12 to match pixel scale
-  FRICTION: 0.60, // Refinement Round 5: Low base friction for fast stopping when input released
-  RUN_FRICTION: 0.93, // Refinement Round 5: Restored high friction to allow running speed
+  FRICTION: 0.60,
+  RUN_FRICTION: 0.93,
   SLIDE_ATTACK_SPEED: 2200,
   SLIDE_ATTACK_DECELERATION: 0.96,
   MAX_SPEED: 1400,
   MAX_FALL_SPEED: 1800, // Reduced from 2600 for floatier fall
 
   // Jump mechanics
-  JUMP_FORCE: -1050, // Refinement 16: Increased slightly (was -990)
+  JUMP_FORCE: -1050,
   SHORT_HOP_FORCE: -540, // Reduced proportionally
   JUMP_HOLD_THRESHOLD: 150,
   DOUBLE_JUMP_FORCE: -900, // Reduced proportionally
   MAX_JUMPS: 3,
 
   // Fast-fall
-  FAST_FALL_MULTIPLIER: 1.7, // Refinement Round 18: Increased slightly from 1.5
+  FAST_FALL_MULTIPLIER: 1.7,
   FAST_FALL_THRESHOLD: 300,
 
   // Recovery attack
-  RECOVERY_FORCE_Y: -1760, // Refinement 14: Reduced by 20% (was -2200)
+  RECOVERY_FORCE_Y: -1760,
   RECOVERY_FORCE_X: 550, // Reduced from 600
   RECOVERY_COOLDOWN: 1000,
   RECOVERY_DURATION: 300,
@@ -50,7 +49,7 @@ export const PhysicsConfig = {
   // Hitbox sizes (Doubled for 1:1 scale)
   LIGHT_HITBOX_WIDTH: 120,
   LIGHT_HITBOX_HEIGHT: 80,
-  // Refinement 13: Massive hitbox for Sigs (was 320, originally 160)
+
   HEAVY_HITBOX_WIDTH: 600,
   HEAVY_HITBOX_HEIGHT: 120,
 
@@ -83,9 +82,9 @@ export const PhysicsConfig = {
   LIGHT_RECOVERY_FRAMES: 50,
 
   // Heavy attacks
-  // Refinement 13: Faster startup (was 80)
+
   HEAVY_STARTUP_FRAMES: 30,
-  // Refinement: Extended duration to match animation (was 150)
+
   HEAVY_ACTIVE_FRAMES: 300,
   HEAVY_RECOVERY_FRAMES: 200,
 
@@ -96,7 +95,7 @@ export const PhysicsConfig = {
   GROUND_POUND_KNOCKBACK: 500, // Reduced from 1800 to match recovery
 
   // Directional attack hitbox offsets (Doubled)
-  // Refinement 13: Increased offset to center wider hitbox (was 200)
+
   SIDE_ATTACK_OFFSET_X: 300,
   UP_ATTACK_OFFSET_Y: -150,
   DOWN_ATTACK_OFFSET_Y: 150,
@@ -109,7 +108,7 @@ export const PhysicsConfig = {
   // Wall mechanics
   WALL_SLIDE_SPEED: 400, // Reduced from 450
   WALL_JUMP_FORCE_X: 1600, // Reduced from 1800
-  WALL_JUMP_FORCE_Y: -1050, // Refinement 15: Reduced from -1750 to match regular jump height (-990)
+  WALL_JUMP_FORCE_Y: -1050,
   WALL_FRICTION: 0.7,
   WALL_COYOTE_TIME: 200, // Grace period for wall jumps and wall slide stability
 
@@ -121,4 +120,30 @@ export const PhysicsConfig = {
   LEDGE_CLIMB_SPEED: -1000, // Reduced from -1200
   LEDGE_JUMP_X: 1200, // Reduced from 1350
   LEDGE_JUMP_Y: -1600, // Reduced from -1800
+
+  // State-dependent friction multipliers (applied per-frame to velocity.x)
+  AIR_FRICTION: 0.91,               // Floaty air drift
+  CHARGE_FRICTION: 0.2,             // Massive friction to stop quickly when charging sigs
+  CHARGE_GRAVITY_CANCEL: 0.5,       // Vertical damping during aerial charge (gravity cancel)
+  ATTACK_RECOVERY_FRICTION: 0.75,   // Higher friction during attack recovery phase
+  ATTACK_ACTIVE_FRICTION: 0.95,     // Slight slide during startup/active attack frames
+  AERIAL_STALL_GRAVITY_DAMP: 0.6,   // Strong vertical damping for aerial flurry attacks
+  AERIAL_STALL_HORIZONTAL_DAMP: 0.9,// Extra horizontal friction for aerial flurry attacks
+  HITSTUN_FRICTION: 0.95,           // Low friction during hitstun for long knockback travel
+  SHORT_HOP_VELOCITY_DAMP: 0.5,     // Velocity multiplier when releasing jump early
+
+  // Combat hitbox overrides (per-attack-type dimension tweaks)
+  DOWN_SIG_HITBOX_WIDTH: 160,
+  DOWN_SIG_HITBOX_HEIGHT: 30,
+  UP_SIG_HITBOX_WIDTH: 127,
+  UP_SIG_HITBOX_HEIGHT: 34,
+  SIDE_LIGHT_HITBOX_WIDTH: 81,
+  SIDE_LIGHT_OFFSET_EXTRA: 20,      // Extra forward offset for side/neutral/up light attacks
+  GHOST_HITBOX_SCALE: 0.65,         // Scale factor for ghost sprite hitbox (Fok Side Sig)
+  RECOVERY_HITBOX_SIZE: 60,         // Width and height of recovery attack hitbox
+  RECOVERY_DAMAGE: 8,               // Damage dealt by recovery attack
+
+  // Side Sig damage scaling (Fok)
+  SIDE_SIG_MIN_DAMAGE: 6,
+  SIDE_SIG_MAX_DAMAGE: 20,
 } as const;

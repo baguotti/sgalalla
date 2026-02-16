@@ -15,6 +15,9 @@ import { Bomb } from '../entities/Bomb';
 import { Chest } from '../entities/Chest';
 import NetworkManager from '../network/NetworkManager';
 import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '../network/NetworkManager';
+import { charConfigs, ALL_CHARACTERS, ANIM_FRAME_RATES } from '../config/CharacterConfig';
+import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
+import type { ZoomLevel } from '../config/MapConfig';
 
 // Define a snapshot type that includes reconstructed server timestamp for fixed-timeline interpolation
 type NetPlayerSnapshot = NetPlayerState & { frame: number; serverTime: number };
@@ -74,26 +77,10 @@ export class OnlineGameScene extends Phaser.Scene {
     private playerCharacters: Map<number, string> = new Map(); // Store character selections
     private confirmedPlayers: Set<number> = new Set();
 
-    // Wall configuration (matching GameScene)
-    private readonly WALL_THICKNESS = 45;
-    private readonly WALL_LEFT_X = 0; // Refinement 14: Pushed out to 0 (Was 200)
-    private readonly WALL_RIGHT_X = 1920; // Refinement 14: Pushed out to 1920 (Was 1720)
-    public walls: Phaser.Geom.Rectangle[] = []; // Renamed from wallRects for consistency with Player.ts
+    public walls: Phaser.Geom.Rectangle[] = [];
 
-    // Blast zone boundaries (matching GameScene)
-    private readonly BLAST_ZONE_LEFT = -1020; // Matching training mode
-    private readonly BLAST_ZONE_RIGHT = 2940; // Matching training mode
-    private readonly BLAST_ZONE_TOP = -600; // Matching training mode
-    private readonly BLAST_ZONE_BOTTOM = 1800;
-
-    // Camera Settings (matching GameScene)
-    // Camera Settings (matching GameScene)
-    private currentZoomLevel: 'CLOSE' | 'NORMAL' | 'WIDE' = 'CLOSE';
-    private readonly ZOOM_SETTINGS = {
-        CLOSE: { padX: 250, padY: 100, minZoom: 0.5, maxZoom: 1.5 }, // Increased padding and range
-        NORMAL: { padX: 450, padY: 300, minZoom: 0.5, maxZoom: 1.1 },
-        WIDE: { padX: 600, padY: 450, minZoom: 0.3, maxZoom: 0.8 }
-    };
+    // Camera Settings
+    private currentZoomLevel: ZoomLevel = 'CLOSE';
 
     // UI Camera
     public uiCamera!: Phaser.Cameras.Scene2D.Camera;
@@ -121,7 +108,7 @@ export class OnlineGameScene extends Phaser.Scene {
     private selectionCountdown: number = 10;
     private selectedCharacter: string = 'fok';
     // Character Selection
-    private availableCharacters: string[] = ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg']; // Refinement: fok is default
+    private availableCharacters: string[] = ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'];
     private selectedCharIndex: number = 0;
 
     // Selection UI Elements
@@ -163,227 +150,11 @@ export class OnlineGameScene extends Phaser.Scene {
 
 
     private createAnimations(): void {
-        const charConfigs = {
-            'fok': {
-                idle: { prefix: 'fok_idle_', count: 12, loop: true },
-                run: { prefix: 'fok_run_', count: 9, loop: true },
-                charging: { prefix: 'fok_charge_', count: 2, loop: true },
-
-                // Dash
-                dash: { prefix: 'fok_dash_', count: 1, suffix: '000', loop: false },
-
-                // Spot Dodge
-                spot_dodge: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false },
-
-                // Side Sig Ghost
-                side_sig_ghost: { prefix: 'fok_side_sig_ghost_', count: 2, loop: true }, // Mapped to ghost frames in atlas
-
-                // --- LIGHT ATTACKS ---
-
-                // Neutral Light -> Mapped to Side Light (Placeholder)
-                attack_light_neutral: { prefix: 'fok_side_light_', count: 1, suffix: '000', loop: false },
-
-                // Up Light -> Mapped to Side Light (Placeholder)
-                attack_light_up: { prefix: 'fok_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_up_air: { prefix: 'fok_side_air_', count: 1, suffix: '000', loop: false },
-
-                // Down Light
-                attack_light_down: { prefix: 'fok_down_light_', count: 1, suffix: '000', loop: false },
-
-                // Side Light
-                attack_light_side: { prefix: 'fok_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_side_air: { prefix: 'fok_side_air_', count: 1, suffix: '000', loop: false },
-
-                // Running Light Attack
-                attack_light_run: { prefix: 'fok_side_run_', count: 1, suffix: '000', loop: false },
-
-                // --- HEAVY ATTACKS (SIGS) ---
-
-                // Neutral Sig -> Mapped to Up Sig (Placeholder)
-                attack_heavy_neutral: { prefix: 'fok_up_sig_', count: 1, suffix: '000', loop: false },
-
-                // Up Sig
-                attack_heavy_up: { prefix: 'fok_up_sig_', count: 1, suffix: '000', loop: false },
-
-                // Side Sig
-                attack_heavy_side: { prefix: 'fok_side_sig_', count: 1, suffix: '000', loop: false },
-
-                // Down Sig -> Mapped to Side Sig (Placeholder)
-                attack_heavy_down: { prefix: 'fok_side_sig_', count: 1, suffix: '000', loop: false },
-
-                // Utilities
-                wall_slide: { prefix: 'fok_wall_slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'fok_recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'fok_ground_pound_', count: 1, suffix: '000', loop: false },
-
-                hurt: { prefix: 'fok_hurt_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'fok_fall_', count: 1, suffix: '000', loop: false },
-                jump: { prefix: 'fok_jump_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false }
-            },
-            'sga': {
-                idle: { prefix: 'sga_idle_', count: 15, loop: true },
-                run: { prefix: 'sga_run_', count: 9, loop: true },
-                charging: { prefix: 'sga_charge_', count: 2, loop: true },
-
-                // Dash
-                dash: { prefix: 'sga_dash_', count: 1, suffix: '000', loop: false },
-
-                // Spot Dodge
-                spot_dodge: { prefix: 'sga_dodge_', count: 1, suffix: '000', loop: false },
-
-                // Side Sig Ghost - Skipped (Missing)
-
-                // --- LIGHT ATTACKS ---
-                attack_light_neutral: { prefix: 'sga_side_light_', count: 1, suffix: '000', loop: false }, // Match Fok
-                attack_light_side: { prefix: 'sga_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_side_air: { prefix: 'sga_side_air_', count: 1, suffix: '000', loop: false },
-                attack_light_run: { prefix: 'sga_side_run_', count: 1, suffix: '000', loop: false },
-
-                attack_light_down: { prefix: 'sga_down_light_', count: 1, suffix: '000', loop: false },
-
-                attack_light_up: { prefix: 'sga_side_light_', count: 1, suffix: '000', loop: false }, // Placeholder mapping
-                attack_light_up_air: { prefix: 'sga_side_air_', count: 1, suffix: '000', loop: false }, // Match Fok
-
-                // --- HEAVY ATTACKS (SIGS) ---
-                attack_heavy_neutral: { prefix: 'sga_up_sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_side: { prefix: 'sga_side_sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_down: { prefix: 'sga_side_sig_', count: 1, suffix: '000', loop: false },
-
-                // Utilities
-                wall_slide: { prefix: 'sga_wall_slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'sga_recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'sga_ground_pound_', count: 1, suffix: '000', loop: false },
-
-                // Hurt/Fall/Jump/Slide
-                hurt: { prefix: 'sga_hurt_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'sga_fall_', count: 1, suffix: '000', loop: false },
-                jump: { prefix: 'sga_jump_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'sga_dodge_', count: 1, suffix: '000', loop: false }
-            },
-            'pe': {
-                idle: { prefix: 'pe_idle_', count: 17, loop: true },
-                run: { prefix: 'pe_run_', count: 9, loop: true },
-                charging: { prefix: 'pe_charge_', count: 2, loop: true },
-
-                // Dash
-                dash: { prefix: 'pe_dash_', count: 1, suffix: '000', loop: false },
-
-                // Spot Dodge
-                spot_dodge: { prefix: 'pe_dodge_', count: 1, suffix: '000', loop: false },
-
-                // --- LIGHT ATTACKS ---
-                attack_light_neutral: { prefix: 'pe_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_side: { prefix: 'pe_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_side_air: { prefix: 'pe_side_air_', count: 1, suffix: '000', loop: false },
-                attack_light_run: { prefix: 'pe_side_run_', count: 1, suffix: '000', loop: false },
-
-                attack_light_down: { prefix: 'pe_down_light_', count: 1, suffix: '000', loop: false },
-
-                attack_light_up: { prefix: 'pe_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_up_air: { prefix: 'pe_side_air_', count: 1, suffix: '000', loop: false },
-
-                // --- HEAVY ATTACKS (SIGS) ---
-                attack_heavy_neutral: { prefix: 'pe_up_sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_side: { prefix: 'pe_side_sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_down: { prefix: 'pe_side_sig_', count: 1, suffix: '000', loop: false },
-
-                // Utilities
-                wall_slide: { prefix: 'pe_wall_slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'pe_recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'pe_ground_pound_', count: 1, suffix: '000', loop: false },
-
-                // Hurt/Fall/Jump/Slide
-                hurt: { prefix: 'pe_hurt_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'pe_fall_', count: 1, suffix: '000', loop: false },
-                jump: { prefix: 'pe_jump_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'pe_dodge_', count: 1, suffix: '000', loop: false }
-            },
-            'nock': {
-                idle: { prefix: 'nock_idle_', count: 17, loop: true },
-                run: { prefix: 'nick_run_', count: 9, loop: true }, // Special case: nick_run
-                charging: { prefix: 'nock_charge_', count: 2, loop: true },
-
-                // Dash
-                dash: { prefix: 'nock_dash_', count: 1, suffix: '000', loop: false },
-
-                // Spot Dodge
-                spot_dodge: { prefix: 'nock_dodge_', count: 1, suffix: '000', loop: false },
-
-                // --- LIGHT ATTACKS ---
-                attack_light_neutral: { prefix: 'nock_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_side: { prefix: 'nock_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_side_air: { prefix: 'nock_side_air_', count: 1, suffix: '000', loop: false },
-                attack_light_run: { prefix: 'nock_side_run_', count: 1, suffix: '000', loop: false },
-
-                attack_light_down: { prefix: 'nock_down_light_', count: 1, suffix: '000', loop: false },
-
-                attack_light_up: { prefix: 'nock_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_up_air: { prefix: 'nock_side_air_', count: 1, suffix: '000', loop: false },
-
-                // --- HEAVY ATTACKS (SIGS) ---
-                attack_heavy_neutral: { prefix: 'nock_up_sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_side: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_down: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
-
-                // Utilities
-                wall_slide: { prefix: 'nock_wall_slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'nock_recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'nock_ground_pound_', count: 1, suffix: '000', loop: false },
-
-                // Hurt/Fall/Jump/Slide
-                hurt: { prefix: 'nock_hurt_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'nock_fall_', count: 1, suffix: '000', loop: false },
-                jump: { prefix: 'nock_jump_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'nock_dodge_', count: 1, suffix: '000', loop: false }
-            },
-            'greg': {
-                idle: { prefix: 'greg_idle_', count: 17, loop: true },
-                run: { prefix: 'greg_run_', count: 9, loop: true },
-                charging: { prefix: 'greg_charge_', count: 2, loop: true },
-
-                // Dash
-                dash: { prefix: 'greg_dash_', count: 1, suffix: '000', loop: false },
-
-                // Spot Dodge
-                spot_dodge: { prefix: 'greg_dodge_', count: 1, suffix: '000', loop: false },
-
-                // --- LIGHT ATTACKS ---
-                attack_light_neutral: { prefix: 'greg_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_side: { prefix: 'greg_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_side_air: { prefix: 'greg_side_air_', count: 1, suffix: '000', loop: false },
-                attack_light_run: { prefix: 'greg_side_run_', count: 1, suffix: '000', loop: false },
-
-                attack_light_down: { prefix: 'greg_down_light_', count: 1, suffix: '000', loop: false },
-
-                attack_light_up: { prefix: 'greg_side_light_', count: 1, suffix: '000', loop: false },
-                attack_light_up_air: { prefix: 'greg_side_air_', count: 1, suffix: '000', loop: false },
-
-                // --- HEAVY ATTACKS (SIGS) ---
-                attack_heavy_neutral: { prefix: 'greg_up_sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_side: { prefix: 'greg_side_sig_', count: 1, suffix: '000', loop: false },
-                attack_heavy_down: { prefix: 'greg_side_sig_', count: 1, suffix: '000', loop: false },
-
-                // Utilities
-                wall_slide: { prefix: 'greg_wall_slide_', count: 1, suffix: '000', loop: false },
-                recovery: { prefix: 'greg_recovery_', count: 1, suffix: '000', loop: false },
-                ground_pound: { prefix: 'greg_ground_pound_', count: 1, suffix: '000', loop: false },
-
-                // Hurt/Fall/Jump/Slide
-                hurt: { prefix: 'greg_hurt_', count: 1, suffix: '000', loop: false },
-                fall: { prefix: 'greg_fall_', count: 1, suffix: '000', loop: false },
-                jump: { prefix: 'greg_jump_', count: 1, suffix: '000', loop: false },
-                slide: { prefix: 'greg_dodge_', count: 1, suffix: '000', loop: false }
-            }
-        };
-
-        const characters = ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'];
-
-        characters.forEach(char => {
-            const config = charConfigs[char as keyof typeof charConfigs];
+        ALL_CHARACTERS.forEach(char => {
+            const config = charConfigs[char];
             if (!config) return;
 
-            Object.entries(config).forEach(([animName, animData]: [string, any]) => {
+            Object.entries(config).forEach(([animName, animData]) => {
                 const animKey = `${char}_${animName}`;
                 if (this.anims.exists(animKey)) return;
 
@@ -396,8 +167,6 @@ export class OnlineGameScene extends Phaser.Scene {
                         zeroPad: 3
                     });
                 } else {
-                    // Sequence 0 to count-1
-                    // fok uses 3 digit zero pad
                     frames = this.anims.generateFrameNames(char, {
                         prefix: animData.prefix,
                         start: 0,
@@ -409,7 +178,7 @@ export class OnlineGameScene extends Phaser.Scene {
                 this.anims.create({
                     key: animKey,
                     frames: frames,
-                    frameRate: animName === 'run' ? 20 : 15,
+                    frameRate: animName === 'run' ? ANIM_FRAME_RATES.RUN : ANIM_FRAME_RATES.DEFAULT,
                     repeat: animData.loop ? -1 : 0
                 });
             });
@@ -852,7 +621,6 @@ export class OnlineGameScene extends Phaser.Scene {
                 // Initialize interpolationTime to RENDER_DELAY behind the newest arrival
                 this.interpolationTime = arrivalTime - this.RENDER_DELAY_MS;
                 this.isBufferInitialized = true;
-                console.log(`[JitterBuffer] Initialized. interpolationTime: ${this.interpolationTime.toFixed(0)}, arrivalTime: ${arrivalTime.toFixed(0)}`);
             }
 
             // Sync stats (stateless)
@@ -980,10 +748,10 @@ export class OnlineGameScene extends Phaser.Scene {
 
         // Check bounds
         const bounds = player.getBounds();
-        if (bounds.left < this.BLAST_ZONE_LEFT ||
-            bounds.right > this.BLAST_ZONE_RIGHT ||
-            bounds.top < this.BLAST_ZONE_TOP ||
-            bounds.bottom > this.BLAST_ZONE_BOTTOM) {
+        if (bounds.left < MapConfig.BLAST_ZONE_LEFT ||
+            bounds.right > MapConfig.BLAST_ZONE_RIGHT ||
+            bounds.top < MapConfig.BLAST_ZONE_TOP ||
+            bounds.bottom > MapConfig.BLAST_ZONE_BOTTOM) {
 
             // Score update (lives)
             player.lives = Math.max(0, player.lives - 1);
@@ -1585,7 +1353,6 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private handleSelectionStart(countdown: number): void {
-        console.log(`[OnlineGameScene] Selection phase started: ${countdown}s`);
         this.phase = 'SELECTING';
         this.selectionCountdown = countdown;
         // Destroy connection status UI completely
@@ -1629,7 +1396,6 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private handleOpponentCharacterSelect(playerId: number, character: string): void {
-        console.log(`[OnlineGameScene] Opponent ${playerId} selected ${character}`);
         this.playerCharacters.set(playerId, character);
         // Note: opponentCharacter property removed, use Map
         if (this.playerSelectionTexts.has(playerId)) {
@@ -1654,9 +1420,7 @@ export class OnlineGameScene extends Phaser.Scene {
     }
 
     private handleGameStart(players: { playerId: number; character: string }[]): void {
-        console.log('[OnlineGameScene] Game starting with players:', JSON.stringify(players));
         players.forEach(p => {
-            console.log(`Player ${p.playerId} char: "${p.character}"`);
             this.playerCharacters.set(p.playerId, p.character);
         });
         this.phase = 'PLAYING';
@@ -1677,7 +1441,6 @@ export class OnlineGameScene extends Phaser.Scene {
             // Validate character against loaded textures. Fallback to 'fok_v3' if invalid.
             const validChars = ['fok', 'sgu', 'sga'];
             const char = validChars.includes(p.character) ? p.character : 'fok';
-            console.log(`[OnlineGameScene] Creating player ${p.playerId} with char: ${char} (Server sent: "${p.character}")`);
 
             const spawnX = spawnPoints[p.playerId % spawnPoints.length];
             const player = this.createPlayer(p.playerId, spawnX, 780, char);
@@ -1780,7 +1543,6 @@ export class OnlineGameScene extends Phaser.Scene {
     private confirmCharacterSelection(): void {
         if (this.phase !== 'SELECTING' || this.confirmedPlayers.has(this.localPlayerId)) return;
 
-        console.log('[OnlineGameScene] Confirmed selection');
         this.networkManager.sendCharacterConfirm();
         // Optimistic update (handler will also set this)
         this.handleCharacterConfirm(this.localPlayerId);
@@ -1795,7 +1557,6 @@ export class OnlineGameScene extends Phaser.Scene {
         const scaleX = this.scale.width / bg.width;
         const scaleY = this.scale.height / bg.height;
         const scale = Math.max(scaleX, scaleY);
-        // Refinement: Background Depth Tweak (Parallax 0.1, Scale +10%)
         bg.setScale(scale * 1.1).setScrollFactor(0.1);
         bg.setDepth(-10);
         if (this.uiCamera) this.uiCamera.ignore(bg);
@@ -1803,7 +1564,7 @@ export class OnlineGameScene extends Phaser.Scene {
         // Side walls (Shortened: Height 540, Y=560)
         bg.setDepth(-100);
 
-        // Main platform (centered, smaller - Refinement 13)
+        // Main platform (centered, smaller)
         // Center: 960. Width 1200. Y changed to extend to blast zone (930 height, y=1335)
         // Top Y = 1335 - 465 = 870. Bottom Y = 1335 + 465 = 1800 (BLAST_ZONE_BOTTOM)
         const mainPlatform = this.add.rectangle(960, 1335, 1200, 930, 0x2c3e50);
@@ -1815,7 +1576,6 @@ export class OnlineGameScene extends Phaser.Scene {
         this.matter.add.gameObject(mainPlatform, { isStatic: true });
 
         // Soft platform 1 (left, closer)
-        // Refinement 13: Pushed in to 610 (Was 260)
         const softPlatform1 = this.add.rectangle(610, 500, 500, 30, 0x0f3460);
         softPlatform1.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform1.setAlpha(0.85);
@@ -1823,7 +1583,6 @@ export class OnlineGameScene extends Phaser.Scene {
         this.matter.add.gameObject(softPlatform1, { isStatic: true });
 
         // Soft platform 2 (right, closer)
-        // Refinement 13: Pushed in to 1310 (Was 1660)
         const softPlatform2 = this.add.rectangle(1310, 500, 500, 30, 0x0f3460);
         softPlatform2.setStrokeStyle(2, 0x1a4d7a, 0.8);
         softPlatform2.setAlpha(0.85);
@@ -1831,12 +1590,12 @@ export class OnlineGameScene extends Phaser.Scene {
         this.matter.add.gameObject(softPlatform2, { isStatic: true });
 
         // Walls
-        const leftWall = this.add.rectangle(this.WALL_LEFT_X, 560, this.WALL_THICKNESS, 540, 0x2a3a4e);
+        const leftWall = this.add.rectangle(MapConfig.WALL_LEFT_X, 560, MapConfig.WALL_THICKNESS, 540, 0x2a3a4e);
         leftWall.setStrokeStyle(4, 0x4a6a8e);
         leftWall.setAlpha(0.6);
         leftWall.setDepth(-5);
 
-        const rightWall = this.add.rectangle(this.WALL_RIGHT_X, 560, this.WALL_THICKNESS, 540, 0x2a3a4e);
+        const rightWall = this.add.rectangle(MapConfig.WALL_RIGHT_X, 560, MapConfig.WALL_THICKNESS, 540, 0x2a3a4e);
         rightWall.setStrokeStyle(4, 0x4a6a8e);
         rightWall.setAlpha(0.6);
         rightWall.setDepth(-5);
@@ -1844,9 +1603,9 @@ export class OnlineGameScene extends Phaser.Scene {
         // Wall Collision Rects
         this.walls = [
             // Left Wall
-            new Phaser.Geom.Rectangle(this.WALL_LEFT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540),
+            new Phaser.Geom.Rectangle(MapConfig.WALL_LEFT_X - MapConfig.WALL_THICKNESS / 2, 290, MapConfig.WALL_THICKNESS, 540),
             // Right Wall
-            new Phaser.Geom.Rectangle(this.WALL_RIGHT_X - this.WALL_THICKNESS / 2, 290, this.WALL_THICKNESS, 540),
+            new Phaser.Geom.Rectangle(MapConfig.WALL_RIGHT_X - MapConfig.WALL_THICKNESS / 2, 290, MapConfig.WALL_THICKNESS, 540),
 
             // Main Platform Walls (For Wall Sliding on the deep floor)
             new Phaser.Geom.Rectangle(360 - 20, 890, 40, 910), // Left Side of Main Plat
@@ -1854,7 +1613,7 @@ export class OnlineGameScene extends Phaser.Scene {
         ];
 
         // Wall Text
-        const leftWallText = this.add.text(this.WALL_LEFT_X - 12, 375, 'WALL', {
+        const leftWallText = this.add.text(MapConfig.WALL_LEFT_X - 12, 375, 'WALL', {
             fontSize: '18px',
             color: '#8ab4f8',
             fontFamily: '"Pixeloid Sans"',
@@ -1864,7 +1623,7 @@ export class OnlineGameScene extends Phaser.Scene {
         leftWallText.setAlpha(0.5);
         leftWallText.setDepth(-4);
 
-        const rightWallText = this.add.text(this.WALL_RIGHT_X + 12, 525, 'WALL', {
+        const rightWallText = this.add.text(MapConfig.WALL_RIGHT_X + 12, 525, 'WALL', {
             fontSize: '18px',
             color: '#8ab4f8',
             fontFamily: '"Pixeloid Sans"',
@@ -1980,10 +1739,10 @@ export class OnlineGameScene extends Phaser.Scene {
         this.players.forEach((player) => {
             if (!player.active) return; // Ignore inactive (dead/waiting respawn) players
             // Check bounds to filter out dying players
-            if (player.x > this.BLAST_ZONE_LEFT + 50 &&
-                player.x < this.BLAST_ZONE_RIGHT - 50 &&
-                player.y < this.BLAST_ZONE_BOTTOM - 50 &&
-                player.y > this.BLAST_ZONE_TOP + 50) {
+            if (player.x > MapConfig.BLAST_ZONE_LEFT + 50 &&
+                player.x < MapConfig.BLAST_ZONE_RIGHT - 50 &&
+                player.y < MapConfig.BLAST_ZONE_BOTTOM - 50 &&
+                player.y > MapConfig.BLAST_ZONE_TOP + 50) {
                 targets.push(player);
             }
         });
@@ -2002,7 +1761,7 @@ export class OnlineGameScene extends Phaser.Scene {
         const centerY = (minY + maxY) / 2;
 
         // Viewport padding based on zoom level
-        const settings = this.ZOOM_SETTINGS[this.currentZoomLevel];
+        const settings = ZOOM_SETTINGS[this.currentZoomLevel];
         const padX = settings.padX;
         const padY = settings.padY;
 

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 
 export class Bomb extends Phaser.Physics.Matter.Sprite {
     private isThrown: boolean = false;
@@ -29,7 +30,7 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         scene.add.existing(this);
 
         // Register to scene (casted because we added 'bombs' recently)
-        const gameScene = scene as any;
+        const gameScene = scene as GameSceneInterface;
         if (gameScene.bombs) {
             gameScene.bombs.push(this);
         }
@@ -80,8 +81,8 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         explosionGraphics.fillCircle(this.x, this.y, visualRadius);
 
         // Prevent ghosting in UI Camera
-        if ((this.scene as any).addToCameraIgnore) {
-            (this.scene as any).addToCameraIgnore(explosionGraphics);
+        if ((this.scene as GameSceneInterface).addToCameraIgnore) {
+            (this.scene as GameSceneInterface).addToCameraIgnore(explosionGraphics);
         }
 
         // Quick fade out
@@ -129,7 +130,7 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
     destroy(fromScene?: boolean): void {
         // Remove from scene list before clearing scene reference
         if (this.scene) {
-            const bombs = (this.scene as any).bombs as Bomb[];
+            const bombs = (this.scene as GameSceneInterface).bombs;
             if (bombs) {
                 const index = bombs.indexOf(this);
                 if (index > -1) {

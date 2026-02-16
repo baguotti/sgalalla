@@ -164,7 +164,6 @@ class NetworkManager {
             const port = 9208;
             const url = `http://${hostname}`;
 
-            console.log(`[NetworkManager] Connecting to ${url}:${port} via Geckos.io (UDP)...`);
 
             // Geckos.io defaults to ordered: false (unreliable/unordered) for real-time
             this.channel = geckos({ url, port });
@@ -177,7 +176,6 @@ class NetworkManager {
                     return;
                 }
 
-                console.log('[NetworkManager] UDP connected, waiting for player assignment...');
                 this.connected = true;
 
                 // Clear buffers on new connection
@@ -191,7 +189,6 @@ class NetworkManager {
             });
 
             this.channel.onDisconnect(() => {
-                console.log('[NetworkManager] Disconnected');
                 this.connected = false;
                 this.onDisconnectCallback?.();
             });
@@ -205,7 +202,6 @@ class NetworkManager {
         this.channel.on(NetMessageType.PLAYER_JOINED, (data: any) => {
             const payload = data as { playerId: number };
             this.localPlayerId = payload.playerId;
-            console.log(`[NetworkManager] Assigned Player ID: ${this.localPlayerId}`);
             this.onConnectedCallback?.(this.localPlayerId);
             onPlayerAssigned(true); // Now resolve the connect() promise
         });
@@ -261,7 +257,6 @@ class NetworkManager {
 
         // Rematch start event
         this.channel.on(NetMessageType.REMATCH_START, () => {
-            console.log('[NetworkManager] Rematch starting!');
             this.onRematchStartCallback?.();
         });
 
@@ -274,7 +269,6 @@ class NetworkManager {
         // Selection phase events
         this.channel.on(NetMessageType.SELECTION_START, (data: any) => {
             const { countdown } = data as { countdown: number };
-            console.log(`[NetworkManager] Selection started, ${countdown}s`);
             this.onSelectionStartCallback?.(countdown);
         });
 
@@ -298,7 +292,6 @@ class NetworkManager {
 
         this.channel.on(NetMessageType.GAME_START, (data: any) => {
             const { players } = data as { players: { playerId: number; character: string }[] };
-            console.log('[NetworkManager] Game starting!', players);
             this.onGameStartCallback?.(players);
         });
 

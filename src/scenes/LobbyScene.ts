@@ -66,7 +66,6 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     init(data: { mode?: 'versus' | 'training', inputType?: 'KEYBOARD' | 'GAMEPAD', gamepadIndex?: number | null, slots?: PlayerSelection[] } | null): void {
-        console.log('LobbyScene.init called');
         this.selectionPhase = 'P1'; // Reset phase
         const safeData = data || {};
         this._initData = safeData;
@@ -92,7 +91,6 @@ export class LobbyScene extends Phaser.Scene {
 
 
     create(): void {
-        console.log('LobbyScene.create called');
         this.slotContainers = []; // CRITICAL: Reset container references on scene restart
 
         const { width, height } = this.scale;
@@ -420,7 +418,6 @@ export class LobbyScene extends Phaser.Scene {
             // Set input time to now so the debounce check in handlePlayerInput fails
             this.lastInputTime.set(slot.playerId, this.time.now);
             this.joinTime.set(slot.playerId, this.time.now);
-            console.log(`[LobbyScene] Player ${slot.playerId + 1} joined via ${type}, gamepadIndex=${index}`);
         }
     }
 
@@ -546,16 +543,13 @@ export class LobbyScene extends Phaser.Scene {
             this.changeCharacter(targetSlot, 1);
             inputRegistered = true;
         } else if (select) {
-            console.log(`[LobbyScene] Select Pressed. Phase: ${this.selectionPhase}`);
             if (this.selectionPhase === 'P1') {
                 p1.ready = true;
                 this.selectionPhase = 'CPU';
                 inputRegistered = true;
-                console.log('[LobbyScene] Switched to CPU Phase');
             } else {
                 cpu.ready = true;
                 inputRegistered = true;
-                console.log('[LobbyScene] Starting Game');
                 this.startTrainingGame();
             }
         }
@@ -566,7 +560,6 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private startTrainingGame(): void {
-        console.log('Training Setup Complete. Starting game...');
         this.time.delayedCall(500, () => {
             this.scene.start('GameScene', { playerData: [this.slots[0], this.slots[1]] });
         });
@@ -582,16 +575,13 @@ export class LobbyScene extends Phaser.Scene {
         const joinedSlots = this.slots.filter(s => s.joined);
         const minPlayers = this.mode === 'versus' ? 2 : 1;
         if (joinedSlots.length >= minPlayers && joinedSlots.every(s => s.ready)) {
-            console.log('All players ready! Starting game...');
             // Start Game
             this.time.delayedCall(500, () => {
                 this.scene.start('GameScene', { playerData: joinedSlots });
             });
         } else {
             if (joinedSlots.length < minPlayers) {
-                console.log(`Need at least ${minPlayers} players (have ${joinedSlots.length})`);
             } else {
-                console.log('Not all players ready yet:', joinedSlots.map(s => `${s.playerId}: ${s.ready}`));
             }
         }
     }

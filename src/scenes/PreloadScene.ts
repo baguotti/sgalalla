@@ -56,7 +56,6 @@ export class PreloadScene extends Phaser.Scene {
         // Wait for ALL fonts to be ready before accepting input
         // @ts-ignore
         document.fonts.ready.then(() => {
-            console.log('[PreloadScene] All document fonts ready');
             loadingText.setFontFamily('"Pixeloid Sans"');
             loadingText.setText('PRESS START');
             loadingText.setFontSize(48);

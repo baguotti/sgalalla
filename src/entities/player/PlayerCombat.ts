@@ -149,7 +149,6 @@ export class PlayerCombat {
             // 3. Normal Attack
             let direction = this.getInputDirection(input);
 
-            // Refinement Round 10: Run-Attack Override (Slide Attack)
             // Any light attack while running OR moving fast (Dash Attack)
             const isRunSpeed = Math.abs(this.player.velocity.x) > PhysicsConfig.MAX_SPEED * 0.8;
             if ((this.player.physics.isRunning || isRunSpeed) && this.player.isGrounded) {
@@ -247,7 +246,6 @@ export class PlayerCombat {
             this.player.isAttacking = true;
             this.hitTargets.clear();
 
-            console.log(`[Combat] startAttack: ${attackKey} (Char: ${this.player.character})`);
 
             // Visual feedback
             // this.player.setVisualTint(0xff0000); // Removed red tint
@@ -513,16 +511,7 @@ export class PlayerCombat {
             this.clearGhostEffect();
         }
 
-        // Visual feedback based on phase
-        /*
-        if (this.currentAttack.phase === AttackPhase.STARTUP) {
-            this.player.setVisualTint(0xf39c12); // Orange during startup
-        } else if (this.currentAttack.phase === AttackPhase.ACTIVE) {
-            this.player.setVisualTint(0xff0000); // Red during active
-        } else if (this.currentAttack.phase === AttackPhase.RECOVERY) {
-            this.player.setVisualTint(0x888888); // Gray during recovery
-        }
-        */
+
 
         if (attackComplete) {
             this.endAttack();
@@ -611,19 +600,11 @@ export class PlayerCombat {
             offset.y = -PhysicsConfig.PLAYER_HEIGHT / 2;
 
             // Adjust dimensions: Wider and Flat (but slightly taller than DownSig)
-            width = 127; // Round 12: +15% (was 110)
-            height = 34;
+            width = PhysicsConfig.UP_SIG_HITBOX_WIDTH;
+            height = PhysicsConfig.UP_SIG_HITBOX_HEIGHT;
         }
 
-        // Refinement Round 6: Explicit Override for Fok_v3 Side Sig
-        // REMOVED per user request (Round 13)
-        /*
-        if (this.player.character === 'fok_v3' &&
-            this.currentAttack.data.type === AttackType.HEAVY &&
-            this.currentAttack.data.direction === AttackDirection.SIDE) {
-            // ... removed ...
-        }
-        */
+
 
         // Side/Neutral/Up Light Attacks - Easy Tweak Block
         if (this.currentAttack.data.type === AttackType.LIGHT &&
@@ -631,14 +612,9 @@ export class PlayerCombat {
                 this.currentAttack.data.direction === AttackDirection.NEUTRAL ||
                 this.currentAttack.data.direction === AttackDirection.UP)) {
 
-            // User requested: "skinnier and move it forward 10pixels"
-            // Previous width was 90. Skinnier -> 70?
-            width = 81;
+            width = PhysicsConfig.SIDE_LIGHT_HITBOX_WIDTH;
             const facing = this.player.getFacingDirection();
-            // Previous logic added 10. Now user wants forward 10 more?
-            // Or just "move it forward 10pixels" relative to standard?
-            // "move it forward 10pixels" implies adding to offset.
-            offset.x += facing * 20; // 10 (prev) + 10 (new)
+            offset.x += facing * PhysicsConfig.SIDE_LIGHT_OFFSET_EXTRA;
         }
 
         let hitboxX = this.player.x + offset.x;
@@ -657,9 +633,8 @@ export class PlayerCombat {
 
             // Override size to match ghost
             if (this.ghostSprite.width > 0) {
-                // User requested 35% smaller (0.65 scale)
-                width = this.ghostSprite.width * 0.65;
-                height = this.ghostSprite.height * 0.65;
+                width = this.ghostSprite.width * PhysicsConfig.GHOST_HITBOX_SCALE;
+                height = this.ghostSprite.height * PhysicsConfig.GHOST_HITBOX_SCALE;
             }
         }
 
@@ -668,7 +643,7 @@ export class PlayerCombat {
 
     public updateRecoveryHitbox(): void {
         // Centered hitbox for recovery - surrounds player (Player is 40x60)
-        this.updateActiveHitbox(this.player.x, this.player.y, 60, 60);
+        this.updateActiveHitbox(this.player.x, this.player.y, PhysicsConfig.RECOVERY_HITBOX_SIZE, PhysicsConfig.RECOVERY_HITBOX_SIZE);
     }
 
     public calculateCurrentDamage(): number {
@@ -683,11 +658,11 @@ export class PlayerCombat {
 
                 const maxCharge = PhysicsConfig.CHARGE_MAX_TIME;
                 const chargeRatio = Math.min(this.lastChargeTime / maxCharge, 1);
-                damage = 6 + (chargeRatio * 14); // 6 to 20
+                damage = PhysicsConfig.SIDE_SIG_MIN_DAMAGE + (chargeRatio * (PhysicsConfig.SIDE_SIG_MAX_DAMAGE - PhysicsConfig.SIDE_SIG_MIN_DAMAGE));
             }
             return Math.floor(damage);
         } else if (this.player.physics.isRecovering) {
-            return 8; // Hardcoded recovery damage
+            return PhysicsConfig.RECOVERY_DAMAGE;
         }
         return 0;
     }

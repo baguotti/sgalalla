@@ -37,7 +37,7 @@ export class MainMenuScene extends Phaser.Scene {
 
 
 
-        this.add.text(width / 2, 270, 'Pre-Alpha Build v0.11.8', {
+        this.add.text(width / 2, 270, 'Pre-Alpha Build v0.12.0', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(0.5);
 
@@ -63,7 +63,6 @@ export class MainMenuScene extends Phaser.Scene {
 
 
         this.input.gamepad?.on('connected', (pad: Phaser.Input.Gamepad.Gamepad) => {
-            console.log('Gamepad connected:', pad.id);
             this.debugText.setText(`Gamepad Connected: ${pad.id}`);
         });
 

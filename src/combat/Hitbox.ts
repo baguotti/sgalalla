@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 
 export class Hitbox {
     scene: Phaser.Scene;
@@ -52,8 +53,8 @@ export class Hitbox {
             this.debugGraphics.setDepth(999);
 
             // Exclude from UI camera if scene supports it
-            if ((this.scene as any).addToCameraIgnore) {
-                (this.scene as any).addToCameraIgnore(this.debugGraphics);
+            if ((this.scene as GameSceneInterface).addToCameraIgnore) {
+                (this.scene as GameSceneInterface).addToCameraIgnore(this.debugGraphics);
             }
         }
 

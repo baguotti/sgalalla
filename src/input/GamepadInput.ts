@@ -74,7 +74,6 @@ export class GamepadInput {
         // If a specific index is requested, set it immediately
         if (targetIndex !== null) {
             this.gamepadIndex = targetIndex;
-            console.log(`GamepadInput initialized for fixed index: ${targetIndex}`);
         }
 
         // Define listeners
@@ -82,21 +81,18 @@ export class GamepadInput {
             // If we are looking for a specific index, ignore others
             if (targetIndex !== null) {
                 if (e.gamepad.index === targetIndex) {
-                    console.log(`Target Gamepad connected: ${e.gamepad.id} (Index: ${targetIndex})`);
                     this.gamepadIndex = targetIndex;
                 }
                 return;
             }
 
             // Legacy behavior: grab first available
-            console.log(`Gamepad connected: ${e.gamepad.id}`);
             if (this.gamepadIndex === null) {
                 this.gamepadIndex = e.gamepad.index;
             }
         };
 
         this.gamepadDisconnectedListener = (e: GamepadEvent) => {
-            console.log(`Gamepad disconnected: ${e.gamepad.id}`);
             if (this.gamepadIndex === e.gamepad.index) {
                 if (targetIndex === null) {
                     this.gamepadIndex = null;
@@ -113,13 +109,11 @@ export class GamepadInput {
         if (targetIndex !== null) {
             if (gamepads[targetIndex]) {
                 this.gamepadIndex = targetIndex;
-                console.log(`Found existing target gamepad: ${gamepads[targetIndex]!.id}`);
             }
         } else {
             for (let i = 0; i < gamepads.length; i++) {
                 if (gamepads[i]) {
                     this.gamepadIndex = i;
-                    console.log(`Found existing gamepad: ${gamepads[i]!.id}`);
                     break;
                 }
             }
