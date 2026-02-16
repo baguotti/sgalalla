@@ -146,4 +146,43 @@ export const PhysicsConfig = {
   // Side Sig damage scaling (Fok)
   SIDE_SIG_MIN_DAMAGE: 6,
   SIDE_SIG_MAX_DAMAGE: 20,
+
+  // Movement thresholds
+  HIGH_SPEED_THRESHOLD_MULT: 1.2,     // Multiplier on MAX_SPEED to detect "high speed" state
+  MAX_AIR_ACTIONS: 9,                  // Max air actions (jumps/wall-jumps) before lockout
+
+  // Platform mechanics
+  PLATFORM_DROP_NUDGE_Y: 1,           // Pixels to nudge player down when dropping through platform
+  PLATFORM_DROP_PUSH_Y: 100,          // Initial downward velocity when dropping through platform
+  PLATFORM_SNAP_THRESHOLD: 45,        // Max pixels below platform surface to count as "on top"
+
+  // Dodge mechanics
+  SPOT_DODGE_AERIAL_Y_DAMP: 0.2,      // Vertical velocity multiplier during aerial spot dodge
+  SPOT_DODGE_ALPHA: 0.7,              // Sprite alpha during spot dodge
+  AIR_DODGE_VERTICAL_DAMP: 0.3,       // Vertical velocity multiplier during air directional dodge
+
+  // Bomb item properties
+  BOMB_RADIUS: 30,
+  BOMB_BOUNCE: 0.8,
+  BOMB_FRICTION: 0.005,
+  BOMB_DENSITY: 0.01,
+  BOMB_FUSE_TIME: 3000,               // ms before auto-explode
+  BOMB_GRACE_TIME: 200,               // ms thrower is immune after throwing
+  BOMB_EXPLOSION_VISUAL_RADIUS: 60,   // Visual circle radius
+  BOMB_EXPLOSION_FADE_MS: 150,        // Fade-out duration for explosion visual
+  BOMB_BLAST_RADIUS: 160,             // Damage radius
+  BOMB_EXPLOSION_DAMAGE: 15,
+  BOMB_EXPLOSION_KNOCKBACK: 12,
+  BOMB_CONTACT_THRESHOLD: 90,         // Distance to trigger contact explosion
+  BOMB_SHAKE_DURATION: 150,           // Camera shake duration on explosion
+  BOMB_SHAKE_INTENSITY: 0.01,         // Camera shake intensity on explosion
+
+  // Chest item properties
+  CHEST_DAMAGE: 25,
+  CHEST_KNOCKBACK_FORCE: 50,
+  CHEST_SHAKE_DURATION: 150,
+  CHEST_SHAKE_INTENSITY: 0.01,
+  CHEST_GROUND_SHAKE_INTENSITY: 0.008,
+  CHEST_GROUND_SHAKE_DURATION: 150,
+  CHEST_SPEED_THRESHOLD: 2,           // Minimum speed for ground impact shake
 } as const;

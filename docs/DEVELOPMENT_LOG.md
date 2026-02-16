@@ -19,6 +19,16 @@ Part 2
 
 ---
 
+### [2026-02-16] v0.12.1 - Stage Factory & Deduplication
+- **[V]** `v0.12.1`
+- **[Refactor]** **StageFactory**: Created `src/stages/StageFactory.ts` to centralize stage creation logic.
+    - **Deduplication**: Removed ~165 lines of duplicate code from `GameScene.ts` and `OnlineGameScene.ts`.
+    - **Type Safety**: Introduced `GameSceneInterface` to enforce safe scene access in entities.
+    - **Stability**: Ensures identical stage layout (platforms, walls, blast zones) for both Local and Online modes.
+- **[Fix]** **Types**: Resolved `as any` technical debt in `PlayerCombat.ts`, `Bomb.ts`, and `Chest.ts` (partial).
+
+---
+
 ### [2026-02-16] v0.12.2 - "Buttery Smooth" Input 🧈
 - **[V]** `v0.12.2`
 - **[Feat]** **Input Buffering**: Added 100ms buffer window for inputs.
@@ -29,12 +39,14 @@ Part 2
 
 ---
 
-### [2026-02-16] v0.12.1 - Stage Factory & Deduplication
-- **[V]** `v0.12.1`
-- **[Refactor]** **StageFactory**: Created `src/stages/StageFactory.ts` to centralize stage creation logic.
-    - **Deduplication**: Removed ~165 lines of duplicate code from `GameScene.ts` and `OnlineGameScene.ts`.
-    - **Type Safety**: Introduced `GameSceneInterface` to enforce safe scene access in entities.
-    - **Stability**: Ensures identical stage layout (platforms, walls, blast zones) for both Local and Online modes.
-- **[Fix]** **Types**: Resolved `as any` technical debt in `PlayerCombat.ts`, `Bomb.ts`, and `Chest.ts` (partial).
-
----
+### [2026-02-16] v0.12.3 - Entity Refactor & Magic Number Purge
+- **[V]** `v0.12.3`
+- **[Refactor]** **Type Safety**:
+    - **Entity Logic**: Replaced all unsafe `as any` casts in `Bomb.ts`, `Chest.ts`, `Player.ts`, and `PlayerCombat.ts` with strict `GameSceneInterface` typing.
+    - **Scene Interface**: Unified access to `players`, `bombs`, and `chests` between `GameScene` (Arrays) and `OnlineGameScene` (Maps).
+- **[Refactor]** **Magic Numbers**:
+    - **PhysicsConfig**: Centralized 30+ hardcoded constants (movement, platform limits, dodge damping, bomb fuse/blast radii, chest interactions).
+    - **Deduplication**: Removed item-specific logic scattered across entity files, moving it to configuration.
+- **[Fix]** **Stability**:
+    - **Bomb Logic**: Fixed potential crashes in `OnlineGameScene` due to data structure mismatches.
+    - **Collision**: Fixed `Chest` collision logic to safely identify players.

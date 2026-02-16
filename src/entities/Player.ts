@@ -10,6 +10,8 @@ import { PlayerCombat } from './player/PlayerCombat';
 import { Attack, AttackPhase, AttackType, AttackDirection } from '../combat/Attack';
 import { PlayerAI } from './player/PlayerAI';
 import type { PlayerSnapshot } from '../network/StateSnapshot';
+import type { Bomb } from './Bomb';
+import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 
 export const PlayerState = {
     GROUNDED: 'Grounded',
@@ -94,11 +96,12 @@ export class Player extends Fighter {
     public lightAttackVariant: number = 0;
 
     // Item Holding
-    public heldItem: any | null = null; // Typing as any to avoid circular import issues with Bomb for now, or use interface
+    public heldItem: Bomb | null = null;
 
     public checkItemPickup(): boolean {
         // Access bombs from scene
-        const bombs = (this.scene as any).bombs;
+        const gameScene = this.scene as GameSceneInterface;
+        const bombs = gameScene.getBombs ? gameScene.getBombs() : [];
         if (!bombs || bombs.length === 0) return false;
 
         const pickupRange = 60; // Interaction radius
@@ -122,7 +125,7 @@ export class Player extends Fighter {
         return false;
     }
 
-    public pickupItem(item: any): void {
+    public pickupItem(item: Bomb): void {
         this.heldItem = item;
         // Disable physics for the item while holding
         item.setSensor(true);

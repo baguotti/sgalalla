@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
+import { PhysicsConfig } from '../config/PhysicsConfig';
 
 export class Bomb extends Phaser.Physics.Matter.Sprite {
     private isThrown: boolean = false;
@@ -10,7 +11,7 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
     constructor(scene: Phaser.Scene, x: number, y: number) {
         // Create a temporary texture if it doesn't exist
         const textureKey = 'bomb_v6'; // New texture key to force regenerate
-        const radius = 30; // Doubled from 15
+        const radius = PhysicsConfig.BOMB_RADIUS;
         const diameter = radius * 2;
 
         if (!scene.textures.exists(textureKey)) {
@@ -23,16 +24,17 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         super(scene.matter.world, x, y, textureKey);
 
         this.setCircle(radius);
-        this.setBounce(0.8); // Higher bounce for bouncing on surfaces
-        this.setFriction(0.005);
-        this.setDensity(0.01);
+        this.setBounce(PhysicsConfig.BOMB_BOUNCE);
+        this.setFriction(PhysicsConfig.BOMB_FRICTION);
+        this.setDensity(PhysicsConfig.BOMB_DENSITY);
 
         scene.add.existing(this);
 
-        // Register to scene (casted because we added 'bombs' recently)
+
+        // Register to scene via Interface
         const gameScene = scene as GameSceneInterface;
-        if (gameScene.bombs) {
-            gameScene.bombs.push(this);
+        if (gameScene.addBomb) {
+            gameScene.addBomb(this);
         }
 
         this.setDepth(100);
@@ -45,9 +47,9 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
 
     public onThrown(thrower: any): void {
         this.isThrown = true;
-        this.fuseTimer = 3000; // 3 seconds
+        this.fuseTimer = PhysicsConfig.BOMB_FUSE_TIME;
         this.thrower = thrower;
-        this.graceTimer = 200; // 200ms grace for thrower
+        this.graceTimer = PhysicsConfig.BOMB_GRACE_TIME;
     }
 
     private handleCollision(data: Phaser.Types.Physics.Matter.MatterCollisionData): void {
@@ -75,35 +77,36 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         this.isExploded = true;
 
         // Visual effect: single small yellow circle
-        const visualRadius = 60; // Doubled from 30
+        const visualRadius = PhysicsConfig.BOMB_EXPLOSION_VISUAL_RADIUS;
         const explosionGraphics = this.scene.add.graphics();
         explosionGraphics.fillStyle(0xffff00, 1);
         explosionGraphics.fillCircle(this.x, this.y, visualRadius);
 
         // Prevent ghosting in UI Camera
-        if ((this.scene as GameSceneInterface).addToCameraIgnore) {
-            (this.scene as GameSceneInterface).addToCameraIgnore(explosionGraphics);
+        const gameScene = this.scene as GameSceneInterface;
+        if (gameScene.addToCameraIgnore) {
+            gameScene.addToCameraIgnore(explosionGraphics);
         }
 
         // Quick fade out
         this.scene.tweens.add({
             targets: explosionGraphics,
             alpha: 0,
-            duration: 150,
+            duration: PhysicsConfig.BOMB_EXPLOSION_FADE_MS,
             onComplete: () => explosionGraphics.destroy()
         });
 
         // Damage nearby players (blast radius for logic remains 80 or similar)
-        const blastRadius = 160; // Doubled from 80
+        const blastRadius = PhysicsConfig.BOMB_BLAST_RADIUS;
 
         // Damage nearby players
-        const players = (this.scene as any).players as any[];
+        const players = gameScene.getPlayers ? gameScene.getPlayers() : [];
         if (players) {
             players.forEach(player => {
                 const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
                 if (dist < blastRadius) {
-                    const damage = 15;
-                    const knockbackForce = 12;
+                    const damage = PhysicsConfig.BOMB_EXPLOSION_DAMAGE;
+                    const knockbackForce = PhysicsConfig.BOMB_EXPLOSION_KNOCKBACK;
                     const angle = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
 
                     const knockback = new Phaser.Math.Vector2(
@@ -121,7 +124,7 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         }
 
         // Camera shake
-        this.scene.cameras.main.shake(150, 0.01);
+        this.scene.cameras.main.shake(PhysicsConfig.BOMB_SHAKE_DURATION, PhysicsConfig.BOMB_SHAKE_INTENSITY);
 
         // Destroy the bomb
         this.destroy();
@@ -130,12 +133,9 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
     destroy(fromScene?: boolean): void {
         // Remove from scene list before clearing scene reference
         if (this.scene) {
-            const bombs = (this.scene as GameSceneInterface).bombs;
-            if (bombs) {
-                const index = bombs.indexOf(this);
-                if (index > -1) {
-                    bombs.splice(index, 1);
-                }
+            const gameScene = this.scene as GameSceneInterface;
+            if (gameScene.removeBomb) {
+                gameScene.removeBomb(this);
             }
         }
         super.destroy(fromScene);
@@ -152,14 +152,15 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
 
         // Check contact with players if thrown
         if (this.isThrown) {
-            const players = (this.scene as any).players as any[];
+            const gameScene = this.scene as GameSceneInterface;
+            const players = gameScene.getPlayers ? gameScene.getPlayers() : [];
             if (players) {
                 for (const player of players) {
                     // Ignore thrower during grace
                     if (this.graceTimer > 0 && player === this.thrower) continue;
 
                     const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
-                    if (dist < 90) { // Contact threshold doubled (45 -> 90)
+                    if (dist < PhysicsConfig.BOMB_CONTACT_THRESHOLD) {
                         this.explode();
                         return;
                     }

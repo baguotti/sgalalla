@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { Player } from '../entities/Player';
 import type { Chest } from '../entities/Chest';
 import type { Bomb } from '../entities/Bomb';
 
@@ -16,8 +17,20 @@ export interface GameSceneInterface extends Phaser.Scene {
     chests: Chest[];
 
     /** Active bombs in the scene (GameScene only; unused in OnlineGameScene) */
-    bombs: Bomb[];
+    bombs: Bomb[] | Map<number, Bomb>;
+
+    /** Add a bomb to the scene tracker */
+    addBomb(bomb: Bomb): void;
+
+    /** Remove a bomb from the scene tracker */
+    removeBomb(bomb: Bomb): void;
+
+    /** Unified access to bombs list */
+    getBombs(): Bomb[];
 
     /** UI camera (separate from main game camera, used for HUD) */
     uiCamera: Phaser.Cameras.Scene2D.Camera | null;
+
+    /** Unified access to players list (abstracts away Array vs Map storage) */
+    getPlayers(): Player[];
 }

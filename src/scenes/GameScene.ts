@@ -10,7 +10,10 @@ import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
 import { createStage as createSharedStage } from '../stages/StageFactory';
 
-export class GameScene extends Phaser.Scene {
+import type { GameSceneInterface } from './GameSceneInterface';
+
+
+export class GameScene extends Phaser.Scene implements GameSceneInterface {
     // private player1!: Player;
     // private player2!: Player;
 
@@ -186,6 +189,25 @@ export class GameScene extends Phaser.Scene {
                 repeat: -1
             });
         }
+    }
+
+    public addBomb(bomb: Bomb): void {
+        this.bombs.push(bomb);
+    }
+
+    public removeBomb(bomb: Bomb): void {
+        const index = this.bombs.indexOf(bomb);
+        if (index > -1) {
+            this.bombs.splice(index, 1);
+        }
+    }
+
+    public getBombs(): Bomb[] {
+        return this.bombs;
+    }
+
+    public getPlayers(): Player[] {
+        return this.players;
     }
 
     private players: Player[] = [];

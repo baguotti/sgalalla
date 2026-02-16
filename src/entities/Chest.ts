@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
+import { PhysicsConfig } from '../config/PhysicsConfig';
+import { Player } from './Player';
 
 // List of scrin image filenames (loaded in GameScene preload)
 const SCRIN_IMAGES = [
@@ -15,7 +17,7 @@ const SCRIN_IMAGES = [
 /**
  * Chest - A rectangular box that drops from the sky.
  * Falls with gravity, lands on platforms.
- * Damages players (15%) if it lands on them from above.
+ * Damages players (25%) if it lands on them from above.
  * Players can open by attacking near it → displays a random scrin image.
  * Dimensions: 90x60
  */
@@ -72,22 +74,19 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
         const bodyA = data.bodyA as any;
         const bodyB = data.bodyB as any;
 
-        // DEBUG LOGGING
-        // confirm collision happened
-
-        let player: any = null;
+        let player: Player | null = null;
 
         for (const b of [bodyA, bodyB]) {
             const go = b.gameObject;
 
             if (go && go !== this) {
-                // Check if it has damagePercent
-                if ((go as any).damagePercent !== undefined) {
+                // Check if it is a Player instance
+                if (go instanceof Player) {
                     player = go;
                     break;
                 }
                 // Check parent container
-                if (go.parentContainer && (go.parentContainer as any).damagePercent !== undefined) {
+                if (go.parentContainer && go.parentContainer instanceof Player) {
                     player = go.parentContainer;
                     break;
                 }
@@ -96,22 +95,21 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
 
         // If no player found, check for ground/static impact
         if (!player) {
-            // Determine the other body (not us)
             const other = (bodyA.gameObject === this) ? bodyB :
                 (bodyB.gameObject === this) ? bodyA :
                     bodyB; // fallback
             if (other.isStatic) {
                 const body = this.body as MatterJS.BodyType;
-                if (body && body.speed > 2) {
-                    this.scene.cameras.main.shake(150, 0.008); // Heavy thud shake
+                if (body && body.speed > PhysicsConfig.CHEST_SPEED_THRESHOLD) {
+                    this.scene.cameras.main.shake(PhysicsConfig.CHEST_GROUND_SHAKE_DURATION, PhysicsConfig.CHEST_GROUND_SHAKE_INTENSITY);
                 }
             }
             return;
         }
 
         // Player found — apply damage and massive knockback
-        const damage = 25;
-        const knockbackForce = 50;
+        const damage = PhysicsConfig.CHEST_DAMAGE;
+        const knockbackForce = PhysicsConfig.CHEST_KNOCKBACK_FORCE;
 
         const angle = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
         const knockback = new Phaser.Math.Vector2(
@@ -119,12 +117,10 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
             Math.sin(angle) * knockbackForce
         );
 
-        if (player.setDamage && player.setKnockback) {
-            player.setDamage(player.damagePercent + damage);
-            player.setKnockback(knockback.x, knockback.y);
-            if (player.applyHitStun) player.applyHitStun();
-            this.scene.cameras.main.shake(150, 0.01);
-        }
+        player.setDamage(player.damagePercent + damage);
+        player.setKnockback(knockback.x, knockback.y);
+        player.applyHitStun();
+        this.scene.cameras.main.shake(PhysicsConfig.CHEST_SHAKE_DURATION, PhysicsConfig.CHEST_SHAKE_INTENSITY);
     }
 
     /**
@@ -136,7 +132,6 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
         if (this.isOpened) return;
 
         // Ground check: ensure chest is not falling
-        // We check if vertical velocity is near zero
         const body = this.body as MatterJS.BodyType;
         if (Math.abs(body.velocity.y) > 0.5) {
             return;
@@ -296,7 +291,6 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
             darkBg.destroy();
             scrinImage.destroy();
             legend.destroy();
-            // this.destroy(); // Moved inside delayedCall
         };
 
         // Visual feedback: grey out chest and stop physics

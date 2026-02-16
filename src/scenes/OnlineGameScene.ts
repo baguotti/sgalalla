@@ -27,7 +27,9 @@ import type { GameSnapshot, PlayerSnapshot } from '../network/StateSnapshot';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { DebugOverlay } from '../components/DebugOverlay';
 
-export class OnlineGameScene extends Phaser.Scene {
+import type { GameSceneInterface } from './GameSceneInterface';
+
+export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface {
     // Networking
     private networkManager: NetworkManager;
     private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
@@ -120,6 +122,32 @@ export class OnlineGameScene extends Phaser.Scene {
     constructor() {
         super({ key: 'OnlineGameScene' });
         this.networkManager = NetworkManager.getInstance();
+    }
+
+    public addBomb(_bomb: Bomb): void {
+        // Online bombs are managed by NetworkManager typically.
+        // If this is a local visual bomb, we might not track it in the main map?
+        // Or if it's predicted...
+        // For now, no-op or simple log as strictly local bombs shouldn't exist online?
+        // Actually, preventing crash is the goal.
+    }
+
+    public removeBomb(bomb: Bomb): void {
+        // Find by value and remove?
+        for (const [id, b] of this.bombs.entries()) {
+            if (b === bomb) {
+                this.bombs.delete(id);
+                break;
+            }
+        }
+    }
+
+    public getBombs(): Bomb[] {
+        return Array.from(this.bombs.values());
+    }
+
+    public getPlayers(): Player[] {
+        return Array.from(this.players.values());
     }
 
     preload(): void {

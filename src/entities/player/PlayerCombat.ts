@@ -702,7 +702,7 @@ export class PlayerCombat {
                 this.debugDamageText.setDepth(100);
 
                 // Fix Double Render Glitch (Ignore in UI Camera)
-                const scene = this.scene as unknown as GameSceneInterface;
+                const scene = this.scene as GameSceneInterface;
                 if (scene.uiCamera) {
                     scene.uiCamera.ignore(this.debugDamageText);
                 }
@@ -852,7 +852,7 @@ export class PlayerCombat {
         }
 
         // Fix Double Sprite Glitch (Ignore in UI Camera)
-        const scene = this.scene as unknown as GameSceneInterface;
+        const scene = this.scene as GameSceneInterface;
         if (scene.uiCamera) {
             scene.uiCamera.ignore(ghost);
         }

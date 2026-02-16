@@ -137,7 +137,7 @@ export class PlayerPhysics {
         let friction: number = this.player.isGrounded ? PhysicsConfig.FRICTION : PhysicsConfig.AIR_FRICTION;
 
         // Dynamic Friction: Check momentum
-        const isHighSpeed = Math.abs(velocity.x) > PhysicsConfig.MAX_SPEED * 1.2;
+        const isHighSpeed = Math.abs(velocity.x) > PhysicsConfig.MAX_SPEED * PhysicsConfig.HIGH_SPEED_THRESHOLD_MULT;
 
         if (this.isRunning || (isHighSpeed && this.player.isGrounded)) {
             friction = PhysicsConfig.RUN_FRICTION; // Slidier when running or stopping from run
@@ -340,8 +340,8 @@ export class PlayerPhysics {
         // Physics updates to start falling
         this.player.isGrounded = false;
         this.currentPlatform = null;
-        this.player.y += 1; // Nudge down to ensure we are "in" the platform for the grace period check
-        this.player.velocity.y = 100; // Small downward push
+        this.player.y += PhysicsConfig.PLATFORM_DROP_NUDGE_Y;
+        this.player.velocity.y = PhysicsConfig.PLATFORM_DROP_PUSH_Y;
     }
 
     public performJump(): void {
@@ -362,7 +362,7 @@ export class PlayerPhysics {
         }
 
         // Air Jump (Multi-jump)
-        if (this.jumpsRemaining > 0 && this.airActionCounter < 9) {
+        if (this.jumpsRemaining > 0 && this.airActionCounter < PhysicsConfig.MAX_AIR_ACTIONS) {
             this.player.velocity.y = PhysicsConfig.DOUBLE_JUMP_FORCE;
             this.jumpsRemaining--;
             this.airActionCounter++;
@@ -446,12 +446,12 @@ export class PlayerPhysics {
             this.player.velocity.x = 0;
 
             if (!this.player.isGrounded) {
-                this.player.velocity.y *= 0.2;
+                this.player.velocity.y *= PhysicsConfig.SPOT_DODGE_AERIAL_Y_DAMP;
             }
 
             // Visual feedback
             this.player.setVisualTint(0xffffff);
-            this.player.spriteObject.setAlpha(0.7);
+            this.player.spriteObject.setAlpha(PhysicsConfig.SPOT_DODGE_ALPHA);
         } else {
             // DIRECTIONAL DODGE
             this.isSpotDodging = false;
@@ -471,7 +471,7 @@ export class PlayerPhysics {
 
             if (!this.player.isGrounded) {
                 // Reduce vertical velocity during air dodge for better control
-                this.player.velocity.y *= 0.3;
+                this.player.velocity.y *= PhysicsConfig.AIR_DODGE_VERTICAL_DAMP;
             }
 
             // No visual effects for dash (user request)
@@ -533,14 +533,14 @@ export class PlayerPhysics {
             }
             if (this.player.velocity.y < 0) return;
             // FIX: Increased threshold from 10 to 45 to catch high-speed fallers (Max Fall Speed ~43px/frame)
-            if (playerBounds.bottom > platBounds.top + 45) {
+            if (playerBounds.bottom > platBounds.top + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) {
                 return;
             }
         } else {
             // Hard platform: Only ground if player is near the top surface, not beside it
             // This prevents the tall main platform from grounding players who are wall sliding alongside it
             if (this.player.velocity.y < 0) return; // Moving upward, skip
-            if (playerBounds.bottom > platBounds.top + 45) {
+            if (playerBounds.bottom > platBounds.top + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) {
                 return; // Player is too far below the surface — they're beside the platform, not on top
             }
         }
