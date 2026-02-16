@@ -37,7 +37,7 @@ export class MainMenuScene extends Phaser.Scene {
 
 
 
-        this.add.text(width / 2, 270, 'Pre-Alpha Build v0.12.0', {
+        this.add.text(width / 2, 270, 'v0.12.1', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(0.5);
 

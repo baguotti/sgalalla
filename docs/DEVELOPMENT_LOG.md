@@ -18,3 +18,13 @@ Part 2
 - **[S]** **STATUS**: Codebase deep-cleaned and structured for scalability.
 
 ---
+
+### [2026-02-16] v0.12.1 - Stage Factory & Deduplication
+- **[V]** `v0.12.1`
+- **[Refactor]** **StageFactory**: Created `src/stages/StageFactory.ts` to centralize stage creation logic.
+    - **Deduplication**: Removed ~165 lines of duplicate code from `GameScene.ts` and `OnlineGameScene.ts`.
+    - **Type Safety**: Introduced `GameSceneInterface` to enforce safe scene access in entities.
+    - **Stability**: Ensures identical stage layout (platforms, walls, blast zones) for both Local and Online modes.
+- **[Fix]** **Types**: Resolved `as any` technical debt in `PlayerCombat.ts`, `Bomb.ts`, and `Chest.ts` (partial).
+
+---
