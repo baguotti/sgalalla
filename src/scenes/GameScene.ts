@@ -38,7 +38,7 @@ export class GameScene extends Phaser.Scene {
 
 
     // Wall configuration
-    private readonly VERSION = 'v0.12.1';
+    private readonly VERSION = 'v0.12.2';
 
     public uiCamera!: Phaser.Cameras.Scene2D.Camera;
     private debugText!: Phaser.GameObjects.Text; // Added compilation fix

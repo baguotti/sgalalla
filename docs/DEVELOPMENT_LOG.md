@@ -19,6 +19,16 @@ Part 2
 
 ---
 
+### [2026-02-16] v0.12.2 - "Buttery Smooth" Input 🧈
+- **[V]** `v0.12.2`
+- **[Feat]** **Input Buffering**: Added 100ms buffer window for inputs.
+    - **Jump/Dodge**: Can now be queued 6 frames before landing/action ends.
+    - **Combat**: Attack inputs pressed during cooldowns or hitstun are stored and execute on first available frame.
+    - **Technical**: Created `InputBuffer.ts` and integrated into `PlayerPhysics` and `PlayerCombat`.
+- **[Docs]** **Technical Briefs**: Added deep-dive analysis on State Machines and Determinism.
+
+---
+
 ### [2026-02-16] v0.12.1 - Stage Factory & Deduplication
 - **[V]** `v0.12.1`
 - **[Refactor]** **StageFactory**: Created `src/stages/StageFactory.ts` to centralize stage creation logic.
