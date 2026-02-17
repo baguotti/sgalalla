@@ -2,20 +2,6 @@
 
 Part 2
 
-### [2026-02-17] v0.12.6 - Visual Pooling & New Challengers
-- **[V]** `v0.12.6`
-- **[Feat]** **Visual Pooling**:
-    - **EffectManager**: Implemented object pooling for explosions and ghosts, significantly reducing GC spikes during combat.
-    - **Optimization**: Refactored `Bomb.ts` and `PlayerCombat.ts` to use pooled visual effects.
-- **[Fix]** **Nock Character**:
-    - **Assets**: Restored missing sprites and fixed atlas loading issues.
-    - **Mechanics**: Implemented "Side Sig Ghost" (1 frame) and corrected run animation prefix.
-- **[Feat]** **Greg Character**:
-    - **New Challenger**: Added Greg to the roster with full sprite sheet support.
-    - **Mechanics**: Implemented "Side Sig Ghost" with custom 3-frame animation.
-- **[S]** **STATUS**: Performance improved, roster expanded, and critical visual bugs resolved.
-
----
 
 ### [2026-02-16] v0.12.0 - Refactoring & Technical Debt Cleanup
 - **[V]** `v0.12.0`
@@ -93,3 +79,30 @@ Part 2
     - **Rendering**: Enabled Texture Atlases for `fok`, `sgu`, and `sga` to minimize draw calls.
 - **[Docs]** **Process**:
     - **Skill Audit**: Integrated `find-skills` workflow to audit and validate project dependencies.
+
+---
+
+### [2026-02-17] v0.12.7 - Polish & Deep Clean
+- **[V]** `v0.12.7`
+- **[Feat]** **Game Feel**:
+    - **Wall Slide Dust**: Added subtle particle effects when sliding down walls (`PlayerPhysics.ts` + `EffectManager.ts`).
+    - **Renaming**: Changed "1v1" to "**BOTTE IN REMOTO**" in Main Menu for clarity.
+- **[Refactor]** **Deep Code Cleanup**:
+    - **Zombie Code**: Removed residual/dead "Chromatic Aberration" code from `GameScene` and `PlayerCombat`.
+    - **Audit**: Conducted deep structure analysis (`audit_report_2.md`) identifying unused assets and complexity hotspots.
+- **[S]** **STATUS**: Codebase is verifying clean and ready for next feature phase.
+
+    ### [2026-02-17] v0.12.6 - Visual Pooling & New Challengers
+- **[V]** `v0.12.6`
+- **[Feat]** **Visual Pooling**:
+    - **EffectManager**: Implemented object pooling for explosions and ghosts, significantly reducing GC spikes during combat.
+    - **Optimization**: Refactored `Bomb.ts` and `PlayerCombat.ts` to use pooled visual effects.
+- **[Fix]** **Nock Character**:
+    - **Assets**: Restored missing sprites and fixed atlas loading issues.
+    - **Mechanics**: Implemented "Side Sig Ghost" (1 frame) and corrected run animation prefix.
+- **[Feat]** **Greg Character**:
+    - **New Challenger**: Added Greg to the roster with full sprite sheet support.
+    - **Mechanics**: Implemented "Side Sig Ghost" with custom 3-frame animation.
+- **[S]** **STATUS**: Performance improved, roster expanded, and critical visual bugs resolved.
+
+---

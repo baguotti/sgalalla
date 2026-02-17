@@ -11,7 +11,7 @@ export class MainMenuScene extends Phaser.Scene {
     private menuOptions = [
         { label: 'TRAINING', mode: 'training' },
         { label: 'BOTTE IN LOCALE', mode: 'versus' },
-        { label: '1v1', mode: 'online' }
+        { label: 'BOTTE IN REMOTO', mode: 'online' }
     ];
     private menuTexts: Phaser.GameObjects.Text[] = [];
 
@@ -37,7 +37,7 @@ export class MainMenuScene extends Phaser.Scene {
 
 
 
-        this.add.text(width / 2, 270, 'v0.12.6', {
+        this.add.text(width / 2, 270, 'v0.12.7', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(0.5);
 

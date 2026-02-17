@@ -118,4 +118,23 @@ export class EffectManager {
         // Clean up FX if any added
         if (ghost.preFX) ghost.preFX.clear();
     }
+
+    public spawnWallDust(x: number, y: number, facing: number): void {
+        // Simple "puff" cloud
+        const p = this.scene.add.circle(x + (facing * 10), y, 3, 0xffffff);
+        p.setAlpha(0.6);
+        p.setDepth(20);
+
+        this.scene.tweens.add({
+            targets: p,
+            x: p.x + (facing * 15), // Drift away from wall
+            y: p.y - 10,            // Drift up
+            alpha: 0,
+            scale: 0.1,
+            duration: 300,
+            onComplete: () => {
+                p.destroy();
+            }
+        });
+    }
 }

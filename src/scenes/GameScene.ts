@@ -75,10 +75,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.load.atlas('nock', 'assets/nock/nock.png', 'assets/nock/nock.json');
         this.load.atlas('greg', 'public/assets/greg/greg.png', 'public/assets/greg/greg.json');
 
+        this.load.atlas('greg', 'public/assets/greg/greg.png', 'public/assets/greg/greg.json');
+
         // Legacy Greg Run Frames (Removed as now in Atlas)
 
 
         // Load Maps
+
         this.load.image('background_lake', 'assets/pixel-lake08-sunny-water.jpg');
         // New Stage Background
         this.load.image('adria_bg', 'assets/adria_background.webp');
@@ -142,9 +145,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // Special cases / Extra mappings to ensure all keys exist
             const ensureAnim = (key: string, frameName: string, frameIndex: number = 0) => {
                 if (!this.anims.exists(key)) {
+                    // Fix: If using 'fok_' fallback frames, look in 'fok' atlas, otherwise use character atlas
+                    const textureKey = frameName.startsWith('fok_') ? 'fok' : char;
+
                     this.anims.create({
                         key: key,
-                        frames: this.anims.generateFrameNames(char, { prefix: frameName, start: frameIndex, end: frameIndex, zeroPad: 3 }),
+                        frames: this.anims.generateFrameNames(textureKey, { prefix: frameName, start: frameIndex, end: frameIndex, zeroPad: 3 }),
                         frameRate: 10,
                         repeat: 0
                     });
@@ -618,7 +624,44 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     private debugUpdateCounter = 0;
 
+    /**
+     * Chromatic Aberration Implementation:
+     * Uses built-in Camera Shake + Flash red/blue as a cheap "vibe" alternative 
+     * if simple CA shader isn't available, but here we will try to use the ColorMatrix 
+     * or simple camera shake which natively does some of this feeling.
+     * 
+     * ACTUALLY: Let's use a "Glitch" shake.
+     */
+    public triggerChromaticAberration(intensity: number, duration: number): void {
+        // Method 1: Camera Shake (Physical impact)
+        this.cameras.main.shake(duration, intensity);
+
+        // Method 2: Flash colors (Visual impact)
+        // A very short flash of a complementary color can simulate eye shock
+        // this.cameras.main.flash(50, 255, 0, 0); // Too aggressive?
+
+        // Method 3: PostFX (The Real Deal - if supported)
+        // note: requires pipeline support. For now, let's stick to a targeted shake
+        // coupled with a slight zoom punch.
+
+        // Zoom Punch
+        // Use 'any' cast to access custom property if not typed, or fallback to current zoom
+        const originalZoom = (this as any).targetZoom || this.cameras.main.zoom;
+        this.tweens.add({
+            targets: this.cameras.main,
+            zoom: originalZoom * 1.02, // 2% punch in
+            duration: 50,
+            yoyo: true,
+            onComplete: () => {
+                // Ensure we return to normal (handled by updateCamera usually)
+            }
+        });
+    }
+
     update(_time: number, delta: number): void {
+        // --- HITSTOP REMOVED --- 
+        // Logic flows normally now.
+
         this.debugUpdateCounter++;
 
         // Stop updates if game over
