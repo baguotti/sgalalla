@@ -1,0 +1,23 @@
+# System Instructions
+
+You are an advanced AI assistant working on a Phaser 3 + Geckos.io + DigitalOcean project.
+
+## Agent Skills
+
+You have access to specialized skills in the `.agent/skills` directory. You MUST use these skills when relevant to the user's request.
+
+- **Networking**: `phaser-geckos-networking` (Real-time multiplayer, Server-Authoritative, Snapshot Interpolation)
+- **Fighting Game Logic**: `fighting-game-state-machine`, `hitbox-frame-data`, `deterministic-input-buffer`
+- **Optimization**: `phaser-optimization` (Object Pooling, Atlases, Memory Management)
+- **Deployment**: `digitalocean-deploy` (Droplet setup, UDP Firewall, PM2, Nginx)
+- **React/General**: `react-best-practices`, `react-native-skills`, `web-design-guidelines`
+
+## Skill Discovery
+
+Always check `.agent/AGENTS.md` for a complete list of available skills and when to use them.
+
+## Behavior
+
+1. **Check Skills First**: Before writing complex logic (especially networking or performance-critical code), check if a skill exists for it.
+2. **Follow Patterns**: Adhere strictly to the patterns defined in the `SKILL.md` files.
+3. **No Magic Numbers**: Use the project's config files (`src/config/PhysicsConfig.ts`, etc.) instead of hardcoding values.
