@@ -64,3 +64,17 @@ Part 2
 - **[WIP]** **Pe Character**:
     - **Integration**: Generated new atlas with 43 frames (Idle, Run, Attacks).
     - **Status**: Idle works. Run/Ghost animations pending debug.
+
+---
+
+### [2026-02-17] v0.12.5 - Pe Mechanics & Optimization
+- **[V]** `v0.12.5`
+- **[Fix]** **Pe Character**:
+    - **Mechanics**: Implemented missing "Side Sig Ghost" animation and hitbox logic (FSM-ready).
+    - **HUD**: Added fallback icon for Pe (using idle frame) to fix missing asset issue.
+    - **Visuals**: Enabled full texture atlas support for Pe, resolving run animation glitch.
+- **[Refactor]** **Optimization**:
+    - **Object Pooling**: Implemented `BombPool` for efficient projectile recycling, reducing GC pressure.
+    - **Rendering**: Enabled Texture Atlases for `fok`, `sgu`, and `sga` to minimize draw calls.
+- **[Docs]** **Process**:
+    - **Skill Audit**: Integrated `find-skills` workflow to audit and validate project dependencies.
