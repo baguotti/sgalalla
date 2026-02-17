@@ -157,6 +157,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.load.image('background', 'assets/background.png'); // Keep for fallback?
 
         this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
+        this.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');
+        this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
+        this.load.atlas('pe', 'assets/pe/pe.png', 'assets/pe/pe.json');
 
         // Greg Run Frames (Standalone - Atlas Missing)
         ['greg'].forEach(char => {
@@ -194,8 +197,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 if (this.anims.exists(animKey)) return;
 
                 let frames;
-                if (animName === 'run' && ['greg', 'pe'].includes(char)) {
-                    // Greg/Pe Run (Standalone Frames)
+                if (animName === 'run' && ['greg'].includes(char)) {
+                    // Greg Run (Standalone Frames)
                     frames = [];
                     for (let i = 0; i <= 8; i++) {
                         frames.push({ key: `${char}_run_00${i}` });

@@ -135,6 +135,9 @@ export const charConfigs: Record<string, CharacterAnimations> = {
         dash: { prefix: 'pe_dash_', count: 1, suffix: '000', loop: false },
         spot_dodge: { prefix: 'pe_dodge_', count: 1, suffix: '000', loop: false },
 
+        // Side Sig Ghost
+        side_sig_ghost: { prefix: 'pe_side_sig_ghost_', count: 1, loop: false },
+
         // --- LIGHT ATTACKS ---
         attack_light_neutral: { prefix: 'pe_side_light_', count: 1, suffix: '000', loop: false },
         attack_light_side: { prefix: 'pe_side_light_', count: 1, suffix: '000', loop: false },

@@ -17,7 +17,7 @@ export interface GameSceneInterface extends Phaser.Scene {
     chests: Chest[];
 
     /** Active bombs in the scene (GameScene only; unused in OnlineGameScene) */
-    bombs: Bomb[] | Map<number, Bomb>;
+    bombs: Phaser.GameObjects.Group | Map<number, Bomb>;
 
     /** Add a bomb to the scene tracker */
     addBomb(bomb: Bomb): void;

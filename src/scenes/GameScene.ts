@@ -20,7 +20,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private debugOverlay!: DebugOverlay;
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
-    public bombs: Bomb[] = [];
+    public bombs!: Phaser.GameObjects.Group;
     public chests: Chest[] = [];
     public seals: any[] = []; // Seal projectiles
     private background!: Phaser.GameObjects.Graphics;
@@ -67,10 +67,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
     private loadCharacterAssets(): void {
-        this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
-
-        // Sgu Ghost Frames (Standalone)
-        // NOTE: These are now in the 'sgu' atlas.
+        // Load Atlases
+        this.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');
+        this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
+        this.load.atlas('pe', 'assets/pe/pe.png', 'assets/pe/pe.json');
 
         // Greg Run Frames (Standalone - Atlas Missing)
         ['greg'].forEach(char => {
@@ -113,8 +113,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
                 let frames;
                 // Special handling for Sgu Ghost (Standalone Frames)
-                if (animName === 'run' && ['greg', 'pe'].includes(char)) {
-                    // Greg/Pe/Sga Run (Standalone Frames)
+                if (animName === 'run' && ['greg'].includes(char)) {
+                    // Greg Run (Standalone Frames)
                     frames = [];
                     for (let i = 0; i <= 8; i++) {
                         frames.push({ key: `${char}_run_00${i}` });
@@ -211,19 +211,16 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
     }
 
-    public addBomb(bomb: Bomb): void {
-        this.bombs.push(bomb);
+    public addBomb(_bomb: Bomb): void {
+        // No-op: Group handles list management
     }
 
-    public removeBomb(bomb: Bomb): void {
-        const index = this.bombs.indexOf(bomb);
-        if (index > -1) {
-            this.bombs.splice(index, 1);
-        }
+    public removeBomb(_bomb: Bomb): void {
+        // No-op: Group handles list management
     }
 
     public getBombs(): Bomb[] {
-        return this.bombs;
+        return this.bombs.getChildren() as Bomb[];
     }
 
     public getPlayers(): Player[] {
@@ -266,7 +263,19 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.softPlatforms = [];
             this.walls = [];
             this.wallTexts = [];
-            this.bombs = [];
+            this.walls = [];
+            this.wallTexts = [];
+
+            // Re-create bomb group if needed or clear it
+            if (this.bombs) {
+                this.bombs.clear(true, true);
+            }
+            this.bombs = this.add.group({
+                classType: Bomb,
+                runChildUpdate: true,
+                maxSize: 20 // Reasonable limit for performance
+            });
+
             this.chests.forEach(c => c.destroy());
             this.chests = [];
             this.isGameOver = false;
@@ -478,9 +487,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const x = Phaser.Math.Between(padding, width - padding);
         const y = 0; // Top of screen (inside bounds)
 
-        const bomb = new Bomb(this, x, y);
-        if (this.uiCamera) {
-            this.uiCamera.ignore(bomb);
+        const bomb = this.bombs.get(x, y) as Bomb;
+        if (bomb) {
+            bomb.enable(x, y);
+            if (this.uiCamera) {
+                this.uiCamera.ignore(bomb);
+            }
         }
     }
 

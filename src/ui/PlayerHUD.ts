@@ -125,9 +125,13 @@ export class PlayerHudSlot {
 
         // Standardized Icon Retrieval for Fok and Sgu
         // Standardized Icon Retrieval for Fok and Sgu
-        if (['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'].includes(character.toLowerCase())) {
+        if (['fok', 'sgu', 'sga', 'nock', 'greg'].includes(character.toLowerCase())) {
             texture = character.toLowerCase(); // Texture key is 'fok', 'sgu'
             frame = `00_${character.toLowerCase()}_icon`;
+        } else if (character.toLowerCase() === 'pe') {
+            // Pe does not have an icon in the atlas yet, use idle frame
+            texture = 'pe';
+            frame = 'pe_idle_000';
         } else {
             // Fallback for legacy/other characters
             texture = character;

@@ -10,7 +10,7 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
     private graceTimer: number = 0;
     constructor(scene: Phaser.Scene, x: number, y: number) {
         // Create a temporary texture if it doesn't exist
-        const textureKey = 'bomb_v6'; // New texture key to force regenerate
+        const textureKey = 'bomb_v6';
         const radius = PhysicsConfig.BOMB_RADIUS;
         const diameter = radius * 2;
 
@@ -22,27 +22,72 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         }
 
         super(scene.matter.world, x, y, textureKey);
-
+        
+        // Initial setup (Physics properties that don't change)
         this.setCircle(radius);
         this.setBounce(PhysicsConfig.BOMB_BOUNCE);
         this.setFriction(PhysicsConfig.BOMB_FRICTION);
         this.setDensity(PhysicsConfig.BOMB_DENSITY);
-
-        scene.add.existing(this);
-
-
-        // Register to scene via Interface
-        const gameScene = scene as GameSceneInterface;
-        if (gameScene.addBomb) {
-            gameScene.addBomb(this);
-        }
-
+        
         this.setDepth(100);
 
         // Handle collisions
         this.setOnCollide((data: Phaser.Types.Physics.Matter.MatterCollisionData) => {
-            this.handleCollision(data);
+            if (this.active) {
+                this.handleCollision(data);
+            }
         });
+
+        // Start disabled for pooling
+        this.setActive(false);
+        this.setVisible(false);
+        if (this.world) {
+            this.scene.matter.world.remove(this.body as MatterJS.BodyType);
+        }
+    }
+
+    public enable(x: number, y: number): void {
+        this.setPosition(x, y);
+        this.setActive(true);
+        this.setVisible(true);
+        
+        // Reset state
+        this.isThrown = false;
+        this.fuseTimer = 0;
+        this.isExploded = false;
+        this.thrower = null;
+        this.graceTimer = 0;
+        
+        // Re-enable physics
+        if (this.body) {
+             this.scene.matter.world.add(this.body as MatterJS.BodyType);
+             this.setVelocity(0, 0);
+             this.setAngularVelocity(0);
+             this.setIgnoreGravity(false);
+             this.setSensor(false);
+        }
+
+        // Register to scene via Interface (Legacy support if needed, or removed if using Group)
+        const gameScene = this.scene as GameSceneInterface;
+        if (gameScene.addBomb) {
+            gameScene.addBomb(this);
+        }
+    }
+
+    public disable(): void {
+        this.setActive(false);
+        this.setVisible(false);
+        
+        // Remove from physics world
+        if (this.body && this.world) {
+            this.scene.matter.world.remove(this.body as MatterJS.BodyType);
+        }
+
+        // Remove from scene list
+        const gameScene = this.scene as GameSceneInterface;
+        if (gameScene.removeBomb) {
+            gameScene.removeBomb(this);
+        }
     }
 
     public onThrown(thrower: any): void {
@@ -127,7 +172,8 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         this.scene.cameras.main.shake(PhysicsConfig.BOMB_SHAKE_DURATION, PhysicsConfig.BOMB_SHAKE_INTENSITY);
 
         // Destroy the bomb
-        this.destroy();
+        // Disable instead of destroy
+        this.disable();
     }
 
     destroy(fromScene?: boolean): void {

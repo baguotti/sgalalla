@@ -304,7 +304,7 @@ export class PlayerCombat {
             // Side Sig Ghost: Spawn immediately so remote players see it
             if (this.currentAttack.data.type === AttackType.HEAVY &&
                 this.currentAttack.data.direction === AttackDirection.SIDE &&
-                (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga')) {
+                (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe')) {
                 this.updateGhostEffect();
             }
 
@@ -508,7 +508,7 @@ export class PlayerCombat {
         // Side Sig Ghost Effect (Fok & Sgu)
         if (this.currentAttack.data.type === AttackType.HEAVY &&
             this.currentAttack.data.direction === AttackDirection.SIDE &&
-            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga')) {
+            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe')) {
 
             this.updateGhostEffect();
         } else {
@@ -629,7 +629,7 @@ export class PlayerCombat {
         // Hitbox must follow the ghost sprite
         if (this.currentAttack.data.type === AttackType.HEAVY &&
             this.currentAttack.data.direction === AttackDirection.SIDE &&
-            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga') &&
+            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe') &&
             this.ghostSprite && this.ghostSprite.active) {
 
             // Override position to match ghost
@@ -657,7 +657,7 @@ export class PlayerCombat {
 
             // Side Sig Damage Scaling (Fok & Sgu)
             // Min 6 -> Max 20 based on charge
-            if ((this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga') &&
+            if ((this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe') &&
                 this.currentAttack.data.type === AttackType.HEAVY &&
                 this.currentAttack.data.direction === AttackDirection.SIDE) {
 
