@@ -163,7 +163,7 @@ export const charConfigs: Record<string, CharacterAnimations> = {
     },
     'nock': {
         idle: { prefix: 'nock_idle_', count: 17, loop: true },
-        run: { prefix: 'nick_run_', count: 9, loop: true }, // Note: nick_run (atlas naming)
+        run: { prefix: 'nock_run_', count: 9, loop: true },
         charging: { prefix: 'nock_charge_', count: 2, loop: true },
 
         dash: { prefix: 'nock_dash_', count: 1, suffix: '000', loop: false },
@@ -183,6 +183,9 @@ export const charConfigs: Record<string, CharacterAnimations> = {
         attack_heavy_side: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_down: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
 
+        // Side Sig Ghost
+        side_sig_ghost: { prefix: 'nock_side_sig_ghost_', count: 1, suffix: '000', loop: false },
+
         // Utilities
         wall_slide: { prefix: 'nock_wall_slide_', count: 1, suffix: '000', loop: false },
         recovery: { prefix: 'nock_recovery_', count: 1, suffix: '000', loop: false },
@@ -199,6 +202,9 @@ export const charConfigs: Record<string, CharacterAnimations> = {
 
         dash: { prefix: 'greg_dash_', count: 1, suffix: '000', loop: false },
         spot_dodge: { prefix: 'greg_dodge_', count: 1, suffix: '000', loop: false },
+
+        // Side Sig Ghost
+        side_sig_ghost: { prefix: 'greg_side_sig_ghost_', count: 3, loop: false },
 
         // --- LIGHT ATTACKS ---
         attack_light_neutral: { prefix: 'greg_side_light_', count: 1, suffix: '000', loop: false },

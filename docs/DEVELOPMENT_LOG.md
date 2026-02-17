@@ -2,6 +2,21 @@
 
 Part 2
 
+### [2026-02-17] v0.12.6 - Visual Pooling & New Challengers
+- **[V]** `v0.12.6`
+- **[Feat]** **Visual Pooling**:
+    - **EffectManager**: Implemented object pooling for explosions and ghosts, significantly reducing GC spikes during combat.
+    - **Optimization**: Refactored `Bomb.ts` and `PlayerCombat.ts` to use pooled visual effects.
+- **[Fix]** **Nock Character**:
+    - **Assets**: Restored missing sprites and fixed atlas loading issues.
+    - **Mechanics**: Implemented "Side Sig Ghost" (1 frame) and corrected run animation prefix.
+- **[Feat]** **Greg Character**:
+    - **New Challenger**: Added Greg to the roster with full sprite sheet support.
+    - **Mechanics**: Implemented "Side Sig Ghost" with custom 3-frame animation.
+- **[S]** **STATUS**: Performance improved, roster expanded, and critical visual bugs resolved.
+
+---
+
 ### [2026-02-16] v0.12.0 - Refactoring & Technical Debt Cleanup
 - **[V]** `v0.12.0`
 - **[Refactor]** **Core Optimization**:

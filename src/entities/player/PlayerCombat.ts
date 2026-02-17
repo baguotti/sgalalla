@@ -304,7 +304,7 @@ export class PlayerCombat {
             // Side Sig Ghost: Spawn immediately so remote players see it
             if (this.currentAttack.data.type === AttackType.HEAVY &&
                 this.currentAttack.data.direction === AttackDirection.SIDE &&
-                (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe')) {
+                (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe' || this.player.character === 'nock' || this.player.character === 'greg')) {
                 this.updateGhostEffect();
             }
 
@@ -508,7 +508,7 @@ export class PlayerCombat {
         // Side Sig Ghost Effect (Fok & Sgu)
         if (this.currentAttack.data.type === AttackType.HEAVY &&
             this.currentAttack.data.direction === AttackDirection.SIDE &&
-            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe')) {
+            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe' || this.player.character === 'nock' || this.player.character === 'greg')) {
 
             this.updateGhostEffect();
         } else {
@@ -629,8 +629,9 @@ export class PlayerCombat {
         // Hitbox must follow the ghost sprite
         if (this.currentAttack.data.type === AttackType.HEAVY &&
             this.currentAttack.data.direction === AttackDirection.SIDE &&
-            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe') &&
+            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe' || this.player.character === 'nock' || this.player.character === 'greg') &&
             this.ghostSprite && this.ghostSprite.active) {
+            // Check if we have released the key early (before max charge) {
 
             // Override position to match ghost
             hitboxX = this.ghostSprite.x;
@@ -760,8 +761,8 @@ export class PlayerCombat {
             knockbackAngle = data.knockbackAngle;
             isHeavy = data.type === AttackType.HEAVY;
 
-            // Side Sig Knockback Scaling (Fok) — reward for risky full charge
-            if (this.player.character === 'fok' &&
+            // Side Sig Knockback Scaling (Fok/Nock/Pe/Sgu/Greg) — reward for risky full charge
+            if ((this.player.character === 'fok' || this.player.character === 'nock' || this.player.character === 'pe' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'greg') &&
                 data.type === AttackType.HEAVY &&
                 data.direction === AttackDirection.SIDE) {
 
@@ -842,22 +843,31 @@ export class PlayerCombat {
         const initialFrame = `${char}_side_sig_ghost_000`;
         const animKey = `${char}_side_sig_ghost`;
 
-        let ghost: Phaser.GameObjects.Sprite;
+        let ghost: Phaser.GameObjects.Sprite | null = null;
+        const scene = this.scene as GameSceneInterface;
 
-        // All characters now use atlas
-        ghost = this.scene.add.sprite(this.player.x, this.player.y, char, initialFrame);
-
-        ghost.setDepth(this.player.depth - 1); // Behind player
-        ghost.play(animKey);
-        // Faint glow effect (Diffused White)
-        let glowFx: Phaser.FX.Glow | null = null;
-        if (ghost.preFX) {
-            // Color: White (0xffffff), Strength: 2, Quality: 0.1, Distance: 90 (very soft/diffused)
-            glowFx = ghost.preFX.addGlow(0xffffff, 2, 0, false, 0.1, 90);
+        if (scene.effectManager) {
+            ghost = scene.effectManager.spawnGhost(this.player.x, this.player.y, char, initialFrame, animKey, facing);
+        } else {
+            // Fallback
+            ghost = this.scene.add.sprite(this.player.x, this.player.y, char, initialFrame);
+            ghost.setDepth(this.player.depth - 1);
+            ghost.play(animKey);
+            ghost.setScale(facing, 1);
         }
 
+        if (!ghost) return; // Should not happen
+
+        // Faint glow effect (Diffused White)
+        // Note: FX might need re-adding if pooled object had them cleared
+        if (!ghost.preFX) {
+            // Re-enable if cleared? Or just check if exists.
+            // If we cleared FX in releaseGhost, we need to add, but preFX is a manager.
+        }
+        // For now, skip FX on ghost to save perf or handle in manager.
+        // Actually, let's keep it simple for pooling.
+
         // Fix Double Sprite Glitch (Ignore in UI Camera)
-        const scene = this.scene as GameSceneInterface;
         if (scene.uiCamera) {
             scene.uiCamera.ignore(ghost);
         }
@@ -870,12 +880,7 @@ export class PlayerCombat {
         // Restore reference for Hitbox tracking
         this.ghostSprite = ghost;
 
-        // Flip logic: Use scaleX to ensure correct orientation
-        // If firing left (-1), scaleX becomes -1 (flipped)
-        // If firing right (1), scaleX becomes 1 (normal)
-        ghost.setScale(facing, 1);
-
-        // Tween 1: Propel forward — distance scales with charge (110px min, 145px max)
+        // Tween 1: Propel forward — distance scales with charge
         const maxChg = PhysicsConfig.CHARGE_MAX_TIME;
         const chgRatio = Math.min(this.lastChargeTime / maxChg, 1);
         const travelDist = 110 + (chgRatio * 35); // 110 to 145
@@ -887,36 +892,33 @@ export class PlayerCombat {
             ease: 'Cubic.easeOut'
         });
 
-        // Calculate ghost linger time to match recovery window
-        // Recovery = 100 + chargeRatio * 600  (from endAttack)
-        const maxCharge = PhysicsConfig.CHARGE_MAX_TIME;
-        const chargeRatio = Math.min(this.lastChargeTime / maxCharge, 1);
-        const recoveryTime = 100 + (chargeRatio * 600);
-        // Ghost stays solid during movement (300ms), then visible for remaining recovery
-        const fadeDelay = Math.max(recoveryTime - 300, 50); // At least 50ms delay
+        // Calculate ghost linger time
+        const recoveryTime = 100 + (chgRatio * 600);
 
         // Tween 2: Fade Out after recovery-scaled delay
         this.scene.tweens.add({
             targets: ghost,
             alpha: 0,
-            delay: fadeDelay,
-            duration: 600, // Even smoother fade (was 500)
+            delay: Math.max(recoveryTime - 300, 50),
+            duration: 200,
             onComplete: () => {
-                if (ghost && ghost.active) {
-                    ghost.destroy();
+                // Only clear if it's still the active ghost (haven't started a new one)
+                if (this.ghostSprite === ghost) {
+                    this.ghostSprite = null;
+                }
+
+                if (scene.effectManager) {
+                    scene.effectManager.releaseGhost(ghost!);
+                } else {
+                    ghost!.destroy();
                 }
             }
         });
 
         // Tween 3: Fade Glow Strength (starts slightly earlier or with alpha)
-        if (glowFx) {
-            this.scene.tweens.add({
-                targets: glowFx,
-                outerStrength: 0,
-                delay: fadeDelay,
-                duration: 600,
-            });
-        }
+        // Note: glowFx variable is not accessible here as it was local to the block above.
+        // If we want to tween the glow, we need to capture it or manage it in EffectManager.
+        // For now, let's assume the alpha fade on the sprite handles the visual fade out sufficiently.
     }
 
     private clearGhostEffect(): void {

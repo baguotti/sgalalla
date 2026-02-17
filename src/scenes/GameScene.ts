@@ -9,6 +9,7 @@ import { charConfigs, ALL_CHARACTERS, ANIM_FRAME_RATES } from '../config/Charact
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
 import { createStage as createSharedStage } from '../stages/StageFactory';
+import { EffectManager } from '../effects/EffectManager';
 
 import type { GameSceneInterface } from './GameSceneInterface';
 
@@ -25,7 +26,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     public seals: any[] = []; // Seal projectiles
     private background!: Phaser.GameObjects.Graphics;
     private backgroundImage!: Phaser.GameObjects.Image; // Add class property
-    private walls: Phaser.GameObjects.Rectangle[] = [];
+    public walls: Phaser.GameObjects.Rectangle[] = [];
     private wallTexts: Phaser.GameObjects.Text[] = [];
 
     // Debug visibility
@@ -71,13 +72,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');
         this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
         this.load.atlas('pe', 'assets/pe/pe.png', 'assets/pe/pe.json');
+        this.load.atlas('nock', 'assets/nock/nock.png', 'assets/nock/nock.json');
+        this.load.atlas('greg', 'public/assets/greg/greg.png', 'public/assets/greg/greg.json');
 
-        // Greg Run Frames (Standalone - Atlas Missing)
-        ['greg'].forEach(char => {
-            for (let i = 0; i <= 8; i++) {
-                this.load.image(`${char}_run_00${i}`, `assets/${char}/${char}_run_00${i}.png`);
-            }
-        });
+        // Legacy Greg Run Frames (Removed as now in Atlas)
 
 
         // Load Maps
@@ -112,14 +110,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 if (this.anims.exists(animKey)) return;
 
                 let frames;
-                // Special handling for Sgu Ghost (Standalone Frames)
-                if (animName === 'run' && ['greg'].includes(char)) {
-                    // Greg Run (Standalone Frames)
-                    frames = [];
-                    for (let i = 0; i <= 8; i++) {
-                        frames.push({ key: `${char}_run_00${i}` });
-                    }
-                } else if (animData.count === 1 && animData.suffix) {
+                if (animData.count === 1 && animData.suffix) {
                     frames = this.anims.generateFrameNames(char, {
                         prefix: animData.prefix,
                         start: parseInt(animData.suffix),
@@ -232,6 +223,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private matchHUD!: MatchHUD;
     private playerData: any[] = [];
 
+    public effectManager!: EffectManager;
+
     init(data: any): void {
         if (data.playerData) {
             this.playerData = data.playerData;
@@ -250,6 +243,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     create(): void {
         try {
+            // Initialize Effect Manager
+            this.effectManager = new EffectManager(this);
 
             // CRITICAL: Reset state arrays on scene restart
             // CRITICAL: Reset state arrays on scene restart

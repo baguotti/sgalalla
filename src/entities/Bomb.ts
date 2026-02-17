@@ -22,13 +22,13 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         }
 
         super(scene.matter.world, x, y, textureKey);
-        
+
         // Initial setup (Physics properties that don't change)
         this.setCircle(radius);
         this.setBounce(PhysicsConfig.BOMB_BOUNCE);
         this.setFriction(PhysicsConfig.BOMB_FRICTION);
         this.setDensity(PhysicsConfig.BOMB_DENSITY);
-        
+
         this.setDepth(100);
 
         // Handle collisions
@@ -50,21 +50,21 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         this.setPosition(x, y);
         this.setActive(true);
         this.setVisible(true);
-        
+
         // Reset state
         this.isThrown = false;
         this.fuseTimer = 0;
         this.isExploded = false;
         this.thrower = null;
         this.graceTimer = 0;
-        
+
         // Re-enable physics
         if (this.body) {
-             this.scene.matter.world.add(this.body as MatterJS.BodyType);
-             this.setVelocity(0, 0);
-             this.setAngularVelocity(0);
-             this.setIgnoreGravity(false);
-             this.setSensor(false);
+            this.scene.matter.world.add(this.body as MatterJS.BodyType);
+            this.setVelocity(0, 0);
+            this.setAngularVelocity(0);
+            this.setIgnoreGravity(false);
+            this.setSensor(false);
         }
 
         // Register to scene via Interface (Legacy support if needed, or removed if using Group)
@@ -77,7 +77,7 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
     public disable(): void {
         this.setActive(false);
         this.setVisible(false);
-        
+
         // Remove from physics world
         if (this.body && this.world) {
             this.scene.matter.world.remove(this.body as MatterJS.BodyType);
@@ -121,25 +121,22 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         if (this.isExploded) return;
         this.isExploded = true;
 
-        // Visual effect: single small yellow circle
-        const visualRadius = PhysicsConfig.BOMB_EXPLOSION_VISUAL_RADIUS;
-        const explosionGraphics = this.scene.add.graphics();
-        explosionGraphics.fillStyle(0xffff00, 1);
-        explosionGraphics.fillCircle(this.x, this.y, visualRadius);
-
-        // Prevent ghosting in UI Camera
+        // Use Effect Manager for explosion visual
         const gameScene = this.scene as GameSceneInterface;
-        if (gameScene.addToCameraIgnore) {
-            gameScene.addToCameraIgnore(explosionGraphics);
+        if (gameScene.effectManager) {
+            gameScene.effectManager.spawnExplosion(this.x, this.y, PhysicsConfig.BOMB_EXPLOSION_VISUAL_RADIUS, 0xffff00);
+        } else {
+            // Fallback (should not happen if GameScene is initialized correctly)
+            const explosionGraphics = this.scene.add.graphics();
+            explosionGraphics.fillStyle(0xffff00, 1);
+            explosionGraphics.fillCircle(this.x, this.y, PhysicsConfig.BOMB_EXPLOSION_VISUAL_RADIUS);
+            this.scene.tweens.add({
+                targets: explosionGraphics,
+                alpha: 0,
+                duration: PhysicsConfig.BOMB_EXPLOSION_FADE_MS,
+                onComplete: () => explosionGraphics.destroy()
+            });
         }
-
-        // Quick fade out
-        this.scene.tweens.add({
-            targets: explosionGraphics,
-            alpha: 0,
-            duration: PhysicsConfig.BOMB_EXPLOSION_FADE_MS,
-            onComplete: () => explosionGraphics.destroy()
-        });
 
         // Damage nearby players (blast radius for logic remains 80 or similar)
         const blastRadius = PhysicsConfig.BOMB_BLAST_RADIUS;

@@ -16,6 +16,10 @@ export interface GameSceneInterface extends Phaser.Scene {
     /** Active chests in the scene */
     chests: Chest[];
 
+    /** Active walls in the scene (GameScene only; unused in OnlineGameScene) */
+    walls?: Phaser.GameObjects.Rectangle[];
+    effectManager?: any; // Avoiding circular dependency with EffectManager type for now, or use import type
+
     /** Active bombs in the scene (GameScene only; unused in OnlineGameScene) */
     bombs: Phaser.GameObjects.Group | Map<number, Bomb>;
 
