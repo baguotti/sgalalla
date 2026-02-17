@@ -82,16 +82,6 @@ Part 2
 
 ---
 
-### [2026-02-17] v0.12.7 - Polish & Deep Clean
-- **[V]** `v0.12.7`
-- **[Feat]** **Game Feel**:
-    - **Wall Slide Dust**: Added subtle particle effects when sliding down walls (`PlayerPhysics.ts` + `EffectManager.ts`).
-    - **Renaming**: Changed "1v1" to "**BOTTE IN REMOTO**" in Main Menu for clarity.
-- **[Refactor]** **Deep Code Cleanup**:
-    - **Zombie Code**: Removed residual/dead "Chromatic Aberration" code from `GameScene` and `PlayerCombat`.
-    - **Audit**: Conducted deep structure analysis (`audit_report_2.md`) identifying unused assets and complexity hotspots.
-- **[S]** **STATUS**: Codebase is verifying clean and ready for next feature phase.
-
     ### [2026-02-17] v0.12.6 - Visual Pooling & New Challengers
 - **[V]** `v0.12.6`
 - **[Feat]** **Visual Pooling**:
@@ -105,4 +95,25 @@ Part 2
     - **Mechanics**: Implemented "Side Sig Ghost" with custom 3-frame animation.
 - **[S]** **STATUS**: Performance improved, roster expanded, and critical visual bugs resolved.
 
----
+### [2026-02-17] v0.12.7 - Polish & Deep Clean
+- **[V]** `v0.12.7`
+- **[Feat]** **Game Feel**:
+    - **Wall Slide Dust**: Added subtle particle effects when sliding down walls (`PlayerPhysics.ts` + `EffectManager.ts`).
+    - **Renaming**: Changed "1v1" to "**BOTTE IN REMOTO**" in Main Menu for clarity.
+- **[Refactor]** **Deep Code Cleanup**:
+    - **Zombie Code**: Removed residual/dead "Chromatic Aberration" code from `GameScene` and `PlayerCombat`.
+    - **Audit**: Conducted deep structure analysis (`audit_report_2.md`) identifying unused assets and complexity hotspots.
+- **[S]** **STATUS**: Codebase is verifying clean and ready for next feature phase.
+
+### [2026-02-17] v0.12.8 - Animation Refactor & Scrin Polish 🎞️
+- **[V]** `v0.12.8`
+- **[Refactor]** **Animation System**:
+    - **Logic Extraction**: Created `AnimationHelpers.ts` to centralize asset loading and animation creation.
+    - **Deduplication**: Removed ~230 lines of redundant code between `GameScene` and `OnlineGameScene`.
+    - **Standardization**: Enforced consistent use of `CharacterConfig.ts` across all modes.
+- **[Polish]** **Scrin Reveal**:
+    - **"Pop & Focus"**: Replaced instant appearance with a punchy `Back.easeOut` scale animation simultaneously de-blurring the image.
+    - **Input Blocking**: Added `canClose` lock to prevent accidental closing during the reveal sequence (800ms).
+    - **Breathing**: Added gentle idle pulse to revealed images.
+- **[Fix]** **Types**: Resolved `Phaser.Geom.Rectangle` incompatibility in `GameSceneInterface`.
+- **[S]** **STATUS**: Animation pipeline robust; UI feel improved.

@@ -5,11 +5,12 @@ import { DebugOverlay } from '../components/DebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
 import { Bomb } from '../entities/Bomb';
 import { Chest } from '../entities/Chest';
-import { charConfigs, ALL_CHARACTERS, ANIM_FRAME_RATES } from '../config/CharacterConfig';
+import { charConfigs } from '../config/CharacterConfig';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
 import { createStage as createSharedStage } from '../stages/StageFactory';
 import { EffectManager } from '../effects/EffectManager';
+import { AnimationHelpers } from '../managers/AnimationHelpers';
 
 import type { GameSceneInterface } from './GameSceneInterface';
 
@@ -68,144 +69,16 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
     private loadCharacterAssets(): void {
-        // Load Atlases
-        this.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');
-        this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
-        this.load.atlas('pe', 'assets/pe/pe.png', 'assets/pe/pe.json');
-        this.load.atlas('nock', 'assets/nock/nock.png', 'assets/nock/nock.json');
-        this.load.atlas('greg', 'public/assets/greg/greg.png', 'public/assets/greg/greg.json');
-
-        this.load.atlas('greg', 'public/assets/greg/greg.png', 'public/assets/greg/greg.json');
-
-        // Legacy Greg Run Frames (Removed as now in Atlas)
-
-
-        // Load Maps
+        AnimationHelpers.loadCharacterAssets(this);
+        AnimationHelpers.loadCommonAssets(this);
 
         this.load.image('background_lake', 'assets/pixel-lake08-sunny-water.jpg');
         // New Stage Background
         this.load.image('adria_bg', 'assets/adria_background.webp');
-
-        // Preload scrin images for chest opening
-        const scrinFiles = [
-            'scrin_001.jpg', 'scrin_002.jpg', 'scrin_003.jpg', 'scrin_004.jpg', 'scrin_005.jpg',
-            'scrin_006.jpg', 'scrin_007.jpg', 'scrin_008.jpg', 'scrin_009.jpg', 'scrin_0010.jpg',
-            'scrin_0011.jpg', 'scrin_0012.jpg', 'scrin_0013.jpg', 'scrin_0014.jpg', 'scrin_0015.jpg',
-            'scrin_0016.jpg', 'scrin_0017.jpg', 'scrin_0018.jpg', 'scrin_0019.jpg', 'scrin_0020.jpg',
-            'scrin_0021.jpg', 'scrin_0022.jpg', 'scrin_0023.jpg', 'scrin_0024.jpg', 'scrin_0025.jpg',
-            'scrin_0026.jpg', 'scrin_0027.jpg', 'scrin_0028.jpg', 'scrin_0029.jpg', 'scrin_0030.jpg',
-            'scrin_0031.jpg'
-        ];
-
-        scrinFiles.forEach(file => {
-            const key = file.replace('.jpg', '').replace('.png', '');
-            this.load.image(key, `assets/scrins/${file}`);
-        });
     }
 
     private createAnimations(): void {
-        ALL_CHARACTERS.forEach(char => {
-            const config = charConfigs[char];
-            if (!config) return;
-
-            Object.entries(config).forEach(([animName, animData]) => {
-                const animKey = `${char}_${animName}`;
-                if (this.anims.exists(animKey)) return;
-
-                let frames;
-                if (animData.count === 1 && animData.suffix) {
-                    frames = this.anims.generateFrameNames(char, {
-                        prefix: animData.prefix,
-                        start: parseInt(animData.suffix),
-                        end: parseInt(animData.suffix),
-                        zeroPad: 3
-                    });
-                } else {
-                    frames = this.anims.generateFrameNames(char, {
-                        prefix: animData.prefix,
-                        start: 0,
-                        end: animData.count - 1,
-                        zeroPad: 3
-                    });
-                }
-
-                this.anims.create({
-                    key: animKey,
-                    frames: frames,
-                    frameRate: animName === 'run' ? ANIM_FRAME_RATES.RUN : ANIM_FRAME_RATES.DEFAULT,
-                    repeat: animData.loop ? -1 : 0
-                });
-
-
-                if (char === 'pe') {
-                    // Debug logging removed
-                }
-            });
-
-            // Special cases / Extra mappings to ensure all keys exist
-            const ensureAnim = (key: string, frameName: string, frameIndex: number = 0) => {
-                if (!this.anims.exists(key)) {
-                    // Fix: If using 'fok_' fallback frames, look in 'fok' atlas, otherwise use character atlas
-                    const textureKey = frameName.startsWith('fok_') ? 'fok' : char;
-
-                    this.anims.create({
-                        key: key,
-                        frames: this.anims.generateFrameNames(textureKey, { prefix: frameName, start: frameIndex, end: frameIndex, zeroPad: 3 }),
-                        frameRate: 10,
-                        repeat: 0
-                    });
-                }
-            };
-
-            ensureAnim(`${char}_attack_light_0`, 'fok_side_light_', 0);
-            ensureAnim(`${char}_attack_light_1`, 'fok_side_light_', 0);
-            ensureAnim(`${char}_dodge`, 'fok_dodge_', 0);
-            ensureAnim(`${char}_jump_start`, 'fok_jump_', 0);
-
-            // COMPATIBILITY ALIASING for 'fok'
-            // Alias new specific keys to existing legacy ones
-            const createAlias = (newSuffix: string, existingSuffix: string) => {
-                const newKey = `${char}_${newSuffix}`;
-                const existingKey = `${char}_${existingSuffix}`;
-                if (!this.anims.exists(newKey) && this.anims.exists(existingKey)) {
-                    const existingAnim = this.anims.get(existingKey);
-                    const frames = existingAnim.frames.map(f => ({ key: f.textureKey, frame: f.textureFrame }));
-                    this.anims.create({
-                        key: newKey,
-                        frames: frames,
-                        frameRate: 10,
-                        repeat: 0
-                    });
-                }
-            };
-
-            createAlias('attack_light_neutral', 'attack_light');
-            createAlias('attack_light_up', 'attack_up');
-            createAlias('attack_light_down', 'attack_down');
-            createAlias('attack_light_side', 'attack_side');
-            createAlias('attack_light_side_air', 'attack_side');
-
-            createAlias('attack_heavy_neutral', 'attack_heavy');
-            createAlias('attack_heavy_up', 'attack_up');
-            createAlias('attack_heavy_side', 'attack_side');
-            createAlias('attack_heavy_down', 'attack_down');
-
-            createAlias('spot_dodge', 'slide');
-            createAlias('dash', 'slide'); // Use slide for dash too (legacy fallback)
-        });
-
-        // Manual Animation: Fok Side Sig Ghost (from standalone images)
-        if (!this.anims.exists('fok_side_sig_ghost')) {
-            this.anims.create({
-                key: 'fok_side_sig_ghost',
-                frames: [
-                    { key: 'fok_ghost_0' },
-                    { key: 'fok_ghost_1' }
-                ],
-                frameRate: 10,
-                repeat: -1
-            });
-        }
+        AnimationHelpers.createAnimations(this);
     }
 
     public addBomb(_bomb: Bomb): void {

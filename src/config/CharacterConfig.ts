@@ -115,6 +115,7 @@ export const charConfigs: Record<string, CharacterAnimations> = {
 
         // --- HEAVY ATTACKS (SIGS) ---
         attack_heavy_neutral: { prefix: 'sga_up_sig_', count: 1, suffix: '000', loop: false },
+        attack_heavy_up: { prefix: 'sga_up_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_side: { prefix: 'sga_side_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_down: { prefix: 'sga_side_sig_', count: 1, suffix: '000', loop: false },
 

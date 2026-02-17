@@ -15,7 +15,7 @@ import { Bomb } from '../entities/Bomb';
 import { Chest } from '../entities/Chest';
 import NetworkManager from '../network/NetworkManager';
 import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '../network/NetworkManager';
-import { charConfigs, ALL_CHARACTERS, ANIM_FRAME_RATES } from '../config/CharacterConfig';
+import { AnimationHelpers } from '../managers/AnimationHelpers';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
 import { createStage as createSharedStage } from '../stages/StageFactory';
@@ -156,90 +156,14 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.load.image('adria_bg', 'assets/adria_background.webp');
         this.load.image('background', 'assets/background.png'); // Keep for fallback?
 
-        this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
-        this.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');
-        this.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
-        this.load.atlas('pe', 'assets/pe/pe.png', 'assets/pe/pe.json');
-
-        // Greg Run Frames (Standalone - Atlas Missing)
-        ['greg'].forEach(char => {
-            for (let i = 0; i <= 8; i++) {
-                this.load.image(`${char}_run_00${i}`, `assets/${char}/${char}_run_00${i}.png`);
-            }
-        });
-
-        // Preload scrin images for chest opening
-        const scrinFiles = [
-            'scrin_001.jpg', 'scrin_002.jpg', 'scrin_003.jpg', 'scrin_004.jpg', 'scrin_005.jpg',
-            'scrin_006.jpg', 'scrin_007.jpg', 'scrin_008.jpg', 'scrin_009.jpg', 'scrin_0010.jpg',
-            'scrin_0011.jpg', 'scrin_0012.jpg', 'scrin_0013.jpg', 'scrin_0014.jpg', 'scrin_0015.jpg',
-            'scrin_0016.jpg', 'scrin_0017.jpg', 'scrin_0018.jpg', 'scrin_0019.jpg', 'scrin_0020.jpg',
-            'scrin_0021.jpg', 'scrin_0022.jpg', 'scrin_0023.jpg', 'scrin_0024.jpg', 'scrin_0025.jpg',
-            'scrin_0026.jpg', 'scrin_0027.jpg', 'scrin_0028.jpg', 'scrin_0029.jpg', 'scrin_0030.jpg',
-            'scrin_0031.jpg'
-        ];
-
-        scrinFiles.forEach(file => {
-            const key = file.replace('.jpg', '').replace('.png', '');
-            this.load.image(key, `assets/scrins/${file}`);
-        });
+        AnimationHelpers.loadCharacterAssets(this);
+        AnimationHelpers.loadCommonAssets(this);
     }
 
 
 
     private createAnimations(): void {
-        ALL_CHARACTERS.forEach(char => {
-            const config = charConfigs[char];
-            if (!config) return;
-
-            Object.entries(config).forEach(([animName, animData]) => {
-                const animKey = `${char}_${animName}`;
-                if (this.anims.exists(animKey)) return;
-
-                let frames;
-                if (animName === 'run' && ['greg'].includes(char)) {
-                    // Greg Run (Standalone Frames)
-                    frames = [];
-                    for (let i = 0; i <= 8; i++) {
-                        frames.push({ key: `${char}_run_00${i}` });
-                    }
-                } else if (animData.count === 1 && animData.suffix) {
-                    frames = this.anims.generateFrameNames(char, {
-                        prefix: animData.prefix,
-                        start: parseInt(animData.suffix),
-                        end: parseInt(animData.suffix),
-                        zeroPad: 3
-                    });
-                } else {
-                    frames = this.anims.generateFrameNames(char, {
-                        prefix: animData.prefix,
-                        start: 0,
-                        end: animData.count - 1,
-                        zeroPad: 3
-                    });
-                }
-
-                this.anims.create({
-                    key: animKey,
-                    frames: frames,
-                    frameRate: animName === 'run' ? ANIM_FRAME_RATES.RUN : ANIM_FRAME_RATES.DEFAULT,
-                    repeat: animData.loop ? -1 : 0
-                });
-            });
-        });
-
-        // Manual Animation: Fok Side Sig Ghost (from standalone images)
-        if (!this.anims.exists('fok_side_sig_ghost')) {
-            this.anims.create({
-                key: 'fok_side_sig_ghost',
-                frames: [
-                    { key: 'fok_ghost_0' },
-                    { key: 'fok_ghost_1' }
-                ],
-                frameRate: 10,
-                repeat: -1
-            });
-        }
+        AnimationHelpers.createAnimations(this);
     }
 
     private setupCameras(): void {

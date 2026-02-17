@@ -17,7 +17,7 @@ export interface GameSceneInterface extends Phaser.Scene {
     chests: Chest[];
 
     /** Active walls in the scene (GameScene only; unused in OnlineGameScene) */
-    walls?: Phaser.GameObjects.Rectangle[];
+    walls?: Phaser.GameObjects.Rectangle[] | Phaser.Geom.Rectangle[];
     effectManager?: any; // Avoiding circular dependency with EffectManager type for now, or use import type
 
     /** Active bombs in the scene (GameScene only; unused in OnlineGameScene) */
@@ -37,4 +37,5 @@ export interface GameSceneInterface extends Phaser.Scene {
 
     /** Unified access to players list (abstracts away Array vs Map storage) */
     getPlayers(): Player[];
+
 }
