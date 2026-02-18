@@ -501,9 +501,7 @@ export class Player extends Fighter {
         this.physics.checkWallCollision(walls);
     }
 
-    public checkCeilingCollision(ceilings: Phaser.GameObjects.Rectangle[]): void {
-        this.physics.checkCeilingCollision(ceilings);
-    }
+
 
 
 

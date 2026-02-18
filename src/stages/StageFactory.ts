@@ -6,13 +6,13 @@ import Phaser from 'phaser';
  * and assign references to their own properties.
  */
 export interface StageResult {
-    background: Phaser.GameObjects.Image;
+    background: Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite;
+
     mainPlatform: Phaser.GameObjects.Rectangle;
     softPlatforms: Phaser.GameObjects.Rectangle[];
     sidePlatforms: Phaser.GameObjects.Rectangle[]; // Added side platforms
 
     wallCollisionRects: Phaser.Geom.Rectangle[];
-    ceilings: Phaser.GameObjects.Rectangle[]; // Collision check for bottom-up entry
     platformTextures: Phaser.GameObjects.Image[];
 }
 
@@ -25,26 +25,23 @@ export interface StageResult {
  */
 export function createStage(scene: Phaser.Scene): StageResult {
     // --- Background ---
-    const background = scene.add.image(scene.scale.width / 2, scene.scale.height / 2, 'adria_bg'); // New BG
+    // --- Background ---
+    const background = scene.add.image(scene.scale.width / 2, scene.scale.height / 2 + 150, 'adria_bg'); // New BG
     const scaleX = scene.scale.width / background.width;
     const scaleY = scene.scale.height / background.height;
-    const scale = Math.max(scaleX, scaleY) * 0.8; // Scale to cover (1.0)
-    // 0.1 scroll factor means it moves very little (far away). 
-    // If you want it "closer", increase this (e.g. 0.3).
-    // User asked for "scale up OR move closer", so let's stick to scale first.
+    const scale = Math.max(scaleX, scaleY) * 2.0;
+
     background.setScale(scale).setScrollFactor(0.9);
     background.setDepth(-100);
+
+
 
     // --- Main Platform ---
     // Center: 960. Width 1200. Extended to blast zone (930 height, y=1335)
     // Top Y = 870. Bottom Y = 1800 (BLAST_ZONE_BOTTOM)
-    // Make the main platform body invisible (or just stroke) so it doesn't stick out
-    // User wants "only see the platform" (textures)
-    // We'll reduce alpha to 0 or removing fill/stroke, but we need it for physics.
-    // Matter object creation uses the gameObject.
-
     const mainPlatform = scene.add.rectangle(960, 1335, 1180, 930, 0x000000, 0); // Invisible, width 1180
     // mainPlatform.setStrokeStyle(3, PLATFORM_STROKE); // Remove stroke
+
     (scene as any).matter.add.gameObject(mainPlatform, { isStatic: true });
 
     // --- Platform Textures ---
@@ -125,7 +122,7 @@ export function createStage(scene: Phaser.Scene): StageResult {
     sp1Visual.setScale(0.8);
     sp1Visual.setDepth(-10);
     // Collision Rectangle (this is what the player walks on):
-    const sp1 = scene.add.rectangle(670, 470, 565, 20);
+    const sp1 = scene.add.rectangle(685, 470, 550, 20);
     sp1.setVisible(false); // Invisible — debug mode draws it
     (scene as any).matter.add.gameObject(sp1, { isStatic: true });
     softPlatforms.push(sp1);
@@ -136,7 +133,7 @@ export function createStage(scene: Phaser.Scene): StageResult {
     sp2Visual.setScale(0.8);
     sp2Visual.setDepth(-10);
     // Collision Rectangle (this is what the player walks on):
-    const sp2 = scene.add.rectangle(1258, 470, 565, 20);
+    const sp2 = scene.add.rectangle(1258, 470, 575, 20);
     sp2.setVisible(false); // Invisible — debug mode draws it
     (scene as any).matter.add.gameObject(sp2, { isStatic: true });
     softPlatforms.push(sp2);
@@ -152,54 +149,41 @@ export function createStage(scene: Phaser.Scene): StageResult {
     // ---------------------------------------------------------
     const wallCollisionRects = [
         // Walls 1 & 2 (Main Stage)
-        new Phaser.Geom.Rectangle(350, 890, 40, 910),
-        new Phaser.Geom.Rectangle(1530, 890, 40, 910),
+        new Phaser.Geom.Rectangle(350, 890, 40, 430),
+        new Phaser.Geom.Rectangle(1530, 890, 40, 430),
 
         // --- Left Platform Walls ---
         // WALL 3 (Inner/Right side of Left Plat): 
         // Match Visual (40, 450) -> X = 175-20. 
         // Height Extended to 625 to reach closer to bottom, leaving 60px gap for corner chop.
-        new Phaser.Geom.Rectangle(175 - 20, 110, 40, 625),
+        new Phaser.Geom.Rectangle(175 - 20, 110, 40, 445),
         // WALL 4 (Outer/Left side of Left Plat):
         // X = 40 - (389/2) approx = -154.
-        new Phaser.Geom.Rectangle(-135 - 20, 110, 40, 730),
+        new Phaser.Geom.Rectangle(-135 - 20, 110, 40, 680),
+
+        // WALL 5 (Horizontal Bottom Wall):
+        // Connects Wall 4 (x=-135) to Wall 3 (x=175). Width ~310.
+        // Y Position: Below Wall 3 (110 + 445 = 555).
+        // Let's place it at Y=555 with height 40.
+        new Phaser.Geom.Rectangle(-135, 555, 250 + 40, 20),
 
 
     ];
 
     // --- Camera ---
-    scene.cameras.main.setZoom(0.9);
+    scene.cameras.main.setZoom(1);
     scene.cameras.main.centerOn(960, 540);
 
-    // --- Ceilings (Bottom Blocks) ---
-    // Prevent entry from below.
-    // MANUAL TUNING GUIDE (CEILINGS):
-    // ---------------------------------------------------------
-    // Adjust these to match the bottom of your blocks.
-    // ---------------------------------------------------------
-    const ceilings: Phaser.GameObjects.Rectangle[] = [];
 
-    // Left Platform Bottom Cap:
-    // Block Top: 450 - 345 = 105. Block Bottom: 450 + 345 = 795.
-    // Width: 315. Center X: 25.
-    // We place a thin ceiling rect at the bottom edge.
-    // CHOPPED CORNER: Reduced width from 315 to 254, shifted Left to -5.
-    // This removes collision from the bottom-right 60px.
-    const leftCeiling = scene.add.rectangle(-5, 795, 254, 30);
-    leftCeiling.setVisible(false);
-    // Note: We don't necessarily need Matter body if using custom physics check, 
-    // but adding it as static doesn't hurt and helps debug.
-    (scene as any).matter.add.gameObject(leftCeiling, { isStatic: true });
-    ceilings.push(leftCeiling);
 
     return {
         background,
+
         mainPlatform,
         softPlatforms,
         sidePlatforms, // Now Rectangles
 
         wallCollisionRects,
-        ceilings, // Added ceilings
         platformTextures: [leftTex, rightTex, ...topPlatVisuals, ...sidePlatVisuals]
     };
 }

@@ -44,6 +44,7 @@ export class PlayerPhysics {
 
     // Platform Logic
     public droppingThroughPlatform: Phaser.GameObjects.Rectangle | null = null;
+    public droppingThroughY: number | null = null; // Fix for overlapping platforms
     public dropGraceTimer: number = 0;
     public currentPlatform: Phaser.GameObjects.Rectangle | null = null;
 
@@ -335,6 +336,8 @@ export class PlayerPhysics {
 
         // Initiate drop
         this.droppingThroughPlatform = this.currentPlatform;
+        // Also track Y level to ignore adjacent/overlapping platforms at same height
+        this.droppingThroughY = this.currentPlatform.y;
         this.dropGraceTimer = PhysicsConfig.PLATFORM_DROP_GRACE_PERIOD;
 
         // Physics updates to start falling
@@ -540,8 +543,12 @@ export class PlayerPhysics {
         }
 
         if (isSoft) {
-            if (this.droppingThroughPlatform === platform && this.dropGraceTimer > 0) {
-                return;
+            // Ignore if specifically dropping through this platform
+            // OR if dropping through a platform at the same Y level (handles seams/overlaps)
+            if (this.dropGraceTimer > 0) {
+                if (this.droppingThroughPlatform === platform) return;
+
+                if (this.droppingThroughY !== null && Math.abs(platform.y - this.droppingThroughY) < 5) return;
             }
             if (this.player.velocity.y < 0) return;
             // FIX: Increased threshold from 10 to 45 to catch high-speed fallers (Max Fall Speed ~43px/frame)
@@ -566,33 +573,14 @@ export class PlayerPhysics {
             this.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
             this.recoveryAvailable = true;
             this.droppingThroughPlatform = null;
+            this.droppingThroughY = null;
             this.airActionCounter = 0;
             this.wallTouchesExhausted = false;
             this.currentPlatform = isSoft ? platform : null;
         }
     }
 
-    public checkCeilingCollision(ceilings: Phaser.GameObjects.Rectangle[]): void {
-        // Only checks when moving Upwards
-        if (this.player.velocity.y >= 0) return;
 
-        const playerBounds = this.player.getBounds();
-
-        for (const ceiling of ceilings) {
-            const ceilBounds = ceiling.getBounds();
-
-            if (Phaser.Geom.Rectangle.Overlaps(playerBounds, ceilBounds)) {
-                // Ensure we are somewhat below the ceiling (center is below ceiling center)
-                // This prevents snapping if we are already mostly above it?
-                // Actually, just snap to bottom.
-
-                // Snap Top of Player to Bottom of Ceiling
-                this.player.y = ceilBounds.bottom + (this.player.height / 2);
-                this.player.velocity.y = 0;
-                return; // Handle one ceiling collision at a time
-            }
-        }
-    }
 
 
     public checkWallCollision(walls: Phaser.Geom.Rectangle[]): void {
@@ -634,6 +622,7 @@ export class PlayerPhysics {
         this.isWallSliding = false;
         this.wallTouchesExhausted = false;
         this.droppingThroughPlatform = null;
+        this.droppingThroughY = null;
     }
 
     public reset(): void {
@@ -649,6 +638,7 @@ export class PlayerPhysics {
         this.isWallSliding = false;
         this.wallTouchesExhausted = false;
         this.droppingThroughPlatform = null;
+        this.droppingThroughY = null;
         this.recoveryAvailable = true;
         this.dodgeTimer = 0;
         this.dodgeCooldownTimer = 0;

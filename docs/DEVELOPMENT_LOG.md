@@ -3,6 +3,12 @@
 Part 2
 
 
+### [2026-02-18] v0.13.2 - Death Polish & Respawn Fixes
+- **[V]** `v0.13.2`
+- **[Fix]** **Respawn Glitch**: Fixed immediate death loop by resetting physics body and validating spawn points.
+- **[Polishing]** **Death Impact**: Added camera shake and explosion visual effect on player death.
+- **[Refactor]** **Effect Manager**: Centralized effect handling in `EffectManager.ts`.
+
 ### [2026-02-16] v0.12.0 - Refactoring & Technical Debt Cleanup
 - **[V]** `v0.12.0`
 - **[Refactor]** **Core Optimization**:

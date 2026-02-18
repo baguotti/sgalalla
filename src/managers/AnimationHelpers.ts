@@ -63,7 +63,8 @@ export class AnimationHelpers {
         scene.load.image('platform_corner_right', 'assets/stages/Platform_BH4B.png');
 
         // New Brawlhaven Layout Assets
-        scene.load.image('adria_bg', 'assets/stages/BG_Adria.webp');
+        scene.load.image('adria_bg', 'assets/stages/BG_Adria_v2.webp');
+        scene.load.image('adria_clouds', 'assets/stages/Adria_Clouds.png'); // Cloud layer
         scene.load.image('bh_plat_1', 'assets/stages/Platform_BH1.png'); // Top Center?
         scene.load.image('bh_plat_2', 'assets/stages/Platform_BH2.png'); // Small?
         scene.load.image('bh_plat_left', 'assets/stages/Platform_BH5_left.png'); // Left Wall

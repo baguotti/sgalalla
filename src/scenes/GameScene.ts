@@ -26,10 +26,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     public chests: Chest[] = [];
     public seals: any[] = []; // Seal projectiles
     private background!: Phaser.GameObjects.Graphics;
-    private backgroundImage!: Phaser.GameObjects.Image; // Add class property
+    private backgroundImage!: Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite;
+
     public walls: Phaser.Geom.Rectangle[] = []; // Unified walls (geom)
     private stageTextures: Phaser.GameObjects.Image[] = []; // Restore this
-    private ceilings: Phaser.GameObjects.Rectangle[] = []; // Bottom blocking
 
     // Debug visibility
     public debugVisible: boolean = false;
@@ -101,6 +101,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private players: Player[] = [];
     // private playerHUDs: PlayerHUD[] = []; // Deprecated
     private matchHUD!: MatchHUD;
+    public spawnPoints: { x: number, y: number }[] = [];
     private playerData: any[] = [];
 
     public effectManager!: EffectManager;
@@ -217,18 +218,20 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // DUMMY MODE OVERRIDE: Spawn closer together at center
             const hasDummy = this.playerData.some(p => p.isTrainingDummy);
             if (hasDummy) {
-                spawnPoints = [
+                this.spawnPoints = [
                     { x: 880, y: 300 },  // P1: Left of center
                     { x: 1040, y: 300 }, // P2 (Dummy): Right of center
                     { x: 960, y: 200 },
                     { x: 960, y: 400 }
                 ];
+            } else {
+                this.spawnPoints = spawnPoints;
             }
 
             this.playerData.forEach(pData => {
                 if (!pData.joined) return;
 
-                const spawn = spawnPoints[pData.playerId] || { x: 960, y: 300 };
+                const spawn = this.spawnPoints[pData.playerId] || { x: 960, y: 300 };
 
                 const player = new Player(this, spawn.x, spawn.y, {
                     playerId: pData.playerId,
@@ -429,6 +432,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Ignore static world elements
         if (this.background) this.uiCamera.ignore(this.background);
         if (this.backgroundImage) this.uiCamera.ignore(this.backgroundImage); // Ignore bg image
+
         if (this.platforms.length > 0) this.uiCamera.ignore(this.platforms);
         if (this.softPlatforms.length > 0) this.uiCamera.ignore(this.softPlatforms);
         if (this.stageTextures.length > 0) this.uiCamera.ignore(this.stageTextures);
@@ -454,16 +458,17 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         // Populate ALL tracking arrays so configureCameraExclusions always works
         this.backgroundImage = stage.background;
+
         this.platforms = [stage.mainPlatform];
         this.softPlatforms = stage.softPlatforms;
         this.sidePlatforms = stage.sidePlatforms; // Store side platforms
-        this.ceilings = stage.ceilings || []; // Store ceilings
-        this.stageTextures = [...stage.platformTextures]; // Track ALL textures (side visuals are in platformTextures now)
         this.walls = stage.wallCollisionRects;
+        this.stageTextures = [...stage.platformTextures]; // Track ALL textures (side visuals are in platformTextures now)
 
         // Explicitly ignore every stage object in UI camera (with guards for empty arrays)
         if (this.uiCamera) {
             this.uiCamera.ignore(stage.background);
+
             this.uiCamera.ignore(stage.mainPlatform);
             if (stage.softPlatforms.length > 0) this.uiCamera.ignore(stage.softPlatforms);
             if (stage.platformTextures.length > 0) this.uiCamera.ignore(stage.platformTextures);
@@ -618,8 +623,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.players.forEach(p => p.checkPlatformCollision(platform, true));
         }
 
-        // Ceiling Collision (Bottom Block)
-        this.players.forEach(p => p.checkCeilingCollision(this.ceilings));
+
 
         // 3. Update Logic (Anim)
         this.players.forEach(p => p.updateLogic(delta));
@@ -693,12 +697,26 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 bounds.top < MapConfig.BLAST_ZONE_TOP ||
                 bounds.bottom > MapConfig.BLAST_ZONE_BOTTOM) {
 
+                // --- DEATH IMPACT START ---
+                // Camera Shake
+                this.cameras.main.shake(300, 0.02);
+
+                // Spawn Explosion at clamp point
+                const impactX = Phaser.Math.Clamp(bounds.centerX, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
+                const impactY = Phaser.Math.Clamp(bounds.centerY, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
+
+                // Use generic red for now.
+                this.effectManager.spawnDeathExplosion(impactX, impactY, 0xff4444);
+                // --- DEATH IMPACT END ---
+
                 // Score update (lives)
                 player.lives = Math.max(0, player.lives - 1);
 
                 // Deactivate player immediately so camera ignores them
                 player.setActive(false);
                 player.setVisible(false);
+                player.setPosition(-9999, -9999);
+                if (player.body) this.matter.world.remove(player.body); // Remove body to prevent physics interactions while respawning
 
                 if (player.lives > 0) {
                     // 2 Second Respawn Delay
@@ -726,20 +744,22 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         player.setActive(true);
         player.setVisible(true);
 
-        // Respawn position
-        const spawnPoints = [
-            { x: 450, y: 300 },
-            { x: 1470, y: 300 },
-            { x: 960, y: 200 },
-            { x: 960, y: 400 }
-        ];
-        const spawn = spawnPoints[playerId] || { x: 960, y: 300 };
+        // Respawn position - Use the stored spawn points (same as initial spawn)
+        const spawn = this.spawnPoints[playerId] || { x: 960, y: 300 };
         const spawnX = spawn.x;
 
-        const spawnY = 300;
+        const spawnY = spawn.y;
 
         // Reset physics and state
+        console.log(`[Respawn] Player ${playerId} respawning at ${spawnX}, ${spawnY}`);
         player.setPosition(spawnX, spawnY);
+        // Explicitly reset body physics to prevent ghost velocity/position
+        if (player.body) {
+            this.matter.body.setPosition(player.body as MatterJS.BodyType, { x: spawnX, y: spawnY });
+            this.matter.body.setVelocity(player.body as MatterJS.BodyType, { x: 0, y: 0 });
+        }
+        // player.physics.reset(); // This might be redundant or Arcade specific, but Player.ts uses it. 
+        // Let's check Player.ts. It likely uses matter methods inside.
         player.physics.reset();
         player.setState(PlayerState.AIRBORNE);
         player.setDamage(0);
@@ -1137,4 +1157,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
         this.debugLabels.push(t);
     }
+
+
 }

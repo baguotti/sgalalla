@@ -8,7 +8,7 @@
  * - Receives authoritative state updates from server
  * - Interpolates remote player positions
  */
-
+import { EffectManager } from '../effects/EffectManager';
 import Phaser from 'phaser';
 import { Player, PlayerState } from '../entities/Player';
 import { Bomb } from '../entities/Bomb';
@@ -97,6 +97,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     // Game Over State
     private isGameOver: boolean = false;
     private gameOverContainer!: Phaser.GameObjects.Container;
+
+    // Effects
+    public effectManager!: EffectManager;
 
     // Player indicator colors (from PlayerHUD for consistency)
     private readonly PLAYER_COLORS = SMASH_COLORS;
@@ -254,6 +257,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
         // Debug Toggle Key
         this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+
+        // Initialize EffectManager
+        this.effectManager = new EffectManager(this);
 
         // Setup input (local player only)
         this.inputManager = new InputManager(this, {
@@ -722,6 +728,14 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Score update (lives)
             player.lives = Math.max(0, player.lives - 1);
+
+            // IMPACT POLISH (Local only for shake, visual for all? Actually local visual is fine for now)
+            // Ideally we broadcast this event, but for now client-side prediction visual is okay.
+            this.cameras.main.shake(300, 0.02);
+            // Clamp impact position
+            const impactX = Phaser.Math.Clamp(bounds.centerX, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
+            const impactY = Phaser.Math.Clamp(bounds.centerY, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
+            this.effectManager.spawnDeathExplosion(impactX, impactY, 0xff4444);
 
             // Hide immediately
             player.setActive(false);
@@ -1528,6 +1542,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         // Camera exclusions
         if (this.uiCamera) {
             this.uiCamera.ignore(stage.background);
+
             this.uiCamera.ignore(this.platforms);
             this.uiCamera.ignore(this.softPlatforms);
             // Removed wallVisuals/Texts as they are gone
