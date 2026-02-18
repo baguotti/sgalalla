@@ -177,9 +177,10 @@ export const PhysicsConfig = {
   BOMB_SHAKE_DURATION: 150,           // Camera shake duration on explosion
   BOMB_SHAKE_INTENSITY: 0.01,         // Camera shake intensity on explosion
 
-  // Chest item properties
   CHEST_DAMAGE: 25,
-  CHEST_KNOCKBACK_FORCE: 50,
+  CHEST_PROJECTILE_DAMAGE: 15,
+  CHEST_PROJECTILE_SPEED_THRESHOLD: 8, // Minimum speed to be dangerous
+  CHEST_KNOCKBACK_FORCE: 2500,
   CHEST_SHAKE_DURATION: 150,
   CHEST_SHAKE_INTENSITY: 0.01,
   CHEST_GROUND_SHAKE_INTENSITY: 0.008,

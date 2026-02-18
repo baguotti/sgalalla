@@ -3,11 +3,6 @@
 Part 2
 
 
-### [2026-02-18] v0.13.2 - Death Polish & Respawn Fixes
-- **[V]** `v0.13.2`
-- **[Fix]** **Respawn Glitch**: Fixed immediate death loop by resetting physics body and validating spawn points.
-- **[Polishing]** **Death Impact**: Added camera shake and explosion visual effect on player death.
-- **[Refactor]** **Effect Manager**: Centralized effect handling in `EffectManager.ts`.
 
 ### [2026-02-16] v0.12.0 - Refactoring & Technical Debt Cleanup
 - **[V]** `v0.12.0`
@@ -141,3 +136,24 @@ Part 2
 - **[V]** `v0.13.1`
 - **[Refactor]** **StageFactory Cleanup**: Deep cleaned `StageFactory.ts` by removing unused legacy code (Color constants, visual wall arrays), and unified wall collision logic across `GameScene` and `OnlineGameScene`.
 - **[Docs]** **Logs**: Updated changelogs.
+
+### [2026-02-18] v0.13.3 - Stage Polish & Dramatic Finish 🎭
+- **[V]** `v0.13.3`
+- **[Feat]** **Stage Assets (Adria v2)**:
+    - **Visual Upgrade**: Swapped placeholder assets for final "Adria" stage art (Main, Side, Top platforms).
+    - **Layout Tuning**: Consolidated top platforms into a single centered floating platform.
+    - **Mapping**: Fixed main platform texture mapping to correctly cover the physics body.
+    - **Background**: Verified and fixed background image loading.
+- **[Feat]** **Dramatic Game End**:
+    - **Zoom**: Implemented a dramatic camera zoom/pan to the winning player upon victory.
+    - **Victory Text**: Updated victory text to "PLAYER X HA ARATO!" for local flavor.
+    - **Polish**: Added a black overlay to dim the background, ensuring text legibility.
+- **[Polishing]** **Training Room**:
+    - **Loading Screen**: Added a black "LOADING..." overlay to hide the blue-screen transition when entering Training Mode.
+- **[Fix]** **Lint**: Resolved TypeScript errors in `StageFactory`.
+
+### [2026-02-18] v0.13.2 - Death Polish & Respawn Fixes
+- **[V]** `v0.13.2`
+- **[Fix]** **Respawn Glitch**: Fixed immediate death loop by resetting physics body and validating spawn points.
+- **[Polishing]** **Death Impact**: Added camera shake and explosion visual effect on player death.
+- **[Refactor]** **Effect Manager**: Centralized effect handling in `EffectManager.ts`.

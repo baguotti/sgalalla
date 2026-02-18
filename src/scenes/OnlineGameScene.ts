@@ -228,8 +228,11 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         void this.selectionCountdown;
 
 
+        // Initialize fast with Black Screen + Loading Text (User Request)
+        this.cameras.main.setBackgroundColor('#000000');
+        this.showConnectionStatus('LOADING...');
+
         // Try to connect
-        this.showConnectionStatus('Connecting...');
         const connected = await this.networkManager.connect();
 
         if (!connected) {
@@ -699,11 +702,23 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             if (!player.isAttacking) return;
 
             for (const chest of [...this.chests]) {
-                if (chest.isOpened) continue;
-
                 const dist = Phaser.Math.Distance.Between(player.x, player.y, chest.x, chest.y);
-                if (dist < interactRange) {
-                    chest.open();
+
+                if (!chest.isOpened) {
+                    if (dist < interactRange) {
+                        chest.open();
+                    }
+                } else {
+                    // Opened: knock it around! (if cooldown is over)
+                    if (dist < interactRange && chest.canBePunched) {
+                        const angle = Phaser.Math.Angle.Between(player.x, player.y, chest.x, chest.y);
+                        // Pulse force to match GameScene
+                        const force = 2.0;
+                        chest.applyForce(new Phaser.Math.Vector2(
+                            Math.cos(angle) * force,
+                            Math.sin(angle) * force - 0.15
+                        ));
+                    }
                 }
             }
         });
@@ -733,9 +748,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             // Ideally we broadcast this event, but for now client-side prediction visual is okay.
             this.cameras.main.shake(300, 0.02);
             // Clamp impact position
-            const impactX = Phaser.Math.Clamp(bounds.centerX, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
-            const impactY = Phaser.Math.Clamp(bounds.centerY, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
-            this.effectManager.spawnDeathExplosion(impactX, impactY, 0xff4444);
+            // const impactX = Phaser.Math.Clamp(bounds.centerX, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
+            // const impactY = Phaser.Math.Clamp(bounds.centerY, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
+            // this.effectManager.spawnDeathExplosion(impactX, impactY, 0xff4444);
 
             // Hide immediately
             player.setActive(false);
@@ -767,6 +782,18 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         const spawn = spawnPoints[this.localPlayerId] || { x: 960, y: 300 };
 
         player.setPosition(spawn.x, 300);
+
+        // Re-add body if removed (critical for physics to resume)
+        if (player.body) {
+            if (!this.matter.world.has(player.body as MatterJS.BodyType)) {
+                this.matter.world.add(player.body as MatterJS.BodyType);
+            }
+            this.matter.body.setPosition(player.body as MatterJS.BodyType, { x: spawn.x, y: 300 });
+            this.matter.body.setVelocity(player.body as MatterJS.BodyType, { x: 0, y: 0 });
+            this.matter.body.setAngle(player.body as MatterJS.BodyType, 0);
+            this.matter.body.setAngularVelocity(player.body as MatterJS.BodyType, 0);
+        }
+
         player.physics.reset();
         player.setState(PlayerState.AIRBORNE);
         player.setDamage(0);
@@ -834,6 +861,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         // Create container for game over UI
         this.gameOverContainer = this.add.container(0, 0);
         this.gameOverContainer.setDepth(2000);
+        this.cameras.main.ignore(this.gameOverContainer); // Ensure UI doesn't zoom with the game world
 
         // Darken background
         const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
@@ -841,7 +869,26 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
         let winnerText = "GAME!";
         if (winnerId >= 0) {
-            winnerText += `\nPLAYER ${winnerId + 1} WINS!`;
+            winnerText += `\nPLAYER ${winnerId + 1} HA ARATO!`; // Custom Text
+
+            // ZOOM LOGIC for Online
+            // Find the winning player sprite
+            // Players are in this.players (Map<string, Player> where key is sessionId? NO, it's a Map<string, Player>)
+            // We need to find the player by ID.
+            let winner: Player | undefined;
+            // Iterate map values
+            for (const p of this.players.values()) {
+                if ((p as any).playerId === winnerId) {
+                    winner = p;
+                    break;
+                }
+            }
+
+            if (winner) {
+                this.cameras.main.pan(winner.x, winner.y, 1500, 'Power2');
+                this.cameras.main.zoomTo(2.0, 1500, 'Power2');
+            }
+
         } else {
             winnerText += "\nGAME OVER";
         }
@@ -1088,7 +1135,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         if (!this.connectionStatusBg) {
             this.connectionStatusBg = this.add.rectangle(
                 this.scale.width / 2, this.scale.height / 2,
-                this.scale.width, this.scale.height, 0x000000, 0.95
+                this.scale.width, this.scale.height, 0x000000, 1.0 // Fully opaque
             ).setDepth(999);
             if (this.uiCamera) this.cameras.main.ignore(this.connectionStatusBg);
         }
@@ -1099,7 +1146,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 this.scale.width / 2,
                 this.scale.height / 2,
                 message,
-                { fontSize: '32px', color: '#ffffff', backgroundColor: '#333333', padding: { x: 20, y: 10 }, fontFamily: '"Pixeloid Sans"' }
+                { fontSize: '32px', color: '#ffffff', fontFamily: '"Pixeloid Sans"' } // Removed bg color
             ).setOrigin(0.5).setDepth(1000);
             if (this.uiCamera) this.cameras.main.ignore(this.connectionStatusText);
         } else {

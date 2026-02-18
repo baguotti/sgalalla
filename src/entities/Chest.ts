@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 import { PhysicsConfig } from '../config/PhysicsConfig';
-import { Player } from './Player';
 
 // List of scrin image filenames (loaded in GameScene preload)
 const SCRIN_IMAGES = [
@@ -23,105 +22,169 @@ const SCRIN_IMAGES = [
  */
 export class Chest extends Phaser.Physics.Matter.Sprite {
     public isOpened: boolean = false;
+    public canBePunched: boolean = false; // Interactability flag (false by default or during cooldown)
     public isOverlayOpen: boolean = false; // Tracks if the reward UI is currently visible
     private canClose: boolean = false; // Blocks input during reveal animation
+    private hitboxVisual?: Phaser.GameObjects.Graphics;
+    private isFalling: boolean = true;
+    private hasHitPlayers: Set<any> = new Set(); // Track which players were already hit
 
     constructor(scene: Phaser.Scene, x: number, y: number) {
-        const textureKey = 'chest_rect_v1';
-        const width = 90;
-        const height = 60;
+        const textureKey = 'chest_closed'; // New asset
+        const width = 88; // Matches chest_closed.png
 
-        if (!scene.textures.exists(textureKey)) {
-            const graphics = scene.make.graphics({ x: 0, y: 0 });
-            graphics.fillStyle(0x8B4513, 1); // Saddle Brown
-            graphics.fillRect(0, 0, width, height);
-            graphics.lineStyle(4, 0x5C2D06, 1);
-            graphics.strokeRect(0, 0, width, height);
-
-            // Gold lock detail
-            graphics.fillStyle(0xFFD700, 1);
-            graphics.fillRect((width / 2) - 5, (height / 2) - 5, 10, 10);
-
-            graphics.generateTexture(textureKey, width, height);
-            graphics.destroy();
-        }
+        // Removed dynamic texture generation since we now have assets
 
         super(scene.matter.world, x, y, textureKey);
 
-        this.setRectangle(width, height);
+        this.setRectangle(width, 40); // Physics height (40) < visual height (69) for ~15px sink
         this.setBounce(0.0); // No bounce for heavy feel
         this.setFriction(0.9); // High friction to stop sliding
         this.setFrictionAir(0.0); // No air resistance (falls faster)
         this.setDensity(1.0); // Very heavy (was 0.1) ~ Metal box weight
         this.setVelocityY(20); // Initial downward velocity
 
-        scene.add.existing(this);
+        // Origin centered for symmetric rotation (upside-down looks identical)
+        this.setOrigin(0.5, 0.5);
 
         const gameScene = scene as GameSceneInterface;
         if (gameScene.chests) {
             gameScene.chests.push(this);
         }
 
-        this.setDepth(-10);
+        this.setDepth(20); // Render in front of characters (usually depth 0 or 1)
+
+        // --- Red Hitbox Visual (debug only) ---
+        this.hitboxVisual = scene.add.graphics();
+        this.hitboxVisual.setDepth(19);
+        this.hitboxVisual.setVisible(false); // Hidden by default
+        scene.events.on('update', this.updateHitboxVisual, this);
 
         this.setOnCollide((data: Phaser.Types.Physics.Matter.MatterCollisionData) => {
             this.handleCollision(data);
         });
+
+        scene.add.existing(this); // Ensure preUpdate is called
+    }
+
+    private updateHitboxVisual(): void {
+        if (!this.hitboxVisual || !this.active) return;
+
+        // Optimization: Don't draw if not visible
+        if (!this.hitboxVisual.visible) return;
+
+        this.hitboxVisual.clear();
+
+        if (this.isFalling) {
+            // Draw red glow hitbox
+            this.hitboxVisual.fillStyle(0xff0000, 0.25);
+            this.hitboxVisual.fillRect(this.x - 50, this.y - 40, 100, 80);
+            this.hitboxVisual.lineStyle(2, 0xff0000, 0.8);
+            this.hitboxVisual.strokeRect(this.x - 50, this.y - 40, 100, 80);
+        }
     }
 
     private handleCollision(data: Phaser.Types.Physics.Matter.MatterCollisionData): void {
-        if (this.isOpened) return;
-
         const bodyA = data.bodyA as any;
         const bodyB = data.bodyB as any;
 
-        let player: Player | null = null;
+        // We only care about hitting static ground/walls for the camera shake
+        // Player interaction is handled in preUpdate (for damage) and GameScene (for punching)
 
-        for (const b of [bodyA, bodyB]) {
-            const go = b.gameObject;
+        const other = (bodyA.gameObject === this) ? bodyB :
+            (bodyB.gameObject === this) ? bodyA :
+                bodyB; // fallback
 
-            if (go && go !== this) {
-                // Check if it is a Player instance
-                if (go instanceof Player) {
-                    player = go;
-                    break;
-                }
-                // Check parent container
-                if (go.parentContainer && go.parentContainer instanceof Player) {
-                    player = go.parentContainer;
-                    break;
+        if (other.isStatic) {
+            // Stop falling hitbox on ground landing
+            const isFirstLanding = this.isFalling;
+            if (this.isFalling) this.isFalling = false;
+
+            const body = this.body as MatterJS.BodyType;
+            if (body && body.speed > PhysicsConfig.CHEST_SPEED_THRESHOLD) {
+                // Full shake on first landing, much reduced on bounces
+                const intensity = isFirstLanding
+                    ? PhysicsConfig.CHEST_GROUND_SHAKE_INTENSITY
+                    : (PhysicsConfig.CHEST_GROUND_SHAKE_INTENSITY * 0.25);
+                this.scene.cameras.main.shake(PhysicsConfig.CHEST_GROUND_SHAKE_DURATION, intensity);
+            }
+        }
+    }
+
+    /**
+     * preUpdate: Distance-based player damage while falling.
+     * Player is a Container (not Matter body), so setOnCollide never fires against them.
+     * This mirrors the Bomb.ts pattern for reliable collision detection.
+     */
+    preUpdate(time: number, delta: number): void {
+        super.preUpdate(time, delta);
+
+        // Logic 1: Falling Damage (vertical)
+        if (this.isFalling && !this.isOpened) {
+            const gameScene = this.scene as GameSceneInterface;
+            const players = gameScene.getPlayers ? gameScene.getPlayers() : [];
+            const contactRange = 60;
+
+            for (const player of players) {
+                if (this.hasHitPlayers.has(player)) continue;
+
+                const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
+                if (dist < contactRange) {
+                    const damage = PhysicsConfig.CHEST_DAMAGE;
+                    const knockbackForce = PhysicsConfig.CHEST_KNOCKBACK_FORCE; // 2500
+                    const angle = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
+
+                    const knockback = new Phaser.Math.Vector2(
+                        Math.cos(angle) * knockbackForce,
+                        Math.sin(angle) * knockbackForce
+                    );
+
+                    player.setDamage(player.damagePercent + damage);
+                    player.setKnockback(knockback.x, knockback.y);
+                    player.applyHitStun();
+                    this.scene.cameras.main.shake(PhysicsConfig.CHEST_SHAKE_DURATION, PhysicsConfig.CHEST_SHAKE_INTENSITY);
+
+                    this.hasHitPlayers.add(player);
                 }
             }
         }
 
-        // If no player found, check for ground/static impact
-        if (!player) {
-            const other = (bodyA.gameObject === this) ? bodyB :
-                (bodyB.gameObject === this) ? bodyA :
-                    bodyB; // fallback
-            if (other.isStatic) {
-                const body = this.body as MatterJS.BodyType;
-                if (body && body.speed > PhysicsConfig.CHEST_SPEED_THRESHOLD) {
-                    this.scene.cameras.main.shake(PhysicsConfig.CHEST_GROUND_SHAKE_DURATION, PhysicsConfig.CHEST_GROUND_SHAKE_INTENSITY);
+        // Logic 2: Projectile Damage (horizontal/speed based for opened chest)
+        if (this.isOpened) {
+            const body = this.body as MatterJS.BodyType;
+            if (body.speed > PhysicsConfig.CHEST_PROJECTILE_SPEED_THRESHOLD) {
+                const gameScene = this.scene as GameSceneInterface;
+                const players = gameScene.getPlayers ? gameScene.getPlayers() : [];
+                const contactRange = 50; // Slightly smaller for projectile
+
+                for (const player of players) {
+                    if (this.hasHitPlayers.has(player)) continue;
+
+                    const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
+                    if (dist < contactRange) {
+                        // Apply projectile damage
+                        const damage = PhysicsConfig.CHEST_PROJECTILE_DAMAGE;
+                        // Use chest velocity for knockback direction
+                        const velocity = new Phaser.Math.Vector2(body.velocity.x, body.velocity.y).normalize();
+                        const knockbackForce = PhysicsConfig.CHEST_KNOCKBACK_FORCE * 0.8; // Slightly less than falling
+
+                        player.setDamage(player.damagePercent + damage);
+                        player.setKnockback(velocity.x * knockbackForce, velocity.y * knockbackForce);
+                        player.applyHitStun();
+                        this.scene.cameras.main.shake(PhysicsConfig.CHEST_SHAKE_DURATION, PhysicsConfig.CHEST_SHAKE_INTENSITY);
+
+                        this.hasHitPlayers.add(player);
+                    }
+                }
+            } else {
+                // Reset hit list when slow enough (so it can be punched again and hit again)
+                // We clear it only if it was previously populated, to save perf? 
+                // Set.clear() is cheap. A simple threshold check prevents clearing every frame if unused.
+                if (this.hasHitPlayers.size > 0) {
+                    this.hasHitPlayers.clear();
                 }
             }
-            return;
         }
-
-        // Player found — apply damage and massive knockback
-        const damage = PhysicsConfig.CHEST_DAMAGE;
-        const knockbackForce = PhysicsConfig.CHEST_KNOCKBACK_FORCE;
-
-        const angle = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
-        const knockback = new Phaser.Math.Vector2(
-            Math.cos(angle) * knockbackForce,
-            Math.sin(angle) * knockbackForce
-        );
-
-        player.setDamage(player.damagePercent + damage);
-        player.setKnockback(knockback.x, knockback.y);
-        player.applyHitStun();
-        this.scene.cameras.main.shake(PhysicsConfig.CHEST_SHAKE_DURATION, PhysicsConfig.CHEST_SHAKE_INTENSITY);
     }
 
     /**
@@ -139,6 +202,13 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
         }
 
         this.isOpened = true;
+
+        // Prevent immediate punching
+        this.canBePunched = false;
+        this.scene.time.delayedCall(500, () => {
+            if (this.active) this.canBePunched = true;
+        });
+
         this.isOverlayOpen = true;
         this.canClose = false; // Block input initially
 
@@ -266,7 +336,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
                     // Keep isOverlayOpen true for a short moment
                     this.scene.time.delayedCall(100, () => {
                         this.isOverlayOpen = false;
-                        this.destroy();
+                        // this.destroy(); // Keep chest in world
                     });
 
                     gamepadCheck.remove();
@@ -304,13 +374,14 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
         };
         this.scene.input.keyboard?.on('keydown', onKey);
 
-        // Visual feedback: grey out chest and stop physics
-        this.setTint(0x555555);
-        this.setStatic(true);
+        // Visual feedback: switch to open texture, keep dynamic so players can push it around
+        this.setTexture('chest_open');
+        this.setDensity(0.01); // Ultra-light once opened — flies far when punched
     }
 
     destroy(fromScene?: boolean): void {
         if (this.scene) {
+            this.scene.events.off('update', this.updateHitboxVisual, this);
             const chests = (this.scene as GameSceneInterface).chests;
             if (chests) {
                 const index = chests.indexOf(this);
@@ -318,6 +389,9 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
                     chests.splice(index, 1);
                 }
             }
+        }
+        if (this.hitboxVisual) {
+            this.hitboxVisual.destroy();
         }
         super.destroy(fromScene);
     }

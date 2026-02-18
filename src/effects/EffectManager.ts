@@ -86,55 +86,9 @@ export class EffectManager {
     }
 
     public spawnDeathExplosion(x: number, y: number, color: number): void {
-        const explosion = this.explosions.get() as Phaser.GameObjects.Graphics;
-        if (!explosion) return;
-
-        console.log(`[EffectManager] Spawning Death Explosion at ${x}, ${y}`);
-
-        explosion.setActive(true);
-        explosion.setVisible(true);
-        explosion.setDepth(100); // Ensure visibility above stage/players
-        explosion.setPosition(0, 0); // Reset position
-        explosion.clear();
-
-        // 1. Core Flash (White)
-        explosion.fillStyle(0xffffff, 1);
-        explosion.fillCircle(x, y, 60);
-
-        // 2. Colored Outer Ring (Player Color)
-        explosion.lineStyle(10, color, 1);
-        explosion.strokeCircle(x, y, 80);
-
-        // Animation: Expand and Stick
-        this.scene.tweens.add({
-            targets: explosion,
-            alpha: { from: 1, to: 0 },
-            scale: { from: 1, to: 2.5 }, // Massive expansion
-            duration: 600, // Lingers a bit
-            ease: 'Cubic.out',
-            onUpdate: () => {
-                // Redraw logic if we were using purely data-driven, but scaling the Graphics object works for simple shapes
-                // If we need complex multi-colored particles, we'd use emitters. 
-                // For now, scaling the whole graphics object (which contains the circle) at 0,0 
-                // might shift it if we drew at world.x, world.y.
-                // Wait, if we draw at x,y and scale the container (Graphics), it scales from 0,0 (top left of screen).
-                // We must set position to x,y and draw at 0,0 for scaling to work from center!
-            },
-            onStart: () => {
-                explosion.setPosition(x, y); // Set position to impact point
-                explosion.clear();
-                explosion.fillStyle(0xffffff, 1);
-                explosion.fillCircle(0, 0, 60); // Draw at local 0,0
-                explosion.lineStyle(20, color, 1);
-                explosion.strokeCircle(0, 0, 80);
-            },
-            onComplete: () => {
-                explosion.setActive(false);
-                explosion.setVisible(false);
-                explosion.clear();
-                explosion.setScale(1); // Reset
-            }
-        });
+        // Disabled by user request
+        // const explosion = this.explosions.get() as Phaser.GameObjects.Graphics;
+        // if (!explosion) return;
     }
 
     public spawnGhost(x: number, y: number, texture: string, frame: string, animKey: string, facing: number, options: { tint?: number, alpha?: number } = {}): Phaser.GameObjects.Sprite | null {

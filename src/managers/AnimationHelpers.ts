@@ -42,7 +42,13 @@ export class AnimationHelpers {
      * @param scene The scene to load assets into.
      */
     public static loadCommonAssets(scene: Phaser.Scene): void {
-        // Preload scrin images for chest opening
+        scene.load.image('platform_corner_right', 'assets/stages/Platform_BH4A_adria.png'); // Re-confirmed path
+
+        // Chest Assets
+        scene.load.image('chest_closed', 'assets/items/chest_closed.png');
+        scene.load.image('chest_open', 'assets/items/chest_open.png');
+
+        // Scrin Images (Rewards)
         const scrinFiles = [
             'scrin_001.jpg', 'scrin_002.jpg', 'scrin_003.jpg', 'scrin_004.jpg', 'scrin_005.jpg',
             'scrin_006.jpg', 'scrin_007.jpg', 'scrin_008.jpg', 'scrin_009.jpg', 'scrin_0010.jpg',
@@ -59,16 +65,17 @@ export class AnimationHelpers {
         });
 
         // Stage Assets
-        scene.load.image('platform_corner_left', 'assets/stages/Platform_BH4A.png');
-        scene.load.image('platform_corner_right', 'assets/stages/Platform_BH4B.png');
+        scene.load.image('adria_bg', 'assets/stages/adria_v2.2_web.webp'); // Restored
+        scene.load.image('platform_corner_left', 'assets/stages/Platform_BH4A_adria.png');
+        scene.load.image('platform_corner_right', 'assets/stages/Platform_BH4A_adria.png'); // Same asset, flipped code-side
 
-        // New Brawlhaven Layout Assets
-        scene.load.image('adria_bg', 'assets/stages/BG_Adria_v2.webp');
-        scene.load.image('adria_clouds', 'assets/stages/Adria_Clouds.png'); // Cloud layer
-        scene.load.image('bh_plat_1', 'assets/stages/Platform_BH1.png'); // Top Center?
-        scene.load.image('bh_plat_2', 'assets/stages/Platform_BH2.png'); // Small?
-        scene.load.image('bh_plat_left', 'assets/stages/Platform_BH5_left.png'); // Left Wall
-        scene.load.image('bh_plat_right', 'assets/stages/Platform_BH5_right.png'); // Right Chunk
+        // Updated Assets (Adria v2)
+        scene.load.image('platform_main', 'assets/platform_main.png');
+        scene.load.image('platform_side', 'assets/platform_side.png');
+        scene.load.image('platform_top', 'assets/platform_top_left.png'); // Will flip for right side
+
+        // Legacy/Unused? (Keeping just in case, or removing if confirmed unused)
+        // scene.load.image('bh_plat_2', 'assets/stages/Platform_BH2.png'); 
     }
 
     /**

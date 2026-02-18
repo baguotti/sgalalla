@@ -28,8 +28,17 @@ export class PlayerHudSlot {
     private bigDamageText: Phaser.GameObjects.Text;
     private percentText: Phaser.GameObjects.Text;
     private nameText: Phaser.GameObjects.Text;
-    private stocksText: Phaser.GameObjects.Text;
+    // private stocksText: Phaser.GameObjects.Text; // Removed
+    private heartContainer: Phaser.GameObjects.Container;
     private portraitContainer: Phaser.GameObjects.Container;
+    private scene: Phaser.Scene;
+    private colorHex: string; // Store for hearts
+
+    // Shake State
+    private lastDamage: number = 0;
+    private lastStocks: number = -1; // Force initial render
+    private portraitBaseX: number = 0;
+    private portraitBaseY: number = 0;
 
     constructor(
         scene: Phaser.Scene,
@@ -42,6 +51,7 @@ export class PlayerHudSlot {
         character: string,
         isRightSide: boolean = false
     ) {
+        this.scene = scene;
         this.container = scene.add.container(x, y);
         this.container.setScrollFactor(0);
         this.container.setDepth(101);
@@ -49,6 +59,7 @@ export class PlayerHudSlot {
         const colorObj = Phaser.Display.Color.ValueToColor(SMASH_COLORS[playerIndex % SMASH_COLORS.length]);
         const color = colorObj.color;
         const colorHex = '#' + color.toString(16).padStart(6, '0');
+        this.colorHex = colorHex;
 
         // Darker color for top of gradient
         const darkerColorObj = new Phaser.Display.Color(colorObj.red, colorObj.green, colorObj.blue);
@@ -92,18 +103,19 @@ export class PlayerHudSlot {
         this.container.add(this.nameText);
 
 
-        // --- 2. Diamond Shadow (Middle Layer) ---
+        // --- 3. Diamond Portrait (Front Layer) ---
+        this.portraitBaseX = portraitOffset;
+        this.portraitBaseY = 0;
+        this.portraitContainer = scene.add.container(portraitOffset, 0);
+
+        // --- 2. Diamond Shadow (Now inside portraitContainer for shared shake) ---
         const shadowGraphics = scene.add.graphics();
         shadowGraphics.fillStyle(0x000000, 1); // Hard black shadow
         shadowGraphics.fillRect(-diamondSize / 2, -diamondSize / 2, diamondSize, diamondSize);
         shadowGraphics.rotation = Phaser.Math.DegToRad(45);
-        shadowGraphics.x = portraitOffset + 5; // Offset X
-        shadowGraphics.y = 5; // Offset Y
-        this.container.add(shadowGraphics);
-
-
-        // --- 3. Diamond Portrait (Front Layer) ---
-        this.portraitContainer = scene.add.container(portraitOffset, 0);
+        shadowGraphics.x = 5; // Offset X relative to container (was portraitOffset + 5)
+        shadowGraphics.y = 5; // Offset Y relative to container
+        this.portraitContainer.add(shadowGraphics);
 
         // A. Diamond Gradient Fill
         const fillGraphics = scene.add.graphics();
@@ -187,35 +199,18 @@ export class PlayerHudSlot {
         this.container.add(this.percentText);
 
 
-        // --- 5. Stocks (Under Name Tag, Split Colors) ---
-        // "Move hearts and lives under name tag"
-        // "Hearts right colors but X number white"
-        const stockX = nameX + 10 - 28; // +7px right (was -43)
-        const stockY = nameY + 25;
+        this.container.add(this.bigDamageText);
+        this.container.add(this.percentText);
 
-        // Heart Icon (Player Color)
-        const heartIcon = scene.add.text(stockX, stockY, '♥', {
-            fontSize: '18px',
-            fontFamily: '"Pixeloid Sans"',
-            color: colorHex,
-            stroke: '#000000',
-            strokeThickness: 3
-        }).setOrigin(0, 0.5);
-        heartIcon.setShadow(2, 2, '#000000', 0, true, true);
-        this.container.add(heartIcon);
 
-        // Stocks Text (White)
-        this.stocksText = scene.add.text(stockX + 22, stockY, 'x 3', {
-            fontSize: '18px',
-            fontFamily: '"Pixeloid Sans"',
-            fontStyle: 'bold',
-            color: '#ffffff', // White
-            stroke: '#000000',
-            strokeThickness: 3
-        }).setOrigin(0, 0.5);
-        this.stocksText.setShadow(2, 2, '#000000', 0, true, true);
+        // --- 5. Stocks (Under Name Tag) ---
+        // Visual Hearts logic
+        // We'll manage hearts in update() to ensure they match live stock count
+        // Create a container for hearts to easily clear/rebuild
+        this.heartContainer = scene.add.container(nameX - 15, nameY + 25);
+        this.container.add(this.heartContainer);
 
-        this.container.add(this.stocksText);
+        // Initial render will happen in first update() call
 
         void width; void height; void isRightSide;
     }
@@ -223,11 +218,16 @@ export class PlayerHudSlot {
     update(damage: number, stocks: number): void {
         const d = Math.floor(damage);
         this.bigDamageText.setText(`${d}`);
-        this.stocksText.setText(`x ${stocks}`);
 
         // Update Position of % symbol to follow number
         const width = this.bigDamageText.width;
         this.percentText.x = this.bigDamageText.x + width + 2;
+
+        // Stocks Update (Only redraw if changed)
+        if (stocks !== this.lastStocks) {
+            this.updateHearts(stocks);
+            this.lastStocks = stocks;
+        }
 
         // Color Grading for Damage
         if (damage < 50) {
@@ -237,6 +237,63 @@ export class PlayerHudSlot {
         } else {
             this.bigDamageText.setColor('#ff4444'); // Red
         }
+
+        // Shake detection
+        if (damage > this.lastDamage) {
+            const diff = damage - this.lastDamage;
+            // Higher damage = more shake
+            // Signatures do ~15-20 damage. Light attacks ~4-8.
+            // Shake intensity: 2px base, +1px per 10 damage?
+            let intensity = 2;
+            if (diff > 12) intensity = 5; // Heavy hit
+
+            this.shake(intensity);
+        }
+        this.lastDamage = damage;
+    }
+
+    private updateHearts(stocks: number): void {
+        this.heartContainer.removeAll(true); // Clear existing
+
+        const spacing = 22; // Horizontal spacing
+
+        // Get player color for hearts
+        const colorHex = this.colorHex || '#ffffff'; // Fallback logic needed or store color
+
+        // Limit visual hearts to prevent overflow? (e.g. max 5)
+        // For now, draw all.
+        for (let i = 0; i < stocks; i++) {
+            const heart = this.scene.add.text(i * spacing, 0, '♥', {
+                fontSize: '20px',
+                fontFamily: '"Pixeloid Sans"',
+                color: this.colorHex,
+                stroke: '#000000',
+                strokeThickness: 3
+            }).setOrigin(0, 0.5);
+            heart.setShadow(2, 2, '#000000', 0, true, true);
+            this.heartContainer.add(heart);
+        }
+    }
+
+    private shake(intensity: number): void {
+        // Subtle Y-axis shake only
+        // Check if tween already active? If so, maybe stop it and do new one if stronger?
+        if (this.scene.tweens.isTweening(this.portraitContainer)) {
+            this.scene.tweens.killTweensOf(this.portraitContainer);
+            this.portraitContainer.setPosition(this.portraitBaseX, this.portraitBaseY);
+        }
+
+        this.scene.tweens.add({
+            targets: this.portraitContainer,
+            y: { from: this.portraitBaseY, to: this.portraitBaseY + intensity },
+            duration: 50, // Fast
+            yoyo: true,
+            repeat: 3, // 3 shakes
+            ease: 'Sine.easeInOut',
+            onComplete: () => {
+                this.portraitContainer.setPosition(this.portraitBaseX, this.portraitBaseY);
+            }
+        });
     }
 
     destroy(): void {

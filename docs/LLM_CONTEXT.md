@@ -32,7 +32,7 @@ For every commit or major task completion, update `DEVELOPMENT_LOG.md` using the
 1. **PROCEDURE Protocol**: When the user says "PROCEDURE", perform the following EXACT steps:
     - **Bump Version**: Update `package.json` (e.g., `v0.13.2`).
     - **Update UI**: Ensure the new version is displayed under the Main Title in `MainMenuScene.ts`.
-    - **Log**: Update `docs/DEVELOPMENT_LOG.md` with latest changes chronologically.
+    - **Log**: Update `docs/DEVELOPMENT_LOG.md` with latest changes chronologically (add new updates at the end of the doc)
     - **Commit**: Message MUST match the version + a brief description (e.g., `v0.13.2: Fixed physics bug`).
     - **Push**: Execute `git push` to deploy online.
 

@@ -194,8 +194,44 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // Create stage platforms
             this.createStage();
 
+            // LOADING SCREEN (User Request: Hide blue transition)
+            const loadingOverlay = this.add.rectangle(
+                this.scale.width / 2, this.scale.height / 2,
+                this.scale.width, this.scale.height, 0x000000
+            ).setDepth(10000); // Top level
+
+            const loadingText = this.add.text(
+                this.scale.width / 2, this.scale.height / 2,
+                "LOADING...",
+                { fontSize: '32px', color: '#ffffff', fontFamily: '"Pixeloid Sans"' }
+            ).setOrigin(0.5).setDepth(10001);
+
+            // Ignore loading screen for UI camera if it exists (though UI camera is created inside setupCameras)
+            if (this.uiCamera) {
+                this.uiCamera.ignore([loadingOverlay, loadingText]);
+            }
+            // Actually, we want it ON the main camera or UI camera?
+            // If we put it on Main, it covers everything.
+            // If UI camera ignores it, it won't be drawn by UI camera.
+            // But Main camera sees it.
+            // However, verify if UI Camera clears the screen? No, it usually overlays.
+            // So this is fine.
+
+            // Fade out after a short delay to ensure assets/rendering is ready
+            this.time.delayedCall(100, () => {
+                this.tweens.add({
+                    targets: [loadingOverlay, loadingText],
+                    alpha: 0,
+                    duration: 500,
+                    onComplete: () => {
+                        loadingOverlay.destroy();
+                        loadingText.destroy();
+                    }
+                });
+            });
+
             // BACKGROUND LOGIC
-            this.cameras.main.setBackgroundColor('#99d7f0'); // New Sky Blue
+            this.cameras.main.setBackgroundColor('#99d7f0'); // Blue sky behind stage
 
             // Background graphics are created in createStage(), ensure they are visible
             if (this.background) {
@@ -403,11 +439,32 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (!player.isAttacking) continue;
 
             for (const chest of [...this.chests]) { // Copy array since open() may modify it
-                if (chest.isOpened) continue;
-
                 const dist = Phaser.Math.Distance.Between(player.x, player.y, chest.x, chest.y);
-                if (dist < interactRange) {
-                    chest.open();
+
+                if (!chest.isOpened) {
+                    // Unopened: open it (consume attack, no knockback)
+                    if (dist < interactRange) {
+                        chest.open();
+                        // Optional: Reset player attack so they don't immediately punch it away?
+                        // player.isAttacking = false; 
+                        // But let's leave it, just don't apply force HERE.
+                        // Force is only applied in the 'else' block which won't run this frame
+                        // because chest.isOpened was false at start of check.
+
+                        // Actually, chest.open() sets isOpened=true immediately.
+                        // Next frame physics might pick it up.
+                        // But for THIS frame, we just open.
+                    }
+                } else {
+                    // Opened: knock it around! (if cooldown is over)
+                    if (dist < interactRange && chest.canBePunched) {
+                        const angle = Phaser.Math.Angle.Between(player.x, player.y, chest.x, chest.y);
+                        const force = 2.0; // Very strong punch force
+                        chest.applyForce(new Phaser.Math.Vector2(
+                            Math.cos(angle) * force,
+                            Math.sin(angle) * force - 0.15 // Upward pop
+                        ));
+                    }
                 }
             }
         }
@@ -755,11 +812,16 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         player.setPosition(spawnX, spawnY);
         // Explicitly reset body physics to prevent ghost velocity/position
         if (player.body) {
+            // Re-add body to world if it was removed
+            if (!this.matter.world.has(player.body as MatterJS.BodyType)) {
+                this.matter.world.add(player.body as MatterJS.BodyType);
+            }
             this.matter.body.setPosition(player.body as MatterJS.BodyType, { x: spawnX, y: spawnY });
             this.matter.body.setVelocity(player.body as MatterJS.BodyType, { x: 0, y: 0 });
+            // Reset rotation/angular velocity too just in case
+            this.matter.body.setAngle(player.body as MatterJS.BodyType, 0);
+            this.matter.body.setAngularVelocity(player.body as MatterJS.BodyType, 0);
         }
-        // player.physics.reset(); // This might be redundant or Arcade specific, but Player.ts uses it. 
-        // Let's check Player.ts. It likely uses matter methods inside.
         player.physics.reset();
         player.setState(PlayerState.AIRBORNE);
         player.setDamage(0);
@@ -912,6 +974,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Close pause menu
         this.isPaused = false;
         this.pauseMenu.hide();
+
+        // Clear all chests
+        this.chests.forEach(c => c.destroy());
+        this.chests = [];
     }
 
 
@@ -1040,22 +1106,41 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         const { width, height } = this.scale;
 
-        // Darken background
+        // Darken background (Fixed to screen)
         const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
+        overlay.setScrollFactor(0); // Ensure it stays covers screen during zoom
         overlay.setDepth(1000);
-        this.addToCameraIgnore(overlay); // UI Camera ignores it? NO, UI camera renders UI. Wait.
-        // If we want UI to render this, we must ensure it is visible to UI camera properly.
-        // Actually, main camera ignores UI. UI camera renders UI.
-        // If I just add to scene, Main Camera renders it by default.
-        // But wait, GameScene uses `uiCamera`.
-        // Objects for UI should be ignored by Main Camera.
-        this.cameras.main.ignore(overlay);
+        this.cameras.main.ignore(overlay); // Ignored by main? No, we want main to see it DIM the world.
+        // Wait, if we ignore it, main won't see it.
+        // The previous code had `this.cameras.main.ignore(overlay)`.
+        // This implies `checkGameOver` relied on `uiCamera` to render it?
+        // But `uiCamera` ignores main game objects.
+        // If `overlay` is added here, it's a game object.
+        // If `uiCamera` is setup to ignore `this.players` etc, does it render new objects by default?
+        // Let's assume the previous logic for camera visibility was correct for the TEXT, but maybe not the overlay?
+        // LINE 1118 was `this.cameras.main.ignore(overlay)`.
+        // This suggests only UI Camera renders the overlay.
+        // If UI Camera renders it, zooming Main Camera won't affect the overlay scaling (good).
+        // So we keep `cameras.main.ignore(overlay)`.
+
+        if (this.uiCamera) {
+            // Ensure UI camera sees these/defaults to seeing them
+        }
 
         let winnerText = "GAME!";
+        let winner: Player | undefined;
+
         if (winnerId >= 0) {
-            winnerText += `\\nPLAYER ${winnerId + 1} WINS!`;
+            winnerText += `\nPLAYER ${winnerId + 1} HA ARATO!`; // Custom Text
+            winner = this.players.find(p => p.playerId === winnerId);
+
+            // DRAMATIC ZOOM
+            if (winner) {
+                this.cameras.main.pan(winner.x, winner.y, 1500, 'Power2');
+                this.cameras.main.zoomTo(2.0, 1500, 'Power2');
+            }
         } else {
-            winnerText += "\\nDRAW GAME!";
+            winnerText += "\nDRAW GAME!";
         }
 
         const text = this.add.text(width / 2, height / 2, winnerText, {
