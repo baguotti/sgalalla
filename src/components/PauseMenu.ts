@@ -25,13 +25,13 @@ export class PauseMenu {
     private visible: boolean = false;
 
     private menuOptions = [
-        { label: 'Resume', value: MenuOption.RESUME },
-        { label: 'Controls', value: MenuOption.CONTROLS },
+        { label: 'RIPRENDI', value: MenuOption.RESUME },
+        { label: 'COMANDI', value: MenuOption.CONTROLS },
         // Training Options removed
-        { label: 'Spawn Training Partner', value: MenuOption.SPAWN_DUMMY },
-        { label: 'Restart Match', value: MenuOption.RESTART },
-        { label: 'Return to Lobby', value: MenuOption.LOBBY },
-        { label: 'Exit to Menu', value: MenuOption.EXIT }
+        { label: 'SPAWN CPU', value: MenuOption.SPAWN_DUMMY },
+        { label: 'RIAVVIA PARTITA', value: MenuOption.RESTART },
+        { label: 'TORNA ALLA LOBBY', value: MenuOption.LOBBY },
+        { label: 'TORNA AL MENU', value: MenuOption.EXIT }
     ];
 
     private upKey!: Phaser.Input.Keyboard.Key;
@@ -245,6 +245,9 @@ export class PauseMenu {
         this.menuState = 'MAIN'; // Reset to main menu
         this.mainSelectedIndex = 0;
 
+        // Sound: Open (Player Ready)
+        this.scene.sound.play('ui_player_ready', { volume: 0.5 });
+
         // Sync gamepad state to prevent immediate re-trigger
         this.syncGamepadState();
 
@@ -309,9 +312,11 @@ export class PauseMenu {
 
         if (this.menuState === 'MAIN') {
             if (Phaser.Input.Keyboard.JustDown(this.upKey) || gp.upPressed) {
+                this.scene.sound.play('ui_move_cursor', { volume: 0.5 });
                 this.mainSelectedIndex = (this.mainSelectedIndex - 1 + this.menuOptions.length) % this.menuOptions.length;
                 this.updateSelection();
             } else if (Phaser.Input.Keyboard.JustDown(this.downKey) || gp.downPressed) {
+                this.scene.sound.play('ui_move_cursor', { volume: 0.5 });
                 this.mainSelectedIndex = (this.mainSelectedIndex + 1) % this.menuOptions.length;
                 this.updateSelection();
             }
@@ -321,11 +326,13 @@ export class PauseMenu {
             }
 
             if (Phaser.Input.Keyboard.JustDown(this.escKey) || gp.bPressed || gp.startPressed) {
+                this.scene.sound.play('ui_back', { volume: 0.5 });
                 this.executeOption(MenuOption.RESUME);
             }
         } else if (this.menuState === 'CONTROLS') {
             // Back to Main Menu
             if (Phaser.Input.Keyboard.JustDown(this.escKey) || gp.bPressed || gp.aPressed || gp.startPressed) {
+                this.scene.sound.play('ui_back', { volume: 0.5 });
                 this.menuState = 'MAIN';
                 this.hideControlsMenu();
                 this.showMainMenu();
@@ -346,6 +353,7 @@ export class PauseMenu {
     }
 
     private selectOption(): void {
+        this.scene.sound.play('ui_confirm', { volume: 0.5 });
         const option = this.menuOptions[this.mainSelectedIndex].value;
         this.executeOption(option);
     }

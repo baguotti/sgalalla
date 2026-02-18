@@ -21,10 +21,9 @@ export class MainMenuScene extends Phaser.Scene {
         super({ key: 'MainMenuScene' });
     }
 
-    private debugText!: Phaser.GameObjects.Text;
+
 
     preload(): void {
-        // ui_title_loop removed in favor of global music
         this.load.audio('ui_menu_hover', 'assets/audio/ui/ui_menu_hover.wav');
         this.load.audio('ui_confirm', 'assets/audio/ui/ui_confirm.wav');
         this.load.audio('ui_back', 'assets/audio/ui/ui_back.wav');
@@ -70,17 +69,16 @@ export class MainMenuScene extends Phaser.Scene {
 
 
         // Version Text (Below Title)
-        this.add.text(width / 2, 260, 'v0.13.4', {
+        this.add.text(width / 2, 260, 'v0.13.5', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(0.5);
 
 
-        // Version (Removed - combined with subtitle)
 
         // Menu Items
         const startY = 650; // Moved down from 420
         this.menuOptions.forEach((opt, index) => {
-            const text = this.add.text(width / 2, startY + (index * 90), opt.label, {
+            const text = this.add.text(width / 2, startY + (index * 70), opt.label, {
                 fontSize: '48px', fontFamily: '"Pixeloid Sans"', color: '#888888'
             }).setOrigin(0.5);
 
@@ -91,13 +89,7 @@ export class MainMenuScene extends Phaser.Scene {
 
         this.updateSelection();
 
-        // DEBUG: Gamepad Status
-        this.debugText = this.add.text(10, 10, 'Gamepad: ???', { fontSize: '16px', color: '#00ff00', fontFamily: '"Pixeloid Sans"' });
 
-
-        this.input.gamepad?.on('connected', (pad: Phaser.Input.Gamepad.Gamepad) => {
-            this.debugText.setText(`Gamepad Connected: ${pad.id}`);
-        });
 
         // Input Safety (Prevent ghost clicks)
         this.time.delayedCall(500, () => {
@@ -122,15 +114,7 @@ export class MainMenuScene extends Phaser.Scene {
     }
 
     update(): void {
-        const gamepads = navigator.getGamepads();
-        let debugStr = 'Gamepads:\n';
-        for (let i = 0; i < gamepads.length; i++) {
-            const gp = gamepads[i];
-            if (gp) {
-                debugStr += `[${i}] ${gp.id.substring(0, 20)}...\n`;
-            }
-        }
-        this.debugText.setText(debugStr);
+
 
         if (!this.canInput) return;
 

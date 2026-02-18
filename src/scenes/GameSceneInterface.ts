@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import type { Chest } from '../entities/Chest';
 import type { Bomb } from '../entities/Bomb';
-import type { EffectManager } from '../effects/EffectManager';
+
 
 /**
  * Shared interface for scene properties accessed by entities like Chest, Hitbox, and Bomb.

@@ -16,6 +16,9 @@ export class SettingsScene extends Phaser.Scene {
     private keyEnter!: Phaser.Input.Keyboard.Key;
     private keyEsc!: Phaser.Input.Keyboard.Key;
 
+    private keySpace!: Phaser.Input.Keyboard.Key;
+    private canInput: boolean = false;
+
     constructor() {
         super({ key: 'SettingsScene' });
         this.audioManager = AudioManager.getInstance();
@@ -23,6 +26,10 @@ export class SettingsScene extends Phaser.Scene {
 
     create(): void {
         const { width, height } = this.scale;
+
+        // Clear arrays to prevent holding references to destroyed objects
+        this.menuTexts = [];
+        this.valueTexts = [];
 
         // Background (Black overlay)
         this.add.rectangle(0, 0, width, height, 0x000000).setOrigin(0);
@@ -43,7 +50,13 @@ export class SettingsScene extends Phaser.Scene {
         this.keyLeft = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
         this.keyRight = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
         this.keyEnter = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+        this.keySpace = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.keyEsc = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+        // DELAY INPUT ACTIVATION to prevent accidental double-presses from previous menu
+        this.time.delayedCall(500, () => {
+            this.canInput = true;
+        });
 
         this.updateSelection();
 
@@ -108,6 +121,8 @@ export class SettingsScene extends Phaser.Scene {
     }
 
     update(): void {
+        if (!this.canInput) return;
+
         if (Phaser.Input.Keyboard.JustDown(this.keyUp)) {
             this.changeSelection(-1);
         } else if (Phaser.Input.Keyboard.JustDown(this.keyDown)) {
@@ -116,7 +131,7 @@ export class SettingsScene extends Phaser.Scene {
             this.modifyValue(-1);
         } else if (Phaser.Input.Keyboard.JustDown(this.keyRight)) {
             this.modifyValue(1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEnter)) {
+        } else if (Phaser.Input.Keyboard.JustDown(this.keyEnter) || Phaser.Input.Keyboard.JustDown(this.keySpace)) {
             this.confirmSelection();
         } else if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
             this.goBack();

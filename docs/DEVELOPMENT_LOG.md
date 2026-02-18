@@ -164,3 +164,12 @@ Part 2
   - Added input throttling to Main Menu to prevent hypersensitive scrolling.
   - Fixed "START" (Pause) and "SELECT" (Debug) buttons not working on some controllers by scanning all connected gamepads.
   - Verified and fixed logic for assigning the correct controller (Player 1) from Menu to Lobby to Game.
+### [2026-02-18] v0.13.5 - Codebase Cleanup (Phase 1) 🧹
+- **[V]** `v0.13.5`
+- **[Cleanup]** **Asset Audit**:
+    - **Deleted Unused**: Removed `public/assets/fok_v3/` (consolidated to `v4`), legacy audio files, and unused platform textures.
+    - **Documentation**: Archived `DEVELOPMENT_LOG_LEGACY.md` to reduce clutter.
+- **[Refactor]** **Legacy Code Removal**:
+    - **PreloadScene**: Stripped commented-out asset loading blocks.
+    - **AnimationHelpers**: Removed dead code for old platform types.
+- **[S]** **STATUS**: Project size reduced; legacy debt cleared. Ready for architectural upgrades.

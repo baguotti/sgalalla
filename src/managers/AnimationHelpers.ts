@@ -34,7 +34,7 @@ export class AnimationHelpers {
         scene.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
         scene.load.atlas('pe', 'assets/pe/pe.png', 'assets/pe/pe.json');
         scene.load.atlas('nock', 'assets/nock/nock.png', 'assets/nock/nock.json');
-        scene.load.atlas('greg', 'public/assets/greg/greg.png', 'public/assets/greg/greg.json');
+        scene.load.atlas('greg', 'assets/greg/greg.png', 'assets/greg/greg.json');
     }
 
     /**
@@ -75,7 +75,22 @@ export class AnimationHelpers {
         scene.load.image('platform_top', 'assets/platform_top_left.png'); // Will flip for right side
 
         // Legacy/Unused? (Keeping just in case, or removing if confirmed unused)
-        // scene.load.image('bh_plat_2', 'assets/stages/Platform_BH2.png'); 
+    }
+
+    /**
+     * Loads UI Audio Assets.
+     * @param scene The scene to load assets into.
+     */
+    public static loadUIAudio(scene: Phaser.Scene): void {
+        scene.load.audio('ui_player_found', 'assets/audio/ui/ui_player_found.wav');
+        scene.load.audio('ui_change_character', 'assets/audio/ui/ui_change_character.wav');
+        scene.load.audio('ui_confirm_character', 'assets/audio/ui/ui_confirm_character.wav');
+        scene.load.audio('ui_back', 'assets/audio/ui/ui_back.wav');
+        scene.load.audio('ui_player_ready', 'assets/audio/ui/ui_player_ready.wav');
+        scene.load.audio('ui_menu_hover', 'assets/audio/ui/ui_menu_hover.wav');
+        scene.load.audio('ui_confirm', 'assets/audio/ui/ui_confirm.wav');
+        scene.load.audio('ui_move_cursor', 'assets/audio/ui/ui_move_cursor.wav');
+        scene.load.audio('ui_match_begin', 'assets/audio/ui/ui_match_begin.wav');
     }
 
     /**

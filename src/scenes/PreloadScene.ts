@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { AudioManager } from '../managers/AudioManager';
 
 export class PreloadScene extends Phaser.Scene {
     constructor() {
@@ -6,8 +7,8 @@ export class PreloadScene extends Phaser.Scene {
     }
 
     preload(): void {
-        // this.load.image('logo', 'assets/ui/logo.jpg'); // Removed as file is deleted
         this.load.image('title_card', 'assets/ui/main_title.jpg');
+        this.load.video('title_card_video', 'assets/ui/Title_card_loop_001.mp4'); // Load video
 
         this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
         this.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');
@@ -16,9 +17,12 @@ export class PreloadScene extends Phaser.Scene {
         this.load.atlas('nock', 'assets/nock/nock.png', 'assets/nock/nock.json');
         this.load.atlas('greg', 'assets/greg/greg.png', 'assets/greg/greg.json');
 
+        // Load Global Music
+        this.load.audio('global_music_loop', 'assets/audio/music/manici_intro_002_loop.mp3');
     }
 
     create(): void {
+        // Music will replace user interaction to satisfy browser policies
         const { width, height } = this.scale;
 
         // Black Background (Fallback)
@@ -75,7 +79,22 @@ export class PreloadScene extends Phaser.Scene {
     }
 
     private setupInput(): void {
-        const proceed = () => {
+        const proceed = async () => {
+            // Resume Audio Context (Browser Policy)
+            if (this.sound instanceof Phaser.Sound.WebAudioSoundManager) {
+                if (this.sound.context.state === 'suspended') {
+                    await this.sound.context.resume();
+                }
+            }
+
+            // Start Global Music (if not already playing)
+            const audioManager = AudioManager.getInstance();
+            audioManager.init(this);
+
+            if (!this.sound.get('global_music_loop')) {
+                this.sound.play('global_music_loop', { loop: true, volume: audioManager.getMusicVolume() });
+            }
+
             this.scene.start('MainMenuScene');
         };
 

@@ -258,7 +258,7 @@ export class PlayerHudSlot {
         const spacing = 22; // Horizontal spacing
 
         // Get player color for hearts
-        const colorHex = this.colorHex || '#ffffff'; // Fallback logic needed or store color
+
 
         // Limit visual hearts to prevent overflow? (e.g. max 5)
         // For now, draw all.
@@ -337,9 +337,17 @@ export class MatchHUD {
         // GameScene stores playerData array.
         let totalSlots = 4;
         const scene: any = this.scene;
+        // Check playerData or players array density
         if (scene.playerData && Array.isArray(scene.playerData)) {
             totalSlots = Math.max(scene.playerData.length, 4);
+        } else if (scene.players && Array.isArray(scene.players)) {
+            totalSlots = Math.max(scene.players.length, 4);
         }
+
+        // Force 6 slots if we have high IDs?
+        // If we have player ID 5 (6th player), we need at least 6 slots.
+        if (playerId >= 4) totalSlots = 6;
+        if (totalSlots === 5) totalSlots = 6; // Balance for 5 players (use 6 slots layout)
 
         const segment = width / totalSlots;
         const slotIndex = playerId; // 0-based index

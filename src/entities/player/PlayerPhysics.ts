@@ -510,17 +510,7 @@ export class PlayerPhysics {
                     this.player.velocity.y = PhysicsConfig.WALL_SLIDE_SPEED;
                 }
 
-                // Trigger Wall Slide Dust (Subtle)
-                // Spawn every ~5 frames (20% chance per frame)
-                if (Math.random() < 0.2) {
-                    if ((this.player.scene as any).effectManager) {
-                        (this.player.scene as any).effectManager.spawnWallDust(
-                            this.player.x,
-                            this.player.y + (this.player.height * 0.2),
-                            this.wallDirection
-                        );
-                    }
-                }
+                // Particles removed per user request
             } else {
                 this.isWallSliding = false;
             }

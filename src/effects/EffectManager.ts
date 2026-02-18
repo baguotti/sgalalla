@@ -85,7 +85,7 @@ export class EffectManager {
         });
     }
 
-    public spawnDeathExplosion(x: number, y: number, color: number): void {
+    public spawnDeathExplosion(_x: number, _y: number, _color: number): void {
         // Disabled by user request
         // const explosion = this.explosions.get() as Phaser.GameObjects.Graphics;
         // if (!explosion) return;

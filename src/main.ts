@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PreloadScene } from './scenes/PreloadScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
+import { SettingsScene } from './scenes/SettingsScene';
 import { LobbyScene } from './scenes/LobbyScene';
 import { GameScene } from './scenes/GameScene';
 import { OnlineGameScene } from './scenes/OnlineGameScene';
@@ -20,7 +21,7 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true
   },
-  scene: [PreloadScene, MainMenuScene, LobbyScene, GameScene, OnlineGameScene],
+  scene: [PreloadScene, MainMenuScene, SettingsScene, LobbyScene, GameScene, OnlineGameScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
