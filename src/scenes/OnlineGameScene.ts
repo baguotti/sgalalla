@@ -244,6 +244,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
         // Setup stage (but don't spawn players yet)
         this.createStage();
+        this.cameras.main.setBackgroundColor('#99d7f0');
 
         // Initialize HUD
         this.matchHUD = new MatchHUD(this);
@@ -1531,8 +1532,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             this.uiCamera.ignore(stage.background);
             this.uiCamera.ignore(this.platforms);
             this.uiCamera.ignore(this.softPlatforms);
-            this.uiCamera.ignore(stage.wallVisuals);
-            this.uiCamera.ignore(stage.wallTexts);
+            // Removed wallVisuals/Texts as they are gone
         }
     }
 

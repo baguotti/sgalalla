@@ -130,3 +130,8 @@ Part 2
 - **[Tuning]** **Blast Zone**: Raised the top blast zone ceiling (`BLAST_ZONE_TOP`) from -600 to -1000 to provide more vertical play space.
 - **[Tuning]** **Background**: Scaled up background image by 35% for better framing.
 - **[Refactor]** **Physics Engine**: Added `checkCeilingCollision` to `PlayerPhysics` to support bottom-blocking infrastructure.
+
+### [2026-02-18] v0.13.1 - Stage Cleanliness
+- **[V]** `v0.13.1`
+- **[Refactor]** **StageFactory Cleanup**: Deep cleaned `StageFactory.ts` by removing unused legacy code (Color constants, visual wall arrays), and unified wall collision logic across `GameScene` and `OnlineGameScene`.
+- **[Docs]** **Logs**: Updated changelogs.

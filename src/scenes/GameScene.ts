@@ -27,9 +27,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     public seals: any[] = []; // Seal projectiles
     private background!: Phaser.GameObjects.Graphics;
     private backgroundImage!: Phaser.GameObjects.Image; // Add class property
-    public walls: Phaser.GameObjects.Rectangle[] = [];
-    private wallTexts: Phaser.GameObjects.Text[] = [];
-    private wallRects: Phaser.Geom.Rectangle[] = [];
+    public walls: Phaser.Geom.Rectangle[] = []; // Unified walls (geom)
     private stageTextures: Phaser.GameObjects.Image[] = []; // Restore this
     private ceilings: Phaser.GameObjects.Rectangle[] = []; // Bottom blocking
 
@@ -141,7 +139,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.softPlatforms = [];
             this.sidePlatforms = [];
             this.walls = [];
-            this.wallTexts = [];
             this.stageTextures = [];
 
             // Re-create bomb group
@@ -198,7 +195,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.createStage();
 
             // BACKGROUND LOGIC
-            this.cameras.main.setBackgroundColor('#000000'); // Fallback black
+            this.cameras.main.setBackgroundColor('#99d7f0'); // New Sky Blue
 
             // Background graphics are created in createStage(), ensure they are visible
             if (this.background) {
@@ -435,8 +432,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         if (this.backgroundImage) this.uiCamera.ignore(this.backgroundImage); // Ignore bg image
         if (this.platforms.length > 0) this.uiCamera.ignore(this.platforms);
         if (this.softPlatforms.length > 0) this.uiCamera.ignore(this.softPlatforms);
-        if (this.walls.length > 0) this.uiCamera.ignore(this.walls);
-        if (this.wallTexts.length > 0) this.uiCamera.ignore(this.wallTexts);
         if (this.stageTextures.length > 0) this.uiCamera.ignore(this.stageTextures);
 
         // Ignore entities
@@ -463,19 +458,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.platforms = [stage.mainPlatform];
         this.softPlatforms = stage.softPlatforms;
         this.sidePlatforms = stage.sidePlatforms; // Store side platforms
-        this.walls = stage.wallVisuals;       // May be empty but must be assigned
-        this.wallTexts = stage.wallTexts;     // May be empty but must be assigned
         this.ceilings = stage.ceilings || []; // Store ceilings
         this.stageTextures = [...stage.platformTextures]; // Track ALL textures (side visuals are in platformTextures now)
-        this.wallRects = stage.wallCollisionRects;
+        this.walls = stage.wallCollisionRects;
 
         // Explicitly ignore every stage object in UI camera (with guards for empty arrays)
         if (this.uiCamera) {
             this.uiCamera.ignore(stage.background);
             this.uiCamera.ignore(stage.mainPlatform);
             if (stage.softPlatforms.length > 0) this.uiCamera.ignore(stage.softPlatforms);
-            if (stage.wallVisuals.length > 0) this.uiCamera.ignore(stage.wallVisuals);
-            if (stage.wallTexts.length > 0) this.uiCamera.ignore(stage.wallTexts);
             if (stage.platformTextures.length > 0) this.uiCamera.ignore(stage.platformTextures);
             if (stage.sidePlatforms.length > 0) this.uiCamera.ignore(stage.sidePlatforms);
         }
@@ -635,7 +626,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.players.forEach(p => p.updateLogic(delta));
 
         // 4. Wall Collisions (end of frame — sets isTouchingWall for next frame)
-        this.players.forEach(p => p.checkWallCollision(this.wallRects));
+        this.players.forEach(p => p.checkWallCollision(this.walls));
 
 
         // Combat Hit Checks
@@ -1125,7 +1116,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.debugGraphics.lineStyle(2, 0xff0000, 1);
         this.debugGraphics.fillStyle(0xff0000, 0.2);
 
-        this.wallRects.forEach((r, index) => {
+        this.walls.forEach((r: Phaser.Geom.Rectangle, index: number) => {
             if (!r) return;
             this.debugGraphics.strokeRect(r.x, r.y, r.width, r.height);
             this.debugGraphics.fillRect(r.x, r.y, r.width, r.height);

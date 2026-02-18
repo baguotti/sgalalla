@@ -63,7 +63,7 @@ export class AnimationHelpers {
         scene.load.image('platform_corner_right', 'public/assets/stages/Platform_BH4B.png');
 
         // New Brawlhaven Layout Assets
-        scene.load.image('bh_bg', 'public/assets/stages/BG_Brawlhaven.jpg');
+        scene.load.image('adria_bg', 'public/assets/stages/BG_Adria.webp');
         scene.load.image('bh_plat_1', 'public/assets/stages/Platform_BH1.png'); // Top Center?
         scene.load.image('bh_plat_2', 'public/assets/stages/Platform_BH2.png'); // Small?
         scene.load.image('bh_plat_left', 'public/assets/stages/Platform_BH5_left.png'); // Left Wall

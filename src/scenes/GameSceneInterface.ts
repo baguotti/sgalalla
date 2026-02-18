@@ -16,8 +16,8 @@ export interface GameSceneInterface extends Phaser.Scene {
     /** Active chests in the scene */
     chests: Chest[];
 
-    /** Active walls in the scene (GameScene only; unused in OnlineGameScene) */
-    walls?: Phaser.GameObjects.Rectangle[] | Phaser.Geom.Rectangle[];
+    /** Active walls in the scene (Unified: Geom.Rectangle for collision) */
+    walls: Phaser.Geom.Rectangle[];
     effectManager?: any; // Avoiding circular dependency with EffectManager type for now, or use import type
 
     /** Active bombs in the scene (GameScene only; unused in OnlineGameScene) */

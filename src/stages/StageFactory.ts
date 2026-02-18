@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { MapConfig } from '../config/MapConfig';
+
 
 /**
  * Result of creating a stage. Scenes can pick what they need
@@ -10,20 +10,14 @@ export interface StageResult {
     mainPlatform: Phaser.GameObjects.Rectangle;
     softPlatforms: Phaser.GameObjects.Rectangle[];
     sidePlatforms: Phaser.GameObjects.Rectangle[]; // Added side platforms
-    wallVisuals: Phaser.GameObjects.Rectangle[];
-    wallTexts: Phaser.GameObjects.Text[];
+
     wallCollisionRects: Phaser.Geom.Rectangle[];
     ceilings: Phaser.GameObjects.Rectangle[]; // Collision check for bottom-up entry
     platformTextures: Phaser.GameObjects.Image[];
 }
 
 // Shared color constants for stage visuals
-const WALL_COLOR = 0x2a3a4e;
-const WALL_STROKE = 0x4a6a8e;
-const PLATFORM_COLOR = 0x2c3e50;
-const PLATFORM_STROKE = 0x3a506b;
-const SOFT_PLATFORM_COLOR = 0x0f3460;
-const SOFT_PLATFORM_STROKE = 0x1a4d7a;
+
 
 /**
  * Creates the standard Sgalalla stage layout.
@@ -31,14 +25,14 @@ const SOFT_PLATFORM_STROKE = 0x1a4d7a;
  */
 export function createStage(scene: Phaser.Scene): StageResult {
     // --- Background ---
-    const background = scene.add.image(scene.scale.width / 2, scene.scale.height / 2, 'bh_bg'); // New BG
+    const background = scene.add.image(scene.scale.width / 2, scene.scale.height / 2, 'adria_bg'); // New BG
     const scaleX = scene.scale.width / background.width;
     const scaleY = scene.scale.height / background.height;
-    const scale = Math.max(scaleX, scaleY) * 1.35; // Scale up 35% for "closer" feel
+    const scale = Math.max(scaleX, scaleY) * 0.8; // Scale to cover (1.0)
     // 0.1 scroll factor means it moves very little (far away). 
     // If you want it "closer", increase this (e.g. 0.3).
     // User asked for "scale up OR move closer", so let's stick to scale first.
-    background.setScale(scale).setScrollFactor(0.1);
+    background.setScale(scale).setScrollFactor(0.9);
     background.setDepth(-100);
 
     // --- Main Platform ---
@@ -150,11 +144,6 @@ export function createStage(scene: Phaser.Scene): StageResult {
     // Track visual images for camera ignore
     const topPlatVisuals = [sp1Visual, sp2Visual];
 
-    // --- Wall Visuals ---
-    const wallVisuals: Phaser.GameObjects.Rectangle[] = [];
-
-    // --- Wall Text Labels ---
-    const wallTexts: Phaser.GameObjects.Text[] = [];
 
     // --- Wall Collisions (Slideable Surfaces) ---
     // MANUAL TUNING GUIDE (WALLS - RED BOXES):
@@ -208,8 +197,7 @@ export function createStage(scene: Phaser.Scene): StageResult {
         mainPlatform,
         softPlatforms,
         sidePlatforms, // Now Rectangles
-        wallVisuals,
-        wallTexts,
+
         wallCollisionRects,
         ceilings, // Added ceilings
         platformTextures: [leftTex, rightTex, ...topPlatVisuals, ...sidePlatVisuals]
