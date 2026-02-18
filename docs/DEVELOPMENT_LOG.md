@@ -157,3 +157,10 @@ Part 2
 - **[Fix]** **Respawn Glitch**: Fixed immediate death loop by resetting physics body and validating spawn points.
 - **[Polishing]** **Death Impact**: Added camera shake and explosion visual effect on player death.
 - **[Refactor]** **Effect Manager**: Centralized effect handling in `EffectManager.ts`.
+
+## v0.13.4 (2026-02-18)
+- **Gamepad Input Fixes**:
+  - Implemented raw input polling via `navigator.getGamepads()` to support Xbox controllers and non-primary gamepads in menus and game.
+  - Added input throttling to Main Menu to prevent hypersensitive scrolling.
+  - Fixed "START" (Pause) and "SELECT" (Debug) buttons not working on some controllers by scanning all connected gamepads.
+  - Verified and fixed logic for assigning the correct controller (Player 1) from Menu to Lobby to Game.

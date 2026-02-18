@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { AudioManager } from '../managers/AudioManager';
 import { SMASH_COLORS } from '../ui/PlayerHUD';
 import { charConfigs } from '../config/CharacterConfig';
 
@@ -87,6 +88,13 @@ export class LobbyScene extends Phaser.Scene {
     preload(): void {
         this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
 
+        // Audio
+        this.load.audio('ui_player_found', 'assets/audio/ui/ui_player_found.wav');
+        this.load.audio('ui_change_character', 'assets/audio/ui/ui_change_character.wav');
+        this.load.audio('ui_confirm_character', 'assets/audio/ui/ui_confirm_character.wav');
+        this.load.audio('ui_back', 'assets/audio/ui/ui_back.wav');
+        this.load.audio('ui_player_ready', 'assets/audio/ui/ui_player_ready.wav');
+
     }
 
 
@@ -98,6 +106,17 @@ export class LobbyScene extends Phaser.Scene {
 
         // Background
         this.add.rectangle(0, 0, width, height, 0x000000).setOrigin(0);
+
+        // Ensure Global Music Volume (Restore to user setting)
+        const audioManager = AudioManager.getInstance();
+        const music = this.sound.get('global_music_loop');
+        if (music && music.isPlaying) {
+            this.tweens.add({
+                targets: music,
+                volume: audioManager.getMusicVolume(),
+                duration: 1000
+            });
+        }
 
         // Title
         const centerY = height / 2 + 20;
@@ -142,9 +161,19 @@ export class LobbyScene extends Phaser.Scene {
 
         this.createSlotUI();
 
-        // Handle specific modes
+        // Handle specific modes or Auto-Join from Main Menu
         if (this.mode === 'training') {
             this.setupTrainingMode();
+        } else if (this.mode === 'versus') {
+            // If we came from Main Menu with a specific input, auto-join P1
+            if (this.initialInputType === 'GAMEPAD' && this.initialGamepadIndex !== null) {
+                this.joinPlayer('GAMEPAD', this.initialGamepadIndex);
+            } else if (this.initialInputType === 'KEYBOARD') {
+                // Optional: Auto-join Keyboard P1? Usually yes for single player convience
+                // But "Botte in Locale" implies multiplayer setup. 
+                // Let's auto-join P1 if keyboard was used to select it, for consistency.
+                this.joinPlayer('KEYBOARD', null);
+            }
         }
 
         // CRITICAL: Reset keyboard state before adding keys
@@ -359,6 +388,7 @@ export class LobbyScene extends Phaser.Scene {
         }
 
         if (goBack) {
+            AudioManager.getInstance().playSFX('ui_back', { volume: 0.5 });
             this.scene.start('MainMenuScene');
         }
 
@@ -406,6 +436,8 @@ export class LobbyScene extends Phaser.Scene {
             slot.input.type = type;
             slot.input.gamepadIndex = index;
             slot.character = 'fok';
+
+            AudioManager.getInstance().playSFX('ui_player_found', { volume: 0.5 }); // Join Sound
 
             // Prevent immediate "Ready" input in the same frame
             // Set input time to now so the debounce check in handlePlayerInput fails
@@ -472,6 +504,7 @@ export class LobbyScene extends Phaser.Scene {
                 } else if (select) {
                     // SAFETY: Prevent immediate ready if scene just started (prevent held button carryover)
                     if (Date.now() - this.sceneStartTime > 500) {
+                        AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 });
                         slot.ready = true;
                         inputRegistered = true;
                         this.checkAllReady();
@@ -537,10 +570,12 @@ export class LobbyScene extends Phaser.Scene {
             inputRegistered = true;
         } else if (select) {
             if (this.selectionPhase === 'P1') {
+                AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 });
                 p1.ready = true;
                 this.selectionPhase = 'CPU';
                 inputRegistered = true;
             } else {
+                AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 }); // Or ui_player_ready
                 cpu.ready = true;
                 inputRegistered = true;
                 this.startTrainingGame();
@@ -553,12 +588,14 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private startTrainingGame(): void {
+        AudioManager.getInstance().playSFX('ui_player_ready', { volume: 0.6 });
         this.time.delayedCall(500, () => {
             this.scene.start('GameScene', { playerData: [this.slots[0], this.slots[1]] });
         });
     }
 
     private changeCharacter(slot: PlayerSelection, dir: number): void {
+        AudioManager.getInstance().playSFX('ui_change_character', { volume: 0.4 });
         const idx = this.characters.indexOf(slot.character);
         const newIdx = (idx + dir + this.characters.length) % this.characters.length;
         slot.character = this.characters[newIdx];
@@ -569,7 +606,8 @@ export class LobbyScene extends Phaser.Scene {
         const minPlayers = this.mode === 'versus' ? 2 : 1;
         if (joinedSlots.length >= minPlayers && joinedSlots.every(s => s.ready)) {
             // Start Game
-            this.time.delayedCall(500, () => {
+            AudioManager.getInstance().playSFX('ui_player_ready', { volume: 0.6 });
+            this.time.delayedCall(1000, () => {
                 this.scene.start('GameScene', { playerData: joinedSlots });
             });
         } else {

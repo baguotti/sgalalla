@@ -10,6 +10,7 @@ import type { ZoomLevel } from '../config/MapConfig';
 import { createStage as createSharedStage } from '../stages/StageFactory';
 import { EffectManager } from '../effects/EffectManager';
 import { AnimationHelpers } from '../managers/AnimationHelpers';
+import { AudioManager } from '../managers/AudioManager';
 
 import type { GameSceneInterface } from './GameSceneInterface';
 
@@ -74,6 +75,16 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private loadCharacterAssets(): void {
         AnimationHelpers.loadCharacterAssets(this);
         AnimationHelpers.loadCommonAssets(this);
+        AnimationHelpers.loadUIAudio(this);
+
+        AnimationHelpers.loadUIAudio(this);
+
+        // Music is now global (loaded in PreloadScene)
+        // this.load.audio('music_match_loop_main', ...); 
+
+        this.load.on('loaderror', (file: { src: string }) => {
+            console.error('Asset load failed:', file.src);
+        });
 
         // Stage Background loaded in AnimationHelpers
     }
@@ -217,8 +228,31 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // However, verify if UI Camera clears the screen? No, it usually overlays.
             // So this is fine.
 
+            // Ensure Global Music loops at lower volume
+            const globalMusic = this.sound.get('global_music_loop');
+            const audioManager = AudioManager.getInstance();
+            const targetVolume = 0.5 * audioManager.getMusicVolume();
+
+            if (globalMusic) {
+                if (!globalMusic.isPlaying) {
+                    globalMusic.play({ loop: true, volume: targetVolume });
+                } else {
+                    this.tweens.add({
+                        targets: globalMusic,
+                        volume: targetVolume,
+                        duration: 1000
+                    });
+                }
+            } else {
+                // Fallback if not started yet (e.g. dev reload on GameScene)
+                this.sound.play('global_music_loop', { loop: true, volume: targetVolume });
+            }
+
+            // this.sound.stopAll(); // Removed to allow global music persistence
+
             // Fade out after a short delay to ensure assets/rendering is ready
             this.time.delayedCall(100, () => {
+                AudioManager.getInstance().playSFX('ui_match_begin', { volume: 0.6 });
                 this.tweens.add({
                     targets: [loadingOverlay, loadingText],
                     alpha: 0,
@@ -894,64 +928,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         );
     }
 
-    private checkGamepadSelect(): boolean {
-        // Check if gamepad SELECT/BACK button was just pressed
-        const gamepads = navigator.getGamepads();
-        let currentSelectPressed = false;
 
-        for (let i = 0; i < gamepads.length; i++) {
-            const gamepad = gamepads[i];
-            if (gamepad) {
-                // Button 8 is usually SELECT/BACK/VIEW on standard gamepads (Xbox/PlayStation)
-                currentSelectPressed = gamepad.buttons[8]?.pressed || false;
-                break; // Only check first connected gamepad
-            }
-        }
-
-        // Detect rising edge (was not pressed, now is pressed)
-        const justPressed = currentSelectPressed && !this.previousSelectPressed;
-        this.previousSelectPressed = currentSelectPressed;
-
-        return justPressed;
-    }
-
-    private checkGamepadA(): boolean {
-        // Check if gamepad A button (0) was just pressed
-        const gamepads = navigator.getGamepads();
-        let currentAPressed = false;
-
-        for (let i = 0; i < gamepads.length; i++) {
-            const gamepad = gamepads[i];
-            if (gamepad) {
-                currentAPressed = gamepad.buttons[0]?.pressed || false;
-                break; // Only check first connected gamepad
-            }
-        }
-
-        const justPressed = currentAPressed && !this.previousAButtonPressed;
-        this.previousAButtonPressed = currentAPressed;
-        return justPressed;
-    }
-
-    private checkGamepadPause(): boolean {
-        // Check if gamepad START button was just pressed
-        const gamepads = navigator.getGamepads();
-        let currentStartPressed = false;
-
-        for (let i = 0; i < gamepads.length; i++) {
-            const gamepad = gamepads[i];
-            if (gamepad) {
-                currentStartPressed = gamepad.buttons[9]?.pressed || false; // Button 9 is START
-                break; // Only check first connected gamepad
-            }
-        }
-
-        // Detect rising edge (was not pressed, now is pressed)
-        const justPressed = currentStartPressed && !this.previousStartPressed;
-        this.previousStartPressed = currentStartPressed;
-
-        return justPressed;
-    }
 
     private togglePause(): void {
         this.isPaused = !this.isPaused;
@@ -983,7 +960,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
 
     private spawnTrainingDummy(): void {
-        const maxPlayers = 4;
+        const maxPlayers = 6; // User requested up to 5 CPUs (assuming +1 user = 6 total)
 
         // Find first available player ID
         let availableId = -1;
@@ -995,8 +972,36 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
 
         if (availableId === -1) {
+            console.log("Max players reached");
             return;
         }
+
+        // --- Random Character Logic ---
+        // Get list of currently used characters
+        const usedCharacters = this.players.map(p => p.character);
+
+        // Filter available characters from ALL_CHARACTERS
+        // Import ALL_CHARACTERS is needed. 
+        // Since I cannot import easily in replace_block without adding to top, I will use hardcoded list or assume imports.
+        // Actually, I can use Object.keys(charConfigs) if imported, or just hardcode the list for now if import is missing.
+        // Let's check imports. MainMenuScene has no imports of config. 
+        // GameScene imports `charConfigs`? 
+        // I will assume `ALL_CHARACTERS` or `charConfigs` is available or I will add the import.
+        // Let's just use the keys from `charConfigs` if available, or list them.
+        // GameScene likely has `charConfigs` imported.
+        // Wait, `CharacterConfig` was imported in recent changes.
+        // Let's assume `ALL_CHARACTERS` is available or use a local list to be safe.
+        // validChars = ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'];
+        const validChars = ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'];
+
+        const availableChars = validChars.filter(c => !usedCharacters.includes(c));
+
+        if (availableChars.length === 0) {
+            console.log("All characters already on screen");
+            return;
+        }
+
+        const randomChar = availableChars[Phaser.Math.Between(0, availableChars.length - 1)];
 
         const playerId = availableId;
 
@@ -1006,9 +1011,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             joined: true,
             ready: true,
             input: { type: 'KEYBOARD', gamepadIndex: null },
-            character: 'fok' as const,
+            character: randomChar,
             isAI: true,
-            isTrainingDummy: true
+            isTrainingDummy: true // Keep this flag for now, maybe rename to isCPU later?
         };
 
         // Check if already exists in data (shouldn't if check passed)
@@ -1016,22 +1021,35 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.playerData.push(dummyData);
         }
 
-        // Spawn logic
-        // Center Spawn (with slight offset to avoid complete overlap if multiple spawn at once)
-        const spawnX = 960 + (playerId * 10);
+        // Create dynamic spawn points for up to 6 players
+        // Center area is around 960.
+        // Let's distribute them: 
+        // 4 players: 400, 800, 1120, 1520
+        // 6 players: Need to squeeze or spread.
+        // Let's stick to the center cluster logic for now, but widen it.
+        // 960 center. 
+        // Logic was: 960 + (playerId * 40).
+        // P0=960, P1=1000, P2=1040, P3=1080, P4=1120, P5=1160
+        // That's fine, prevents stacking.
+        const spawnX = 960 + (playerId * 60) - 100; // Shift left a bit so P0 isn't center
+        // P0 (User) = 860
+        // P1 = 920
+        // P2 = 980
+        // P3 = 1040
+        // P4 = 1100
+        // P5 = 1160
         const spawnY = 300;
 
         const player = new Player(this, spawnX, spawnY, {
             playerId: playerId,
             gamepadIndex: null,
             useKeyboard: false,
-            character: 'fok',
+            character: randomChar,
             isAI: true
         });
 
         player.isTrainingDummy = true;
 
-        // Set Color
         // Set Color
         const color = this.PLAYER_COLORS[playerId] || 0xffffff;
         player.visualColor = color;
@@ -1244,4 +1262,73 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
 
+    // --- Gamepad Helper Methods (Raw Input for reliability) ---
+    private checkGamepadPause(): boolean {
+        // Pause is usually Start (9)
+        const gamepads = navigator.getGamepads();
+        for (const gp of gamepads) {
+            if (!gp) continue;
+            // Check Start (9)
+            if (gp.buttons[9]?.pressed) {
+                if (!this.previousStartPressed) {
+                    this.previousStartPressed = true;
+                    return true;
+                }
+            } else {
+                // Reset only if THIS gamepad released it? 
+                // Simple approach: if ANY gamepad holds start, we set flag. 
+                // If NO gamepad holds start, we reset flag.
+            }
+        }
+
+        // Reset flag if no gamepad is pressing start
+        const isAnyStartPressed = Array.from(gamepads).some(gp => gp && gp.buttons[9]?.pressed);
+        if (!isAnyStartPressed) {
+            this.previousStartPressed = false;
+        }
+
+        return false;
+    }
+
+    private checkGamepadSelect(): boolean {
+        // Debug/Select is usually Back/Select (8)
+        const gamepads = navigator.getGamepads();
+        for (const gp of gamepads) {
+            if (!gp) continue;
+            if (gp.buttons[8]?.pressed) {
+                if (!this.previousSelectPressed) {
+                    this.previousSelectPressed = true;
+                    return true;
+                }
+            }
+        }
+
+        const isAnySelectPressed = Array.from(gamepads).some(gp => gp && gp.buttons[8]?.pressed);
+        if (!isAnySelectPressed) {
+            this.previousSelectPressed = false;
+        }
+
+        return false;
+    }
+
+    private checkGamepadA(): boolean {
+        // Restart/Confirm is usually A (0)
+        const gamepads = navigator.getGamepads();
+        for (const gp of gamepads) {
+            if (!gp) continue;
+            if (gp.buttons[0]?.pressed) {
+                if (!this.previousAButtonPressed) {
+                    this.previousAButtonPressed = true;
+                    return true;
+                }
+            }
+        }
+
+        const isAnyAPressed = Array.from(gamepads).some(gp => gp && gp.buttons[0]?.pressed);
+        if (!isAnyAPressed) {
+            this.previousAButtonPressed = false;
+        }
+
+        return false;
+    }
 }
