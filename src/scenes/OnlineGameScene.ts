@@ -152,8 +152,6 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
     preload(): void {
         this.load.image('platform', 'assets/platform.png');
-        // New Stage Background
-        this.load.image('adria_bg', 'assets/adria_background.webp');
         this.load.image('background', 'assets/background.png'); // Keep for fallback?
 
         AnimationHelpers.loadCharacterAssets(this);

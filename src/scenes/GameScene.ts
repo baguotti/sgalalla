@@ -75,8 +75,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         AnimationHelpers.loadCharacterAssets(this);
         AnimationHelpers.loadCommonAssets(this);
 
-        // New Stage Background
-        this.load.image('adria_bg', 'assets/adria_background.webp');
+        // Stage Background loaded in AnimationHelpers
     }
 
     private createAnimations(): void {
