@@ -811,28 +811,7 @@ export class PlayerCombat {
         // Apply damage and knockback (also calls applyHitStun)
         DamageSystem.applyDamage(target, damage, knockbackVector);
 
-        // --- CHROMATIC ABERRATION (IMPACT FX) ---
-        // Replaced Hitstop with subtle visual impact
-        // Scale intensity with damage
-        if ((target.scene as any).triggerChromaticAberration) {
-            let intensity = 0;
-            let duration = 0;
 
-            // Heavy Hit / Kill Move
-            if (damage >= 15 || knockbackForce > 800) {
-                intensity = 0.005; // 0.5% shake (Visible)
-                duration = 150;
-            }
-            // Medium Hit
-            else if (damage >= 10 || knockbackForce > 500) {
-                intensity = 0.002; // 0.2% shake (Subtle)
-                duration = 80;
-            }
-
-            if (intensity > 0) {
-                (target.scene as GameSceneInterface).triggerChromaticAberration(intensity, duration);
-            }
-        }
 
         // Reset air action counter on hit - Check if target is Player
         if (target instanceof Player) {
@@ -922,7 +901,7 @@ export class PlayerCombat {
         this.scene.tweens.add({
             targets: ghost,
             alpha: 0,
-            delay: Math.max(recoveryTime - 300, 50),
+            delay: recoveryTime, // Extended per user request
             duration: 200,
             onComplete: () => {
                 // Only clear if it's still the active ghost (haven't started a new one)

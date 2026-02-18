@@ -117,3 +117,16 @@ Part 2
     - **Breathing**: Added gentle idle pulse to revealed images.
 - **[Fix]** **Types**: Resolved `Phaser.Geom.Rectangle` incompatibility in `GameSceneInterface`.
 - **[S]** **STATUS**: Animation pipeline robust; UI feel improved.
+- **[Fix]** **Stability**: Fixed `GameScene` crash (`cannot read undefined reading size`) caused by accessing destroyed bomb group on restart.
+- **[Cleanup]** **Assets**: Removed `background_lake` dead code to fix missing file error.
+
+### [2026-02-18] v0.13.0 - Side Platform Overhaul & Physics Tuning
+- **[V]** `v0.13.0`
+- **[Refactor]** **Side Platform Overhaul**: Refactored `StageFactory` to fully decouple Visuals, Walkable Floors, and Slideable Walls. This allows independent tuning of each element.
+- **[Feat]** **Improved Green Block (Left Platform)**:
+    - **Visual**: Synced wall and floor positions to match the visual asset perfectly.
+    - **Collision**: Added a "Chopped Corner" (Notification) to the bottom-right, trimming the wall and ceiling collision to match the texture's 45-degree cut.
+    - **Solid Bottom**: Added a Ceiling Collision check to the Player Physics engine and a corresponding invisible Bottom Wall to prevent players from passing through the block from below.
+- **[Tuning]** **Blast Zone**: Raised the top blast zone ceiling (`BLAST_ZONE_TOP`) from -600 to -1000 to provide more vertical play space.
+- **[Tuning]** **Background**: Scaled up background image by 35% for better framing.
+- **[Refactor]** **Physics Engine**: Added `checkCeilingCollision` to `PlayerPhysics` to support bottom-blocking infrastructure.

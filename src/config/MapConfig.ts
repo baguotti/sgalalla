@@ -12,7 +12,7 @@ export const MapConfig = {
     // Blast zone boundaries (KO boundaries)
     BLAST_ZONE_LEFT: -1020,
     BLAST_ZONE_RIGHT: 2940,
-    BLAST_ZONE_TOP: -600,
+    BLAST_ZONE_TOP: -1000,
     BLAST_ZONE_BOTTOM: 1800,
 } as const;
 

@@ -57,6 +57,17 @@ export class AnimationHelpers {
             const key = file.replace('.jpg', '').replace('.png', '');
             scene.load.image(key, `assets/scrins/${file}`);
         });
+
+        // Stage Assets
+        scene.load.image('platform_corner_left', 'public/assets/stages/Platform_BH4A.png');
+        scene.load.image('platform_corner_right', 'public/assets/stages/Platform_BH4B.png');
+
+        // New Brawlhaven Layout Assets
+        scene.load.image('bh_bg', 'public/assets/stages/BG_Brawlhaven.jpg');
+        scene.load.image('bh_plat_1', 'public/assets/stages/Platform_BH1.png'); // Top Center?
+        scene.load.image('bh_plat_2', 'public/assets/stages/Platform_BH2.png'); // Small?
+        scene.load.image('bh_plat_left', 'public/assets/stages/Platform_BH5_left.png'); // Left Wall
+        scene.load.image('bh_plat_right', 'public/assets/stages/Platform_BH5_right.png'); // Right Chunk
     }
 
     /**

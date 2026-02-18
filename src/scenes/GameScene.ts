@@ -1,11 +1,10 @@
 import Phaser from 'phaser';
 import { Player, PlayerState } from '../entities/Player';
-import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD'; // Import MatchHUD
+import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
 import { Bomb } from '../entities/Bomb';
 import { Chest } from '../entities/Chest';
-import { charConfigs } from '../config/CharacterConfig';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
 import { createStage as createSharedStage } from '../stages/StageFactory';
@@ -22,6 +21,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private debugOverlay!: DebugOverlay;
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
+    private sidePlatforms: Phaser.GameObjects.Rectangle[] = []; // Track side platforms
     public bombs!: Phaser.GameObjects.Group;
     public chests: Chest[] = [];
     public seals: any[] = []; // Seal projectiles
@@ -29,9 +29,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private backgroundImage!: Phaser.GameObjects.Image; // Add class property
     public walls: Phaser.GameObjects.Rectangle[] = [];
     private wallTexts: Phaser.GameObjects.Text[] = [];
+    private wallRects: Phaser.Geom.Rectangle[] = [];
+    private stageTextures: Phaser.GameObjects.Image[] = []; // Restore this
+    private ceilings: Phaser.GameObjects.Rectangle[] = []; // Bottom blocking
 
     // Debug visibility
     public debugVisible: boolean = false;
+    private debugGraphics!: Phaser.GameObjects.Graphics;
+    private debugLabels: Phaser.GameObjects.Text[] = [];
     private debugToggleKey!: Phaser.Input.Keyboard.Key;
     private trainingToggleKey!: Phaser.Input.Keyboard.Key;
     // Debug bomb spawn key
@@ -72,7 +77,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         AnimationHelpers.loadCharacterAssets(this);
         AnimationHelpers.loadCommonAssets(this);
 
-        this.load.image('background_lake', 'assets/pixel-lake08-sunny-water.jpg');
         // New Stage Background
         this.load.image('adria_bg', 'assets/adria_background.webp');
     }
@@ -135,15 +139,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             }
             this.platforms = [];
             this.softPlatforms = [];
+            this.sidePlatforms = [];
             this.walls = [];
             this.wallTexts = [];
-            this.walls = [];
-            this.wallTexts = [];
+            this.stageTextures = [];
 
-            // Re-create bomb group if needed or clear it
-            if (this.bombs) {
-                this.bombs.clear(true, true);
-            }
+            // Re-create bomb group
+            // (Old group is destroyed by scene shutdown, just overwrite reference)
             this.bombs = this.add.group({
                 classType: Bomb,
                 runChildUpdate: true,
@@ -188,6 +190,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
             // Let's try setScrollFactor(0) to make it static and ensure depth is comfortably low.
             // And also `sendToBack()`.
+
+            // Setup cameras (Must be before createStage so UI camera exists for ignore logic)
+            this.setupCameras();
 
             // Create stage platforms
             this.createStage();
@@ -267,12 +272,18 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             });
 
 
-            // Setup cameras
-            this.setupCameras();
+            // Re-run camera exclusions now that players exist
+            // (setupCameras was moved up before createStage, but players are created after)
+            this.configureCameraExclusions();
 
             // Create debug overlay
             this.debugOverlay = new DebugOverlay(this);
             this.debugOverlay.setCameraIgnore(this.cameras.main);
+
+            // Debug Graphics for Platform Visualization
+            this.debugGraphics = this.add.graphics();
+            this.debugGraphics.setDepth(9999);
+            this.uiCamera.ignore(this.debugGraphics); // Only visible in main camera (world space)
 
             // Add controls hint
             // this.createControlsHint();
@@ -426,6 +437,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         if (this.softPlatforms.length > 0) this.uiCamera.ignore(this.softPlatforms);
         if (this.walls.length > 0) this.uiCamera.ignore(this.walls);
         if (this.wallTexts.length > 0) this.uiCamera.ignore(this.wallTexts);
+        if (this.stageTextures.length > 0) this.uiCamera.ignore(this.stageTextures);
 
         // Ignore entities
         this.players.forEach(p => p.addToCameraIgnore(this.uiCamera));
@@ -441,20 +453,34 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
     }
 
-    private wallRects: Phaser.Geom.Rectangle[] = [];
+
 
     private createStage(): void {
         const stage = createSharedStage(this);
 
-        // Store references
+        // Populate ALL tracking arrays so configureCameraExclusions always works
         this.backgroundImage = stage.background;
-        this.platforms.push(stage.mainPlatform);
-        this.softPlatforms.push(...stage.softPlatforms);
-        this.walls.push(...stage.wallVisuals);
+        this.platforms = [stage.mainPlatform];
+        this.softPlatforms = stage.softPlatforms;
+        this.sidePlatforms = stage.sidePlatforms; // Store side platforms
+        this.walls = stage.wallVisuals;       // May be empty but must be assigned
+        this.wallTexts = stage.wallTexts;     // May be empty but must be assigned
+        this.ceilings = stage.ceilings || []; // Store ceilings
+        this.stageTextures = [...stage.platformTextures]; // Track ALL textures (side visuals are in platformTextures now)
         this.wallRects = stage.wallCollisionRects;
-        this.wallTexts.push(...stage.wallTexts);
 
-        // Update camera exclusions now that stage is created
+        // Explicitly ignore every stage object in UI camera (with guards for empty arrays)
+        if (this.uiCamera) {
+            this.uiCamera.ignore(stage.background);
+            this.uiCamera.ignore(stage.mainPlatform);
+            if (stage.softPlatforms.length > 0) this.uiCamera.ignore(stage.softPlatforms);
+            if (stage.wallVisuals.length > 0) this.uiCamera.ignore(stage.wallVisuals);
+            if (stage.wallTexts.length > 0) this.uiCamera.ignore(stage.wallTexts);
+            if (stage.platformTextures.length > 0) this.uiCamera.ignore(stage.platformTextures);
+            if (stage.sidePlatforms.length > 0) this.uiCamera.ignore(stage.sidePlatforms);
+        }
+
+        // Re-run full exclusion pass (catches anything missed above)
         this.configureCameraExclusions();
     }
 
@@ -505,31 +531,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
      * 
      * ACTUALLY: Let's use a "Glitch" shake.
      */
-    public triggerChromaticAberration(intensity: number, duration: number): void {
-        // Method 1: Camera Shake (Physical impact)
-        this.cameras.main.shake(duration, intensity);
 
-        // Method 2: Flash colors (Visual impact)
-        // A very short flash of a complementary color can simulate eye shock
-        // this.cameras.main.flash(50, 255, 0, 0); // Too aggressive?
-
-        // Method 3: PostFX (The Real Deal - if supported)
-        // note: requires pipeline support. For now, let's stick to a targeted shake
-        // coupled with a slight zoom punch.
-
-        // Zoom Punch
-        // Use 'any' cast to access custom property if not typed, or fallback to current zoom
-        const originalZoom = (this as any).targetZoom || this.cameras.main.zoom;
-        this.tweens.add({
-            targets: this.cameras.main,
-            zoom: originalZoom * 1.02, // 2% punch in
-            duration: 50,
-            yoyo: true,
-            onComplete: () => {
-                // Ensure we return to normal (handled by updateCamera usually)
-            }
-        });
-    }
 
     update(_time: number, delta: number): void {
         // --- HITSTOP REMOVED --- 
@@ -576,11 +578,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         if (qKeyPressed || gamepadSelectPressed) {
             this.debugVisible = !this.debugVisible;
-            // Update Debug Overlay
             this.debugOverlay.setVisible(this.debugVisible);
-            // Update Players
+            this.toggleDebugVisuals(this.debugVisible);
             this.players.forEach(p => p.setDebug(this.debugVisible));
-            // Update Seals
             this.seals.forEach(s => s.setDebug(this.debugVisible));
         }
 
@@ -619,9 +619,17 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         for (const platform of this.platforms) {
             this.players.forEach(p => p.checkPlatformCollision(platform, false));
         }
+        // Side Platforms (Solid)
+        for (const platform of this.sidePlatforms) {
+            this.players.forEach(p => p.checkPlatformCollision(platform, false));
+        }
+        // Soft Platforms (One-Way)
         for (const platform of this.softPlatforms) {
             this.players.forEach(p => p.checkPlatformCollision(platform, true));
         }
+
+        // Ceiling Collision (Bottom Block)
+        this.players.forEach(p => p.checkCeilingCollision(this.ceilings));
 
         // 3. Update Logic (Anim)
         this.players.forEach(p => p.updateLogic(delta));
@@ -1061,5 +1069,82 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         subText.setOrigin(0.5);
         subText.setDepth(1001);
         this.cameras.main.ignore(subText);
+    }
+    private toggleDebugVisuals(visible: boolean): void {
+        // Safety check for debugGraphics existence
+        if (!this.debugGraphics) {
+            // Re-create if missing (e.g. scene restart)
+            this.debugGraphics = this.add.graphics();
+            this.debugGraphics.setDepth(9999);
+            if (this.uiCamera) this.uiCamera.ignore(this.debugGraphics);
+        }
+
+        this.debugGraphics.clear();
+        this.debugLabels.forEach(t => t.destroy());
+        this.debugLabels = [];
+
+        if (!visible) return;
+
+        // Draw Solids (Green) - Main Platform
+        this.debugGraphics.lineStyle(2, 0x00ff00, 1);
+        this.debugGraphics.fillStyle(0x00ff00, 0.2);
+
+        this.platforms.forEach((p, index) => {
+            if (!p) return;
+            this.debugGraphics.strokeRect(p.x - p.width / 2, p.y - p.height / 2, p.width, p.height);
+            this.debugGraphics.fillRect(p.x - p.width / 2, p.y - p.height / 2, p.width, p.height);
+            this.addDebugLabel(p.x, p.y - p.height / 2 - 15, `MAIN #${index} (${p.width}x${p.height})`, '#00ff00');
+        });
+
+        // Draw Solids (Green) - Side Platforms (Images)
+        this.sidePlatforms.forEach((p, index) => {
+            if (!p) return;
+            // Images use different origin/size logic sometimes, but usually centered.
+            // Use displayWidth/Height for safety.
+            const w = p.displayWidth;
+            const h = p.displayHeight;
+            this.debugGraphics.strokeRect(p.x - w * p.originX, p.y - h * p.originY, w, h);
+            this.debugGraphics.fillRect(p.x - w * p.originX, p.y - h * p.originY, w, h);
+            this.addDebugLabel(p.x, p.y - h * p.originY - 15, `SIDE #${index + 1} (${Math.round(w)}x${Math.round(h)})`, '#00ff00');
+        });
+
+        // Draw Soft (Yellow) - Top Platforms
+        this.debugGraphics.lineStyle(2, 0xffff00, 1);
+        this.debugGraphics.fillStyle(0xffff00, 0.2);
+
+        this.softPlatforms.forEach((p, index) => {
+            if (!p) return;
+            const w = p.displayWidth;
+            const h = p.displayHeight;
+            this.debugGraphics.strokeRect(p.x - w * p.originX, p.y - h * p.originY, w, h);
+            this.debugGraphics.fillRect(p.x - w * p.originX, p.y - h * p.originY, w, h);
+            this.addDebugLabel(p.x, p.y - h * p.originY - 15, `TOP #${index + 1} (${Math.round(w)}x${Math.round(h)})`, '#ffff00');
+        });
+
+        // Draw Walls (Red)
+        this.debugGraphics.lineStyle(2, 0xff0000, 1);
+        this.debugGraphics.fillStyle(0xff0000, 0.2);
+
+        this.wallRects.forEach((r, index) => {
+            if (!r) return;
+            this.debugGraphics.strokeRect(r.x, r.y, r.width, r.height);
+            this.debugGraphics.fillRect(r.x, r.y, r.width, r.height);
+            this.addDebugLabel(r.x + r.width / 2, r.y - 15, `WALL #${index + 1} (${r.width}x${r.height})`, '#ff0000');
+        });
+    }
+
+    private addDebugLabel(x: number, y: number, text: string, color: string): void {
+        const t = this.add.text(x, y, text, {
+            fontSize: '12px',
+            color: color,
+            backgroundColor: '#000000aa',
+            padding: { x: 2, y: 1 }
+        });
+        t.setOrigin(0.5);
+        t.setDepth(10000);
+        if (this.uiCamera) {
+            this.uiCamera.ignore(t); // Only show in world camera
+        }
+        this.debugLabels.push(t);
     }
 }

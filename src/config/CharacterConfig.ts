@@ -150,6 +150,7 @@ export const charConfigs: Record<string, CharacterAnimations> = {
 
         // --- HEAVY ATTACKS (SIGS) ---
         attack_heavy_neutral: { prefix: 'pe_up_sig_', count: 1, suffix: '000', loop: false },
+        attack_heavy_up: { prefix: 'pe_up_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_side: { prefix: 'pe_side_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_down: { prefix: 'pe_side_sig_', count: 1, suffix: '000', loop: false },
 
@@ -181,6 +182,7 @@ export const charConfigs: Record<string, CharacterAnimations> = {
 
         // --- HEAVY ATTACKS (SIGS) ---
         attack_heavy_neutral: { prefix: 'nock_up_sig_', count: 1, suffix: '000', loop: false },
+        attack_heavy_up: { prefix: 'nock_up_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_side: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_down: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
 
@@ -198,7 +200,7 @@ export const charConfigs: Record<string, CharacterAnimations> = {
     },
     'greg': {
         idle: { prefix: 'greg_idle_', count: 17, loop: true },
-        run: { prefix: 'greg_run_', count: 9, loop: true },
+        run: { prefix: 'greg_run_', count: 8, loop: true },
         charging: { prefix: 'greg_charge_', count: 2, loop: true },
 
         dash: { prefix: 'greg_dash_', count: 1, suffix: '000', loop: false },
@@ -218,6 +220,7 @@ export const charConfigs: Record<string, CharacterAnimations> = {
 
         // --- HEAVY ATTACKS (SIGS) ---
         attack_heavy_neutral: { prefix: 'greg_up_sig_', count: 1, suffix: '000', loop: false },
+        attack_heavy_up: { prefix: 'greg_up_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_side: { prefix: 'greg_side_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_down: { prefix: 'greg_side_sig_', count: 1, suffix: '000', loop: false },
 

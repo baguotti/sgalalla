@@ -493,12 +493,16 @@ export class Player extends Fighter {
     }
 
     // Delegated Methods
-    public checkPlatformCollision(platform: Phaser.GameObjects.Rectangle, isSoft: boolean = false): void {
-        this.physics.checkPlatformCollision(platform, isSoft);
+    public checkPlatformCollision(platform: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Image, isSoft: boolean = false): void {
+        this.physics.checkPlatformCollision(platform as any, isSoft); // Cast to any or generic GameObject if Physics supports it
     }
 
     public checkWallCollision(walls: Phaser.Geom.Rectangle[]): void {
         this.physics.checkWallCollision(walls);
+    }
+
+    public checkCeilingCollision(ceilings: Phaser.GameObjects.Rectangle[]): void {
+        this.physics.checkCeilingCollision(ceilings);
     }
 
 

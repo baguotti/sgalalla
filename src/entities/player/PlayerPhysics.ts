@@ -572,6 +572,29 @@ export class PlayerPhysics {
         }
     }
 
+    public checkCeilingCollision(ceilings: Phaser.GameObjects.Rectangle[]): void {
+        // Only checks when moving Upwards
+        if (this.player.velocity.y >= 0) return;
+
+        const playerBounds = this.player.getBounds();
+
+        for (const ceiling of ceilings) {
+            const ceilBounds = ceiling.getBounds();
+
+            if (Phaser.Geom.Rectangle.Overlaps(playerBounds, ceilBounds)) {
+                // Ensure we are somewhat below the ceiling (center is below ceiling center)
+                // This prevents snapping if we are already mostly above it?
+                // Actually, just snap to bottom.
+
+                // Snap Top of Player to Bottom of Ceiling
+                this.player.y = ceilBounds.bottom + (this.player.height / 2);
+                this.player.velocity.y = 0;
+                return; // Handle one ceiling collision at a time
+            }
+        }
+    }
+
+
     public checkWallCollision(walls: Phaser.Geom.Rectangle[]): void {
         const playerBounds = this.player.getBounds();
         const halfW = this.player.width / 2;
