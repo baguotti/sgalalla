@@ -113,9 +113,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES + 50,
         // Hitbox covers attacker body + punch reach
-        hitboxWidth: 150, // Extended to include body (was 120)
+        hitboxWidth: 250, // Extended massively to catch enemies we slide past at close range
         hitboxHeight: 70,
-        hitboxOffsetX: 0, // Starts at player center (was 60)
+        hitboxOffsetX: -30, // Shifted slightly backward to hit enemies we slide through
         hitboxOffsetY: 0,
     },
     'light_up_grounded': {
