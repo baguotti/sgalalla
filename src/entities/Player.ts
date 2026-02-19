@@ -356,6 +356,7 @@ export class Player extends Fighter {
      */
     public updateVisuals(delta: number): void {
         this.updateTimers(delta);
+        this.updateAnimation();
         this.updateDamageDisplay();
         this.updateHeldItemPosition();
 

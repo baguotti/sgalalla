@@ -635,6 +635,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (spacePressed || escPressed || aButtonPressed) {
                 window.location.reload();
             }
+            this.players.forEach(p => p.updateVisuals(delta));
             return;
         }
 

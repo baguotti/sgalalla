@@ -300,6 +300,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         if (this.isGameOver) {
             // Poll gamepad for menu navigation
             this.pollGamepadForMenu();
+            this.players.forEach(p => p.updateVisuals(delta));
             return;
         }
 
