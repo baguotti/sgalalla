@@ -35,6 +35,9 @@ export class AnimationHelpers {
         scene.load.atlas('pe', 'assets/pe/pe.png', 'assets/pe/pe.json');
         scene.load.atlas('nock', 'assets/nock/nock.png', 'assets/nock/nock.json');
         scene.load.atlas('greg', 'assets/greg/greg.png', 'assets/greg/greg.json');
+
+        // Single Standalone Images
+        scene.load.image('greg_win_000', 'assets/greg/greg_win_000.png');
     }
 
     /**
@@ -203,6 +206,16 @@ export class AnimationHelpers {
                 ],
                 frameRate: 10,
                 repeat: -1
+            });
+        }
+
+        // Manual Animation: Greg Win (from standalone image)
+        if (!scene.anims.exists('greg_win')) {
+            scene.anims.create({
+                key: 'greg_win',
+                frames: [{ key: 'greg_win_000' }],
+                frameRate: 10,
+                repeat: 0
             });
         }
     }
