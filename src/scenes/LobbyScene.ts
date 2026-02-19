@@ -121,7 +121,7 @@ export class LobbyScene extends Phaser.Scene {
         // Title
         const centerY = height / 2 + 20;
         const titleY = centerY - 150 - 50;
-        const titleText = this.mode === 'training' ? 'TRAINING MODE' : 'BOTTE IN LOCALE';
+        const titleText = this.mode === 'training' ? 'TRAINING MODE' : 'SCEGLI IL TUO MANICO';
         this.add.text(width / 2, titleY, titleText, {
             fontSize: '48px',
             color: '#ffffff',
@@ -407,8 +407,15 @@ export class LobbyScene extends Phaser.Scene {
             const isAssigned = this.slots.some(s => s.joined && s.input.type === 'GAMEPAD' && s.input.gamepadIndex === gp.index);
 
             if (!isAssigned) {
-                const anyPressed = gp.buttons.some(b => b.pressed);
-                if (anyPressed) {
+                const isSwitch = gp.id.toLowerCase().includes('nintendo') ||
+                    gp.id.toLowerCase().includes('switch') ||
+                    gp.id.toLowerCase().includes('joy-con') ||
+                    gp.id.toLowerCase().includes('pro controller');
+
+                // Map logical A button: standard is index 0, Switch physical A is index 1
+                const logicalAIndex = isSwitch ? 1 : 0;
+
+                if (gp.buttons[logicalAIndex]?.pressed) {
                     this.joinPlayer('GAMEPAD', gp.index);
                 }
             }
@@ -488,7 +495,13 @@ export class LobbyScene extends Phaser.Scene {
                     }
 
                     if (canHoldInput) {
-                        select = gp.buttons[0]?.pressed; // A Button
+                        const isSwitch = gp.id.toLowerCase().includes('nintendo') ||
+                            gp.id.toLowerCase().includes('switch') ||
+                            gp.id.toLowerCase().includes('joy-con') ||
+                            gp.id.toLowerCase().includes('pro controller');
+
+                        const logicalAIndex = isSwitch ? 1 : 0;
+                        select = gp.buttons[logicalAIndex]?.pressed; // A Button
                     }
                 }
             }
@@ -553,7 +566,13 @@ export class LobbyScene extends Phaser.Scene {
                     right = gp.axes[0] > 0.5 || gp.buttons[15]?.pressed;
                 }
                 // Edge detection for select: only trigger on button DOWN, not held
-                const currentSelect = gp.buttons[0]?.pressed ?? false;
+                const isSwitch = gp.id.toLowerCase().includes('nintendo') ||
+                    gp.id.toLowerCase().includes('switch') ||
+                    gp.id.toLowerCase().includes('joy-con') ||
+                    gp.id.toLowerCase().includes('pro controller');
+
+                const logicalAIndex = isSwitch ? 1 : 0;
+                const currentSelect = gp.buttons[logicalAIndex]?.pressed ?? false;
                 if (Date.now() - this.sceneStartTime > 500) {
                     select = currentSelect && !this.prevGamepadSelect;
                 }
@@ -588,7 +607,7 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private startTrainingGame(): void {
-        AudioManager.getInstance().playSFX('ui_player_ready', { volume: 0.6 });
+        AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
         this.time.delayedCall(500, () => {
             this.scene.start('GameScene', { playerData: [this.slots[0], this.slots[1]] });
         });
@@ -606,7 +625,7 @@ export class LobbyScene extends Phaser.Scene {
         const minPlayers = this.mode === 'versus' ? 2 : 1;
         if (joinedSlots.length >= minPlayers && joinedSlots.every(s => s.ready)) {
             // Start Game
-            AudioManager.getInstance().playSFX('ui_player_ready', { volume: 0.6 });
+            AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
             this.time.delayedCall(1000, () => {
                 this.scene.start('GameScene', { playerData: joinedSlots });
             });

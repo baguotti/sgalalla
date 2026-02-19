@@ -8,6 +8,7 @@ import type { Damageable } from '../../combat/DamageSystem'; // Type import
 import { DamageSystem } from '../../combat/DamageSystem';
 import { PhysicsConfig } from '../../config/PhysicsConfig';
 import type { InputState } from '../../input/InputManager'; // Type import
+import { AudioManager } from '../../managers/AudioManager';
 
 export class PlayerCombat {
     private player: Player;
@@ -279,6 +280,15 @@ export class PlayerCombat {
                 this.currentAttack.data.direction === AttackDirection.SIDE &&
                 this.player.character === 'fok') {
                 this.updateGhostEffect();
+            }
+
+            // SFX: Attack Start (Whiff)
+            if (this.currentAttack.data.type === AttackType.LIGHT) {
+                if (this.currentAttack.data.direction === AttackDirection.RUN) {
+                    AudioManager.getInstance().playSFX('sfx_run_light_miss', { volume: 0.5 });
+                } else {
+                    AudioManager.getInstance().playSFX('sfx_side_light_miss', { volume: 0.5 });
+                }
             }
         } catch (e) {
             console.warn('Unknown attack:', attackKey);
@@ -772,6 +782,16 @@ export class PlayerCombat {
                 baseKnockback = baseKnockback * (1.0 + (chargeRatio * 0.5));
                 knockbackGrowth = knockbackGrowth * (1.0 + (chargeRatio * 0.3));
             }
+
+            // SFX: Attack Hit (Impact)
+            if (this.currentAttack.data.type === AttackType.LIGHT) {
+                if (this.currentAttack.data.direction === AttackDirection.RUN) {
+                    AudioManager.getInstance().playSFX('sfx_run_light_hit', { volume: 0.6 });
+                } else {
+                    AudioManager.getInstance().playSFX('sfx_side_light_hit', { volume: 0.6 });
+                }
+            }
+
         } else if (this.player.physics.isRecovering) {
             // Recovery Hit Data
             damage = 8;

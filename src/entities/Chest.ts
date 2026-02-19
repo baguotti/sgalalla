@@ -268,15 +268,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
                 // Animation complete -> Allow closing
                 this.canClose = true;
 
-                // Start "Breathing" idle animation
-                this.scene.tweens.add({
-                    targets: scrinImage,
-                    scale: scale * 1.02,
-                    duration: 2000,
-                    yoyo: true,
-                    repeat: -1,
-                    ease: 'Sine.easeInOut'
-                });
+
 
                 // Fade in Legend NOW
                 this.scene.tweens.add({

@@ -8,7 +8,7 @@ export class PreloadScene extends Phaser.Scene {
 
     preload(): void {
         this.load.image('title_card', 'assets/ui/main_title.jpg');
-        this.load.video('title_card_video', 'assets/ui/Title_card_loop_001.mp4'); // Load video
+        this.load.video('title_card_video', 'assets/ui/Main_menu/Main_Menu_Animation_001.mp4'); // Load video
 
         this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
         this.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');
@@ -16,9 +16,9 @@ export class PreloadScene extends Phaser.Scene {
         this.load.atlas('pe', 'assets/pe/pe.png', 'assets/pe/pe.json');
         this.load.atlas('nock', 'assets/nock/nock.png', 'assets/nock/nock.json');
         this.load.atlas('greg', 'assets/greg/greg.png', 'assets/greg/greg.json');
-
         // Load Global Music
         this.load.audio('global_music_loop', 'assets/audio/music/manici_intro_002_loop.mp3');
+        this.load.audio('ui_player_found', 'assets/audio/ui/ui_player_found.wav');
     }
 
     create(): void {
@@ -95,6 +95,7 @@ export class PreloadScene extends Phaser.Scene {
                 this.sound.play('global_music_loop', { loop: true, volume: audioManager.getMusicVolume() });
             }
 
+            this.sound.play('ui_player_found', { volume: 0.5 });
             this.scene.start('MainMenuScene');
         };
 

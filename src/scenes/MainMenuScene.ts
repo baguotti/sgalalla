@@ -36,7 +36,7 @@ export class MainMenuScene extends Phaser.Scene {
         const music = this.sound.get('global_music_loop');
         if (music) {
             if (!music.isPlaying) {
-                music.play({ loop: true, volume: 0.8 });
+                music.play({ loop: true, volume: 0.3 });
             } else {
                 // Tween volume back to user setting if it was lowered
                 this.tweens.add({
@@ -58,25 +58,15 @@ export class MainMenuScene extends Phaser.Scene {
         if (this.cache.video.has('title_card_video')) {
             const video = this.add.video(width / 2, height / 2, 'title_card_video');
             // User requested scale 1.5 (likely to zoom in and crop, or fill specific aspect ratio)
+            video.setMute(true); // Ensure autoplay works if the video has an audio track
             video.setScale(1.5).play(true); // true = loop
         }
 
-        // Title Text
-        this.add.text(width / 2, 200, 'SUPER SMASH FIOI', {
-            fontSize: '80px', fontFamily: '"Pixeloid Sans"', color: '#ffffff'
-        }).setOrigin(0.5);
-
-
-
-        // Version Text (Below Title)
-        this.add.text(width / 2, 260, 'v0.13.5', {
+        // Version Text
+        this.add.text(width - 20, height - 20, 'v0.13.5', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
-        }).setOrigin(0.5);
-
-
-
-        // Menu Items
-        const startY = 650; // Moved down from 420
+        }).setOrigin(1, 1);        // Menu Items
+        const startY = height - 280; // Moved lower
         this.menuOptions.forEach((opt, index) => {
             const text = this.add.text(width / 2, startY + (index * 70), opt.label, {
                 fontSize: '48px', fontFamily: '"Pixeloid Sans"', color: '#888888'
@@ -171,9 +161,16 @@ export class MainMenuScene extends Phaser.Scene {
                 this.lastGamepadInputTime = now;
             }
 
-            // A Button (0) or Start (9) to select
+            const isSwitch = pad.id.toLowerCase().includes('nintendo') ||
+                pad.id.toLowerCase().includes('switch') ||
+                pad.id.toLowerCase().includes('joy-con') ||
+                pad.id.toLowerCase().includes('pro controller');
+
+            const logicalAIndex = isSwitch ? 1 : 0;
+
+            // A Button (0/1) or Start (9) to select
             // Manual debounce for buttons usually not needed as much for selection, but good to have
-            if (pad.buttons[0].pressed || pad.buttons[9].pressed) {
+            if (pad.buttons[logicalAIndex].pressed || pad.buttons[9].pressed) {
                 if (now - this.lastGamepadInputTime > 300) { // Longer debounce for select
                     this.selectOption('GAMEPAD', pad.index);
                     this.lastGamepadInputTime = now;
@@ -193,10 +190,12 @@ export class MainMenuScene extends Phaser.Scene {
             if (index === this.selectedIndex) {
                 text.setColor('#ffffff');
                 text.setAlpha(1);
+                text.setShadow(0, 0, '#ffffff', 8, false, true); // subtle glow
             } else {
                 text.setColor('#888888');
                 text.setAlpha(0.5);
                 text.setFontSize(48);
+                text.setShadow(0, 0, 'transparent', 0, false, false); // remove glow
             }
         });
     }

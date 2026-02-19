@@ -245,8 +245,8 @@ export class PauseMenu {
         this.menuState = 'MAIN'; // Reset to main menu
         this.mainSelectedIndex = 0;
 
-        // Sound: Open (Player Ready)
-        this.scene.sound.play('ui_player_ready', { volume: 0.5 });
+        // Sound: Open (Player Ready -> Confirm Character)
+        this.scene.sound.play('ui_confirm_character', { volume: 0.5 });
 
         // Sync gamepad state to prevent immediate re-trigger
         this.syncGamepadState();
@@ -396,11 +396,18 @@ export class PauseMenu {
                 const dpadDown = gamepad.buttons[13]?.pressed || false;
                 const deadzone = 0.5;
                 const stickY = gamepad.axes[1] || 0;
+                const isSwitch = gamepad.id.toLowerCase().includes('nintendo') ||
+                    gamepad.id.toLowerCase().includes('switch') ||
+                    gamepad.id.toLowerCase().includes('joy-con') ||
+                    gamepad.id.toLowerCase().includes('pro controller');
+
+                const logicalAIndex = isSwitch ? 1 : 0;
+                const logicalBIndex = isSwitch ? 0 : 1;
 
                 currentState.up = dpadUp || stickY < -deadzone;
                 currentState.down = dpadDown || stickY > deadzone;
-                currentState.a = gamepad.buttons[0]?.pressed || false;
-                currentState.b = gamepad.buttons[1]?.pressed || false;
+                currentState.a = gamepad.buttons[logicalAIndex]?.pressed || false;
+                currentState.b = gamepad.buttons[logicalBIndex]?.pressed || false;
                 currentState.start = gamepad.buttons[9]?.pressed || false;
                 break;
             }
@@ -433,10 +440,18 @@ export class PauseMenu {
                 const deadzone = 0.5;
                 const stickY = gamepad.axes[1] || 0;
 
+                const isSwitch = gamepad.id.toLowerCase().includes('nintendo') ||
+                    gamepad.id.toLowerCase().includes('switch') ||
+                    gamepad.id.toLowerCase().includes('joy-con') ||
+                    gamepad.id.toLowerCase().includes('pro controller');
+
+                const logicalAIndex = isSwitch ? 1 : 0;
+                const logicalBIndex = isSwitch ? 0 : 1;
+
                 currentState.up = dpadUp || stickY < -deadzone;
                 currentState.down = dpadDown || stickY > deadzone;
-                currentState.a = gamepad.buttons[0]?.pressed || false;
-                currentState.b = gamepad.buttons[1]?.pressed || false;
+                currentState.a = gamepad.buttons[logicalAIndex]?.pressed || false;
+                currentState.b = gamepad.buttons[logicalBIndex]?.pressed || false;
                 currentState.start = gamepad.buttons[9]?.pressed || false;
                 break;
             }

@@ -3,6 +3,7 @@ import { Player } from '../Player';
 import { PhysicsConfig } from '../../config/PhysicsConfig';
 import type { InputState } from '../../input/InputManager';
 import { AttackPhase, AttackType } from '../../combat/Attack';
+import { AudioManager } from '../../managers/AudioManager';
 
 export class PlayerPhysics {
     private player: Player;
@@ -10,6 +11,7 @@ export class PlayerPhysics {
     // Physics State
     public acceleration: Phaser.Math.Vector2;
     public isGrounded: boolean = false;
+    public wasGroundedLastFrame: boolean = false;
     public isFastFalling: boolean = false;
 
     // Jump State
@@ -67,6 +69,8 @@ export class PlayerPhysics {
         }
 
         // 1. Reset Acceleration (Gravity is constant)
+        // 1. Reset Acceleration (Gravity is constant)
+        this.wasGroundedLastFrame = this.player.isGrounded;
         this.isGrounded = false; // Reset grounding at start of frame
         this.acceleration.set(0, PhysicsConfig.GRAVITY);
 
@@ -361,6 +365,9 @@ export class PlayerPhysics {
         if (this.player.isGrounded) {
             this.player.velocity.y = PhysicsConfig.JUMP_FORCE;
             this.player.isGrounded = false;
+
+            // SFX
+            AudioManager.getInstance().playSFX('sfx_jump_1', { volume: 0.5 });
             return;
         }
 
@@ -369,6 +376,9 @@ export class PlayerPhysics {
             this.player.velocity.y = PhysicsConfig.DOUBLE_JUMP_FORCE;
             this.jumpsRemaining--;
             this.airActionCounter++;
+
+            // SFX
+            AudioManager.getInstance().playSFX('sfx_jump_2', { volume: 0.5 });
         }
     }
 
@@ -388,6 +398,9 @@ export class PlayerPhysics {
         this.isWallSliding = false;
         this.isFastFalling = false;
 
+        // SFX - Recovery is basically a jump/launch
+        AudioManager.getInstance().playSFX('sfx_jump_2', { volume: 0.6 });
+
         // Visuals
         // this.player.setVisualTint(0x00ffff); // Removed: User request "remove color change effect"
     }
@@ -401,6 +414,9 @@ export class PlayerPhysics {
 
         this.isWallSliding = false;
         this.airActionCounter++;
+
+        // SFX
+        AudioManager.getInstance().playSFX('sfx_jump_1', { volume: 0.5 });
     }
 
     private handleFastFall(input: InputState): void {
@@ -434,6 +450,9 @@ export class PlayerPhysics {
         this.isDodging = true;
         this.player.isInvincible = true;
         this.player.isDodging = true; // Sync with Player state
+
+        // SFX
+        AudioManager.getInstance().playSFX('sfx_dash', { volume: 0.5 });
 
         const hasDirectionalInput = input.moveLeft || input.moveRight;
 
@@ -555,6 +574,8 @@ export class PlayerPhysics {
         }
 
         if (this.player.velocity.y >= 0) {
+            // const wasGrounded = this.player.isGrounded; // REMOVED: Always false due to update() reset
+
             this.player.y = platBounds.top - this.player.height / 2;
             this.player.velocity.y = 0;
             this.player.isGrounded = true;
@@ -567,6 +588,12 @@ export class PlayerPhysics {
             this.airActionCounter = 0;
             this.wallTouchesExhausted = false;
             this.currentPlatform = isSoft ? platform : null;
+
+            // SFX: Play landing sound if we weren't grounded before
+            // We use a debounce or verify we were actually falling to prevent spam
+            if (!this.wasGroundedLastFrame) {
+                AudioManager.getInstance().playSFX('sfx_landing', { volume: 0.3 });
+            }
         }
     }
 

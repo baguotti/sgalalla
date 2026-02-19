@@ -173,3 +173,10 @@ Part 2
     - **PreloadScene**: Stripped commented-out asset loading blocks.
     - **AnimationHelpers**: Removed dead code for old platform types.
 - **[S]** **STATUS**: Project size reduced; legacy debt cleared. Ready for architectural upgrades.
+
+### [2026-02-18] v0.13.6 - Combat Audio 🔊
+- **[V]** `v0.13.6`
+- **[Feat]** **Combat SFX**:
+    - **Movement**: Added custom SFX for Jump, Double Jump, Dash, and Landing (`PlayerPhysics.ts`).
+    - **Combat**: Implemented distinct audio for Running Light Attacks vs Standard Light Attacks (Miss/Hit variations).
+    - **Integration**: Mapped 8 new audio assets provided by user to gameplay events.

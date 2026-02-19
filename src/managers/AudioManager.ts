@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 
 export class AudioManager {
     private static instance: AudioManager;
-    private musicVolume: number = 0.8;
+    private musicVolume: number = 0.3;
     private sfxVolume: number = 1.0;
     private scene: Phaser.Scene | null = null;
 

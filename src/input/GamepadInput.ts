@@ -169,6 +169,11 @@ export class GamepadInput {
 
         state.connected = true;
 
+        const isSwitchController = gamepad.id.toLowerCase().includes('nintendo') ||
+            gamepad.id.toLowerCase().includes('switch') ||
+            gamepad.id.toLowerCase().includes('pro controller') ||
+            gamepad.id.toLowerCase().includes('joy-con');
+
         // Left Stick (axes 0 and 1)
         const leftStickX = this.applyDeadzone(gamepad.axes[0] || 0);
         const leftStickY = this.applyDeadzone(gamepad.axes[1] || 0);
@@ -190,10 +195,21 @@ export class GamepadInput {
         state.aimRight = state.moveX > 0.5;
 
         // Buttons - detect press (not held) for actions
-        const aPressed = gamepad.buttons[XBOX_BUTTONS.A]?.pressed || false;
-        const xPressed = gamepad.buttons[XBOX_BUTTONS.X]?.pressed || false;
-        const bPressed = gamepad.buttons[XBOX_BUTTONS.B]?.pressed || false;
-        const yPressed = gamepad.buttons[XBOX_BUTTONS.Y]?.pressed || false;
+        let aPressed = gamepad.buttons[XBOX_BUTTONS.A]?.pressed || false;
+        let xPressed = gamepad.buttons[XBOX_BUTTONS.X]?.pressed || false;
+        let bPressed = gamepad.buttons[XBOX_BUTTONS.B]?.pressed || false;
+        let yPressed = gamepad.buttons[XBOX_BUTTONS.Y]?.pressed || false;
+
+        // Remap for Nintendo Switch (Swap A/B and X/Y)
+        if (isSwitchController) {
+            const tempA = aPressed;
+            aPressed = bPressed;
+            bPressed = tempA;
+
+            const tempX = xPressed;
+            xPressed = yPressed;
+            yPressed = tempX;
+        }
 
         // Triggers (value 0-1)
         const ltValue = gamepad.buttons[XBOX_BUTTONS.LT]?.value || 0;

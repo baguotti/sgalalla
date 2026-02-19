@@ -675,14 +675,12 @@ export class Player extends Fighter {
         this.sprite.x = 0;
         // this.sprite.y = 0; // If we ever need Y offset
 
-        if (this.character === 'fok') {
-            if (anim.key.includes('wall_slide')) {
-                // Use facingDirection (which is guaranteed to be away from wall during slide)
-                // If facing Right (1), wall is Left (-1). Offset should be -7 (Left).
-                // If facing Left (-1), wall is Right (1). Offset should be 7 (Right).
-                // So: -facingDirection * 7
-                this.sprite.x = -this.getFacingDirection() * 7;
-            }
+        if (anim.key.includes('wall_slide')) {
+            // Use facingDirection (which is guaranteed to be away from wall during slide)
+            // If facing Right (1), wall is Left (-1). Offset should be -7 (Left).
+            // If facing Left (-1), wall is Right (1). Offset should be 7 (Right).
+            // So: -facingDirection * 7
+            this.sprite.x = -this.getFacingDirection() * 7;
         }
     }
 
