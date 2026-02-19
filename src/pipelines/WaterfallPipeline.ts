@@ -24,9 +24,9 @@ void main(void) {
     // Only apply effect where the texture is not fully transparent
     if (color.a > 0.05) {    
         // We want the flow to be on the opposite axis (horizontal) and WAY more subtle
-        // Slowing down 't' and swapping x/y influence for horizontal flow
-        float highlight1 = sin(uv.y * 200.0 + uv.x * 10.0 + t * 15.0);
-        float highlight2 = sin(uv.y * 100.0 + uv.x * 5.0 + t * 25.0 + 2.0);
+        // Slowing down 't' by 10x for a very slow flow
+        float highlight1 = sin(uv.y * 200.0 + uv.x * 10.0 + t * 1.5);
+        float highlight2 = sin(uv.y * 100.0 + uv.x * 5.0 + t * 2.5 + 2.0);
         
         // Combine into a smooth flow pattern
         float flow = (highlight1 + highlight2) * 0.5;
