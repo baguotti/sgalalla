@@ -39,6 +39,8 @@ export function createStage(scene: Phaser.Scene): StageResult {
     const water = scene.add.image(scene.scale.width / 2, scene.scale.height / 2 + 150, 'adria_bg_water');
     water.setScale(scale).setScrollFactor(0.9);
     water.setDepth(-99); // Place directly on top of background
+    // Apply the custom Waterfall shader pipeline
+    water.setPostPipeline('WaterfallPipeline');
 
 
 

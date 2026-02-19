@@ -5,6 +5,7 @@ import { SettingsScene } from './scenes/SettingsScene';
 import { LobbyScene } from './scenes/LobbyScene';
 import { GameScene } from './scenes/GameScene';
 import { OnlineGameScene } from './scenes/OnlineGameScene';
+import WaterfallPipeline from './pipelines/WaterfallPipeline';
 import './style.css';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -35,6 +36,9 @@ const config: Phaser.Types.Core.GameConfig = {
   },
   input: {
     gamepad: true
+  },
+  pipeline: {
+    WaterfallPipeline: WaterfallPipeline as any
   }
 };
 
