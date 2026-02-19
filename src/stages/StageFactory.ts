@@ -7,6 +7,7 @@ import Phaser from 'phaser';
  */
 export interface StageResult {
     background: Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite;
+    waterOverlay: Phaser.GameObjects.Image;
 
     mainPlatform: Phaser.GameObjects.Rectangle;
     softPlatforms: Phaser.GameObjects.Rectangle[];
@@ -33,6 +34,12 @@ export function createStage(scene: Phaser.Scene): StageResult {
 
     background.setScale(scale).setScrollFactor(0.9);
     background.setDepth(-100);
+
+    // --- Water Overlay ---
+    const water = scene.add.image(scene.scale.width / 2, scene.scale.height / 2 + 150, 'adria_bg_water');
+    water.setScale(scale).setScrollFactor(0.9);
+    water.setDepth(-99); // Place directly on top of background
+
 
 
 
@@ -172,6 +179,7 @@ export function createStage(scene: Phaser.Scene): StageResult {
 
     return {
         background,
+        waterOverlay: water,
 
         mainPlatform,
         softPlatforms,

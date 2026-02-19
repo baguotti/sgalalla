@@ -19,6 +19,7 @@ import { AnimationHelpers } from '../managers/AnimationHelpers';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
 import { createStage as createSharedStage } from '../stages/StageFactory';
+import type { StageResult } from '../stages/StageFactory';
 
 // Define a snapshot type that includes reconstructed server timestamp for fixed-timeline interpolation
 type NetPlayerSnapshot = NetPlayerState & { frame: number; serverTime: number };
@@ -156,10 +157,12 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     preload(): void {
         this.load.image('platform', 'assets/platform.png');
         this.load.image('background', 'assets/background.png'); // Keep for fallback?
-
         AnimationHelpers.loadCharacterAssets(this);
         AnimationHelpers.loadCommonAssets(this);
+
     }
+
+    private waterOverlay!: Phaser.GameObjects.Image;
 
 
 
@@ -181,6 +184,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         if (!this.uiCamera) return;
 
         // Ignore static world elements
+        if (this.waterOverlay) this.uiCamera.ignore(this.waterOverlay);
         if (this.platforms.length > 0) this.uiCamera.ignore(this.platforms);
         if (this.softPlatforms.length > 0) this.uiCamera.ignore(this.softPlatforms);
 
@@ -245,10 +249,13 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.localPlayerId = this.networkManager.getLocalPlayerId();
         this.phase = 'WAITING';
         this.showConnectionStatus(`Connected as Player ${this.localPlayerId + 1}. Waiting for opponent...`);
-
         // Setup stage (but don't spawn players yet)
-        this.createStage();
+        const stage = this.createStage();
+        this.waterOverlay = stage.waterOverlay;
+
         this.cameras.main.setBackgroundColor('#99d7f0');
+
+        // Note: createStage() calls configureCameraExclusions, which now ignores waterOverlay on uiCamera.
 
         // Initialize HUD
         this.matchHUD = new MatchHUD(this);
@@ -1578,7 +1585,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
 
 
-    private createStage(): void {
+    private createStage(): StageResult {
         const stage = createSharedStage(this);
 
         // Store references
@@ -1594,6 +1601,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             this.uiCamera.ignore(this.softPlatforms);
             // Removed wallVisuals/Texts as they are gone
         }
+
+        return stage;
     }
 
     private escapePromptVisible: boolean = false;

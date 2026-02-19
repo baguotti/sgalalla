@@ -28,6 +28,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     public seals: any[] = []; // Seal projectiles
     private background!: Phaser.GameObjects.Graphics;
     private backgroundImage!: Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite;
+    private waterOverlay!: Phaser.GameObjects.Image;
 
     public walls: Phaser.Geom.Rectangle[] = []; // Unified walls (geom)
     private stageTextures: Phaser.GameObjects.Image[] = []; // Restore this
@@ -523,6 +524,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Ignore static world elements
         if (this.background) this.uiCamera.ignore(this.background);
         if (this.backgroundImage) this.uiCamera.ignore(this.backgroundImage); // Ignore bg image
+        if (this.waterOverlay) this.uiCamera.ignore(this.waterOverlay);
 
         if (this.platforms.length > 0) this.uiCamera.ignore(this.platforms);
         if (this.softPlatforms.length > 0) this.uiCamera.ignore(this.softPlatforms);
@@ -549,6 +551,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         // Populate ALL tracking arrays so configureCameraExclusions always works
         this.backgroundImage = stage.background;
+        this.waterOverlay = stage.waterOverlay;
 
         this.platforms = [stage.mainPlatform];
         this.softPlatforms = stage.softPlatforms;
@@ -559,6 +562,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Explicitly ignore every stage object in UI camera (with guards for empty arrays)
         if (this.uiCamera) {
             this.uiCamera.ignore(stage.background);
+            this.uiCamera.ignore(stage.waterOverlay);
 
             this.uiCamera.ignore(stage.mainPlatform);
             if (stage.softPlatforms.length > 0) this.uiCamera.ignore(stage.softPlatforms);

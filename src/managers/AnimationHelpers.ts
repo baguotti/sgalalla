@@ -66,6 +66,7 @@ export class AnimationHelpers {
 
         // Stage Assets
         scene.load.image('adria_bg', 'assets/stages/adria_v2.2_web.webp'); // Restored
+        scene.load.image('adria_bg_water', 'assets/stages/adria_v2.2_water_comp.png');
         scene.load.image('platform_corner_left', 'assets/stages/Platform_BH4A_adria.png');
         scene.load.image('platform_corner_right', 'assets/stages/Platform_BH4A_adria.png'); // Same asset, flipped code-side
 
@@ -91,6 +92,16 @@ export class AnimationHelpers {
         scene.load.audio('ui_confirm', 'assets/audio/ui/ui_confirm.wav');
         scene.load.audio('ui_move_cursor', 'assets/audio/ui/ui_move_cursor.wav');
         scene.load.audio('ui_match_begin', 'assets/audio/ui/ui_match_begin.wav');
+
+        // Combat SFX
+        scene.load.audio('sfx_jump_1', 'assets/audio/sfx/fight_jump_1.wav');
+        scene.load.audio('sfx_jump_2', 'assets/audio/sfx/fight_jump_2.wav');
+        scene.load.audio('sfx_landing', 'assets/audio/sfx/fight_landing.wav');
+        scene.load.audio('sfx_dash', 'assets/audio/sfx/fight_dash.wav');
+        scene.load.audio('sfx_run_light_miss', 'assets/audio/sfx/fight_run_light_miss.wav');
+        scene.load.audio('sfx_run_light_hit', 'assets/audio/sfx/fight_run_light_hit.wav');
+        scene.load.audio('sfx_side_light_miss', 'assets/audio/sfx/fight_side_light_miss.wav');
+        scene.load.audio('sfx_side_light_hit', 'assets/audio/sfx/fight_side_light_hit.wav');
     }
 
     /**
