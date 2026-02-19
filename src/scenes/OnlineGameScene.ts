@@ -865,10 +865,6 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.gameOverContainer.setDepth(2000);
         this.cameras.main.ignore(this.gameOverContainer); // Ensure UI doesn't zoom with the game world
 
-        // Darken background
-        const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
-        this.gameOverContainer.add(overlay);
-
         let winnerText = "GAME!";
         if (winnerId >= 0) {
             winnerText += `\nPLAYER ${winnerId + 1} HA ARATO!`; // Custom Text

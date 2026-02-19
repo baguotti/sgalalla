@@ -1125,27 +1125,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         const { width, height } = this.scale;
 
-        // Darken background (Fixed to screen)
-        const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
-        overlay.setScrollFactor(0); // Ensure it stays covers screen during zoom
-        overlay.setDepth(1000);
-        this.cameras.main.ignore(overlay); // Ignored by main? No, we want main to see it DIM the world.
-        // Wait, if we ignore it, main won't see it.
-        // The previous code had `this.cameras.main.ignore(overlay)`.
-        // This implies `checkGameOver` relied on `uiCamera` to render it?
-        // But `uiCamera` ignores main game objects.
-        // If `overlay` is added here, it's a game object.
-        // If `uiCamera` is setup to ignore `this.players` etc, does it render new objects by default?
-        // Let's assume the previous logic for camera visibility was correct for the TEXT, but maybe not the overlay?
-        // LINE 1118 was `this.cameras.main.ignore(overlay)`.
-        // This suggests only UI Camera renders the overlay.
-        // If UI Camera renders it, zooming Main Camera won't affect the overlay scaling (good).
-        // So we keep `cameras.main.ignore(overlay)`.
-
-        if (this.uiCamera) {
-            // Ensure UI camera sees these/defaults to seeing them
-        }
-
         let winnerText = "GAME!";
         let winner: Player | undefined;
 
