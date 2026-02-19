@@ -23,10 +23,10 @@ void main(void) {
     
     // Only apply effect where the texture is not fully transparent
     if (color.a > 0.05) {    
-        // Create fast, vertically stretched downward sweeping highlights
-        // We use sin combined with uv to simulate the reflections of running tap water
-        float highlight1 = sin(uv.x * 200.0 + uv.y * 10.0 - t * 25.0);
-        float highlight2 = sin(uv.x * 100.0 + uv.y * 5.0 - t * 45.0 + 2.0);
+        // We want the flow to be on the opposite axis (horizontal) and WAY more subtle
+        // Slowing down 't' and swapping x/y influence for horizontal flow
+        float highlight1 = sin(uv.y * 200.0 + uv.x * 10.0 + t * 15.0);
+        float highlight2 = sin(uv.y * 100.0 + uv.x * 5.0 + t * 25.0 + 2.0);
         
         // Combine into a smooth flow pattern
         float flow = (highlight1 + highlight2) * 0.5;
@@ -34,14 +34,14 @@ void main(void) {
         // Map flow from [-1, 1] to [0, 1]
         flow = flow * 0.5 + 0.5;
         
-        // Sharpen the highlights to look like fast moving light reflections on water
-        float specular = smoothstep(0.6, 1.0, flow) * 0.3;
+        // Very subtle specular reflection (reduced by 10x from 0.3 to 0.03)
+        float specular = smoothstep(0.6, 1.0, flow) * 0.03;
         
-        // Add sweeping shining highlights (slight cyan/white tint) which flow rapidly downwards
+        // Add sweeping shining highlights
         color.rgb += specular * vec3(0.8, 0.9, 1.0) * color.a;
         
-        // Slight darkening in the troughs for contrast to make the bright spots pop
-        color.rgb -= (1.0 - flow) * 0.05 * color.a;
+        // Extremely subtle darkening in troughs (reduced by 10x from 0.05 to 0.005)
+        color.rgb -= (1.0 - flow) * 0.005 * color.a;
     }
     
     gl_FragColor = color;
