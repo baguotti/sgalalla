@@ -21,13 +21,13 @@ void main(void) {
     
     // Create a distortion factor that flows downwards
     // We add time to y so the wave moves down 
-    float distortionX = sin((uv.y - t * 0.5) * 50.0) * 0.0015;
+    float distortionX = sin((uv.y - t * 0.5) * 50.0) * 0.0003;
     
     // Secondary higher frequency wave
-    distortionX += sin((uv.y - t * 0.8) * 120.0) * 0.0005;
+    distortionX += sin((uv.y - t * 0.8) * 120.0) * 0.0001;
     
     // Horizontal distortion slowly moving
-    float distortionY = cos((uv.x + t * 0.2) * 30.0) * 0.001;
+    float distortionY = cos((uv.x + t * 0.2) * 30.0) * 0.0002;
     
     uv.x += distortionX;
     uv.y += distortionY;
