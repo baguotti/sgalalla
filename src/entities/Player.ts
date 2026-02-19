@@ -311,9 +311,8 @@ export class Player extends Fighter {
         // Remote players don't run combat logic (it's synced from network)
         // Only local players run combat update/handleInput
         if (this.currentInput) {
-            // Check taunt
             if (this.currentInput.taunt && this.isGrounded && !this.isAttacking && !this.isHitStunned && !this.isDodging) {
-                this.isTaunting = true;
+                this.isTaunting = !this.isTaunting;
             }
 
             // Cancel taunt on movement/actions
