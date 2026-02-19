@@ -66,7 +66,6 @@ export class AnimationHelpers {
 
         // Stage Assets
         scene.load.image('adria_bg', 'assets/stages/adria_v2.2_web.webp'); // Restored
-        scene.load.image('adria_bg_water', 'assets/stages/adria_v2.2_water_comp.png');
         scene.load.image('platform_corner_left', 'assets/stages/Platform_BH4A_adria.png');
         scene.load.image('platform_corner_right', 'assets/stages/Platform_BH4A_adria.png'); // Same asset, flipped code-side
 

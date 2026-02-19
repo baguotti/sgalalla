@@ -162,10 +162,6 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
     }
 
-    private waterOverlay!: Phaser.GameObjects.Image;
-
-
-
     private createAnimations(): void {
         AnimationHelpers.createAnimations(this);
     }
@@ -184,7 +180,6 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         if (!this.uiCamera) return;
 
         // Ignore static world elements
-        if (this.waterOverlay) this.uiCamera.ignore(this.waterOverlay);
         if (this.platforms.length > 0) this.uiCamera.ignore(this.platforms);
         if (this.softPlatforms.length > 0) this.uiCamera.ignore(this.softPlatforms);
 
@@ -250,8 +245,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.phase = 'WAITING';
         this.showConnectionStatus(`Connected as Player ${this.localPlayerId + 1}. Waiting for opponent...`);
         // Setup stage (but don't spawn players yet)
-        const stage = this.createStage();
-        this.waterOverlay = stage.waterOverlay;
+        this.createStage();
 
         this.cameras.main.setBackgroundColor('#99d7f0');
 
