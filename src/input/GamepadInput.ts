@@ -26,6 +26,7 @@ export interface GamepadState {
     dodgeHeld: boolean; // For running (trigger held)
     throw: boolean;
     pause: boolean; // START button for pause menu
+    taunt: boolean; // R3 button for taunt
 
     // Direction for attacks
     aimUp: boolean;
@@ -139,6 +140,7 @@ export class GamepadInput {
             dodgeHeld: false,
             throw: false,
             pause: false,
+            taunt: false,
             aimUp: false,
             aimDown: false,
             aimLeft: false,
@@ -242,6 +244,10 @@ export class GamepadInput {
         // Pause (START button) - detect new press only
         const startPressed = gamepad.buttons[XBOX_BUTTONS.START]?.pressed || false;
         state.pause = startPressed && !this.wasButtonPressed(XBOX_BUTTONS.START);
+
+        // Taunt (Right Stick Click / R3) - detect new press only
+        const r3Pressed = gamepad.buttons[XBOX_BUTTONS.R3]?.pressed || false;
+        state.taunt = r3Pressed && !this.wasButtonPressed(XBOX_BUTTONS.R3);
 
         this.previousState = { ...state };
         this.cacheButtonStates(gamepad);

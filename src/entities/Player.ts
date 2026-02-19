@@ -79,6 +79,7 @@ export class Player extends Fighter {
     public isAI: boolean = false;
     public isDead: boolean = false;
     public isWinner: boolean = false;
+    public isTaunting: boolean = false;
     private ai: PlayerAI | null = null;
     private aiInput: any = {}; // Store AI generated input
     public isTrainingDummy: boolean = false; // Toggle for training mode
@@ -310,11 +311,27 @@ export class Player extends Fighter {
         // Remote players don't run combat logic (it's synced from network)
         // Only local players run combat update/handleInput
         if (this.currentInput) {
+            // Check taunt
+            if (this.currentInput.taunt && this.isGrounded && !this.isAttacking && !this.isHitStunned && !this.isDodging) {
+                this.isTaunting = true;
+            }
+
+            // Cancel taunt on movement/actions
+            if (this.isTaunting) {
+                if (this.currentInput.moveLeft || this.currentInput.moveRight || this.currentInput.jump ||
+                    this.currentInput.lightAttack || this.currentInput.heavyAttack || this.currentInput.dodge ||
+                    this.isHitStunned || !this.isGrounded) {
+                    this.isTaunting = false;
+                }
+            }
+
             // Update Combat Component
             this.combat.update(delta);
 
             // Handle input for combat
-            this.combat.handleInput(this.currentInput);
+            if (!this.isTaunting) {
+                this.combat.handleInput(this.currentInput);
+            }
         }
 
         // Update Combat/Timers (everyone needs this for cooldowns)
@@ -546,6 +563,20 @@ export class Player extends Fighter {
 
         // Priority 0: End of match winning pose
         if (this.isWinner) {
+            this.sprite.anims.timeScale = 1;
+            const winAnimKey = `${this.character}_win`;
+            if (this.scene.anims.exists(winAnimKey)) {
+                this.animationKey = 'win';
+                this.playAnim('win', true);
+            } else {
+                this.animationKey = 'idle';
+                this.playAnim('idle', true);
+            }
+            return;
+        }
+
+        // Priority 0.5: Taunting
+        if (this.isTaunting) {
             this.sprite.anims.timeScale = 1;
             const winAnimKey = `${this.character}_win`;
             if (this.scene.anims.exists(winAnimKey)) {

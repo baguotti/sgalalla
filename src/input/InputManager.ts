@@ -25,6 +25,7 @@ export interface InputState {
     dodge: boolean;
     dodgeHeld: boolean; // For running (dodge key held)
     recovery: boolean;
+    taunt: boolean; // Taunt / Win Animation
 
     // Directional input for attacks
     aimUp: boolean;
@@ -62,6 +63,7 @@ export class InputManager {
     private jKey!: Phaser.Input.Keyboard.Key;
     private kKey!: Phaser.Input.Keyboard.Key;
     private lKey!: Phaser.Input.Keyboard.Key;
+    private pKey!: Phaser.Input.Keyboard.Key;
 
     // Brawlhalla default keys
     private cKey!: Phaser.Input.Keyboard.Key; // Light attack
@@ -78,6 +80,7 @@ export class InputManager {
     private cKeyWasPressed: boolean = false;
     private xKeyWasPressed: boolean = false;
     private zKeyWasPressed: boolean = false;
+    private pKeyWasPressed: boolean = false;
 
     constructor(scene: Phaser.Scene, config: PlayerInputConfig = { playerId: 0, useKeyboard: true, gamepadIndex: null, enableGamepad: true }) {
         this.scene = scene;
@@ -105,6 +108,7 @@ export class InputManager {
         this.jKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
         this.kKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
         this.lKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L);
+        this.pKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
 
         // Brawlhalla defaults
         this.cKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
@@ -177,6 +181,7 @@ export class InputManager {
             dodge: false,
             dodgeHeld: false,
             recovery: false,
+            taunt: false,
             aimUp: false,
             aimDown: false,
             aimLeft: false,
@@ -195,7 +200,8 @@ export class InputManager {
             state.heavyAttack ||
             state.heavyAttackHeld || // Important: Check held state to prevent fallback to keyboard while charging
             state.dodge ||
-            state.dodgeHeld
+            state.dodgeHeld ||
+            state.taunt
         );
     }
 
@@ -213,6 +219,7 @@ export class InputManager {
         const jDown = this.jKey.isDown;
         const kDown = this.kKey.isDown;
         const lDown = this.lKey.isDown;
+        const pDown = this.pKey.isDown;
         const cDown = this.cKey.isDown;
         const xDown = this.xKey.isDown;
         const zDown = this.zKey.isDown;
@@ -224,6 +231,7 @@ export class InputManager {
         const lightPressed = (jDown && !this.jKeyWasPressed) || (cDown && !this.cKeyWasPressed);
         const heavyPressed = (kDown && !this.kKeyWasPressed) || (xDown && !this.xKeyWasPressed);
         const dodgePressed = (lDown && !this.lKeyWasPressed) || (zDown && !this.zKeyWasPressed);
+        const tauntPressed = pDown && !this.pKeyWasPressed;
 
         // Update previous states
         this.spaceWasPressed = spaceDown;
@@ -234,6 +242,7 @@ export class InputManager {
         this.cKeyWasPressed = cDown;
         this.xKeyWasPressed = xDown;
         this.zKeyWasPressed = zDown;
+        this.pKeyWasPressed = pDown;
 
         return {
             moveLeft: left,
@@ -251,6 +260,7 @@ export class InputManager {
             dodge: dodgePressed,
             dodgeHeld: lDown || zDown, // Track dodge held for running
             recovery: shiftDown || vDown, // Support both Shift and V for recovery
+            taunt: tauntPressed,
             aimUp: up,
             aimDown: down,
             aimLeft: left,
@@ -275,6 +285,7 @@ export class InputManager {
             heavyAttackHeld: state.heavyAttackHeld, // Track B held for charging
             dodge: state.dodge,
             dodgeHeld: state.dodgeHeld, // Track LT/RT held for running
+            taunt: state.taunt,
             recovery: state.heavyAttack && state.aimUp, // Map Up+Heavy to recovery signal. Logic handled by Player.
             aimUp: state.aimUp,
             aimDown: state.aimDown,
