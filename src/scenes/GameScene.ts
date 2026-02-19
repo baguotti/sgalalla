@@ -1154,6 +1154,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
             // DRAMATIC ZOOM
             if (winner) {
+                winner.isWinner = true;
                 this.cameras.main.pan(winner.x, winner.y, 1500, 'Power2');
                 this.cameras.main.zoomTo(2.0, 1500, 'Power2');
             }

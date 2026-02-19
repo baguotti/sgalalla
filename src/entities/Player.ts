@@ -77,6 +77,8 @@ export class Player extends Fighter {
 
     // AI Control
     public isAI: boolean = false;
+    public isDead: boolean = false;
+    public isWinner: boolean = false;
     private ai: PlayerAI | null = null;
     private aiInput: any = {}; // Store AI generated input
     public isTrainingDummy: boolean = false; // Toggle for training mode
@@ -540,6 +542,20 @@ export class Player extends Fighter {
         // DO NOT RETURN HERE: Let the logic below select and play the specific 'attack' or 'hurt' animation key.
         if (this.isAttacking || this.isHitStunned) {
             this.sprite.anims.timeScale = 1;
+        }
+
+        // Priority 0: End of match winning pose
+        if (this.isWinner) {
+            this.sprite.anims.timeScale = 1;
+            const winAnimKey = `${this.character}_win`;
+            if (this.scene.anims.exists(winAnimKey)) {
+                this.animationKey = 'win';
+                this.playAnim('win', true);
+            } else {
+                this.animationKey = 'idle';
+                this.playAnim('idle', true);
+            }
+            return;
         }
 
         // Remote players use synced animationKey directly (set from network)

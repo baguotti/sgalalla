@@ -32,7 +32,10 @@ export const charConfigs: Record<string, CharacterAnimations> = {
         spot_dodge: { prefix: 'fok_dodge_', count: 1, suffix: '000', loop: false },
 
         // Side Sig Ghost
-        side_sig_ghost: { prefix: 'fok_side_sig_ghost_', count: 2, loop: true },
+        side_sig_ghost: { prefix: 'fok_side_sig_ghost_', count: 3, loop: false },
+
+        // Win animation
+        win: { prefix: 'fok_win_', count: 1, suffix: '000', loop: false },
 
         // --- LIGHT ATTACKS ---
         attack_light_neutral: { prefix: 'fok_side_light_', count: 1, suffix: '000', loop: false },
