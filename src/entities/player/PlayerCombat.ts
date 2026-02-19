@@ -276,9 +276,7 @@ export class PlayerCombat {
 
             // Side Sig Ghost: Spawn immediately so remote players see it
             // (Remote players don't run combat.update(), so updateGhostEffect() never fires)
-            if (this.currentAttack.data.type === AttackType.HEAVY &&
-                this.currentAttack.data.direction === AttackDirection.SIDE &&
-                this.player.character === 'fok') {
+            if (this.shouldSpawnGhost()) {
                 this.updateGhostEffect();
             }
 
@@ -312,9 +310,7 @@ export class PlayerCombat {
             }
 
             // Side Sig Ghost: Spawn immediately so remote players see it
-            if (this.currentAttack.data.type === AttackType.HEAVY &&
-                this.currentAttack.data.direction === AttackDirection.SIDE &&
-                (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe' || this.player.character === 'nock' || this.player.character === 'greg')) {
+            if (this.shouldSpawnGhost()) {
                 this.updateGhostEffect();
             }
 
@@ -515,11 +511,8 @@ export class PlayerCombat {
             this.deactivateHitbox();
         }
 
-        // Side Sig Ghost Effect (Fok & Sgu)
-        if (this.currentAttack.data.type === AttackType.HEAVY &&
-            this.currentAttack.data.direction === AttackDirection.SIDE &&
-            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe' || this.player.character === 'nock' || this.player.character === 'greg')) {
-
+        // Side/Up Sig Ghost Effect (Fok, Sgu, Pe, Nock, etc)
+        if (this.shouldSpawnGhost()) {
             this.updateGhostEffect();
         } else {
             // Ensure ghost is cleared if we switch phases or something weird happens
@@ -637,10 +630,7 @@ export class PlayerCombat {
 
         // Custom Override for Side Sig Ghost (Fok & Sgu)
         // Hitbox must follow the ghost sprite
-        if (this.currentAttack.data.type === AttackType.HEAVY &&
-            this.currentAttack.data.direction === AttackDirection.SIDE &&
-            (this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe' || this.player.character === 'nock' || this.player.character === 'greg') &&
-            this.ghostSprite && this.ghostSprite.active) {
+        if (this.shouldSpawnGhost() && this.ghostSprite && this.ghostSprite.active) {
             // Check if we have released the key early (before max charge) {
 
             // Override position to match ghost
@@ -649,8 +639,18 @@ export class PlayerCombat {
 
             // Override size to match ghost
             if (this.ghostSprite.width > 0) {
-                width = this.ghostSprite.width * PhysicsConfig.GHOST_HITBOX_SCALE;
-                height = this.ghostSprite.height * PhysicsConfig.GHOST_HITBOX_SCALE;
+                const char = this.player.character;
+                const dir = this.currentAttack.data.direction;
+                const isVertical = (dir === AttackDirection.UP || dir === AttackDirection.NEUTRAL) && ['pe', 'nock'].includes(char);
+
+                if (isVertical) {
+                    // Rotated 90 degrees, so width and height are visually swapped
+                    width = this.ghostSprite.height * PhysicsConfig.GHOST_HITBOX_SCALE;
+                    height = this.ghostSprite.width * PhysicsConfig.GHOST_HITBOX_SCALE;
+                } else {
+                    width = this.ghostSprite.width * PhysicsConfig.GHOST_HITBOX_SCALE;
+                    height = this.ghostSprite.height * PhysicsConfig.GHOST_HITBOX_SCALE;
+                }
             }
         }
 
@@ -668,9 +668,7 @@ export class PlayerCombat {
 
             // Side Sig Damage Scaling (Fok & Sgu)
             // Min 6 -> Max 20 based on charge
-            if ((this.player.character === 'fok' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'pe') &&
-                this.currentAttack.data.type === AttackType.HEAVY &&
-                this.currentAttack.data.direction === AttackDirection.SIDE) {
+            if (this.shouldSpawnGhost()) {
 
                 const maxCharge = PhysicsConfig.CHARGE_MAX_TIME;
                 const chargeRatio = Math.min(this.lastChargeTime / maxCharge, 1);
@@ -853,15 +851,35 @@ export class PlayerCombat {
         // Removed down arrow visual
     }
 
+    private shouldSpawnGhost(): boolean {
+        if (!this.currentAttack) return false;
+        if (this.currentAttack.data.type !== AttackType.HEAVY) return false;
+
+        const char = this.player.character;
+        const dir = this.currentAttack.data.direction;
+
+        // All characters have side sig ghosts
+        if (dir === AttackDirection.SIDE && ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'].includes(char)) return true;
+
+        // Pe and Nock also have upward ghost on neutral/up
+        if ((dir === AttackDirection.UP || dir === AttackDirection.NEUTRAL) && ['pe', 'nock'].includes(char)) return true;
+
+        return false;
+    }
+
     private updateGhostEffect(): void {
         // If already spawned, do not update (Fire and Forget)
         if (this.hasSpawnedGhost) return;
 
         const facing = this.player.getFacingDirection();
         const char = this.player.character; // 'fok' or 'sgu'
+        const dir = this.currentAttack?.data.direction;
+
+        // Is it a vertical ghost?
+        const isVertical = (dir === AttackDirection.UP || dir === AttackDirection.NEUTRAL) && ['pe', 'nock'].includes(char);
 
         // Create Ghost Sprite
-        // Use character atlas (Fok, Sgu, Sga)
+        // Use character atlas
         const initialFrame = `${char}_side_sig_ghost_000`;
         const animKey = `${char}_side_sig_ghost`;
 
@@ -880,39 +898,51 @@ export class PlayerCombat {
 
         if (!ghost) return; // Should not happen
 
-        // Faint glow effect (Diffused White)
-        // Note: FX might need re-adding if pooled object had them cleared
-        if (!ghost.preFX) {
-            // Re-enable if cleared? Or just check if exists.
-            // If we cleared FX in releaseGhost, we need to add, but preFX is a manager.
-        }
-        // For now, skip FX on ghost to save perf or handle in manager.
-        // Actually, let's keep it simple for pooling.
-
         // Fix Double Sprite Glitch (Ignore in UI Camera)
         if (scene.uiCamera) {
             scene.uiCamera.ignore(ghost);
         }
 
-        // Initial Position: Player X + (15 * facing)
-        const startX = this.player.x + (15 * facing);
-        ghost.setPosition(startX, this.player.y);
+        // Initial Position
+        // Vertical ones start slightly closer or same? Let's keep X offset for side, Y offset for UP
+        let startX = this.player.x;
+        let startY = this.player.y;
+
+        if (isVertical) {
+            startY -= 15;
+            // Ghost travels up, rotate it so it looks like it's pointing up? 
+            // the user just said it travels upwards. We'll rotate the sprite 90 degrees up.
+            ghost.setAngle(-90 * facing); // Depending on facing, we might need to adjust rotation so it faces up
+        } else {
+            startX += (15 * facing);
+        }
+
+        ghost.setPosition(startX, startY);
 
         this.hasSpawnedGhost = true;
         // Restore reference for Hitbox tracking
         this.ghostSprite = ghost;
 
-        // Tween 1: Propel forward — distance scales with charge
+        // Tween 1: Propel forward/upward — distance scales with charge
         const maxChg = PhysicsConfig.CHARGE_MAX_TIME;
         const chgRatio = Math.min(this.lastChargeTime / maxChg, 1);
         const travelDist = 110 + (chgRatio * 35); // 110 to 145
 
-        this.scene.tweens.add({
-            targets: ghost,
-            x: startX + (travelDist * facing),
-            duration: 300,
-            ease: 'Cubic.easeOut'
-        });
+        if (isVertical) {
+            this.scene.tweens.add({
+                targets: ghost,
+                y: startY - travelDist,
+                duration: 300,
+                ease: 'Cubic.easeOut'
+            });
+        } else {
+            this.scene.tweens.add({
+                targets: ghost,
+                x: startX + (travelDist * facing),
+                duration: 300,
+                ease: 'Cubic.easeOut'
+            });
+        }
 
         // Calculate ghost linger time
         const recoveryTime = 100 + (chgRatio * 600);

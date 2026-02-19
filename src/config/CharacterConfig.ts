@@ -161,8 +161,8 @@ export const charConfigs: Record<string, CharacterAnimations> = {
         attack_light_up_air: { prefix: 'pe_side_air_', count: 1, suffix: '000', loop: false },
 
         // --- HEAVY ATTACKS (SIGS) ---
-        attack_heavy_neutral: { prefix: 'pe_up_sig_', count: 1, suffix: '000', loop: false },
-        attack_heavy_up: { prefix: 'pe_up_sig_', count: 1, suffix: '000', loop: false },
+        attack_heavy_neutral: { prefix: 'pe_side_sig_', count: 1, suffix: '000', loop: false },
+        attack_heavy_up: { prefix: 'pe_side_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_side: { prefix: 'pe_side_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_down: { prefix: 'pe_side_sig_', count: 1, suffix: '000', loop: false },
 
@@ -193,8 +193,8 @@ export const charConfigs: Record<string, CharacterAnimations> = {
         attack_light_up_air: { prefix: 'nock_side_air_', count: 1, suffix: '000', loop: false },
 
         // --- HEAVY ATTACKS (SIGS) ---
-        attack_heavy_neutral: { prefix: 'nock_up_sig_', count: 1, suffix: '000', loop: false },
-        attack_heavy_up: { prefix: 'nock_up_sig_', count: 1, suffix: '000', loop: false },
+        attack_heavy_neutral: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
+        attack_heavy_up: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_side: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
         attack_heavy_down: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
 
