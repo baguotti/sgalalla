@@ -46,8 +46,8 @@ export class LobbyScene extends Phaser.Scene {
         enter: false
     };
 
-    // Gamepad edge detection for Training mode
-    private prevGamepadSelect: boolean = false;
+    // Gamepad edge detection
+    private prevGamepadSelects: Map<number, boolean> = new Map();
 
     // Keys
     private keys!: {
@@ -81,7 +81,7 @@ export class LobbyScene extends Phaser.Scene {
         this.joinTime.clear();
         this.canInput = false; // Will be enabled after safety delay in create()
         this.frameInputs = { space: false, enter: false };
-        this.prevGamepadSelect = false;
+        this.prevGamepadSelects.clear();
         this.sceneStartTime = Date.now();
     }
 
@@ -495,15 +495,18 @@ export class LobbyScene extends Phaser.Scene {
                         right = gp.axes[0] > 0.5 || gp.buttons[15]?.pressed;
                     }
 
-                    if (canHoldInput) {
-                        const isSwitch = gp.id.toLowerCase().includes('nintendo') ||
-                            gp.id.toLowerCase().includes('switch') ||
-                            gp.id.toLowerCase().includes('joy-con') ||
-                            gp.id.toLowerCase().includes('pro controller');
+                    const isSwitch = gp.id.toLowerCase().includes('nintendo') ||
+                        gp.id.toLowerCase().includes('switch') ||
+                        gp.id.toLowerCase().includes('joy-con') ||
+                        gp.id.toLowerCase().includes('pro controller');
 
-                        const logicalAIndex = isSwitch ? 1 : 0;
-                        select = gp.buttons[logicalAIndex]?.pressed; // A Button
+                    const logicalAIndex = isSwitch ? 1 : 0;
+                    const currentSelect = gp.buttons[logicalAIndex]?.pressed ?? false;
+
+                    if (Date.now() - this.sceneStartTime > 500) {
+                        select = currentSelect && !this.prevGamepadSelects.get(gp.index);
                     }
+                    this.prevGamepadSelects.set(gp.index, currentSelect);
                 }
             }
 
@@ -575,9 +578,9 @@ export class LobbyScene extends Phaser.Scene {
                 const logicalAIndex = isSwitch ? 1 : 0;
                 const currentSelect = gp.buttons[logicalAIndex]?.pressed ?? false;
                 if (Date.now() - this.sceneStartTime > 500) {
-                    select = currentSelect && !this.prevGamepadSelect;
+                    select = currentSelect && !this.prevGamepadSelects.get(gp.index);
                 }
-                this.prevGamepadSelect = currentSelect;
+                this.prevGamepadSelects.set(gp.index, currentSelect);
             }
         }
 
