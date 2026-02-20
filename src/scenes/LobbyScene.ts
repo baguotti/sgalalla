@@ -366,27 +366,39 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     update(time: number, _delta: number): void {
-        if (!this.canInput) return;
-
-        // Capture inputs once per frame
+        // --- 1. ALWAYS clear Keyboard JustDown buffers ---
         this.frameInputs.space = Phaser.Input.Keyboard.JustDown(this.keys.space);
         this.frameInputs.enter = Phaser.Input.Keyboard.JustDown(this.keys.enter);
+        let goBack = Phaser.Input.Keyboard.JustDown(this.backKey);
+
+        // --- 2. Update Gamepads and evaluate Back ---
+        const gamepads = navigator.getGamepads();
+        for (let i = 0; i < gamepads.length; i++) {
+            const gp = gamepads[i];
+            if (gp) {
+                if (gp.buttons[1]?.pressed || gp.buttons[9]?.pressed) {
+                    goBack = true;
+                }
+
+                // During the input lock, we must update prevGamepadSelects 
+                // so that held buttons from the menu don't trigger as fresh presses later.
+                if (!this.canInput) {
+                    const isSwitch = gp.id.toLowerCase().includes('nintendo') ||
+                        gp.id.toLowerCase().includes('switch') ||
+                        gp.id.toLowerCase().includes('joy-con') ||
+                        gp.id.toLowerCase().includes('pro controller');
+                    const logicalAIndex = isSwitch ? 1 : 0;
+                    this.prevGamepadSelects.set(gp.index, gp.buttons[logicalAIndex]?.pressed ?? false);
+                }
+            }
+        }
+
+        // --- 3. Enforce Safety Window ---
+        if (!this.canInput) return;
 
         this.handleNewConnections();
         this.handleKeyboardJoin(); // Poll for join if not event-based
         this.handlePlayerInput(time);
-
-        let goBack = Phaser.Input.Keyboard.JustDown(this.backKey);
-        if (!goBack) {
-            const gamepads = navigator.getGamepads();
-            for (let i = 0; i < gamepads.length; i++) {
-                const pad = gamepads[i];
-                if (pad && pad.buttons[1] && pad.buttons[1].pressed) {
-                    goBack = true;
-                    break;
-                }
-            }
-        }
 
         if (goBack) {
             AudioManager.getInstance().playSFX('ui_back', { volume: 0.5 });
