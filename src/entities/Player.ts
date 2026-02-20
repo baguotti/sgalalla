@@ -202,6 +202,10 @@ export class Player extends Fighter {
         this.sprite.setScale(scale);
         this.add(this.sprite);
 
+        // Explicitly set player depth to 10 to guarantee they render above stage platforms (depth 0),
+        // and so that relative child effects (like ghosts at player.depth - 1) still render above platforms.
+        this.setDepth(10);
+
 
 
 
