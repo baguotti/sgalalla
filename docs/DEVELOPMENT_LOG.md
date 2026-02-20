@@ -180,3 +180,19 @@ Part 2
     - **Movement**: Added custom SFX for Jump, Double Jump, Dash, and Landing (`PlayerPhysics.ts`).
     - **Combat**: Implemented distinct audio for Running Light Attacks vs Standard Light Attacks (Miss/Hit variations).
     - **Integration**: Mapped 8 new audio assets provided by user to gameplay events.
+
+### [2026-02-19] v0.14.0 - Input Bulletproofing & Vertical Ghosts 👻
+- **[V]** `v0.14.0`
+- **[Fix]** **Input Carryover**: 
+    - Completely bulletproofed the `LobbyScene` and `MainMenuScene` against phantom inputs carrying over from scene transitions. 
+    - Implemented strict edge detection `Map<number, boolean>` tracking for Gamepads to distinguish held buttons from fresh presses.
+    - Added lockout frame-polling to swallow inputs held during scene load.
+    - Segregated Keyboard Join and Ready inputs to prevent accidental double-registration on the same frame.
+- **[Fix]** **Safe Respawning**:
+    - Centralized all respawn logic in `GameScene` and `OnlineGameScene`.
+    - Players now respawn safely near the center of the stage `(960, 200)` with a slight X-offset, rather than dangerously close to the blast zones.
+- **[Feat]** **Vertical Ghosts**:
+    - Expanded the visual ghost system (previously only on Side Signatures) to Upward and Neutral Signatures.
+    - Fok, Sgu, Sga, Pe, Nock, and Greg now all spawn dedicated ghost effects that shoot vertically during their Up/Neutral Heavy attacks.
+    - Standardized ghost rotation (-90 degrees) for all characters except Nock.
+    - Fixed ghost depth issues, ensuring they always render visually *behind* the player but *in front* of the main stage textures (Depth 9 vs Player Depth 10).
