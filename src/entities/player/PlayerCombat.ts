@@ -861,8 +861,8 @@ export class PlayerCombat {
         // All characters have side sig ghosts
         if (dir === AttackDirection.SIDE && ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'].includes(char)) return true;
 
-        // Pe and Nock also have upward ghost on neutral/up
-        if ((dir === AttackDirection.UP || dir === AttackDirection.NEUTRAL) && ['pe', 'nock'].includes(char)) return true;
+        // Pe, Nock, and Fok also have upward ghost on neutral/up
+        if ((dir === AttackDirection.UP || dir === AttackDirection.NEUTRAL) && ['pe', 'nock', 'fok'].includes(char)) return true;
 
         return false;
     }
@@ -876,7 +876,7 @@ export class PlayerCombat {
         const dir = this.currentAttack?.data.direction;
 
         // Is it a vertical ghost?
-        const isVertical = (dir === AttackDirection.UP || dir === AttackDirection.NEUTRAL) && ['pe', 'nock'].includes(char);
+        const isVertical = (dir === AttackDirection.UP || dir === AttackDirection.NEUTRAL) && ['pe', 'nock', 'fok'].includes(char);
 
         // Create Ghost Sprite
         // Use character atlas
@@ -911,8 +911,8 @@ export class PlayerCombat {
         if (isVertical) {
             startY -= 15;
             // Ghost travels up, rotate it so it looks like it's pointing up
-            // Pe points up naturally when rotated -90 degrees.
             // Nock needs to be facing forward per user request (0 degrees rotation).
+            // Pe and Fok point up naturally when rotated -90 degrees.
             ghost.setAngle((char === 'nock' ? 0 : -90) * facing);
         } else {
             startX += (15 * facing);
