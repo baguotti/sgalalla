@@ -399,12 +399,14 @@ export class LobbyScene extends Phaser.Scene {
         if (!this.canInput) return;
 
         this.handleNewConnections();
-        this.handleKeyboardJoin(); // Poll for join if not event-based
+        const joinedThisFrame = this.handleKeyboardJoin(); // Poll for join if not event-based
 
-        // CRITICAL: Clear frameInputs after join check so the same press
-        // can't also trigger "Ready" in handlePlayerInput
-        this.frameInputs.space = false;
-        this.frameInputs.enter = false;
+        // CRITICAL: Clear frameInputs ONLY if the keyboard was just used to join,
+        // so the same press can't also trigger "Ready" in handlePlayerInput
+        if (joinedThisFrame) {
+            this.frameInputs.space = false;
+            this.frameInputs.enter = false;
+        }
 
         this.handlePlayerInput(time);
 
@@ -443,8 +445,8 @@ export class LobbyScene extends Phaser.Scene {
         }
     }
 
-    private handleKeyboardJoin(): void {
-        if (this.mode === 'training' && this.slots[0].joined) return; // P1 already joined in training
+    private handleKeyboardJoin(): boolean {
+        if (this.mode === 'training' && this.slots[0].joined) return false; // P1 already joined in training
 
         // Check for join inputs using frame cache
         const joinPressed = this.frameInputs.space || this.frameInputs.enter;
@@ -453,8 +455,10 @@ export class LobbyScene extends Phaser.Scene {
             const isAssigned = this.slots.some(s => s.joined && s.input.type === 'KEYBOARD');
             if (!isAssigned) {
                 this.joinPlayer('KEYBOARD', null);
+                return true;
             }
         }
+        return false;
     }
 
     private joinPlayer(type: 'KEYBOARD' | 'GAMEPAD', index: number | null): void {
