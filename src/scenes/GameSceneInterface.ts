@@ -15,7 +15,7 @@ export interface GameSceneInterface extends Phaser.Scene {
     addToCameraIgnore(object: Phaser.GameObjects.GameObject): void;
 
     /** Active chests in the scene */
-    chests: Chest[];
+    chests: Phaser.GameObjects.Group | Chest[];
 
     /** Active walls in the scene (Unified: Geom.Rectangle for collision) */
     walls: Phaser.Geom.Rectangle[];

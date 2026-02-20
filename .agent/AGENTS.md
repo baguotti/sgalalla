@@ -17,6 +17,10 @@ This document lists the specialized skills installed in this project. You should
 **Use when:** Defining attacks, active frames, and collisions.
 **Key Concepts:** Frame Data, Hitboxes vs Hurtboxes, Startup/Active/Recovery.
 
+### [Phaser UI Camera Ghosting](file:///Volumes/RIC_SSD_2TB/Coding/sgalalla/.agent/skills/phaser-ui-camera-ghosting/SKILL.md)
+**Use when:** Adding new objects to a scene with a UI camera or fixing platform duplication.
+**Key Concepts:** uiCamera.ignore(), Grouping Stage Visuals.
+
 ### [Deterministic Input Buffer](file:///Volumes/RIC_SSD_2TB/Coding/sgalalla/.agent/skills/deterministic-input-buffer/SKILL.md)
 **Use when:** Handling player input for combos or rollback networking.
 **Key Concepts:** Input Buffer, Fixed Timestep, Rollback.

@@ -48,11 +48,12 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
         this.setOrigin(0.5, 0.5);
 
         const gameScene = scene as GameSceneInterface;
-        if (gameScene.chests) {
+        if (Array.isArray(gameScene.chests)) {
+            // Legacy support if not using Group
             gameScene.chests.push(this);
         }
 
-        this.setDepth(20); // Render in front of characters (usually depth 0 or 1)
+        this.setDepth(20); // Render in front of characters
 
         // --- Red Hitbox Visual (debug only) ---
         this.hitboxVisual = scene.add.graphics();
@@ -61,10 +62,52 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
         scene.events.on('update', this.updateHitboxVisual, this);
 
         this.setOnCollide((data: Phaser.Types.Physics.Matter.MatterCollisionData) => {
-            this.handleCollision(data);
+            if (this.active) {
+                this.handleCollision(data);
+            }
         });
 
-        scene.add.existing(this); // Ensure preUpdate is called
+        // Start disabled for pooling
+        this.setActive(false);
+        this.setVisible(false);
+        if (this.world) {
+            this.scene.matter.world.remove(this.body as MatterJS.BodyType);
+        }
+    }
+
+    public enable(x: number, y: number): void {
+        this.setPosition(x, y);
+        this.setActive(true);
+        this.setVisible(true);
+
+        // Reset state
+        this.isOpened = false;
+        this.canBePunched = false;
+        this.isOverlayOpen = false;
+        this.canClose = false;
+        this.isFalling = true;
+        this.hasHitPlayers.clear();
+        this.setTexture('chest_closed');
+        this.setDensity(1.0);
+
+        // Re-enable physics
+        if (this.body) {
+            this.scene.matter.world.add(this.body as MatterJS.BodyType);
+            this.setVelocity(0, 20); // Initial downward velocity
+            this.setAngularVelocity(0);
+            this.setIgnoreGravity(false);
+            this.setSensor(false);
+        }
+    }
+
+    public disable(): void {
+        this.setActive(false);
+        this.setVisible(false);
+
+        // Remove from physics world
+        if (this.body && this.world) {
+            this.scene.matter.world.remove(this.body as MatterJS.BodyType);
+        }
     }
 
     private updateHitboxVisual(): void {
@@ -118,6 +161,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
      */
     preUpdate(time: number, delta: number): void {
         super.preUpdate(time, delta);
+        if (!this.active) return;
 
         // Logic 1: Falling Damage (vertical)
         if (this.isFalling && !this.isOpened) {
@@ -374,11 +418,11 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
     destroy(fromScene?: boolean): void {
         if (this.scene) {
             this.scene.events.off('update', this.updateHitboxVisual, this);
-            const chests = (this.scene as GameSceneInterface).chests;
-            if (chests) {
-                const index = chests.indexOf(this);
+            const gameScene = this.scene as GameSceneInterface;
+            if (Array.isArray(gameScene.chests)) {
+                const index = gameScene.chests.indexOf(this);
                 if (index > -1) {
-                    chests.splice(index, 1);
+                    gameScene.chests.splice(index, 1);
                 }
             }
         }

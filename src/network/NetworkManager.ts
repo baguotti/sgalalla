@@ -69,6 +69,7 @@ export interface NetPlayerState {
 // Full game state snapshot from server
 export interface NetGameState {
     frame: number;
+    timestamp: number;
     players: NetPlayerState[];
     confirmedInputFrame?: number; // Last frame server has confirmed all inputs for
 }

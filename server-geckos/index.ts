@@ -78,10 +78,9 @@ interface GameRoom {
     bombSpawnTimer: number; // ms until next spawn
 }
 
-// Animation key enum for binary decoding
 const ANIMATION_KEYS = [
     '', 'idle', 'run', 'jump', 'fall', 'attack_light', 'attack_heavy',
-    'attack_up', 'hurt', 'slide', 'dash', 'block', 'charge',
+    'attack_up', 'hurt', 'slide', 'dash', 'block', 'charge', 'spot_dodge'
 ];
 
 function decodeBinaryPlayerState(buffer: ArrayBuffer): Partial<PlayerState> | null {
@@ -221,7 +220,7 @@ io.onConnection((channel: ServerChannel) => {
         animationKey: '',
         damagePercent: 0,
         lives: 3,
-        character: 'fok_v3'
+        character: 'fok'
     };
 
     room.players.set(channelId, playerState);
@@ -496,6 +495,7 @@ setInterval(() => {
         // === STATE BROADCAST ===
         const state = {
             frame: room.frame,
+            timestamp: Date.now(),
             confirmedInputFrame: room.frame,
             players: Array.from(room.players.values())
         };

@@ -24,7 +24,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
     private sidePlatforms: Phaser.GameObjects.Rectangle[] = []; // Track side platforms
     public bombs!: Phaser.GameObjects.Group;
-    public chests: Chest[] = [];
+    public chests!: Phaser.GameObjects.Group;
     public seals: any[] = []; // Seal projectiles
     private background!: Phaser.GameObjects.Graphics;
     private backgroundImage!: Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite;
@@ -102,7 +102,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
     public getBombs(): Bomb[] {
-        return this.bombs.getChildren() as Bomb[];
+        return this.bombs.getChildren().filter(b => b.active) as Bomb[];
     }
 
     public getPlayers(): Player[] {
@@ -160,8 +160,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 maxSize: 20 // Reasonable limit for performance
             });
 
-            this.chests.forEach(c => c.destroy());
-            this.chests = [];
+            if (Array.isArray(this.chests)) {
+                this.chests.forEach(c => c.destroy());
+            }
+            this.chests = this.add.group({
+                classType: Chest,
+                runChildUpdate: true,
+                maxSize: 10
+            });
             this.isGameOver = false;
             this.isPaused = false;
 
@@ -458,21 +464,24 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const x = Phaser.Math.Between(padding, width - padding);
         const y = 0;
 
-        const chest = new Chest(this, x, y);
-        if (this.uiCamera) {
-            this.uiCamera.ignore(chest);
+        const chest = this.chests.get(x, y) as Chest;
+        if (chest) {
+            chest.enable(x, y);
+            if (this.uiCamera) {
+                this.uiCamera.ignore(chest);
+            }
         }
     }
 
     private checkChestInteractions(): void {
-        if (!this.chests || this.chests.length === 0) return;
+        if (!this.chests || this.chests.getLength() === 0) return;
 
         const interactRange = 120; // Proximity range to open chest
 
         for (const player of this.players) {
             if (!player.isAttacking) continue;
 
-            for (const chest of [...this.chests]) { // Copy array since open() may modify it
+            for (const chest of (this.chests.getChildren() as Chest[])) { // Check all chests
                 const dist = Phaser.Math.Distance.Between(player.x, player.y, chest.x, chest.y);
 
                 if (!chest.isOpened) {
@@ -647,7 +656,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const gamepadPausePressed = this.checkGamepadPause();
 
         // Check if any chest overlay is open
-        const isChestOverlayOpen = this.chests.some(chest => chest.isOverlayOpen);
+        const isChestOverlayOpen = (this.chests.getChildren() as Chest[]).some(chest => chest.isOverlayOpen);
 
         if ((pauseKeyPressed || gamepadPausePressed) && !isChestOverlayOpen) {
             this.togglePause();
@@ -954,8 +963,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.pauseMenu.hide();
 
         // Clear all chests
-        this.chests.forEach(c => c.destroy());
-        this.chests = [];
+        if (Array.isArray(this.chests)) {
+            this.chests.forEach(c => c.destroy());
+        }
+        this.chests = this.add.group({
+            classType: Chest,
+            runChildUpdate: true,
+            maxSize: 10
+        });
     }
 
 

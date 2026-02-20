@@ -20,6 +20,7 @@ export const ANIMATION_KEYS = [
     'dash',       // 10
     'block',      // 11
     'charge',     // 12
+    'spot_dodge', // 13
 ] as const;
 
 const animKeyToIndex = new Map<string, number>();

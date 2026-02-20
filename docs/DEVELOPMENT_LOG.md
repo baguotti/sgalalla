@@ -195,4 +195,11 @@ Part 2
     - Expanded the visual ghost system (previously only on Side Signatures) to Upward and Neutral Signatures.
     - Fok, Sgu, Sga, Pe, Nock, and Greg now all spawn dedicated ghost effects that shoot vertically during their Up/Neutral Heavy attacks.
     - Standardized ghost rotation (-90 degrees) for all characters except Nock.
-    - Fixed ghost depth issues, ensuring they always render visually *behind* the player but *in front* of the main stage textures (Depth 9 vs Player Depth 10).
+
+### [2026-02-20] v0.14.1 - Online Multiplayer Sync & Stability Fixes
+- **[V]** `v0.14.1`
+- **[Fix]** **Dash Freeze**: Fixed an uncaught audio cache error (`sfx_dash`, `sfx_jump_2`) caused by missing `AnimationHelpers.loadUIAudio(this)` in `OnlineGameScene.preload()`. This uncaught error was killing the Phaser game loop whenever a local player dashed or jumped online.
+- **[Fix]** **Remote Player Stuck**: Fixed a bug where remote players with an empty initial `animationKey` (`''`) fell through the `isRemotePlayer` guard and entered local grounded/airborne logic, getting permanently stuck in a `fall` animation loop.
+- **[Fix]** **Platform Duplication**: Explicitly added `uiCamera.ignore(stage.platformTextures)` in `OnlineGameScene` to prevent the UI camera from rendering game-world platforms, which previously appeared as floating "ghost" platforms.
+- **[Fix]** **Character Desync**: Changed the server's default character from the legacy `'fok_v3'` back to `'fok'` to match the client's texture atlas key, preventing the `Texture "__MISSING" has no frame "fok_v3_Idle_000.png"` error in `PlayerHUD`.
+- **[Cleanup]** **Legacy Assets**: Removed loads for `platform.png` and `background.png` from `OnlineGameScene` as the assets were deleted in v0.13.5.

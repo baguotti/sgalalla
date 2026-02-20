@@ -14,21 +14,21 @@ export type BufferableAction = 'jump' | 'lightAttack' | 'heavyAttack' | 'dodge' 
 
 interface BufferedInput {
     action: BufferableAction;
-    timestamp: number;
+    frame: number;
 }
 
 export class InputBuffer {
-    /** How long (ms) a buffered input stays valid */
-    private readonly BUFFER_WINDOW_MS: number;
+    /** How long (in frames) a buffered input stays valid */
+    private readonly BUFFER_WINDOW_FRAMES: number;
 
     /** The queue of buffered inputs */
     private buffer: BufferedInput[] = [];
 
-    /** Current time tracker (accumulated from delta) */
-    private currentTime: number = 0;
+    /** Current frame tracker */
+    private currentFrame: number = 0;
 
-    constructor(bufferWindowMs: number = 100) {
-        this.BUFFER_WINDOW_MS = bufferWindowMs;
+    constructor(bufferWindowFrames: number = 6) { // 6 frames @ 60fps ~= 100ms
+        this.BUFFER_WINDOW_FRAMES = bufferWindowFrames;
     }
 
     /**
@@ -41,8 +41,8 @@ export class InputBuffer {
         heavyAttack: boolean;
         dodge: boolean;
         recovery: boolean;
-    }, delta: number): void {
-        this.currentTime += delta;
+    }): void {
+        this.currentFrame++;
 
         // Record new presses
         if (input.jump) this.record('jump');
@@ -53,7 +53,7 @@ export class InputBuffer {
 
         // Purge expired entries
         this.buffer = this.buffer.filter(
-            entry => (this.currentTime - entry.timestamp) <= this.BUFFER_WINDOW_MS
+            entry => (this.currentFrame - entry.frame) <= this.BUFFER_WINDOW_FRAMES
         );
     }
 
@@ -64,11 +64,11 @@ export class InputBuffer {
     private record(action: BufferableAction): void {
         // Don't double-buffer the same action on the same frame
         const existingIdx = this.buffer.findIndex(
-            e => e.action === action && (this.currentTime - e.timestamp) < 2
+            e => e.action === action && e.frame === this.currentFrame
         );
         if (existingIdx >= 0) return;
 
-        this.buffer.push({ action, timestamp: this.currentTime });
+        this.buffer.push({ action, frame: this.currentFrame });
     }
 
     /**
@@ -77,7 +77,7 @@ export class InputBuffer {
      */
     has(action: BufferableAction): boolean {
         return this.buffer.some(
-            e => e.action === action && (this.currentTime - e.timestamp) <= this.BUFFER_WINDOW_MS
+            e => e.action === action && (this.currentFrame - e.frame) <= this.BUFFER_WINDOW_FRAMES
         );
     }
 
@@ -88,7 +88,7 @@ export class InputBuffer {
      */
     consume(action: BufferableAction): boolean {
         const idx = this.buffer.findIndex(
-            e => e.action === action && (this.currentTime - e.timestamp) <= this.BUFFER_WINDOW_MS
+            e => e.action === action && (this.currentFrame - e.frame) <= this.BUFFER_WINDOW_FRAMES
         );
         if (idx >= 0) {
             this.buffer.splice(idx, 1);

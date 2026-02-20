@@ -62,7 +62,7 @@ export class Player extends Fighter {
     // Unified input system (keyboard + gamepad)
     private inputManager!: InputManager;
     private currentInput!: InputState;
-    public inputBuffer: InputBuffer = new InputBuffer(100);
+    public inputBuffer: InputBuffer = new InputBuffer(6);
 
     // Network input injection
     public useExternalInput: boolean = false; // When true, updatePhysics skips internal polling
@@ -302,7 +302,7 @@ export class Player extends Fighter {
         }
 
         // Update Input Buffer (stores recent presses for ~100ms)
-        this.inputBuffer.update(this.currentInput, delta);
+        this.inputBuffer.update(this.currentInput);
 
         // Update Physics Component (Resets isGrounded, Applies Gravity & Move)
         this.physics.update(delta, this.currentInput);
@@ -597,9 +597,12 @@ export class Player extends Fighter {
         // We detect remote players by checking if they have no current input
         const isRemotePlayer = !this.currentInput;
 
-        if (isRemotePlayer && this.animationKey) {
-            this.playAnim(this.animationKey, true);
-            return;
+        if (isRemotePlayer) {
+            // Only play if we have a valid animation key from the network
+            if (this.animationKey) {
+                this.playAnim(this.animationKey, true);
+            }
+            return; // ALWAYS return for remote players — never fall through to local logic
         }
 
         // Local player: calculate animation from state and set animationKey for sync

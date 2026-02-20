@@ -55,7 +55,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
     // Bombs (synced from server)
     public bombs: Map<number, Bomb> = new Map();
-    public chests: Chest[] = [];
+    public chests!: Phaser.GameObjects.Group;
 
     // UI
     private connectionStatusText!: Phaser.GameObjects.Text;
@@ -155,11 +155,13 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     }
 
     preload(): void {
-        this.load.image('platform', 'assets/platform.png');
-        this.load.image('background', 'assets/background.png'); // Keep for fallback?
         AnimationHelpers.loadCharacterAssets(this);
         AnimationHelpers.loadCommonAssets(this);
+        AnimationHelpers.loadUIAudio(this);
 
+        this.load.on('loaderror', (file: { src: string }) => {
+            console.error('Asset load failed:', file.src);
+        });
     }
 
     private createAnimations(): void {
@@ -264,6 +266,13 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
         // Initialize EffectManager
         this.effectManager = new EffectManager(this);
+
+        // Initialize Chests Group
+        this.chests = this.add.group({
+            classType: Chest,
+            runChildUpdate: true,
+            maxSize: 10
+        });
 
         // Setup input (local player only)
         this.inputManager = new InputManager(this, {
@@ -395,7 +404,6 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             const targetLead = maxBufferTime - this.interpolationTime;
 
             // Smooth continuous clock speed curve (eliminates discrete jumps)
-            // Maps targetLead to clockSpeed: closer to target = slower adjustment
             const leadError = targetLead - this.RENDER_DELAY_MS;
             const clockSpeed = Phaser.Math.Clamp(
                 1.0 + (leadError * 0.002), // Gentle adjustment factor
@@ -444,21 +452,26 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                         const latest = buffer[buffer.length - 1];
                         const timeSinceLast = this.interpolationTime - latest.serverTime;
 
-                        // Use velocity for smooth prediction instead of snapping
                         const predictedX = latest.x + (latest.velocityX || 0) * (timeSinceLast / 1000);
                         const predictedY = latest.y + (latest.velocityY || 0) * (timeSinceLast / 1000);
 
-                        // Gentler lerp (0.15) to reduce snap-back when new data arrives
                         player.x = Phaser.Math.Linear(player.x, predictedX, 0.15);
                         player.y = Phaser.Math.Linear(player.y, predictedY, 0.15);
 
                         if (latest.animationKey) player.playAnim(latest.animationKey, true);
                         player.setFacingDirection(latest.facingDirection);
                     }
-
-                    // Update Visuals (Timers, Blink, etc.) independent of interpolation
-                    player.updateVisuals(delta);
+                } else if (buffer && buffer.length === 1) {
+                    // Single snapshot: snap to latest known position immediately
+                    const snap = buffer[0];
+                    player.x = snap.x;
+                    player.y = snap.y;
+                    if (snap.animationKey) player.playAnim(snap.animationKey, true);
+                    player.setFacingDirection(snap.facingDirection);
                 }
+
+                // Update Visuals (Timers, Blink, etc.) — ALWAYS run, even without buffer
+                player.updateVisuals(delta);
 
                 // Check blast zone for remote players
                 this.checkBlastZone(player);
@@ -540,24 +553,12 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
                 if (netPlayer.playerId === this.localPlayerId) {
                     this.localPlayer = player;
-                    // Let the player poll its own internal InputManager (like GameScene does)
-                    // this.localPlayer.useExternalInput = true;
                 }
 
                 // Add to HUD
                 if (this.matchHUD) {
                     const isLocal = netPlayer.playerId === this.localPlayerId;
-                    // For online, use "Player X" or name if available
-                    // We don't have character in NetPlayerState? We DO in CharacterSelect but maybe not in state?
-                    // NetPlayerState has: playerId, x, y, velX, velY, facing, isGrounded, isAttacking, animKey, damage, lives.
-                    // It DOES NOT have character (yet). 
-                    // However, we handle CharacterSelect events. We should store map of ID -> Character.
-
-                    // Note: OnlineGameScene handles "onCharacterSelect". 
-                    // We probably need to store character mapping to pass here.
-                    // For now, default to 'fok' if unknown, but better to fix.
                     const character = this.playerCharacters.get(netPlayer.playerId) || 'fok';
-
                     this.matchHUD.addPlayer(netPlayer.playerId, `Player ${netPlayer.playerId + 1}`, isLocal, character);
                 }
             }
@@ -576,12 +577,11 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             }
 
             // Create a snapshot with CLIENT ARRIVAL timestamp (not reconstructed from frame)
-            // This decouples interpolation from server frame timing issues
             const arrivalTime = performance.now();
             const snapshot: NetPlayerSnapshot = {
                 ...netPlayer,
                 frame: serverFrame,
-                serverTime: arrivalTime // Use real wall-clock arrival time
+                serverTime: arrivalTime
             };
 
             // Add to buffer in chronological order
@@ -596,7 +596,6 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Initialize clock
             if (!this.isBufferInitialized && buffer.length >= 2) {
-                // Initialize interpolationTime to RENDER_DELAY behind the newest arrival
                 this.interpolationTime = arrivalTime - this.RENDER_DELAY_MS;
                 this.isBufferInitialized = true;
             }
@@ -686,9 +685,12 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
      */
     private spawnChestAt(x: number): void {
         const y = 0;
-        const chest = new Chest(this, x, y);
-        if (this.uiCamera) {
-            this.uiCamera.ignore(chest);
+        const chest = this.chests.get(x, y) as Chest;
+        if (chest) {
+            chest.enable(x, y);
+            if (this.uiCamera) {
+                this.uiCamera.ignore(chest);
+            }
         }
     }
 
@@ -696,14 +698,14 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
      * Check if any attacking player is near a chest and open it
      */
     private checkChestInteractions(): void {
-        if (!this.chests || this.chests.length === 0) return;
+        if (!this.chests || this.chests.getLength() === 0) return;
 
         const interactRange = 120;
 
         this.players.forEach((player) => {
             if (!player.isAttacking) return;
 
-            for (const chest of [...this.chests]) {
+            for (const chest of (this.chests.getChildren() as Chest[])) {
                 const dist = Phaser.Math.Distance.Between(player.x, player.y, chest.x, chest.y);
 
                 if (!chest.isOpened) {
@@ -1586,6 +1588,13 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             this.uiCamera.ignore(this.platforms);
             this.uiCamera.ignore(this.softPlatforms);
+
+            if (stage.sidePlatforms && stage.sidePlatforms.length > 0) {
+                this.uiCamera.ignore(stage.sidePlatforms);
+            }
+            if (stage.platformTextures && stage.platformTextures.length > 0) {
+                this.uiCamera.ignore(stage.platformTextures);
+            }
             // Removed wallVisuals/Texts as they are gone
         }
 
@@ -1604,7 +1613,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             }
 
             // Check if any chest overlay is open
-            const isChestOverlayOpen = this.chests.some(chest => chest.isOverlayOpen);
+            const isChestOverlayOpen = (this.chests.getChildren() as Chest[]).some(chest => chest.isOverlayOpen);
             if (isChestOverlayOpen) {
                 return; // Let chest handle the ESC key
             }
