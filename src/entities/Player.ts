@@ -10,7 +10,7 @@ import { PlayerCombat } from './player/PlayerCombat';
 import { Attack, AttackPhase, AttackType, AttackDirection } from '../combat/Attack';
 import { PlayerAI } from './player/PlayerAI';
 import type { PlayerSnapshot } from '../network/StateSnapshot';
-import type { Bomb } from './Bomb';
+import type { Throwable } from './Throwable';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 
 export const PlayerState = {
@@ -58,7 +58,9 @@ export class Player extends Fighter {
 
     // Damage display
 
-
+    // Charge Visual
+    private chargeVisual: Phaser.GameObjects.Sprite;
+    private chargeBlurEffect?: Phaser.FX.Blur;
     // Unified input system (keyboard + gamepad)
     private inputManager!: InputManager;
     private currentInput!: InputState;
@@ -99,36 +101,57 @@ export class Player extends Fighter {
     public lightAttackVariant: number = 0;
 
     // Item Holding
-    public heldItem: Bomb | null = null;
+    public heldItem: Throwable | null = null;
 
     public checkItemPickup(): boolean {
-        // Access bombs from scene
         const gameScene = this.scene as GameSceneInterface;
+
+        // Check bombs first
         const bombs = gameScene.getBombs ? gameScene.getBombs() : [];
-        if (!bombs || bombs.length === 0) return false;
+        if (bombs && bombs.length > 0) {
+            const pickupRange = 100;
+            let closest: Throwable | null = null;
+            let minDist = pickupRange;
 
-        const pickupRange = 60; // Interaction radius
+            for (const bomb of bombs) {
+                const dist = Phaser.Math.Distance.Between(this.x, this.y, bomb.x, bomb.y);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = bomb;
+                }
+            }
 
-        // Find closest bomb
-        let closestBomb = null;
-        let minDist = pickupRange;
-
-        for (const bomb of bombs) {
-            const dist = Phaser.Math.Distance.Between(this.x, this.y, bomb.x, bomb.y);
-            if (dist < minDist) {
-                minDist = dist;
-                closestBomb = bomb;
+            if (closest) {
+                this.pickupItem(closest);
+                return true;
             }
         }
 
-        if (closestBomb) {
-            this.pickupItem(closestBomb);
-            return true;
+        // Check throwable chests (bomb mode)
+        const chests = gameScene.getThrowableChests ? gameScene.getThrowableChests() : [];
+        if (chests && chests.length > 0) {
+            const pickupRange = 100;
+            let closest: Throwable | null = null;
+            let minDist = pickupRange;
+
+            for (const chest of chests) {
+                const dist = Phaser.Math.Distance.Between(this.x, this.y, chest.x, chest.y);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = chest;
+                }
+            }
+
+            if (closest) {
+                this.pickupItem(closest);
+                return true;
+            }
         }
+
         return false;
     }
 
-    public pickupItem(item: Bomb): void {
+    public pickupItem(item: Throwable): void {
         this.heldItem = item;
         // Disable physics for the item while holding
         item.setSensor(true);
@@ -227,6 +250,17 @@ export class Player extends Fighter {
         this.nameTag.setOrigin(0.5);
         this.add(this.nameTag);
         this.nameTag.setVisible(false);
+
+        // Using a slightly scaled-up mirrored sprite with Additive blending and Bloom to simulate energy outline
+        this.chargeVisual = scene.add.sprite(0, 7, this.sprite.texture.key, this.sprite.frame.name);
+        this.chargeVisual.setBlendMode(Phaser.BlendModes.ADD);
+        if (this.chargeVisual.postFX) {
+            // Reduced bloom: intensity 0.6 instead of 1.2
+            this.chargeVisual.postFX.addBloom(0xffffff, 1, 1, 1, 0.6);
+            this.chargeBlurEffect = this.chargeVisual.postFX.addBlur(0, 0, 0, 1, 0xffffff, 4);
+        }
+        this.chargeVisual.setVisible(false);
+        this.addAt(this.chargeVisual, 0); // Behind sprite
 
         // Initialize Components
         this.physics = new PlayerPhysics(this);
@@ -344,6 +378,7 @@ export class Player extends Fighter {
         this.updateAnimation();
         this.updateDamageDisplay();
         this.updateHeldItemPosition();
+        this.updateChargeVisual();
 
     }
 
@@ -362,7 +397,73 @@ export class Player extends Fighter {
         this.updateAnimation();
         this.updateDamageDisplay();
         this.updateHeldItemPosition();
+        this.updateChargeVisual();
 
+    }
+
+    private updateChargeVisual(): void {
+        let isCharging = false;
+        let chargePercent = 0;
+
+        if (this.combat.isThrowCharging) {
+            isCharging = true;
+            chargePercent = Math.min(this.combat.throwChargeTime / 1000, 1);
+        } else if (this.combat.isCharging) {
+            isCharging = true;
+            chargePercent = Math.min(this.combat.chargeTime / 1000, 1);
+        }
+
+        if (isCharging) {
+            this.chargeVisual.setVisible(true);
+
+            // Sync visual with the player's main sprite
+            this.chargeVisual.setPosition(this.sprite.x, this.sprite.y);
+            this.chargeVisual.setTexture(this.sprite.texture.key, this.sprite.frame.name);
+            this.chargeVisual.setFlipX(this.sprite.flipX);
+
+            // Interpolate color from white to pastel red (0xffb3b3)
+            const color1 = Phaser.Display.Color.ValueToColor(0xffffff);
+            const color2 = Phaser.Display.Color.ValueToColor(0xffb3b3);
+            const colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(color1, color2, 100, chargePercent * 100);
+
+            const hexColor = Phaser.Display.Color.GetColor(colorObj.r as number, colorObj.g as number, colorObj.b as number);
+            this.chargeVisual.setTint(hexColor);
+
+            // Crop the sprite to fill from bottom to top
+            const fw = this.chargeVisual.frame.cutWidth;
+            const fh = this.chargeVisual.frame.cutHeight;
+            const cropH = fh * chargePercent;
+            const cropY = fh - cropH;
+            this.chargeVisual.setCrop(0, cropY, fw, cropH);
+
+            // Outline scale growth (starts slightly larger than player, grows a bit)
+            let scale = 1.05 + (chargePercent * 0.15);
+
+            // Wobble effect at maximum size
+            if (chargePercent >= 1) {
+                scale += Math.sin(this.scene.time.now * 0.02) * 0.02; // Reduced wobble for outline
+            }
+
+            this.chargeVisual.setScale(scale);
+
+            // Update blur strength based on charge
+            if (this.chargeBlurEffect) {
+                this.chargeBlurEffect.strength = chargePercent * 4;
+            }
+
+            // Fast pulse when fully charged, smooth fade-in otherwise
+            if (chargePercent >= 1) {
+                // Pulse alpha between 0.95 and 1.15 (Effectively capped at 1 visually, but calculation remains)
+                // Capping at 1 to prevent weird rendering
+                const targetAlpha = Math.min(1, 1.05 + (Math.sin(this.scene.time.now * 0.05) * 0.1));
+                this.chargeVisual.setAlpha(targetAlpha);
+            } else {
+                // Fade in from 0.8 to 0.95
+                this.chargeVisual.setAlpha(0.8 + (chargePercent * 0.15));
+            }
+        } else {
+            this.chargeVisual.setVisible(false);
+        }
     }
 
     private updateTimers(delta: number): void {

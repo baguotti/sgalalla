@@ -149,7 +149,7 @@ export class PlayerPhysics {
         }
 
         // BRAWLHALLA STYLE: Sig Charging stops momentum (Ground & Air)
-        if (this.player.combat.isCharging) {
+        if (this.player.combat.isCharging || this.player.combat.isThrowCharging) {
             friction = PhysicsConfig.CHARGE_FRICTION;
             // Counteract gravity to hang in air briefly (Gravity Cancel feel)
             if (!this.player.isGrounded) {

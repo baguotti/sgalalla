@@ -424,14 +424,24 @@ export class PlayerCombat {
         const chargePercent = Math.min(this.throwChargeTime / maxChargeTime, 1);
 
         // Base speed 18, Max speed 38
-        const powerMultiplier = 18 + (chargePercent * 20);
+        const baseSpeed = 18;
+        const speedBonus = chargePercent * 20;
+        const throwRawSpeed = baseSpeed + speedBonus;
+        // Normalized power scale for knockback (1.0 to ~2.1)
+        const powerMultiplier = throwRawSpeed / baseSpeed;
 
         if (this.player.heldItem) {
             const bomb = this.player.heldItem;
-            this.player.throwItem(dirX * powerMultiplier, dirY * powerMultiplier);
+
+            // Momentum inheritance (add player's current velocity)
+            let throwVx = (dirX * throwRawSpeed) + this.player.velocity.x;
+            let throwVy = (dirY * throwRawSpeed) + this.player.velocity.y;
+
+            this.player.throwItem(throwVx, throwVy);
+
             // Start the 3s fuse on the bomb
             if (bomb.onThrown) {
-                bomb.onThrown(this.player);
+                bomb.onThrown(this.player, powerMultiplier);
             }
         }
 

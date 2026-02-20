@@ -203,3 +203,20 @@ Part 2
 - **[Fix]** **Platform Duplication**: Explicitly added `uiCamera.ignore(stage.platformTextures)` in `OnlineGameScene` to prevent the UI camera from rendering game-world platforms, which previously appeared as floating "ghost" platforms.
 - **[Fix]** **Character Desync**: Changed the server's default character from the legacy `'fok_v3'` back to `'fok'` to match the client's texture atlas key, preventing the `Texture "__MISSING" has no frame "fok_v3_Idle_000.png"` error in `PlayerHUD`.
 - **[Cleanup]** **Legacy Assets**: Removed loads for `platform.png` and `background.png` from `OnlineGameScene` as the assets were deleted in v0.13.5.
+
+### [2026-02-20] v0.14.2 - Throwable Bomb Polish & Charge Silhouette Visuals
+- **[V]** `v0.14.2`
+- **[Feat]** **Advanced Throwable Logic**:
+    - Implemented a unified `Throwable` interface for items.
+    - Added escalating sensory feedback for bombs: violent jitter, pulsing red tint, and motion blur as the 4s fuse counts down.
+    - Added a **6-frame Catch Window**: Players can now catch thrown bombs mid-air by pressing Light Attack at the perfect moment.
+    - **Brawlhalla Physics**: Thrown items now inherit the player's momentum, bounce off walls (0.5 elasticity), tumble in the air, and have an initial "arming time" to prevent immediate self-explosions.
+    - **Variable Force**: Damage and knockback now scale with throw power and the target's current damage percentage.
+- **[Feat]** **Charge Attack Visuals**:
+    - Replaced the basic charge circle with a high-fidelity **Silhouette Fill** effect.
+    - The glowing silhouette mirrors the character's exact animation frame and fills from the feet to the head as charge time builds.
+    - Features smooth color interpolation (White -> Pastel Red), Additive Blending, Bloom, and dynamic Motion Blur.
+    - Added a scale "wobble" effect at 100% charge to indicate maximum intensity.
+- **[Polishing]** **Pickup UX**:
+    - Increased `pickupRange` significantly (from 60 to 100) to make item grabbing faster and more reliable.
+    - Prevented opened chests from being punched/kicked to ensure they remain interactable as items only.

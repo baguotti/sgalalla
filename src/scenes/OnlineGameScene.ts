@@ -154,6 +154,10 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         return Array.from(this.players.values());
     }
 
+    public getThrowableChests(): Chest[] {
+        return []; // Bomb-mode chests are local only
+    }
+
     preload(): void {
         AnimationHelpers.loadCharacterAssets(this);
         AnimationHelpers.loadCommonAssets(this);

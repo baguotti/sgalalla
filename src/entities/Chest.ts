@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 import { PhysicsConfig } from '../config/PhysicsConfig';
+import type { Throwable } from './Throwable';
 
 // List of scrin image filenames (loaded in GameScene preload)
 const SCRIN_IMAGES = [
@@ -20,7 +21,7 @@ const SCRIN_IMAGES = [
  * Players can open by attacking near it → displays a random scrin image.
  * Dimensions: 90x60
  */
-export class Chest extends Phaser.Physics.Matter.Sprite {
+export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
     public isOpened: boolean = false;
     public canBePunched: boolean = false; // Interactability flag (false by default or during cooldown)
     public isOverlayOpen: boolean = false; // Tracks if the reward UI is currently visible
@@ -28,6 +29,18 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
     private hitboxVisual?: Phaser.GameObjects.Graphics;
     private isFalling: boolean = true;
     private hasHitPlayers: Set<any> = new Set(); // Track which players were already hit
+
+    // --- Bomb Mode ---
+    public isBombMode: boolean = false;
+    private isThrown: boolean = false;
+    private bombFuseTimer: number = 0;
+    private isExploded: boolean = false;
+    private thrower: any = null;
+    private graceTimer: number = 0;
+    private bombPulseTimer: number = 0;
+    private throwPowerMultiplier: number = 1;
+    private armingTimer: number = 0;
+    private blurEffect?: Phaser.FX.Blur;
 
     constructor(scene: Phaser.Scene, x: number, y: number) {
         const textureKey = 'chest_closed'; // New asset
@@ -89,6 +102,20 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
         this.hasHitPlayers.clear();
         this.setTexture('chest_closed');
         this.setDensity(1.0);
+
+        // Reset bomb mode
+        this.isBombMode = false;
+        this.isThrown = false;
+        this.bombFuseTimer = 0;
+        this.isExploded = false;
+        this.thrower = null;
+        this.graceTimer = 0;
+        this.bombPulseTimer = 0;
+        this.throwPowerMultiplier = 1;
+        this.armingTimer = 0;
+        this.clearTint();
+        this.setDisplayOrigin(this.width / 2, this.height / 2); // Reset shake
+        if (this.blurEffect) this.blurEffect.strength = 0;
 
         // Re-enable physics
         if (this.body) {
@@ -193,24 +220,101 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
             }
         }
 
-        // Logic 2: Projectile Damage (horizontal/speed based for opened chest)
-        if (this.isOpened) {
+        // Logic 2: Bomb Mode (replaces old projectile damage when in bomb mode)
+        if (this.isBombMode) {
+            // Grace timer
+            if (this.graceTimer > 0) {
+                this.graceTimer -= delta;
+            }
+            // Arming timer
+            if (this.armingTimer > 0) {
+                this.armingTimer -= delta;
+            }
+
+            // Fuse timer always ticks down in bomb mode
+            if (!this.isExploded) {
+                this.bombFuseTimer -= delta;
+                if (this.bombFuseTimer <= 0) {
+                    this.explode();
+                    return;
+                }
+            }
+
+            // --- Visual Escalation ---
+            // Max fuse is 4000ms. Progress goes from 0 to 1 as timer counts down to 0.
+            const fuseProgress = Math.max(0, 1 - (this.bombFuseTimer / 4000));
+
+            // 1. Pulse gets faster and brighter
+            this.bombPulseTimer += delta;
+            const pulseSpeed = 0.008 + (fuseProgress * 0.03);
+            const pulse = Math.sin(this.bombPulseTimer * pulseSpeed) * 0.3 + 0.7;
+            const r = Math.floor(255 * pulse);
+            // More red, less green/blue as it gets closer to explosion
+            const gb = Math.floor(60 * (1 - fuseProgress));
+            this.setTint(Phaser.Display.Color.GetColor(r, gb, Math.floor(gb / 2)));
+
+            // 2. Escalating Shake (Jitter display origin)
+            // Starts at 0, ramps up to +/- 8 pixels in the final moments
+            const maxShake = 8 * fuseProgress;
+            // Only shake significantly in the last half of the fuse
+            const activeShake = fuseProgress > 0.5 ? maxShake : 0;
+            if (activeShake > 0) {
+                this.setDisplayOrigin(
+                    this.width / 2 + (Math.random() - 0.5) * activeShake * 2,
+                    this.height / 2 + (Math.random() - 0.5) * activeShake * 2
+                );
+            } else {
+                this.setDisplayOrigin(this.width / 2, this.height / 2);
+            }
+
+            // 3. Escalating Motion Blur
+            if (this.blurEffect) {
+                // Starts blurring in the last 1.6 seconds (progress > 0.6)
+                this.blurEffect.strength = fuseProgress > 0.6 ? (fuseProgress - 0.6) * 5 : 0;
+            }
+
+            // Flight collision checking
+            if (this.isThrown && !this.isExploded) {
+                // Skip player hit checks if still arming
+                if (this.armingTimer > 0) return;
+
+                // Check contact with players while in flight
+                const gameScene = this.scene as GameSceneInterface;
+                const players = gameScene.getPlayers ? gameScene.getPlayers() : [];
+                for (const player of players) {
+                    if (this.graceTimer > 0 && player === this.thrower) continue;
+                    const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
+                    if (dist < 60) {
+                        // CATCH MECHANIC: 6-frame window (via InputBuffer)
+                        if (player.inputBuffer && player.inputBuffer.consumeLightAttack() && !player.heldItem) {
+                            this.isThrown = false;
+                            this.bombFuseTimer = 4000; // Reset fuse on catch
+                            this.armingTimer = 0;
+                            player.pickupItem(this);
+                            return;
+                        } else {
+                            this.explode();
+                            return;
+                        }
+                    }
+                }
+            }
+        } else if (this.isOpened) {
+            // Legacy projectile damage (pre-bomb mode, only active before scrin is closed)
             const body = this.body as MatterJS.BodyType;
             if (body.speed > PhysicsConfig.CHEST_PROJECTILE_SPEED_THRESHOLD) {
                 const gameScene = this.scene as GameSceneInterface;
                 const players = gameScene.getPlayers ? gameScene.getPlayers() : [];
-                const contactRange = 50; // Slightly smaller for projectile
+                const contactRange = 50;
 
                 for (const player of players) {
                     if (this.hasHitPlayers.has(player)) continue;
 
                     const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
                     if (dist < contactRange) {
-                        // Apply projectile damage
                         const damage = PhysicsConfig.CHEST_PROJECTILE_DAMAGE;
-                        // Use chest velocity for knockback direction
                         const velocity = new Phaser.Math.Vector2(body.velocity.x, body.velocity.y).normalize();
-                        const knockbackForce = PhysicsConfig.CHEST_KNOCKBACK_FORCE * 0.8; // Slightly less than falling
+                        const knockbackForce = PhysicsConfig.CHEST_KNOCKBACK_FORCE * 0.8;
 
                         player.setDamage(player.damagePercent + damage);
                         player.setKnockback(velocity.x * knockbackForce, velocity.y * knockbackForce);
@@ -221,9 +325,6 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
                     }
                 }
             } else {
-                // Reset hit list when slow enough (so it can be punched again and hit again)
-                // We clear it only if it was previously populated, to save perf? 
-                // Set.clear() is cheap. A simple threshold check prevents clearing every frame if unused.
                 if (this.hasHitPlayers.size > 0) {
                     this.hasHitPlayers.clear();
                 }
@@ -372,7 +473,8 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
                     // Keep isOverlayOpen true for a short moment
                     this.scene.time.delayedCall(100, () => {
                         this.isOverlayOpen = false;
-                        // this.destroy(); // Keep chest in world
+                        // BOMB MODE: Activate after scrin is dismissed
+                        this.activateBombMode();
                     });
 
                     gamepadCheck.remove();
@@ -413,6 +515,81 @@ export class Chest extends Phaser.Physics.Matter.Sprite {
         // Visual feedback: switch to open texture, keep dynamic so players can push it around
         this.setTexture('chest_open');
         this.setDensity(0.01); // Ultra-light once opened — flies far when punched
+    }
+
+    // ==========================================
+    // BOMB MODE
+    // ==========================================
+
+    private activateBombMode(): void {
+        this.isBombMode = true;
+        this.canBePunched = false; // Can't kick anymore
+        this.hasHitPlayers.clear();
+        this.setDensity(0.1); // Moderate weight for throwing
+        this.bombFuseTimer = 4000; // 4 second fuse starts immediately
+        this.armingTimer = 0;
+
+        // Add postFX blur if available (Phaser 3.60+)
+        if (this.postFX) {
+            this.blurEffect = this.postFX.addBlur(0, 0, 0, 1, 0xffffff, 4);
+        }
+    }
+
+    public onThrown(thrower: any, power: number): void {
+        this.isThrown = true;
+        // Don't reset bombFuseTimer here anymore! Keep it ticking down.
+        this.thrower = thrower;
+        this.graceTimer = 200; // 200ms self-hit prevention
+
+        this.throwPowerMultiplier = power;
+        this.armingTimer = 150; // ~9 frames of arming time where it passes through players
+
+        this.setBounce(0.5); // Brawlhalla bounciness
+
+        const body = this.body as MatterJS.BodyType;
+        this.setAngularVelocity(body.velocity.x > 0 ? 0.3 * power : -0.3 * power); // Tumbling
+    }
+
+    public explode(): void {
+        if (this.isExploded) return;
+        this.isExploded = true;
+
+        const gameScene = this.scene as GameSceneInterface;
+        const blastRadius = 120;
+        const explosionDamage = 30 * this.throwPowerMultiplier;
+        const baseKnockback = 4000 * this.throwPowerMultiplier;
+
+        // Explosion visual
+        if (gameScene.effectManager) {
+            gameScene.effectManager.spawnExplosion(this.x, this.y, 100, 0xff4400);
+        }
+
+        // Damage nearby players
+        const players = gameScene.getPlayers ? gameScene.getPlayers() : [];
+        for (const player of players) {
+            const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
+            if (dist < blastRadius) {
+                const angle = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
+
+                // Variable force based on target's damage percent
+                const finalKnockback = baseKnockback * (1 + (player.damagePercent / 100));
+
+                const knockback = new Phaser.Math.Vector2(
+                    Math.cos(angle) * finalKnockback,
+                    Math.sin(angle) * finalKnockback
+                );
+
+                player.setDamage(player.damagePercent + explosionDamage);
+                player.setKnockback(knockback.x, knockback.y);
+                player.applyHitStun();
+            }
+        }
+
+        // Camera shake
+        this.scene.cameras.main.shake(300, 0.015);
+
+        // Disable chest
+        this.disable();
     }
 
     destroy(fromScene?: boolean): void {

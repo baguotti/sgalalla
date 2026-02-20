@@ -39,5 +39,7 @@ export interface GameSceneInterface extends Phaser.Scene {
     /** Unified access to players list (abstracts away Array vs Map storage) */
     getPlayers(): Player[];
 
+    /** Get chests that are in bomb mode and available for pickup */
+    getThrowableChests(): Chest[];
 
 }

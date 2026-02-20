@@ -109,6 +109,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         return this.players;
     }
 
+    public getThrowableChests(): Chest[] {
+        if (!this.chests) return [];
+        return (this.chests.getChildren() as Chest[]).filter(c => c.active && c.isBombMode);
+    }
+
     private players: Player[] = [];
     // private playerHUDs: PlayerHUD[] = []; // Deprecated
     private matchHUD!: MatchHUD;
@@ -497,16 +502,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                         // Actually, chest.open() sets isOpened=true immediately.
                         // Next frame physics might pick it up.
                         // But for THIS frame, we just open.
-                    }
-                } else {
-                    // Opened: knock it around! (if cooldown is over)
-                    if (dist < interactRange && chest.canBePunched) {
-                        const angle = Phaser.Math.Angle.Between(player.x, player.y, chest.x, chest.y);
-                        const force = 2.0; // Very strong punch force
-                        chest.applyForce(new Phaser.Math.Vector2(
-                            Math.cos(angle) * force,
-                            Math.sin(angle) * force - 0.15 // Upward pop
-                        ));
                     }
                 }
             }

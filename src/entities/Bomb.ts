@@ -90,11 +90,14 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
         }
     }
 
-    public onThrown(thrower: any): void {
+    private throwPowerMultiplier: number = 1;
+
+    public onThrown(thrower: any, power: number): void {
         this.isThrown = true;
         this.fuseTimer = PhysicsConfig.BOMB_FUSE_TIME;
         this.thrower = thrower;
         this.graceTimer = PhysicsConfig.BOMB_GRACE_TIME;
+        this.throwPowerMultiplier = power;
     }
 
     private handleCollision(data: Phaser.Types.Physics.Matter.MatterCollisionData): void {
@@ -147,13 +150,15 @@ export class Bomb extends Phaser.Physics.Matter.Sprite {
             players.forEach(player => {
                 const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
                 if (dist < blastRadius) {
-                    const damage = PhysicsConfig.BOMB_EXPLOSION_DAMAGE;
-                    const knockbackForce = PhysicsConfig.BOMB_EXPLOSION_KNOCKBACK;
+                    const damage = PhysicsConfig.BOMB_EXPLOSION_DAMAGE * this.throwPowerMultiplier;
+                    const baseKnockbackForce = PhysicsConfig.BOMB_EXPLOSION_KNOCKBACK * this.throwPowerMultiplier;
+                    const finalKnockback = baseKnockbackForce * (1 + (player.damagePercent / 100));
+
                     const angle = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
 
                     const knockback = new Phaser.Math.Vector2(
-                        Math.cos(angle) * knockbackForce,
-                        Math.sin(angle) * knockbackForce
+                        Math.cos(angle) * finalKnockback,
+                        Math.sin(angle) * finalKnockback
                     );
 
                     if (player.setDamage && player.setKnockback) {
