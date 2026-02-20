@@ -662,19 +662,11 @@ export class LobbyScene extends Phaser.Scene {
                 charSprite.setVisible(true);
                 shadow.setVisible(true);
                 const charKey = slot.character as string;
-                if (charKey === 'pe') {
-                    // Special case for Pe icon
-                    charSprite.setTexture('pe', '00_pe_icon');
-                    if (charSprite.anims.isPlaying) {
-                        charSprite.anims.stop();
-                    }
-                } else {
-                    const idleAnim = `${charKey}_idle`;
-                    if (charSprite.anims.currentAnim?.key !== idleAnim) {
-                        charSprite.setTexture(charKey);
-                        if (this.anims.exists(idleAnim)) {
-                            charSprite.play(idleAnim, true);
-                        }
+                const idleAnim = `${charKey}_idle`;
+                if (charSprite.anims.currentAnim?.key !== idleAnim) {
+                    charSprite.setTexture(charKey);
+                    if (this.anims.exists(idleAnim)) {
+                        charSprite.play(idleAnim, true);
                     }
                 }
 

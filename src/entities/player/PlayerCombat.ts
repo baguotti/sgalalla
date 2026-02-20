@@ -912,8 +912,8 @@ export class PlayerCombat {
             startY -= 15;
             // Ghost travels up, rotate it so it looks like it's pointing up
             // Pe points up naturally when rotated -90 degrees.
-            // Nock needs to be rotated +90 degrees clockwise per user request.
-            ghost.setAngle((char === 'nock' ? 90 : -90) * facing);
+            // Nock needs to be facing forward per user request (0 degrees rotation).
+            ghost.setAngle((char === 'nock' ? 0 : -90) * facing);
         } else {
             startX += (15 * facing);
         }
