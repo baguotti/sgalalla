@@ -895,8 +895,10 @@ export class PlayerCombat {
             ghost.play(animKey);
             ghost.setScale(facing, 1);
         }
-
         if (!ghost) return; // Should not happen
+
+        // ALWAYS ensure ghost spawns visually behind the player
+        ghost.setDepth(this.player.depth - 1);
 
         // Fix Double Sprite Glitch (Ignore in UI Camera)
         if (scene.uiCamera) {
@@ -916,6 +918,8 @@ export class PlayerCombat {
             ghost.setAngle((char === 'nock' ? 0 : -90) * facing);
         } else {
             startX += (15 * facing);
+            // Reset rotation to 0 for side attacks (fixes pooled sprites keeping -90 angle)
+            ghost.setAngle(0);
         }
 
         ghost.setPosition(startX, startY);
