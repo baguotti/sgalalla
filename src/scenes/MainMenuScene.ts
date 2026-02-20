@@ -9,6 +9,7 @@ export class MainMenuScene extends Phaser.Scene {
 
     private canInput: boolean = false;
     private selectedIndex: number = 0;
+    private prevGamepadA: Map<number, boolean> = new Map(); // Edge detection for A/Start
     private menuOptions = [
         { label: 'TRAINING', mode: 'training' },
         { label: 'BOTTE IN LOCALE', mode: 'versus' },
@@ -82,6 +83,9 @@ export class MainMenuScene extends Phaser.Scene {
 
 
         // Input Safety (Prevent ghost clicks)
+        this.canInput = false;
+        this.prevGamepadA.clear();
+        this.lastGamepadInputTime = Date.now(); // Reset debounce
         this.time.delayedCall(500, () => {
             this.canInput = true;
             this.startKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -104,7 +108,8 @@ export class MainMenuScene extends Phaser.Scene {
     }
 
     update(): void {
-
+        // Always poll gamepads to track edge states (even during lockout)
+        this.pollGamepadEdgeStates();
 
         if (!this.canInput) return;
 
@@ -117,6 +122,27 @@ export class MainMenuScene extends Phaser.Scene {
         }
 
         this.handleGamepad();
+    }
+
+    /** Track gamepad A/Start states every frame so held buttons from previous scenes get swallowed */
+    private pollGamepadEdgeStates(): void {
+        const gamepads = navigator.getGamepads();
+        for (let i = 0; i < gamepads.length; i++) {
+            const pad = gamepads[i];
+            if (!pad) continue;
+
+            const isSwitch = pad.id.toLowerCase().includes('nintendo') ||
+                pad.id.toLowerCase().includes('switch') ||
+                pad.id.toLowerCase().includes('joy-con') ||
+                pad.id.toLowerCase().includes('pro controller');
+            const logicalAIndex = isSwitch ? 1 : 0;
+
+            const aPressed = pad.buttons[logicalAIndex]?.pressed || pad.buttons[9]?.pressed;
+            if (!this.canInput) {
+                // During lockout, just record the state so held buttons are consumed
+                this.prevGamepadA.set(pad.index, !!aPressed);
+            }
+        }
     }
 
     private lastGamepadInputTime: number = 0;
@@ -168,13 +194,14 @@ export class MainMenuScene extends Phaser.Scene {
 
             const logicalAIndex = isSwitch ? 1 : 0;
 
-            // A Button (0/1) or Start (9) to select
-            // Manual debounce for buttons usually not needed as much for selection, but good to have
-            if (pad.buttons[logicalAIndex].pressed || pad.buttons[9].pressed) {
-                if (now - this.lastGamepadInputTime > 300) { // Longer debounce for select
-                    this.selectOption('GAMEPAD', pad.index);
-                    this.lastGamepadInputTime = now;
-                }
+            // A Button (0/1) or Start (9) to select — EDGE DETECTION
+            const aPressed = pad.buttons[logicalAIndex]?.pressed || pad.buttons[9]?.pressed;
+            const wasPressed = this.prevGamepadA.get(pad.index) ?? false;
+            this.prevGamepadA.set(pad.index, !!aPressed);
+
+            if (aPressed && !wasPressed) {
+                this.selectOption('GAMEPAD', pad.index);
+                this.lastGamepadInputTime = now;
             }
         }
     }
