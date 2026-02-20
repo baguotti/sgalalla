@@ -39,6 +39,7 @@ export class LobbyScene extends Phaser.Scene {
     private canInput: boolean = false;
     private _initData: any = null;
     private sceneStartTime: number = 0;
+    private inputUnlockTime: number = 0; // Phaser time when inputs were unlocked
 
     // Frame inputs (capture once per update to avoid JustDown clearing)
     private frameInputs = {
@@ -198,9 +199,10 @@ export class LobbyScene extends Phaser.Scene {
 
         // Input safety delay: prevent ghost inputs from previous scene
         this.canInput = false;
-        this.time.delayedCall(300, () => {
+        this.time.delayedCall(500, () => {
             this.canInput = true;
             this.sceneStartTime = Date.now(); // Reset debounce timer here to guarantee safety after loading
+            this.inputUnlockTime = this.time.now; // Track Phaser time when inputs unlock
         });
     }
 
@@ -398,6 +400,12 @@ export class LobbyScene extends Phaser.Scene {
 
         this.handleNewConnections();
         this.handleKeyboardJoin(); // Poll for join if not event-based
+
+        // CRITICAL: Clear frameInputs after join check so the same press
+        // can't also trigger "Ready" in handlePlayerInput
+        this.frameInputs.space = false;
+        this.frameInputs.enter = false;
+
         this.handlePlayerInput(time);
 
         if (goBack) {
@@ -492,10 +500,9 @@ export class LobbyScene extends Phaser.Scene {
                 }
 
                 // Use JustDown for Ready to prevent accidental double-tap from Join
-                // Also respect joinTime to prevent join keypress from triggering ready
-                // BUT do NOT use canHoldInput (nav debounce) so we don't block ready after moving
-                const joinedTime = this.joinTime.get(slot.playerId) || 0;
-                if (time - joinedTime > 200) {
+                // Guard: must be 600ms after inputs were unlocked to prevent carryover
+                const timeSinceUnlock = time - this.inputUnlockTime;
+                if (timeSinceUnlock > 600) {
                     select = this.frameInputs.space || this.frameInputs.enter;
                 }
 
@@ -515,7 +522,7 @@ export class LobbyScene extends Phaser.Scene {
                     const logicalAIndex = isSwitch ? 1 : 0;
                     const currentSelect = gp.buttons[logicalAIndex]?.pressed ?? false;
 
-                    if (Date.now() - this.sceneStartTime > 500) {
+                    if (Date.now() - this.sceneStartTime > 800) {
                         select = currentSelect && !this.prevGamepadSelects.get(gp.index);
                     }
                     this.prevGamepadSelects.set(gp.index, currentSelect);
@@ -532,7 +539,7 @@ export class LobbyScene extends Phaser.Scene {
                     inputRegistered = true;
                 } else if (select) {
                     // SAFETY: Prevent immediate ready if scene just started (prevent held button carryover)
-                    if (Date.now() - this.sceneStartTime > 500) {
+                    if (Date.now() - this.sceneStartTime > 800) {
                         AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 });
                         slot.ready = true;
                         inputRegistered = true;
@@ -571,7 +578,7 @@ export class LobbyScene extends Phaser.Scene {
                 right = this.keys.right.isDown || this.keys.d.isDown;
             }
             // Debounce select - use Date.now() to compare with sceneStartTime (also Date.now())
-            if (Date.now() - this.sceneStartTime > 500) {
+            if (Date.now() - this.sceneStartTime > 800) {
                 select = this.frameInputs.space || this.frameInputs.enter;
             }
         } else if (p1.input.type === 'GAMEPAD' && p1.input.gamepadIndex !== null) {
@@ -589,7 +596,7 @@ export class LobbyScene extends Phaser.Scene {
 
                 const logicalAIndex = isSwitch ? 1 : 0;
                 const currentSelect = gp.buttons[logicalAIndex]?.pressed ?? false;
-                if (Date.now() - this.sceneStartTime > 500) {
+                if (Date.now() - this.sceneStartTime > 800) {
                     select = currentSelect && !this.prevGamepadSelects.get(gp.index);
                 }
                 this.prevGamepadSelects.set(gp.index, currentSelect);
