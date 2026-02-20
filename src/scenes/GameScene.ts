@@ -277,8 +277,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
             // Default Spawn Points (Supported up to 6)
             let spawnPoints = [
-                { x: 400, y: 300 },   // P1 (Left Soft)
-                { x: 1520, y: 300 },  // P2 (Right Soft)
+                { x: 520, y: 300 },   // P1 (Left Soft)
+                { x: 1400, y: 300 },  // P2 (Right Soft)
                 { x: 800, y: 200 },   // P3 (Main Center-Left)
                 { x: 1120, y: 200 },  // P4 (Main Center-Right)
                 { x: 600, y: 400 },   // P5 (Low Left)
@@ -836,11 +836,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         player.setActive(true);
         player.setVisible(true);
 
-        // Respawn position - Use the stored spawn points (same as initial spawn)
-        const spawn = this.spawnPoints[playerId] || { x: 960, y: 300 };
-        const spawnX = spawn.x;
-
-        const spawnY = spawn.y;
+        // Respawn position - Center them safely instead of original edge spawns
+        // Center is 960. We'll add a slight random offset so they don't perfectly stack
+        const offsetX = Phaser.Math.Between(-50, 50);
+        const spawnX = 960 + offsetX;
+        const spawnY = 200; // Drop from a safe height above the center
 
         // Reset physics and state
         console.log(`[Respawn] Player ${playerId} respawning at ${spawnX}, ${spawnY}`);

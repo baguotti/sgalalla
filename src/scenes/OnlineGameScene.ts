@@ -773,15 +773,10 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         player.setActive(true);
         player.setVisible(true);
 
-        // Respawn position
-        const spawnPoints = [
-            { x: 450, y: 300 },
-            { x: 1470, y: 300 },
-            { x: 960, y: 200 },
-            { x: 960, y: 400 }
-        ];
-        // Use local player ID for spawn point
-        const spawn = spawnPoints[this.localPlayerId] || { x: 960, y: 300 };
+        // Respawn position - Center them safely
+        // Center is 960. We'll add a slight random offset
+        const offsetX = Phaser.Math.Between(-50, 50);
+        const spawn = { x: 960 + offsetX, y: 200 };
 
         player.setPosition(spawn.x, 300);
 
@@ -1462,8 +1457,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.matchHUD.addToCameraIgnore(this.cameras.main);
 
         // Spawn players with their selected characters
-        // Updated for 4-player spawn points
-        const spawnPoints = [400, 1520, 800, 1120];
+        // Updated for 4-player spawn points (pulled inwards for safety)
+        const spawnPoints = [520, 1400, 800, 1120];
         players.forEach(p => {
             // Validate character against loaded textures. Fallback to 'fok_v3' if invalid.
             const validChars = ['fok', 'sgu', 'sga'];
