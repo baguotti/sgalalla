@@ -200,6 +200,7 @@ export class LobbyScene extends Phaser.Scene {
         this.canInput = false;
         this.time.delayedCall(300, () => {
             this.canInput = true;
+            this.sceneStartTime = Date.now(); // Reset debounce timer here to guarantee safety after loading
         });
     }
 
