@@ -910,9 +910,10 @@ export class PlayerCombat {
 
         if (isVertical) {
             startY -= 15;
-            // Ghost travels up, rotate it so it looks like it's pointing up? 
-            // the user just said it travels upwards. We'll rotate the sprite 90 degrees up.
-            ghost.setAngle(-90 * facing); // Depending on facing, we might need to adjust rotation so it faces up
+            // Ghost travels up, rotate it so it looks like it's pointing up
+            // Pe points up naturally when rotated -90 degrees.
+            // Nock needs to be rotated +90 degrees clockwise per user request.
+            ghost.setAngle((char === 'nock' ? 90 : -90) * facing);
         } else {
             startX += (15 * facing);
         }
