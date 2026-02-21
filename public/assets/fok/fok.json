@@ -1,0 +1,922 @@
+{
+	"textures": [
+		{
+			"image": "fok.png",
+			"format": "RGBA8888",
+			"size": {
+				"w": 1681,
+				"h": 1140
+			},
+			"scale": 1,
+			"frames": [
+				{
+					"filename": "fok_side_sig_ghost_002",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 78,
+						"w": 255,
+						"h": 135
+					},
+					"frame": {
+						"x": 2,
+						"y": 2,
+						"w": 255,
+						"h": 135
+					}
+				},
+				{
+					"filename": "fok_side_sig_ghost_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 16,
+						"y": 73,
+						"w": 226,
+						"h": 135
+					},
+					"frame": {
+						"x": 261,
+						"y": 2,
+						"w": 226,
+						"h": 135
+					}
+				},
+				{
+					"filename": "fok_side_sig_ghost_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 19,
+						"y": 59,
+						"w": 215,
+						"h": 150
+					},
+					"frame": {
+						"x": 491,
+						"y": 2,
+						"w": 215,
+						"h": 150
+					}
+				},
+				{
+					"filename": "00_fok_icon",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 35,
+						"y": 8,
+						"w": 188,
+						"h": 248
+					},
+					"frame": {
+						"x": 2,
+						"y": 141,
+						"w": 188,
+						"h": 248
+					}
+				},
+				{
+					"filename": "fok_charge_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 72,
+						"y": 38,
+						"w": 184,
+						"h": 187
+					},
+					"frame": {
+						"x": 194,
+						"y": 141,
+						"w": 184,
+						"h": 187
+					}
+				},
+				{
+					"filename": "fok_run_003",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 63,
+						"y": 52,
+						"w": 102,
+						"h": 179
+					},
+					"frame": {
+						"x": 382,
+						"y": 141,
+						"w": 102,
+						"h": 179
+					}
+				},
+				{
+					"filename": "fok_fall_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 73,
+						"y": 41,
+						"w": 180,
+						"h": 168
+					},
+					"frame": {
+						"x": 710,
+						"y": 2,
+						"w": 180,
+						"h": 168
+					}
+				},
+				{
+					"filename": "fok_dash_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 36,
+						"y": 38,
+						"w": 173,
+						"h": 184
+					},
+					"frame": {
+						"x": 488,
+						"y": 156,
+						"w": 173,
+						"h": 184
+					}
+				},
+				{
+					"filename": "fok_dodge_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 82,
+						"y": 38,
+						"w": 100,
+						"h": 188
+					},
+					"frame": {
+						"x": 382,
+						"y": 324,
+						"w": 100,
+						"h": 188
+					}
+				},
+				{
+					"filename": "fok_side_run_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 62,
+						"y": 41,
+						"w": 161,
+						"h": 183
+					},
+					"frame": {
+						"x": 194,
+						"y": 344,
+						"w": 161,
+						"h": 183
+					}
+				},
+				{
+					"filename": "fok_side_light_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 40,
+						"w": 158,
+						"h": 187
+					},
+					"frame": {
+						"x": 2,
+						"y": 393,
+						"w": 158,
+						"h": 187
+					}
+				},
+				{
+					"filename": "fok_down_light_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 57,
+						"y": 101,
+						"w": 156,
+						"h": 123
+					},
+					"frame": {
+						"x": 894,
+						"y": 2,
+						"w": 156,
+						"h": 123
+					}
+				},
+				{
+					"filename": "fok_side_air_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 62,
+						"y": 32,
+						"w": 137,
+						"h": 159
+					},
+					"frame": {
+						"x": 1054,
+						"y": 2,
+						"w": 137,
+						"h": 159
+					}
+				},
+				{
+					"filename": "fok_ground_pound_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 60,
+						"y": 38,
+						"w": 135,
+						"h": 190
+					},
+					"frame": {
+						"x": 894,
+						"y": 129,
+						"w": 135,
+						"h": 190
+					}
+				},
+				{
+					"filename": "fok_up_sig_ghost_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 62,
+						"y": 24,
+						"w": 132,
+						"h": 220
+					},
+					"frame": {
+						"x": 665,
+						"y": 174,
+						"w": 132,
+						"h": 220
+					}
+				},
+				{
+					"filename": "fok_recovery_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 92,
+						"y": 37,
+						"w": 82,
+						"h": 192
+					},
+					"frame": {
+						"x": 801,
+						"y": 174,
+						"w": 82,
+						"h": 192
+					}
+				},
+				{
+					"filename": "fok_jump_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 50,
+						"y": 31,
+						"w": 125,
+						"h": 200
+					},
+					"frame": {
+						"x": 486,
+						"y": 344,
+						"w": 125,
+						"h": 200
+					}
+				},
+				{
+					"filename": "fok_side_sig_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 79,
+						"y": 39,
+						"w": 123,
+						"h": 186
+					},
+					"frame": {
+						"x": 359,
+						"y": 516,
+						"w": 123,
+						"h": 186
+					}
+				},
+				{
+					"filename": "fok_run_007",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 41,
+						"y": 45,
+						"w": 125,
+						"h": 185
+					},
+					"frame": {
+						"x": 164,
+						"y": 531,
+						"w": 125,
+						"h": 185
+					}
+				},
+				{
+					"filename": "fok_wall_slide_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 77,
+						"y": 41,
+						"w": 124,
+						"h": 183
+					},
+					"frame": {
+						"x": 2,
+						"y": 584,
+						"w": 124,
+						"h": 183
+					}
+				},
+				{
+					"filename": "fok_run_006",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 41,
+						"y": 38,
+						"w": 123,
+						"h": 176
+					},
+					"frame": {
+						"x": 1195,
+						"y": 2,
+						"w": 123,
+						"h": 176
+					}
+				},
+				{
+					"filename": "fok_run_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 54,
+						"y": 37,
+						"w": 118,
+						"h": 178
+					},
+					"frame": {
+						"x": 1033,
+						"y": 165,
+						"w": 118,
+						"h": 178
+					}
+				},
+				{
+					"filename": "fok_run_005",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 47,
+						"y": 37,
+						"w": 117,
+						"h": 186
+					},
+					"frame": {
+						"x": 887,
+						"y": 323,
+						"w": 117,
+						"h": 186
+					}
+				},
+				{
+					"filename": "fok_idle_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 40,
+						"w": 80,
+						"h": 184
+					},
+					"frame": {
+						"x": 801,
+						"y": 370,
+						"w": 80,
+						"h": 184
+					}
+				},
+				{
+					"filename": "fok_run_002",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 52,
+						"y": 45,
+						"w": 117,
+						"h": 185
+					},
+					"frame": {
+						"x": 615,
+						"y": 398,
+						"w": 117,
+						"h": 185
+					}
+				},
+				{
+					"filename": "fok_hurt_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 85,
+						"y": 52,
+						"w": 115,
+						"h": 173
+					},
+					"frame": {
+						"x": 486,
+						"y": 548,
+						"w": 115,
+						"h": 173
+					}
+				},
+				{
+					"filename": "fok_charge_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 68,
+						"y": 35,
+						"w": 111,
+						"h": 190
+					},
+					"frame": {
+						"x": 293,
+						"y": 706,
+						"w": 111,
+						"h": 190
+					}
+				},
+				{
+					"filename": "fok_up_sig_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 75,
+						"y": 25,
+						"w": 109,
+						"h": 202
+					},
+					"frame": {
+						"x": 130,
+						"y": 720,
+						"w": 109,
+						"h": 202
+					}
+				},
+				{
+					"filename": "fok_run_008",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 58,
+						"y": 51,
+						"w": 108,
+						"h": 180
+					},
+					"frame": {
+						"x": 2,
+						"y": 771,
+						"w": 108,
+						"h": 180
+					}
+				},
+				{
+					"filename": "fok_run_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 61,
+						"y": 42,
+						"w": 106,
+						"h": 186
+					},
+					"frame": {
+						"x": 1322,
+						"y": 2,
+						"w": 106,
+						"h": 186
+					}
+				},
+				{
+					"filename": "fok_run_004",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 68,
+						"y": 45,
+						"w": 98,
+						"h": 185
+					},
+					"frame": {
+						"x": 1155,
+						"y": 182,
+						"w": 98,
+						"h": 185
+					}
+				},
+				{
+					"filename": "fok_idle_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 40,
+						"w": 80,
+						"h": 184
+					},
+					"frame": {
+						"x": 1008,
+						"y": 347,
+						"w": 80,
+						"h": 184
+					}
+				},
+				{
+					"filename": "fok_idle_002",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 40,
+						"w": 80,
+						"h": 184
+					},
+					"frame": {
+						"x": 885,
+						"y": 513,
+						"w": 80,
+						"h": 184
+					}
+				},
+				{
+					"filename": "fok_idle_003",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 40,
+						"w": 80,
+						"h": 184
+					},
+					"frame": {
+						"x": 736,
+						"y": 558,
+						"w": 80,
+						"h": 184
+					}
+				},
+				{
+					"filename": "fok_idle_004",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 40,
+						"w": 80,
+						"h": 184
+					},
+					"frame": {
+						"x": 605,
+						"y": 587,
+						"w": 80,
+						"h": 184
+					}
+				},
+				{
+					"filename": "fok_idle_005",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 40,
+						"w": 80,
+						"h": 184
+					},
+					"frame": {
+						"x": 408,
+						"y": 725,
+						"w": 80,
+						"h": 184
+					}
+				},
+				{
+					"filename": "fok_idle_006",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 40,
+						"w": 80,
+						"h": 184
+					},
+					"frame": {
+						"x": 492,
+						"y": 725,
+						"w": 80,
+						"h": 184
+					}
+				},
+				{
+					"filename": "fok_idle_007",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 41,
+						"w": 80,
+						"h": 183
+					},
+					"frame": {
+						"x": 243,
+						"y": 900,
+						"w": 80,
+						"h": 183
+					}
+				},
+				{
+					"filename": "fok_idle_008",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 41,
+						"w": 80,
+						"h": 183
+					},
+					"frame": {
+						"x": 114,
+						"y": 926,
+						"w": 80,
+						"h": 183
+					}
+				},
+				{
+					"filename": "fok_idle_009",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 41,
+						"w": 80,
+						"h": 183
+					},
+					"frame": {
+						"x": 2,
+						"y": 955,
+						"w": 80,
+						"h": 183
+					}
+				},
+				{
+					"filename": "fok_idle_010",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 41,
+						"w": 80,
+						"h": 183
+					},
+					"frame": {
+						"x": 1432,
+						"y": 2,
+						"w": 80,
+						"h": 183
+					}
+				},
+				{
+					"filename": "fok_idle_011",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 86,
+						"y": 41,
+						"w": 80,
+						"h": 183
+					},
+					"frame": {
+						"x": 1516,
+						"y": 2,
+						"w": 80,
+						"h": 183
+					}
+				},
+				{
+					"filename": "fok_win_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 81,
+						"y": 19,
+						"w": 79,
+						"h": 206
+					},
+					"frame": {
+						"x": 1600,
+						"y": 2,
+						"w": 79,
+						"h": 206
+					}
+				}
+			]
+		}
+	],
+	"meta": {
+		"app": "http://github.com/odrick/free-tex-packer-cli",
+		"version": "0.3.0"
+	}
+}

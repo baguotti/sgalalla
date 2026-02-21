@@ -87,7 +87,7 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     preload(): void {
-        this.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
+        this.load.atlas('fok', 'assets/fok/fok.png', 'assets/fok/fok.json');
 
         // Audio
         this.load.audio('ui_player_found', 'assets/audio/ui/ui_player_found.wav');

@@ -29,7 +29,7 @@ export class AnimationHelpers {
         // GameScene might have loaded it in a previous block or I just missed it in the view.
         // I will include FOK v4 to be safe as it's the main character.
 
-        scene.load.atlas('fok', 'assets/fok_v4/fok_v4.png', 'assets/fok_v4/fok_v4.json');
+        scene.load.atlas('fok', 'assets/fok/fok.png', 'assets/fok/fok.json');
         scene.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');
         scene.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');
         scene.load.atlas('pe', 'assets/pe/pe.png', 'assets/pe/pe.json');
@@ -50,6 +50,7 @@ export class AnimationHelpers {
         // Chest Assets
         scene.load.image('chest_closed', 'assets/items/chest_closed.png');
         scene.load.image('chest_open', 'assets/items/chest_open.png');
+        scene.load.image('chest_dynamite', 'assets/items/chest_dynamite_001.png');
 
         // Scrin Images (Rewards)
         const scrinFiles = [

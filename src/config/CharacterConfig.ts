@@ -33,6 +33,7 @@ export const charConfigs: Record<string, CharacterAnimations> = {
 
         // Side Sig Ghost
         side_sig_ghost: { prefix: 'fok_side_sig_ghost_', count: 3, loop: false },
+        up_sig_ghost: { prefix: 'fok_up_sig_ghost_', count: 1, suffix: '000', loop: false },
 
         // Win animation
         win: { prefix: 'fok_win_', count: 1, suffix: '000', loop: false },
@@ -71,6 +72,7 @@ export const charConfigs: Record<string, CharacterAnimations> = {
 
         // Side Sig Ghost
         side_sig_ghost: { prefix: 'sgu_side_sig_ghost_', count: 3, loop: false },
+        up_sig_ghost: { prefix: 'sgu_up_sig_ghost_', count: 1, suffix: '000', loop: false },
 
         // Win animation
         win: { prefix: 'sgu_win_', count: 1, suffix: '000', loop: false },
@@ -109,6 +111,7 @@ export const charConfigs: Record<string, CharacterAnimations> = {
 
         // Side Sig Ghost
         side_sig_ghost: { prefix: 'sga_side_sig_ghost_', count: 2, loop: false },
+        up_sig_ghost: { prefix: 'sga_up_sig_ghost_', count: 1, suffix: '000', loop: false },
 
         // Win animation
         win: { prefix: 'sga_win_', count: 1, suffix: '000', loop: false },
@@ -146,7 +149,8 @@ export const charConfigs: Record<string, CharacterAnimations> = {
         spot_dodge: { prefix: 'pe_dodge_', count: 1, suffix: '000', loop: false },
 
         // Side Sig Ghost
-        side_sig_ghost: { prefix: 'pe_side_sig_ghost_', count: 1, loop: false },
+        side_sig_ghost: { prefix: 'pe_side_sig_ghost_', count: 3, loop: false },
+        up_sig_ghost: { prefix: 'pe_up_sig_ghost_', count: 1, suffix: '000', loop: false },
 
         // Win animation
         win: { prefix: 'pe_win_', count: 1, suffix: '000', loop: false },
@@ -199,7 +203,8 @@ export const charConfigs: Record<string, CharacterAnimations> = {
         attack_heavy_down: { prefix: 'nock_side_sig_', count: 1, suffix: '000', loop: false },
 
         // Side Sig Ghost
-        side_sig_ghost: { prefix: 'nock_side_sig_ghost_', count: 1, suffix: '000', loop: false },
+        side_sig_ghost: { prefix: 'nock_side_sig_ghost_', count: 3, suffix: '000', loop: false },
+        up_sig_ghost: { prefix: 'nock_up_sig_ghost_', count: 1, suffix: '000', loop: false },
 
         // Win animation
         win: { prefix: 'nock_win_', count: 1, suffix: '000', loop: false },
@@ -223,6 +228,7 @@ export const charConfigs: Record<string, CharacterAnimations> = {
 
         // Side Sig Ghost
         side_sig_ghost: { prefix: 'greg_side_sig_ghost_', count: 3, loop: false },
+        up_sig_ghost: { prefix: 'greg_up_sig_ghost_', count: 1, suffix: '000', loop: false },
 
         // --- LIGHT ATTACKS ---
         attack_light_neutral: { prefix: 'greg_side_light_', count: 1, suffix: '000', loop: false },

@@ -219,4 +219,12 @@ Part 2
     - Added a scale "wobble" effect at 100% charge to indicate maximum intensity.
 - **[Polishing]** **Pickup UX**:
     - Increased `pickupRange` significantly (from 60 to 100) to make item grabbing faster and more reliable.
-    - Prevented opened chests from being punched/kicked to ensure they remain interactable as items only.
+    - Precented opened chests from being punched/kicked to ensure they remain interactable as items only.
+
+### [2026-02-21] v0.14.3 - Ghost Visuals & Input Refinements
+- **[V]** `v0.14.3`
+- **[Feat]** **Visual Polish**:
+    - Added highly subtle WebGL glow, fade blur, and a 1-pixel positional shake to the ghost sprites.
+    - Adjusted ghost spawn offsets (moved forward 25px for most, 35px for Nock) to prevent overlapping with the main character.
+- **[Fix]** **Input Priority**:
+    - Fixed an issue where pressing Down + Light Attack while running would execute a Running Light Attack instead of a Down Light Attack.

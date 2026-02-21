@@ -45,6 +45,8 @@ export class PlayerCombat {
     // Ghost Effect State
     private ghostSprite: Phaser.GameObjects.Sprite | null = null;
     private hasSpawnedGhost: boolean = false;
+    private chargeGhostSprite: Phaser.GameObjects.Sprite | null = null;
+    private chargeBlurFx: any = null;
 
     constructor(player: Player, scene: Phaser.Scene) {
         this.player = player;
@@ -158,7 +160,7 @@ export class PlayerCombat {
 
             // Any light attack while running OR moving fast (Dash Attack)
             const isRunSpeed = Math.abs(this.player.velocity.x) > PhysicsConfig.MAX_SPEED * 0.8;
-            if ((this.player.physics.isRunning || isRunSpeed) && this.player.isGrounded) {
+            if ((this.player.physics.isRunning || isRunSpeed) && this.player.isGrounded && direction !== AttackDirection.DOWN) {
                 // Use new Running Light Attack for all characters (Assets Verified)
                 this.startAttack('light_run_grounded');
                 return;
@@ -351,6 +353,46 @@ export class PlayerCombat {
 
         const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
 
+        // --- Fade In Ghost ---
+        if (!this.chargeGhostSprite) {
+            const char = this.player.character;
+            const initialFrame = `${char}_side_sig_ghost_000`; // Always side_sig_ghost_000 for charging
+            this.chargeGhostSprite = this.scene.add.sprite(this.player.x, this.player.y, char, initialFrame);
+            this.chargeGhostSprite.setDepth(this.player.depth - 1);
+            this.chargeGhostSprite.setAlpha(0);
+
+            // Add SUPER SUBTLE Glow and Blur
+            if (this.chargeGhostSprite.preFX) {
+                this.chargeGhostSprite.preFX.addGlow(0xffffff, 0.4, 0, false, 0.05, 5);
+                this.chargeBlurFx = this.chargeGhostSprite.preFX.addBlur(0, 1.5, 1.5, 1);
+            }
+
+            // Ignore in UI Camera
+            const scene = this.scene as GameSceneInterface;
+            if (scene.uiCamera) {
+                scene.uiCamera.ignore(this.chargeGhostSprite);
+            }
+        }
+
+        const facing = this.player.getFacingDirection();
+        const baseOffset = (this.player.character === 'nock') ? 35 : 25;
+
+        // Very subtle position shake instead of scale wobble
+        const shakeIntensity = 1.0; // VERY subtle
+        const wobbleX = (Math.random() - 0.5) * shakeIntensity;
+        const wobbleY = (Math.random() - 0.5) * shakeIntensity;
+
+        this.chargeGhostSprite.setScale(facing, 1);
+        this.chargeGhostSprite.setPosition(this.player.x + (baseOffset * facing) + wobbleX, this.player.y + wobbleY);
+        this.chargeGhostSprite.setAlpha(chargePercent * 0.7);
+
+        // Fade out blur as the ghost fades in
+        if (this.chargeBlurFx) {
+            const blurAmt = (1 - chargePercent) * 1.5;
+            this.chargeBlurFx.x = blurAmt;
+            this.chargeBlurFx.y = blurAmt;
+        }
+
         // Subtle Shake Effect
         // Intensity increases with charge, max 1.5 pixels
         const maxShake = 1.5;
@@ -364,11 +406,17 @@ export class PlayerCombat {
 
 
 
-    private clearChargeState(): void {
+    public clearChargeState(): void {
         this.isCharging = false;
         this.chargeTime = 0;
         // Reset body color and offset
         this.player.resetVisuals();
+
+        if (this.chargeGhostSprite) {
+            this.chargeGhostSprite.destroy();
+            this.chargeGhostSprite = null;
+            this.chargeBlurFx = null;
+        }
     }
 
     private updateThrowCharge(delta: number): void {
@@ -550,6 +598,7 @@ export class PlayerCombat {
         this.deactivateHitbox();
         this.player.resetVisuals();
         this.clearGhostEffect();
+        this.clearChargeState();
 
         // Set cooldown — scale recovery with charge for Side Sig
         if (this.player.character === 'fok' &&
@@ -890,8 +939,8 @@ export class PlayerCombat {
 
         // Create Ghost Sprite
         // Use character atlas
-        const initialFrame = `${char}_side_sig_ghost_000`;
-        const animKey = `${char}_side_sig_ghost`;
+        const initialFrame = isVertical ? `${char}_up_sig_ghost_000` : `${char}_side_sig_ghost_000`;
+        const animKey = isVertical ? `${char}_up_sig_ghost` : `${char}_side_sig_ghost`;
 
         let ghost: Phaser.GameObjects.Sprite | null = null;
         const scene = this.scene as GameSceneInterface;
@@ -910,22 +959,26 @@ export class PlayerCombat {
         // ALWAYS ensure ghost spawns visually behind the player
         ghost.setDepth(this.player.depth - 1);
 
+        // Scale nock_up_sig_ghost to 1.2x as requested
+        if (char === 'nock' && isVertical) {
+            ghost.setScale(facing * 1.2, 1.2);
+        }
+
         // Fix Double Sprite Glitch (Ignore in UI Camera)
         if (scene.uiCamera) {
             scene.uiCamera.ignore(ghost);
         }
 
         // Initial Position
-        // Vertical ones start slightly closer or same? Let's keep X offset for side, Y offset for UP
-        let startX = this.player.x;
+        // Move ghost sprites forward (Nock gets an extra 10px)
+        const baseOffset = (char === 'nock') ? 35 : 25;
+        let startX = this.player.x + (baseOffset * facing);
         let startY = this.player.y;
 
         if (isVertical) {
             startY -= 15;
-            // Ghost travels up, rotate it so it looks like it's pointing up
-            // Nock needs to be facing forward per user request (0 degrees rotation).
-            // All other characters point up naturally when rotated -90 degrees.
-            ghost.setAngle((char === 'nock' ? 0 : -90) * facing);
+            // Ghost travels up, there is no need to rotate it manually anymore as we have a dedicated up_sig_ghost sprite
+            ghost.setAngle(0);
         } else {
             startX += (15 * facing);
             // Reset rotation to 0 for side attacks (fixes pooled sprites keeping -90 angle)
@@ -938,15 +991,28 @@ export class PlayerCombat {
         // Restore reference for Hitbox tracking
         this.ghostSprite = ghost;
 
+        // Apply SUPER SUBTLE FX
+        let blurFx: any = null;
+        if (ghost.preFX) {
+            ghost.preFX.clear();
+            ghost.preFX.addGlow(0xffffff, 0.4, 0, false, 0.05, 5);
+            blurFx = ghost.preFX.addBlur(0, 0, 0, 1); // 0 blur initially
+        }
+
         // Tween 1: Propel forward/upward — distance scales with charge
         const maxChg = PhysicsConfig.CHARGE_MAX_TIME;
         const chgRatio = Math.min(this.lastChargeTime / maxChg, 1);
         const travelDist = 110 + (chgRatio * 35); // 110 to 145
 
+        const baseScaleX = (char === 'nock' && isVertical) ? facing * 1.2 : facing;
+        const baseScaleY = (char === 'nock' && isVertical) ? 1.2 : 1;
+
         if (isVertical) {
             this.scene.tweens.add({
                 targets: ghost,
                 y: startY - travelDist,
+                scaleX: baseScaleX,
+                scaleY: baseScaleY,
                 duration: 300,
                 ease: 'Cubic.easeOut'
             });
@@ -954,6 +1020,8 @@ export class PlayerCombat {
             this.scene.tweens.add({
                 targets: ghost,
                 x: startX + (travelDist * facing),
+                scaleX: baseScaleX,
+                scaleY: baseScaleY,
                 duration: 300,
                 ease: 'Cubic.easeOut'
             });
@@ -968,6 +1036,13 @@ export class PlayerCombat {
             alpha: 0,
             delay: recoveryTime, // Extended per user request
             duration: 200,
+            onUpdate: () => {
+                if (blurFx && ghost) {
+                    // Increase blur strength as it fades
+                    blurFx.x = 0.5 + (1 - ghost.alpha) * 3;
+                    blurFx.y = 0.5 + (1 - ghost.alpha) * 3;
+                }
+            },
             onComplete: () => {
                 // Only clear if it's still the active ghost (haven't started a new one)
                 if (this.ghostSprite === ghost) {
@@ -982,10 +1057,7 @@ export class PlayerCombat {
             }
         });
 
-        // Tween 3: Fade Glow Strength (starts slightly earlier or with alpha)
-        // Note: glowFx variable is not accessible here as it was local to the block above.
-        // If we want to tween the glow, we need to capture it or manage it in EffectManager.
-        // For now, let's assume the alpha fade on the sprite handles the visual fade out sufficiently.
+        // Removed original dead comments about glowFx since we handle FX natively now
     }
 
     private clearGhostEffect(): void {

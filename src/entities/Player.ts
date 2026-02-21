@@ -58,9 +58,7 @@ export class Player extends Fighter {
 
     // Damage display
 
-    // Charge Visual
-    private chargeVisual: Phaser.GameObjects.Sprite;
-    private chargeBlurEffect?: Phaser.FX.Blur;
+
     // Unified input system (keyboard + gamepad)
     private inputManager!: InputManager;
     private currentInput!: InputState;
@@ -251,16 +249,6 @@ export class Player extends Fighter {
         this.add(this.nameTag);
         this.nameTag.setVisible(false);
 
-        // Using a slightly scaled-up mirrored sprite with Additive blending and Bloom to simulate energy outline
-        this.chargeVisual = scene.add.sprite(0, 7, this.sprite.texture.key, this.sprite.frame.name);
-        this.chargeVisual.setBlendMode(Phaser.BlendModes.ADD);
-        if (this.chargeVisual.postFX) {
-            // Reduced bloom: intensity 0.6 instead of 1.2
-            this.chargeVisual.postFX.addBloom(0xffffff, 1, 1, 1, 0.6);
-            this.chargeBlurEffect = this.chargeVisual.postFX.addBlur(0, 0, 0, 1, 0xffffff, 4);
-        }
-        this.chargeVisual.setVisible(false);
-        this.addAt(this.chargeVisual, 0); // Behind sprite
 
         // Initialize Components
         this.physics = new PlayerPhysics(this);
@@ -378,7 +366,6 @@ export class Player extends Fighter {
         this.updateAnimation();
         this.updateDamageDisplay();
         this.updateHeldItemPosition();
-        this.updateChargeVisual();
 
     }
 
@@ -397,74 +384,9 @@ export class Player extends Fighter {
         this.updateAnimation();
         this.updateDamageDisplay();
         this.updateHeldItemPosition();
-        this.updateChargeVisual();
-
     }
 
-    private updateChargeVisual(): void {
-        let isCharging = false;
-        let chargePercent = 0;
 
-        if (this.combat.isThrowCharging) {
-            isCharging = true;
-            chargePercent = Math.min(this.combat.throwChargeTime / 1000, 1);
-        } else if (this.combat.isCharging) {
-            isCharging = true;
-            chargePercent = Math.min(this.combat.chargeTime / 1000, 1);
-        }
-
-        if (isCharging) {
-            this.chargeVisual.setVisible(true);
-
-            // Sync visual with the player's main sprite
-            this.chargeVisual.setPosition(this.sprite.x, this.sprite.y);
-            this.chargeVisual.setTexture(this.sprite.texture.key, this.sprite.frame.name);
-            this.chargeVisual.setFlipX(this.sprite.flipX);
-
-            // Interpolate color from white to pastel red (0xffb3b3)
-            const color1 = Phaser.Display.Color.ValueToColor(0xffffff);
-            const color2 = Phaser.Display.Color.ValueToColor(0xffb3b3);
-            const colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(color1, color2, 100, chargePercent * 100);
-
-            const hexColor = Phaser.Display.Color.GetColor(colorObj.r as number, colorObj.g as number, colorObj.b as number);
-            this.chargeVisual.setTint(hexColor);
-
-            // Crop the sprite to fill from bottom to top
-            const fw = this.chargeVisual.frame.cutWidth;
-            const fh = this.chargeVisual.frame.cutHeight;
-            const cropH = fh * chargePercent;
-            const cropY = fh - cropH;
-            this.chargeVisual.setCrop(0, cropY, fw, cropH);
-
-            // Outline scale growth (starts slightly larger than player, grows a bit)
-            let scale = 1.05 + (chargePercent * 0.15);
-
-            // Wobble effect at maximum size
-            if (chargePercent >= 1) {
-                scale += Math.sin(this.scene.time.now * 0.02) * 0.02; // Reduced wobble for outline
-            }
-
-            this.chargeVisual.setScale(scale);
-
-            // Update blur strength based on charge
-            if (this.chargeBlurEffect) {
-                this.chargeBlurEffect.strength = chargePercent * 4;
-            }
-
-            // Fast pulse when fully charged, smooth fade-in otherwise
-            if (chargePercent >= 1) {
-                // Pulse alpha between 0.95 and 1.15 (Effectively capped at 1 visually, but calculation remains)
-                // Capping at 1 to prevent weird rendering
-                const targetAlpha = Math.min(1, 1.05 + (Math.sin(this.scene.time.now * 0.05) * 0.1));
-                this.chargeVisual.setAlpha(targetAlpha);
-            } else {
-                // Fade in from 0.8 to 0.95
-                this.chargeVisual.setAlpha(0.8 + (chargePercent * 0.15));
-            }
-        } else {
-            this.chargeVisual.setVisible(false);
-        }
-    }
 
     private updateTimers(delta: number): void {
         this.hitStunTimer -= delta;

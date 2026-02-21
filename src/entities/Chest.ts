@@ -528,6 +528,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
         this.setDensity(0.1); // Moderate weight for throwing
         this.bombFuseTimer = 4000; // 4 second fuse starts immediately
         this.armingTimer = 0;
+        this.setTexture('chest_dynamite');
 
         // Add postFX blur if available (Phaser 3.60+)
         if (this.postFX) {
