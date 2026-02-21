@@ -614,141 +614,147 @@ function applyPhysics(body: SimBody, dt: number, events: PhysicsEvent[]): void {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  COLLISION: PLATFORMS
+//  COLLISION: SINGLE PLATFORM (per-element, for client wrapper)
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Check all platform collisions. Matches PlayerPhysics.checkPlatformCollision() exactly.
- * Call this AFTER stepPhysics(), BEFORE checkWallCollisions().
+ * Check collision against a single platform.
+ * Uses center-origin coordinates for the platform.
+ * Called by the client wrapper (per-platform iteration) and by checkPlatformCollisions.
  */
-export function checkPlatformCollisions(body: SimBody, stage: SimStage): PhysicsEvent[] {
+export function checkSinglePlatformCollision(
+    body: SimBody, platIdx: number,
+    platCx: number, platCy: number, platW: number, platH: number,
+    isSoft: boolean
+): PhysicsEvent[] {
     const events: PhysicsEvent[] = [];
     const halfW = body.width / 2;
     const halfH = body.height / 2;
 
-    for (let i = 0; i < stage.platforms.length; i++) {
-        const plat = stage.platforms[i];
-        const isSoft = plat.isSoft;
+    const platLeft = platCx - platW / 2;
+    const platRight = platCx + platW / 2;
+    const platTop = platCy - platH / 2;
 
-        // Compute bounds (center-origin → AABB)
-        const platLeft = plat.x - plat.w / 2;
-        const platRight = plat.x + plat.w / 2;
-        const platTop = plat.y - plat.h / 2;
-        const platBottom = plat.y + plat.h / 2;
+    const bodyLeft = body.x - halfW;
+    const bodyRight = body.x + halfW;
+    const bodyTop = body.y - halfH;
+    const bodyBottom = body.y + halfH;
 
-        const bodyLeft = body.x - halfW;
-        const bodyRight = body.x + halfW;
-        const bodyTop = body.y - halfH;
-        const bodyBottom = body.y + halfH;
+    // AABB overlap (strict inequalities, matching Phaser)
+    if (bodyRight <= platLeft || bodyLeft >= platRight ||
+        bodyBottom <= platTop || bodyTop >= platCy + platH / 2) {
+        if (body.currentPlatformIdx === platIdx) body.currentPlatformIdx = -1;
+        return events;
+    }
 
-        // AABB overlap (strict inequalities, matching Phaser.Geom.Rectangle.Overlaps)
-        if (bodyRight <= platLeft || bodyLeft >= platRight) {
-            if (body.currentPlatformIdx === i) body.currentPlatformIdx = -1;
-            continue;
+    // Soft platform logic
+    if (isSoft) {
+        if (body.dropGraceTimer > 0) {
+            if (body.droppingThroughPlatformIdx === platIdx) return events;
+            if (!isNaN(body.droppingThroughY) && Math.abs(platCy - body.droppingThroughY) < 5) return events;
         }
-        if (bodyBottom <= platTop || bodyTop >= platBottom) {
-            if (body.currentPlatformIdx === i) body.currentPlatformIdx = -1;
-            continue;
+        if (body.vy < 0) return events;
+        if (bodyBottom > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) return events;
+    } else {
+        if (body.vy < 0) return events;
+        if (bodyBottom > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) return events;
+    }
+
+    // Landing
+    if (body.vy >= 0) {
+        const wasGrounded = body.wasGroundedLastFrame;
+
+        body.y = platTop - halfH;
+        body.vy = 0;
+        body.isGrounded = true;
+        body.isFastFalling = false;
+
+        if (body.isRecovering) {
+            body.isRecovering = false;
+            events.push({ type: 'recovery_end' });
         }
 
-        // ── Soft platform logic ──
-        if (isSoft) {
-            // Skip if dropping through this platform
-            if (body.dropGraceTimer > 0) {
-                if (body.droppingThroughPlatformIdx === i) continue;
-                if (!isNaN(body.droppingThroughY) && Math.abs(plat.y - body.droppingThroughY) < 5) continue;
-            }
-            // Only land if falling
-            if (body.vy < 0) continue;
-            // Must be near top surface
-            if (bodyBottom > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) continue;
-        } else {
-            // Hard platform: only ground if near top surface and falling
-            if (body.vy < 0) continue;
-            if (bodyBottom > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) continue;
-        }
+        body.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
+        body.recoveryAvailable = true;
+        body.droppingThroughPlatformIdx = -1;
+        body.droppingThroughY = NaN;
+        body.airActionCounter = 0;
+        body.wallTouchesExhausted = false;
+        body.currentPlatformIdx = isSoft ? platIdx : -1;
 
-        // ── Landing ──
-        if (body.vy >= 0) {
-            const wasGrounded = body.wasGroundedLastFrame;
-
-            body.y = platTop - halfH;
-            body.vy = 0;
-            body.isGrounded = true;
-            body.isFastFalling = false;
-
-            if (body.isRecovering) {
-                body.isRecovering = false;
-                events.push({ type: 'recovery_end' });
-            }
-
-            body.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
-            body.recoveryAvailable = true;
-            body.droppingThroughPlatformIdx = -1;
-            body.droppingThroughY = NaN;
-            body.airActionCounter = 0;
-            body.wallTouchesExhausted = false;
-            body.currentPlatformIdx = isSoft ? i : -1;
-
-            // Landing SFX
-            if (!wasGrounded) {
-                events.push({ type: 'sfx', key: 'sfx_landing', volume: 0.8 });
-                events.push({ type: 'landing' });
-            }
+        if (!wasGrounded) {
+            events.push({ type: 'sfx', key: 'sfx_landing', volume: 0.8 });
+            events.push({ type: 'landing' });
         }
     }
 
     return events;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  COLLISION: WALLS
-// ═══════════════════════════════════════════════════════════════
-
 /**
- * Check wall collisions. Matches PlayerPhysics.checkWallCollision() exactly.
- * Call this AFTER checkPlatformCollisions().
+ * Check all platform collisions (convenience for server).
  */
-export function checkWallCollisions(body: SimBody, stage: SimStage): void {
-    const halfW = body.width / 2;
-    const halfH = body.height / 2;
+export function checkPlatformCollisions(body: SimBody, stage: SimStage): PhysicsEvent[] {
+    const events: PhysicsEvent[] = [];
+    for (let i = 0; i < stage.platforms.length; i++) {
+        const p = stage.platforms[i];
+        events.push(...checkSinglePlatformCollision(body, i, p.x, p.y, p.w, p.h, p.isSoft));
+    }
+    return events;
+}
 
+// ═══════════════════════════════════════════════════════════════
+//  COLLISION: WALLS (per-element + bulk)
+// ═══════════════════════════════════════════════════════════════
+
+/** Reset wall state before iterating walls. */
+export function resetWallState(body: SimBody): void {
     body.isTouchingWall = false;
     body.wallDirection = 0;
+}
 
-    for (const wall of stage.walls) {
-        const wallLeft = wall.x - wall.w / 2;
-        const wallRight = wall.x + wall.w / 2;
-        const wallTop = wall.y - wall.h / 2;
-        const wallBottom = wall.y + wall.h / 2;
+/** Check collision against a single wall (center-origin coordinates). */
+export function checkSingleWallCollision(
+    body: SimBody,
+    wallCx: number, wallCy: number, wallW: number, wallH: number
+): void {
+    const halfW = body.width / 2;
 
-        const bodyLeft = body.x - halfW;
-        const bodyRight = body.x + halfW;
-        const bodyTop = body.y - halfH;
-        const bodyBottom = body.y + halfH;
+    const wallLeft = wallCx - wallW / 2;
+    const wallRight = wallCx + wallW / 2;
+    const wallTop = wallCy - wallH / 2;
+    const wallBottom = wallCy + wallH / 2;
 
-        // AABB overlap check
-        const overlaps = bodyRight > wallLeft && bodyLeft < wallRight &&
-            bodyBottom > wallTop && bodyTop < wallBottom;
+    const bodyLeft = body.x - halfW;
+    const bodyRight = body.x + halfW;
+    const bodyTop = body.y - body.height / 2;
+    const bodyBottom = body.y + body.height / 2;
 
-        if (overlaps) {
-            const pCx = body.x;
-            const wCx = wall.x;
+    const overlaps = bodyRight > wallLeft && bodyLeft < wallRight &&
+        bodyBottom > wallTop && bodyTop < wallBottom;
 
-            if (pCx < wCx) {
-                body.x = wallLeft - halfW;
-                body.isTouchingWall = true;
-                body.lastWallTouchTimer = PhysicsConfig.WALL_COYOTE_TIME;
-                body.wallDirection = 1;
-                body.lastWallDirection = 1;
-            } else {
-                body.x = wallRight + halfW;
-                body.isTouchingWall = true;
-                body.lastWallTouchTimer = PhysicsConfig.WALL_COYOTE_TIME;
-                body.wallDirection = -1;
-                body.lastWallDirection = -1;
-            }
+    if (overlaps) {
+        if (body.x < wallCx) {
+            body.x = wallLeft - halfW;
+            body.isTouchingWall = true;
+            body.lastWallTouchTimer = PhysicsConfig.WALL_COYOTE_TIME;
+            body.wallDirection = 1;
+            body.lastWallDirection = 1;
+        } else {
+            body.x = wallRight + halfW;
+            body.isTouchingWall = true;
+            body.lastWallTouchTimer = PhysicsConfig.WALL_COYOTE_TIME;
+            body.wallDirection = -1;
+            body.lastWallDirection = -1;
         }
+    }
+}
+
+/** Check all wall collisions (convenience for server). */
+export function checkWallCollisions(body: SimBody, stage: SimStage): void {
+    resetWallState(body);
+    for (const w of stage.walls) {
+        checkSingleWallCollision(body, w.x, w.y, w.w, w.h);
     }
 }
 
@@ -763,8 +769,15 @@ export function checkBlastZone(body: SimBody, stage: SimStage): boolean {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RECOVERY (called externally, e.g. by combat)
+//  STANDALONE ACTIONS (called externally)
 // ═══════════════════════════════════════════════════════════════
+
+/** Perform a jump (for external callers like FSM states). */
+export function doJump(body: SimBody): PhysicsEvent[] {
+    const events: PhysicsEvent[] = [];
+    performJump(body, events);
+    return events;
+}
 
 /**
  * Start a recovery move. Sets velocity and state.

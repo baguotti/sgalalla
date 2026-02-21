@@ -1,3 +1,10 @@
+/**
+ * PlayerPhysics — Thin Wrapper (Phase 4)
+ *
+ * Delegates all physics logic to shared/PhysicsSimulation.ts.
+ * Handles Phaser-specific visuals (recovery ghost, SFX, FSM) via events.
+ * Keeps public field interface for backward compatibility.
+ */
 import Phaser from 'phaser';
 import { Player } from '../Player';
 import { PhysicsConfig } from '../../config/PhysicsConfig';
@@ -5,427 +12,403 @@ import type { InputState } from '../../input/InputManager';
 import { AttackPhase, AttackType } from '../../combat/Attack';
 import { AudioManager } from '../../managers/AudioManager';
 import type { GameSceneInterface } from '../../scenes/GameSceneInterface';
+import {
+    type SimBody, type SimInput, type PhysicsEvent,
+    createBody, stepPhysics,
+    checkSinglePlatformCollision, resetWallState, checkSingleWallCollision,
+    doJump, startRecovery as sharedStartRecovery,
+    ATTACK_PHASE_NONE, ATTACK_PHASE_STARTUP, ATTACK_PHASE_ACTIVE, ATTACK_PHASE_RECOVERY,
+    ATTACK_TYPE_NONE, ATTACK_TYPE_LIGHT, ATTACK_TYPE_HEAVY,
+} from '../../../shared/PhysicsSimulation';
 
 export class PlayerPhysics {
     private player: Player;
 
-    // Physics State
-    public acceleration: Phaser.Math.Vector2;
+    /** The shared SimBody — single source of truth for physics state. */
+    public body: SimBody;
+
+    // ── Public fields (read from body, kept for backward compat) ──
+    // These are synced TO body before stepPhysics and FROM body after.
+    public acceleration: Phaser.Math.Vector2; // Legacy — only .set(0,0) used externally
     public isGrounded: boolean = false;
     public wasGroundedLastFrame: boolean = false;
     public isFastFalling: boolean = false;
 
-    // Jump State
-    public jumpsRemaining: number = 3; // Will be set by reset()
+    public jumpsRemaining: number = 3;
     public airActionCounter: number = 0;
     public jumpHoldTime: number = 0;
     public wasJumpHeld: boolean = false;
 
-    // Recovery State
     public isRecovering: boolean = false;
     public recoveryAvailable: boolean = true;
     public lastRecoveryTime: number = 0;
     public recoveryTimer: number = 0;
     public recoveryGhost: Phaser.GameObjects.Sprite | null = null;
 
-    // Wall Mechanics
     public isWallSliding: boolean = false;
-    public wallDirection: number = 0; // -1 = left, 1 = right
+    public wallDirection: number = 0;
     public isTouchingWall: boolean = false;
     public wallTouchesExhausted: boolean = false;
     public lastWallTouchFrame: boolean = false;
     public lastWallTouchTimer: number = 0;
     public lastWallDirection: number = 0;
 
-    // Ledge mechanics removed (User Request)
-
-    // Dodge State
     public isDodging: boolean = false;
     public isSpotDodging: boolean = false;
     public dodgeTimer: number = 0;
     public dodgeCooldownTimer: number = 0;
     public dodgeDirection: number = 0;
 
-    // Platform Logic
     public droppingThroughPlatform: Phaser.GameObjects.Rectangle | null = null;
-    public droppingThroughY: number | null = null; // Fix for overlapping platforms
+    public droppingThroughY: number | null = null;
     public dropGraceTimer: number = 0;
     public currentPlatform: Phaser.GameObjects.Rectangle | null = null;
+
+    public isRunning: boolean = false;
+
+    // ── Platform index mapping (Phaser object → stable int) ──
+    private platformMap: Map<Phaser.GameObjects.Rectangle, number> = new Map();
+    private indexToPlatform: Map<number, Phaser.GameObjects.Rectangle> = new Map();
+    private nextPlatIdx: number = 0;
 
     constructor(player: Player) {
         this.player = player;
         this.acceleration = new Phaser.Math.Vector2(0, 0);
+        this.body = createBody(player.x, player.y, player.getFacingDirection());
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  MAIN UPDATE — delegates to shared stepPhysics
+    // ═══════════════════════════════════════════════════════
 
     public update(delta: number, input: InputState): void {
-        const deltaSeconds = delta / 1000;
+        // Sync state → body
+        this.syncToBody();
 
-        // Timers
-        this.updateTimers(delta);
+        // Map InputState → SimInput
+        const simInput: SimInput = {
+            moveLeft: input.moveLeft,
+            moveRight: input.moveRight,
+            moveDown: input.moveDown,
+            moveUp: input.moveUp,
+            jumpBuffered: this.player.inputBuffer.has('jump'),
+            jumpHeld: input.jumpHeld,
+            dodgeBuffered: this.player.inputBuffer.has('dodge'),
+            aimUp: input.aimUp,
+            aimDown: input.aimDown,
+        };
 
-        if (this.dropGraceTimer > 0) {
-            this.dropGraceTimer -= delta;
-            if (this.dropGraceTimer <= 0) {
-                this.droppingThroughPlatform = null;
-            }
-        }
+        // Run shared physics
+        const events = stepPhysics(this.body, simInput, delta / 1000);
 
-        // 1. Reset Acceleration (Gravity is constant)
-        // 1. Reset Acceleration (Gravity is constant)
-        this.wasGroundedLastFrame = this.player.isGrounded;
-        this.isGrounded = false; // Reset grounding at start of frame
-        this.acceleration.set(0, PhysicsConfig.GRAVITY);
+        // Sync body → state
+        this.syncFromBody();
 
-        // 2. Handle Mechanics
-        this.handleWallMechanics(input);
-        this.handleHorizontalMovement(input);
-        this.handleJump(delta, input);
-        this.handleFastFall(input);
-        this.handleDodgeInput(input);
-
-        // 4. Apply Physics (Integration)
-        this.applyPhysics(deltaSeconds);
+        // Process events (SFX, input consumption, FSM)
+        this.processEvents(events);
     }
 
-    private updateTimers(delta: number): void {
-        if (this.lastWallTouchTimer > 0) {
-            this.lastWallTouchTimer -= delta;
+    // ═══════════════════════════════════════════════════════
+    //  COLLISION — delegates to shared per-element functions
+    // ═══════════════════════════════════════════════════════
+
+    public checkPlatformCollision(platform: Phaser.GameObjects.Rectangle, isSoft: boolean = false): void {
+        this.syncToBody();
+
+        const platIdx = this.getPlatformIdx(platform);
+        // Platform center coordinates (Phaser Rectangle origin is 0.5, 0.5)
+        const cx = platform.x;
+        const cy = platform.y;
+        const w = platform.displayWidth;
+        const h = platform.displayHeight;
+
+        // Track droppingThroughY from platform center Y
+        if (this.body.droppingThroughPlatformIdx === platIdx) {
+            this.body.droppingThroughY = cy;
         }
 
-        if (this.dodgeCooldownTimer > 0) {
-            this.dodgeCooldownTimer -= delta;
+        const events = checkSinglePlatformCollision(this.body, platIdx, cx, cy, w, h, isSoft);
+
+        this.syncFromBody();
+
+        // Sync Phaser platform references
+        if (this.body.currentPlatformIdx === platIdx) {
+            this.currentPlatform = platform;
+        } else if (this.currentPlatform === platform) {
+            this.currentPlatform = null;
         }
 
-        if (this.dodgeTimer > 0) {
-            this.dodgeTimer -= delta;
-
-            // End invincibility early
-            if (this.isSpotDodging) {
-                if (this.dodgeTimer < PhysicsConfig.SPOT_DODGE_DURATION - PhysicsConfig.DODGE_INVINCIBILITY) {
-                    this.player.isInvincible = false;
-                }
-            } else {
-                if (this.dodgeTimer < PhysicsConfig.DODGE_DURATION - PhysicsConfig.DODGE_INVINCIBILITY) {
-                    this.player.isInvincible = false;
-                }
-            }
-
-            if (this.dodgeTimer <= 0) {
-                this.endDodge();
-            }
-        }
+        this.processEvents(events);
     }
 
-    public applyPhysics(deltaSeconds: number): void {
-        const velocity = this.player.velocity;
+    public checkWallCollision(walls: Phaser.Geom.Rectangle[]): void {
+        this.syncToBody();
+        resetWallState(this.body);
 
-        // Apply acceleration
-        // Soft Cap check: Don't add acceleration if already exceeding max speed in that direction
-        let maxSpeedCheck = PhysicsConfig.MAX_SPEED;
-        if (this.isRunning) maxSpeedCheck *= PhysicsConfig.RUN_SPEED_MULT;
-
-        // If we are dodging, we ignore cap. If hitstunned, ignore cap.
-        if (!this.player.isDodging && !this.player.isHitStunned) {
-            const movingSameDir = Math.sign(this.acceleration.x) === Math.sign(velocity.x);
-            const overSpeed = Math.abs(velocity.x) > maxSpeedCheck;
-
-            if (movingSameDir && overSpeed) {
-                // Don't add acceleration, let friction reduce speed
-            } else {
-                velocity.x += this.acceleration.x * deltaSeconds;
-            }
-        } else {
-            velocity.x += this.acceleration.x * deltaSeconds;
+        for (const wall of walls) {
+            // Phaser.Geom.Rectangle uses top-left origin → convert to center
+            const cx = wall.x + wall.width / 2;
+            const cy = wall.y + wall.height / 2;
+            checkSingleWallCollision(this.body, cx, cy, wall.width, wall.height);
         }
 
-        velocity.y += this.acceleration.y * deltaSeconds;
-
-        // Apply friction
-        let friction: number = this.player.isGrounded ? PhysicsConfig.FRICTION : PhysicsConfig.AIR_FRICTION;
-
-        // Dynamic Friction: Check momentum
-        const isHighSpeed = Math.abs(velocity.x) > PhysicsConfig.MAX_SPEED * PhysicsConfig.HIGH_SPEED_THRESHOLD_MULT;
-
-        if (this.isRunning || (isHighSpeed && this.player.isGrounded)) {
-            friction = PhysicsConfig.RUN_FRICTION; // Slidier when running or stopping from run
-        }
-
-        // BRAWLHALLA STYLE: Sig Charging stops momentum (Ground & Air)
-        if (this.player.combat.isCharging || this.player.combat.isThrowCharging) {
-            friction = PhysicsConfig.CHARGE_FRICTION;
-            // Counteract gravity to hang in air briefly (Gravity Cancel feel)
-            if (!this.player.isGrounded) {
-                velocity.y *= PhysicsConfig.CHARGE_GRAVITY_CANCEL;
-            }
-        }
-        else if (this.player.isAttacking) {
-            // Check if we're in recovery phase
-            const currentAttack = this.player.getCurrentAttack();
-            if (currentAttack && currentAttack.phase === AttackPhase.RECOVERY) {
-                friction = PhysicsConfig.ATTACK_RECOVERY_FRICTION;
-            } else {
-                friction = PhysicsConfig.ATTACK_ACTIVE_FRICTION;
-
-                // Aerial Stall for Flurry Attacks
-                if (!this.player.isGrounded && currentAttack?.data.shouldStallInAir) {
-                    velocity.y *= PhysicsConfig.AERIAL_STALL_GRAVITY_DAMP;
-                    velocity.x *= PhysicsConfig.AERIAL_STALL_HORIZONTAL_DAMP;
-                }
-            }
-        }
-        else if (this.player.isHitStunned) {
-            friction = PhysicsConfig.HITSTUN_FRICTION;
-        }
-
-        // BRAWLHALLA STYLE: Dash should maintain its exact velocity to cover the intended DodgeDistance.
-        if (this.player.isDodging && !this.isSpotDodging) {
-            friction = 1.0;
-        }
-
-        velocity.x *= friction;
-
-        velocity.x *= friction;
-
-        // Clamp speed
-        let maxSpeed = PhysicsConfig.MAX_SPEED;
-        if (this.isRunning) {
-            maxSpeed *= PhysicsConfig.RUN_SPEED_MULT;
-        }
-
-        // Only clamp if NOT dodging (dodging sets its own high velocity)
-        // AND not in hitstun (knockback should exceed max speed)
-        if (!this.player.isDodging && !this.player.isHitStunned) {
-            // Soft Cap: Allow momentum (e.g. from dash) to carry over.
-            // If we are over max speed, don't clamp hard, just let friction reduce it.
-            // But don't allow accelerating further past max speed.
-
-            if (Math.abs(velocity.x) > maxSpeed) {
-                // We are overspeeding (e.g. post-dash)
-                // If acceleration is trying to make us go faster in the same direction, cancel it
-                if (Math.sign(this.acceleration.x) === Math.sign(velocity.x) && this.acceleration.x !== 0) {
-                    // Reduce acceleration contribution to 0 for this frame to prevent infinite speed
-                    // But we already added acceleration up top. We should undo it or clamp velocity to previous value?
-                    // Simpler: Just clamp to previous frame's speed (effectively no acceleration) minus friction
-                    // Actually, friction has already been applied.
-                    // Let's just Clamp to the current speed? No, that locks it.
-
-                    // Correct approach: If overspeed, apply decay (friction is already applied). 
-                    // Just ensure we don't snap DOWN to maxSpeed. 
-                    // And ensure we don't go HIGHER than we currently are.
-
-                    // So... do nothing here? Friction (applied above) naturally reduces speed.
-                    // We just need to ensure we don't CLAMP.
-
-                    // However, we added 'acceleration' at line 121. If holding forward, acc is added.
-                    // We should probably NOT have added acceleration if overspeed. 
-                    // But changing order is risky.
-
-                    // Let's just Clamp to Max(current, maxSpeed) effectively?
-                    // No, simpler: 
-                    // If overspeed, we don't enforce maxSpeed cap.
-                    // But to prevent "run" input from maintaining the "dash" speed forever (balancing friction), we might need extra drag?
-                    // PlayerPhysicsConfig.RUN_FRICTION handles that.
-                }
-            } else {
-                // Normal case: Clamp to max speed
-                velocity.x = Phaser.Math.Clamp(
-                    velocity.x,
-                    -maxSpeed,
-                    maxSpeed
-                );
-            }
-        }
-
-        // Update Position
-        this.player.x += velocity.x * deltaSeconds;
-        this.player.y += velocity.y * deltaSeconds;
-
-        // Physics Update for Recovery State
-        if (this.isRecovering) {
-            this.recoveryTimer -= deltaSeconds * 1000;
-
-            // Track ghost
-            if (this.recoveryGhost && this.recoveryGhost.active) {
-                // Keep ghost fixed relative to player visually (offset 30px up)
-                this.recoveryGhost.setPosition(this.player.x, this.player.y - 30);
-            }
-
-            if (this.recoveryTimer <= 0) {
-                this.isRecovering = false;
-                this.player.resetVisuals();
-            }
-        }
-
-
-
-        // Movement has been applied using the previous frame's grounded state (friction etc)
-        // Now we reset it so GameScene collision checks can determine if we are still grounded
-        this.player.isGrounded = false;
+        this.syncFromBody();
     }
 
-    // Run State
-    public isRunning: boolean = false;
-
-    private handleHorizontalMovement(input: InputState): void {
-        if (this.isWallSliding) return;
-        if (this.isDodging && this.isSpotDodging) return; // Spot dodge locks X
-
-        // Prevent movement during attack startup and active frames, but allow during recovery
-        if (this.player.isAttacking) {
-            const currentAttack = this.player.getCurrentAttack();
-
-            if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
-                this.isRunning = false; // Force sprint off
-                return;
-            }
-
-            if (currentAttack && currentAttack.phase !== AttackPhase.RECOVERY) {
-                return; // Lock movement during STARTUP and ACTIVE phases only for Light attacks
-            }
-        }
-
-        // Calculate Move Force
-        let moveForce = 0;
-        // Disable movement if dodging (unless it's a directional dodge which carries momentum, implemented in startDodge)
-        if (this.isDodging) return;
-
-        // Run Mechanic: Default movement is RUN
-        // Dash input (dodgeHeld) triggers dash (handled in handleDodgeInput), but running is always on if moving.
-        const isMoving = input.moveLeft || input.moveRight;
-        const inRecovery = this.player.isAttacking;
-
-        // If grounded and moving, we are running.
-        this.isRunning = this.player.isGrounded && isMoving && !inRecovery;
-
-        let accel = PhysicsConfig.MOVE_ACCEL;
-        if (this.isRunning) {
-            accel *= PhysicsConfig.RUN_ACCEL_MULT;
-        }
-
-        if (input.moveLeft) moveForce -= accel;
-        if (input.moveRight) moveForce += accel;
-
-        this.acceleration.x += moveForce;
-    }
-
-    private handleJump(delta: number, input: InputState): void {
-        if (this.isDodging) return; // No jumping while dodging
-
-        if (this.player.isAttacking) {
-            const currentAttack = this.player.getCurrentAttack();
-            if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
-                return;
-            }
-        }
-
-        // Use buffered jump input
-        const buffer = this.player.inputBuffer;
-        const jumpRequested = buffer.has('jump');
-
-        // Platform Drop: Down + Jump
-        if (input.moveDown && jumpRequested && this.currentPlatform) {
-            buffer.consume('jump');
-            this.handlePlatformDrop();
-            return; // Skip normal jump
-        }
-
-        // Jump Hold Logic
-        if (input.jumpHeld) {
-            this.jumpHoldTime += delta;
-        } else {
-            this.jumpHoldTime = 0;
-        }
-
-        // New Jump Input (buffered)
-        if (jumpRequested && !this.wasJumpHeld) {
-            buffer.consume('jump');
-            this.performJump();
-        }
-        this.wasJumpHeld = input.jumpHeld;
-
-        // Short Hop Check
-        if (!input.jumpHeld && this.player.velocity.y < 0 && this.player.velocity.y > PhysicsConfig.SHORT_HOP_FORCE) {
-            this.player.velocity.y *= PhysicsConfig.SHORT_HOP_VELOCITY_DAMP;
-        }
-    }
-
-    private handlePlatformDrop(): void {
-        if (!this.currentPlatform) return;
-
-        // Initiate drop
-        this.droppingThroughPlatform = this.currentPlatform;
-        // Also track Y level to ignore adjacent/overlapping platforms at same height
-        this.droppingThroughY = this.currentPlatform.y;
-        this.dropGraceTimer = PhysicsConfig.PLATFORM_DROP_GRACE_PERIOD;
-
-        // Physics updates to start falling
-        this.player.isGrounded = false;
-        this.currentPlatform = null;
-        this.player.y += PhysicsConfig.PLATFORM_DROP_NUDGE_Y;
-        this.player.velocity.y = PhysicsConfig.PLATFORM_DROP_PUSH_Y;
-    }
-
-    public performJump(): void {
-        // Wall Jump
-        // Use timer for coyote time, allowing jump shortly after leaving wall
-        if (this.isWallSliding || (this.lastWallTouchTimer > 0 && !this.player.isGrounded)) {
-            this.wallJump();
-            return;
-        } else if (this.isTouchingWall) {
-        }
-
-
-        // Ground Jump
-        if (this.player.isGrounded) {
-            this.player.velocity.y = PhysicsConfig.JUMP_FORCE;
-            this.player.isGrounded = false;
-
-            // SFX
-            AudioManager.getInstance().playSFX('sfx_jump_1', { volume: 0.5 });
-            return;
-        }
-
-        // Air Jump (Multi-jump)
-        if (this.jumpsRemaining > 0 && this.airActionCounter < PhysicsConfig.MAX_AIR_ACTIONS) {
-            this.player.velocity.y = PhysicsConfig.DOUBLE_JUMP_FORCE;
-            this.jumpsRemaining--;
-            this.airActionCounter++;
-
-            // SFX
-            AudioManager.getInstance().playSFX('sfx_jump_2', { volume: 0.5 });
-        }
-    }
+    // ═══════════════════════════════════════════════════════
+    //  RECOVERY (external trigger from combat)
+    // ═══════════════════════════════════════════════════════
 
     public startRecovery(): void {
-        if (!this.recoveryAvailable) return;
+        this.syncToBody();
+        const events = sharedStartRecovery(this.body);
+        this.syncFromBody();
 
-        this.isRecovering = true;
-        this.recoveryAvailable = false; // Consumed until grounded
-        this.recoveryTimer = PhysicsConfig.RECOVERY_DURATION;
-        this.player.fsm.changeState('Recovery', this.player);
-
-        this.player.velocity.y = PhysicsConfig.RECOVERY_FORCE_Y;
-        // Horizontal drift
-        const facing = this.player.getFacingDirection();
-        this.player.velocity.x = facing * PhysicsConfig.RECOVERY_FORCE_X;
-
-        // Reset state
-        this.isWallSliding = false;
-        this.isFastFalling = false;
-
-        // SFX - Recovery is basically a jump/launch
-        AudioManager.getInstance().playSFX('sfx_jump_2', { volume: 0.6 });
-
-        // Spawn Recovery Ghost
-        this.spawnRecoveryGhost();
+        if (events.length > 0) {
+            this.player.fsm.changeState('Recovery', this.player);
+            this.processEvents(events);
+            this.spawnRecoveryGhost();
+        }
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  JUMP (external trigger)
+    // ═══════════════════════════════════════════════════════
+
+    public performJump(): void {
+        this.syncToBody();
+        const events = doJump(this.body);
+        this.syncFromBody();
+        this.processEvents(events);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  RESET
+    // ═══════════════════════════════════════════════════════
+
+    public resetOnGround(): void {
+        this.player.isGrounded = true;
+        this.isGrounded = true;
+        this.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
+        this.airActionCounter = 0;
+        this.isFastFalling = false;
+        this.isWallSliding = false;
+        this.wallTouchesExhausted = false;
+        this.droppingThroughPlatform = null;
+        this.droppingThroughY = null;
+        this.clearRecoveryGhost();
+        this.syncToBody();
+    }
+
+    public reset(): void {
+        if (this.player.body) {
+            this.player.body.velocity.x = 0;
+            this.player.body.velocity.y = 0;
+        }
+        this.player.velocity.set(0, 0);
+        this.acceleration.set(0, 0);
+        this.isGrounded = false;
+        this.jumpsRemaining = PhysicsConfig.MAX_JUMPS;
+        this.airActionCounter = 0;
+        this.isFastFalling = false;
+        this.isWallSliding = false;
+        this.wallTouchesExhausted = false;
+        this.droppingThroughPlatform = null;
+        this.droppingThroughY = null;
+        this.recoveryAvailable = true;
+        this.dodgeTimer = 0;
+        this.dodgeCooldownTimer = 0;
+        this.clearRecoveryGhost();
+        this.body = createBody(this.player.x, this.player.y, this.player.getFacingDirection());
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  STATE SYNC (PlayerPhysics ↔ SimBody)
+    // ═══════════════════════════════════════════════════════
+
+    private syncToBody(): void {
+        const b = this.body;
+
+        // Position & velocity from Player
+        b.x = this.player.x;
+        b.y = this.player.y;
+        b.vx = this.player.velocity.x;
+        b.vy = this.player.velocity.y;
+        b.facingDirection = this.player.getFacingDirection();
+
+        // Physics state from this
+        b.isGrounded = this.isGrounded;
+        b.wasGroundedLastFrame = this.wasGroundedLastFrame;
+        b.isFastFalling = this.isFastFalling;
+        b.jumpsRemaining = this.jumpsRemaining;
+        b.airActionCounter = this.airActionCounter;
+        b.jumpHoldTime = this.jumpHoldTime;
+        b.wasJumpHeld = this.wasJumpHeld;
+        b.isRecovering = this.isRecovering;
+        b.recoveryAvailable = this.recoveryAvailable;
+        b.recoveryTimer = this.recoveryTimer;
+        b.isWallSliding = this.isWallSliding;
+        b.wallDirection = this.wallDirection;
+        b.isTouchingWall = this.isTouchingWall;
+        b.wallTouchesExhausted = this.wallTouchesExhausted;
+        b.lastWallTouchTimer = this.lastWallTouchTimer;
+        b.lastWallDirection = this.lastWallDirection;
+        b.isDodging = this.isDodging;
+        b.isSpotDodging = this.isSpotDodging;
+        b.dodgeTimer = this.dodgeTimer;
+        b.dodgeCooldownTimer = this.dodgeCooldownTimer;
+        b.dodgeDirection = this.dodgeDirection;
+        b.isInvincible = this.player.isInvincible;
+        b.droppingThroughY = this.droppingThroughY ?? NaN;
+        b.dropGraceTimer = this.dropGraceTimer;
+        b.isRunning = this.isRunning;
+
+        // Platform references → indices
+        b.currentPlatformIdx = this.currentPlatform ? (this.platformMap.get(this.currentPlatform) ?? -1) : -1;
+        b.droppingThroughPlatformIdx = this.droppingThroughPlatform ? (this.platformMap.get(this.droppingThroughPlatform) ?? -1) : -1;
+
+        // Combat state (read-only by physics)
+        b.isAttacking = this.player.isAttacking;
+        b.isHitStunned = this.player.isHitStunned;
+        b.isCharging = this.player.combat?.isCharging ?? false;
+        b.isThrowCharging = this.player.combat?.isThrowCharging ?? false;
+
+        const attack = this.player.getCurrentAttack();
+        if (attack) {
+            b.attackPhase = attack.phase === AttackPhase.STARTUP ? ATTACK_PHASE_STARTUP :
+                attack.phase === AttackPhase.ACTIVE ? ATTACK_PHASE_ACTIVE :
+                    attack.phase === AttackPhase.RECOVERY ? ATTACK_PHASE_RECOVERY :
+                        ATTACK_PHASE_NONE;
+            b.attackType = attack.data.type === AttackType.LIGHT ? ATTACK_TYPE_LIGHT :
+                attack.data.type === AttackType.HEAVY ? ATTACK_TYPE_HEAVY :
+                    ATTACK_TYPE_NONE;
+            b.shouldStallInAir = !!attack.data.shouldStallInAir;
+        } else {
+            b.attackPhase = ATTACK_PHASE_NONE;
+            b.attackType = ATTACK_TYPE_NONE;
+            b.shouldStallInAir = false;
+        }
+    }
+
+    private syncFromBody(): void {
+        const b = this.body;
+
+        // Position & velocity → Player
+        this.player.x = b.x;
+        this.player.y = b.y;
+        this.player.velocity.x = b.vx;
+        this.player.velocity.y = b.vy;
+
+        // Physics state → this
+        this.isGrounded = b.isGrounded;
+        this.wasGroundedLastFrame = b.wasGroundedLastFrame;
+        this.isFastFalling = b.isFastFalling;
+        this.jumpsRemaining = b.jumpsRemaining;
+        this.airActionCounter = b.airActionCounter;
+        this.jumpHoldTime = b.jumpHoldTime;
+        this.wasJumpHeld = b.wasJumpHeld;
+        this.isRecovering = b.isRecovering;
+        this.recoveryAvailable = b.recoveryAvailable;
+        this.recoveryTimer = b.recoveryTimer;
+        this.isWallSliding = b.isWallSliding;
+        this.wallDirection = b.wallDirection;
+        this.isTouchingWall = b.isTouchingWall;
+        this.wallTouchesExhausted = b.wallTouchesExhausted;
+        this.lastWallTouchTimer = b.lastWallTouchTimer;
+        this.lastWallDirection = b.lastWallDirection;
+        this.isDodging = b.isDodging;
+        this.isSpotDodging = b.isSpotDodging;
+        this.dodgeTimer = b.dodgeTimer;
+        this.dodgeCooldownTimer = b.dodgeCooldownTimer;
+        this.dodgeDirection = b.dodgeDirection;
+        this.droppingThroughY = isNaN(b.droppingThroughY) ? null : b.droppingThroughY;
+        this.dropGraceTimer = b.dropGraceTimer;
+        this.isRunning = b.isRunning;
+
+        // Sync back to Player
+        this.player.isGrounded = b.isGrounded;
+        this.player.isInvincible = b.isInvincible;
+        this.player.isDodging = b.isDodging;
+
+        // Platform index → Phaser reference
+        if (b.currentPlatformIdx >= 0) {
+            this.currentPlatform = this.indexToPlatform.get(b.currentPlatformIdx) ?? null;
+        } else {
+            this.currentPlatform = null;
+        }
+        if (b.droppingThroughPlatformIdx >= 0) {
+            this.droppingThroughPlatform = this.indexToPlatform.get(b.droppingThroughPlatformIdx) ?? null;
+        } else {
+            this.droppingThroughPlatform = null;
+        }
+
+        // Recovery ghost tracking (visual only)
+        if (this.isRecovering && this.recoveryGhost && this.recoveryGhost.active) {
+            this.recoveryGhost.setPosition(this.player.x, this.player.y - 30);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  EVENT PROCESSING
+    // ═══════════════════════════════════════════════════════
+
+    private processEvents(events: PhysicsEvent[]): void {
+        for (const evt of events) {
+            switch (evt.type) {
+                case 'sfx':
+                    AudioManager.getInstance().playSFX(evt.key, { volume: evt.volume });
+                    break;
+                case 'consume':
+                    this.player.inputBuffer.consume(evt.input);
+                    break;
+                case 'dodge_start':
+                    this.player.fsm.changeState(
+                        evt.isGrounded ? 'Dodge' : 'AirDodge',
+                        this.player
+                    );
+                    if (evt.isSpot) {
+                        this.player.setVisualTint(0xffffff);
+                        this.player.spriteObject.setAlpha(PhysicsConfig.SPOT_DODGE_ALPHA);
+                    }
+                    break;
+                case 'dodge_end':
+                    this.player.resetVisuals();
+                    this.player.spriteObject.setAlpha(1);
+                    break;
+                case 'recovery_end':
+                    this.player.resetVisuals();
+                    this.clearRecoveryGhost();
+                    break;
+                case 'landing':
+                    // Landing visuals handled elsewhere (animation system)
+                    break;
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  PLATFORM INDEX MAPPING
+    // ═══════════════════════════════════════════════════════
+
+    private getPlatformIdx(platform: Phaser.GameObjects.Rectangle): number {
+        let idx = this.platformMap.get(platform);
+        if (idx === undefined) {
+            idx = this.nextPlatIdx++;
+            this.platformMap.set(platform, idx);
+            this.indexToPlatform.set(idx, platform);
+        }
+        return idx;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  VISUAL EFFECTS (Phaser-only, not in shared physics)
+    // ═══════════════════════════════════════════════════════
 
     private spawnRecoveryGhost(): void {
         const char = this.player.character;
         const facing = this.player.getFacingDirection();
         const scene = this.player.scene as GameSceneInterface;
 
-        // Use the vertical sig ghost
         const initialFrame = `${char}_up_sig_ghost_000`;
         const animKey = `${char}_up_sig_ghost`;
 
@@ -444,7 +427,6 @@ export class PlayerPhysics {
 
         ghost.setDepth(this.player.depth - 1);
 
-        // Scale nock_up_sig_ghost to 1.2x as requested in combat
         if (char === 'nock') {
             ghost.setScale(facing * 1.2, 1.2);
         }
@@ -453,13 +435,11 @@ export class PlayerPhysics {
             scene.uiCamera.ignore(ghost);
         }
 
-        // Adjust Start Y
         let startX = this.player.x;
-        let startY = this.player.y - 30; // Offset 30px up
+        let startY = this.player.y - 30;
         ghost.setAngle(0);
         ghost.setPosition(startX, startY);
 
-        // Apply Glow/Blur FX
         let blurFx: any = null;
         if (ghost.preFX) {
             ghost.preFX.clear();
@@ -469,14 +449,10 @@ export class PlayerPhysics {
 
         const baseScaleX = (char === 'nock') ? facing * 1.2 : facing;
         const baseScaleY = (char === 'nock') ? 1.2 : 1;
-
-        // Apply scale immediately
         ghost.setScale(baseScaleX, baseScaleY);
 
-        // Store reference for tracking
         this.recoveryGhost = ghost;
 
-        // Tween 1: Fade Out
         scene.tweens.add({
             targets: ghost,
             alpha: 0,
@@ -492,7 +468,6 @@ export class PlayerPhysics {
                 if (this.recoveryGhost === ghost) {
                     this.recoveryGhost = null;
                 }
-
                 if (scene.effectManager) {
                     scene.effectManager.releaseGhost(ghost!);
                 } else {
@@ -502,147 +477,11 @@ export class PlayerPhysics {
         });
     }
 
-    private wallJump(): void {
-        this.player.velocity.y = PhysicsConfig.WALL_JUMP_FORCE_Y;
-
-        // Use lastWallDirection if current is 0 (coyote time)
-        const dir = this.wallDirection !== 0 ? this.wallDirection : this.lastWallDirection;
-        this.player.velocity.x = -dir * PhysicsConfig.WALL_JUMP_FORCE_X;
-
-        this.isWallSliding = false;
-        this.airActionCounter++;
-
-        // SFX
-        AudioManager.getInstance().playSFX('sfx_jump_1', { volume: 0.5 });
-    }
-
-    private handleFastFall(input: InputState): void {
-        if (!this.player.isGrounded &&
-            this.player.velocity.y >= PhysicsConfig.FAST_FALL_THRESHOLD &&
-            input.moveDown &&
-            !this.isFastFalling) {
-
-            this.isFastFalling = true;
-            this.player.velocity.y *= PhysicsConfig.FAST_FALL_MULTIPLIER;
-        }
-    }
-
-    private handleDodgeInput(input: InputState): void {
-        if (this.dodgeCooldownTimer > 0) return;
-
-        if (this.player.isAttacking) {
-            const currentAttack = this.player.getCurrentAttack();
-            if (currentAttack && currentAttack.data.type === AttackType.HEAVY) {
-                return;
-            }
-        }
-
-        // Use buffered dodge input
-        if (!this.player.inputBuffer.consume('dodge')) return;
-
-        this.startDodge(input);
-    }
-
-    private startDodge(input: InputState): void {
-        this.isDodging = true;
-        this.player.isInvincible = true;
-        this.player.isDodging = true; // Sync with Player state
-        this.player.fsm.changeState(this.player.isGrounded ? 'Dodge' : 'AirDodge', this.player);
-
-        const hasDirectionalInput = input.moveLeft || input.moveRight;
-
-        // Spot Dodge conditions: No horizontal input, OR holding Up/Down without horizontal
-        // Brawlhalla: Neutral Dodge or Down Dodge = Spot Dodge
-        const isSpotDodge = !hasDirectionalInput || ((input.aimUp || input.aimDown) && !input.moveLeft && !input.moveRight);
-
-        if (isSpotDodge) {
-            // SPOT DODGE — no SFX (stationary dodge, dash sound causes phasing glitch)
-            this.isSpotDodging = true;
-            this.dodgeDirection = 0;
-            this.dodgeTimer = PhysicsConfig.SPOT_DODGE_DURATION;
-            this.player.velocity.x = 0;
-
-            if (!this.player.isGrounded) {
-                this.player.velocity.y *= PhysicsConfig.SPOT_DODGE_AERIAL_Y_DAMP;
-            }
-
-            // Visual feedback
-            this.player.setVisualTint(0xffffff);
-            this.player.spriteObject.setAlpha(PhysicsConfig.SPOT_DODGE_ALPHA);
-        } else {
-            // DIRECTIONAL DODGE — play dash SFX
-            AudioManager.getInstance().playSFX('sfx_dash', { volume: 0.5 });
-
-            this.isSpotDodging = false;
-            this.dodgeTimer = PhysicsConfig.DODGE_DURATION;
-
-            if (input.moveLeft && !input.moveRight) {
-                this.dodgeDirection = -1;
-            } else if (input.moveRight && !input.moveLeft) {
-                this.dodgeDirection = 1;
-            } else {
-                this.dodgeDirection = this.player.getFacingDirection();
-            }
-
-            // Apply dodge velocity (same distance for ground and air)
-            const dodgeSpeed = this.dodgeDirection * (PhysicsConfig.DODGE_DISTANCE / (PhysicsConfig.DODGE_DURATION / 1000));
-            this.player.velocity.x = dodgeSpeed;
-
-            if (!this.player.isGrounded) {
-                // Reduce vertical velocity during air dodge for better control
-                this.player.velocity.y *= PhysicsConfig.AIR_DODGE_VERTICAL_DAMP;
-            }
-
-            // No visual effects for dash (user request)
-            // Keep sprite fully visible and untinted
-        }
-    }
-
-    private endDodge(): void {
-        this.isDodging = false;
-        this.player.isDodging = false; // Sync
-        this.player.isInvincible = false;
-        this.dodgeCooldownTimer = PhysicsConfig.DODGE_COOLDOWN;
-        this.player.resetVisuals();
-        this.player.spriteObject.setAlpha(1);
-        this.isSpotDodging = false;
-    }
-
-    private handleWallMechanics(input: InputState): void {
-        if (this.player.isGrounded) {
-            this.isWallSliding = false;
-            return;
-        }
-
-        if (this.isTouchingWall) {
-            const pushingWall = (this.wallDirection === -1 && input.moveLeft) ||
-                (this.wallDirection === 1 && input.moveRight);
-
-            if (pushingWall && this.player.velocity.y > 0 && !this.wallTouchesExhausted) {
-                this.isWallSliding = true;
-                this.isFastFalling = false;
-
-                if (this.player.velocity.y > PhysicsConfig.WALL_SLIDE_SPEED) {
-                    this.player.velocity.y = PhysicsConfig.WALL_SLIDE_SPEED;
-                }
-
-                // Particles removed per user request
-            } else {
-                this.isWallSliding = false;
-            }
-        } else {
-            this.isWallSliding = false;
-        }
-    }
-
-
-
     private clearRecoveryGhost(): void {
         const scene = this.player.scene as GameSceneInterface;
         if (this.recoveryGhost) {
-            // Need a quick fade out then release
             const ghostToClear = this.recoveryGhost;
-            this.recoveryGhost = null; // Clear immediately so tracking stops
+            this.recoveryGhost = null;
 
             scene.tweens.add({
                 targets: ghostToClear,
@@ -657,134 +496,5 @@ export class PlayerPhysics {
                 }
             });
         }
-    }
-
-    public checkPlatformCollision(platform: Phaser.GameObjects.Rectangle, isSoft: boolean = false): void {
-        const playerBounds = this.player.getBounds();
-        const platBounds = platform.getBounds();
-
-        if (!Phaser.Geom.Rectangle.Overlaps(playerBounds, platBounds)) {
-            if (this.currentPlatform === platform) {
-                this.currentPlatform = null;
-            }
-            return;
-        }
-
-        if (isSoft) {
-            // Ignore if specifically dropping through this platform
-            // OR if dropping through a platform at the same Y level (handles seams/overlaps)
-            if (this.dropGraceTimer > 0) {
-                if (this.droppingThroughPlatform === platform) return;
-
-                if (this.droppingThroughY !== null && Math.abs(platform.y - this.droppingThroughY) < 5) return;
-            }
-            if (this.player.velocity.y < 0) return;
-            // FIX: Increased threshold from 10 to 45 to catch high-speed fallers (Max Fall Speed ~43px/frame)
-            if (playerBounds.bottom > platBounds.top + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) {
-                return;
-            }
-        } else {
-            // Hard platform: Only ground if player is near the top surface, not beside it
-            // This prevents the tall main platform from grounding players who are wall sliding alongside it
-            if (this.player.velocity.y < 0) return; // Moving upward, skip
-            if (playerBounds.bottom > platBounds.top + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) {
-                return; // Player is too far below the surface — they're beside the platform, not on top
-            }
-        }
-
-        if (this.player.velocity.y >= 0) {
-            // const wasGrounded = this.player.isGrounded; // REMOVED: Always false due to update() reset
-
-            this.player.y = platBounds.top - this.player.height / 2;
-            this.player.velocity.y = 0;
-            this.player.isGrounded = true;
-            this.isFastFalling = false;
-
-            if (this.isRecovering) {
-                this.isRecovering = false;
-                this.clearRecoveryGhost();
-            }
-
-            this.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
-            this.recoveryAvailable = true;
-            this.droppingThroughPlatform = null;
-            this.droppingThroughY = null;
-            this.airActionCounter = 0;
-            this.wallTouchesExhausted = false;
-            this.currentPlatform = isSoft ? platform : null;
-
-            // SFX: Play landing sound if we weren't grounded before
-            // We use a debounce or verify we were actually falling to prevent spam
-            if (!this.wasGroundedLastFrame) {
-                AudioManager.getInstance().playSFX('sfx_landing', { volume: 0.8 });
-            }
-        }
-    }
-
-
-
-
-    public checkWallCollision(walls: Phaser.Geom.Rectangle[]): void {
-        const playerBounds = this.player.getBounds();
-        const halfW = this.player.width / 2;
-
-        this.isTouchingWall = false;
-        this.wallDirection = 0;
-
-        for (const wall of walls) {
-            if (Phaser.Geom.Rectangle.Overlaps(playerBounds, wall)) {
-                const pCx = playerBounds.centerX;
-                const wCx = wall.centerX;
-
-                if (pCx < wCx) {
-                    this.player.x = wall.left - halfW;
-                    this.isTouchingWall = true;
-                    this.lastWallTouchTimer = PhysicsConfig.WALL_COYOTE_TIME;
-                    this.wallDirection = 1;
-                    this.lastWallDirection = 1;
-                } else {
-                    this.player.x = wall.right + halfW;
-                    this.isTouchingWall = true;
-                    this.lastWallTouchTimer = PhysicsConfig.WALL_COYOTE_TIME;
-                    this.wallDirection = -1;
-                    this.lastWallDirection = -1;
-                }
-            }
-        }
-    }
-
-
-
-    public resetOnGround(): void {
-        this.player.isGrounded = true;
-        this.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
-        this.airActionCounter = 0;
-        this.isFastFalling = false;
-        this.isWallSliding = false;
-        this.wallTouchesExhausted = false;
-        this.droppingThroughPlatform = null;
-        this.droppingThroughY = null;
-        this.clearRecoveryGhost();
-    }
-
-    public reset(): void {
-        if (this.player.body) {
-            this.player.body.velocity.x = 0;
-            this.player.body.velocity.y = 0;
-        }
-        this.player.velocity.set(0, 0); // Crucial: Reset logic velocity to prevent huge gravity accumulation
-        this.acceleration.set(0, 0);
-        this.isGrounded = false;
-        this.jumpsRemaining = PhysicsConfig.MAX_JUMPS;
-        this.airActionCounter = 0;
-        this.isFastFalling = false;
-        this.isWallSliding = false;
-        this.wallTouchesExhausted = false;
-        this.droppingThroughPlatform = null;
-        this.droppingThroughY = null;
-        this.recoveryAvailable = true;
-        this.dodgeTimer = 0;
-        this.dodgeCooldownTimer = 0;
-        this.clearRecoveryGhost();
     }
 }
