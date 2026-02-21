@@ -43,9 +43,10 @@ For every commit or major task completion, update `DEVELOPMENT_LOG.md` using the
 - **Items**: Standalone bombs were deprecated. Chests now act as the primary interactable item, which can transition into a `isBombMode` state and be thrown.
 
 ## Deployment Workflow
-- **Client**: `./deploy_client.sh` (Builds locally -> SCP -> Nginx).
-- **Server**: `./deploy_server.sh` (SSH -> Git Pull -> PM2 Reload).
+- **Client**: `./deploy_client.sh` (Builds locally -> SCP -> Nginx). Pass: 3003
+- **Server**: `./deploy_server.sh` (SSH -> Git Pull -> PM2 Reload). Pass: 3003
 - **Manual**: SSH into `164.90.235.15` (root).
+
 
 ## Critical Implementation Details
 - **Physics**: Hybrid. Player movement is **custom** (deterministic), environment uses Matter.js for static bodies.

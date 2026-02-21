@@ -230,7 +230,14 @@ Part 2
     - Fixed a bug where `sfx_fight_charge` would loop forever if a player was hit mid-charge.
     - Integrated `clearChargeState()` into `applyHitStun()` and added a hard failsafe timeout to the sound cleanup routine to ensure looping sounds are always destroyed.
 - **[Polish]** **Audio Transitions**: Balanced charge sound fade-out to trail off naturally while remaining technically solid against interruptions.
- 
+
+### [2026-02-21] v0.14.5 - UI Clarity & Training Metadata ℹ️
+- **[V]** `v0.14.5`
+- **[Feat]** **Controls Overlay**:
+    - Added 'T' key information to the `COMANDI` overlay.
+    - Explicitly documented the **Dummy Hostility Toggle** for Training Mode.
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-02-21] v1.0.0 - THE MASSIVE MILESTONE 🚀
 - **[V]** `v1.0.0`
 - **[Feat]** **Full Online Synchronization**:
@@ -242,9 +249,20 @@ Part 2
 - **[Fix]** **Network Stability**:
     - **Idle Logic**: Resolved "Connection Refused" issues by better managing server idle timeouts and file-watcher restarts.
 - **[S]** **STATUS**: Stable v1.0.0 release. Competitive platform fighting is now fully synchronized online.
-
-### [2026-02-21] v0.14.5 - UI Clarity & Training Metadata ℹ️
-- **[V]** `v0.14.5`
-- **[Feat]** **Controls Overlay**:
-    - Added 'T' key information to the `COMANDI` overlay.
-    - Explicitly documented the **Dummy Hostility Toggle** for Training Mode.
+--------------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-21] v1.0.1 - Player State Machine Refactor: Phase 2 🧠
+- **[V]** `v1.0.1`
+- **[Arch]** **State Machine Infrastructure (Phase 1 & 2)**:
+    - Successfully implemented the core **Finite State Machine (FSM)** infrastructure to replace the legacy boolean-flag system.
+    - **Created 15 Discrete State Classes**: Each state now owns its own lifecycle (`enter`, `update`, `exit`) and animation mapping.
+        - **Ground**: `Idle`, `Run`, `Taunt`, `Win`.
+        - **Airborne**: `Jump`, `Fall`, `WallSlide`.
+        - **Combat**: `Attack`, `Charging`, `HitStun`.
+        - **Defensive**: `Dodge`, `AirDodge`.
+        - **Special**: `Recovery`, `GroundPound`, `Respawning`.
+    - **StateMachine Core**: Implemented a passive `StateMachine` class that delegates logic to the active state, ensuring clean transitions and state isolation.
+    - **Type Safety**: Verified full project compilation (`tsc --noEmit`) with the new FSM architecture integrated via forward declaration in `Player.ts`.
+- **[Polish]** **Code Hygiene**: Cleaned up over 50 linting warnings related to unused parameters across the new state implementations to maintain high code standards.
+- **[S]** **STATUS**: Phase 2 Complete. All state logic is defined and ready for Phase 3 (wiring and logic migration).
+--------------------------------------------------------------------------------------------------------------------------------------------------

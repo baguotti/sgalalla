@@ -10,6 +10,7 @@ import { PlayerCombat } from './player/PlayerCombat';
 import { Attack, AttackPhase, AttackType, AttackDirection } from '../combat/Attack';
 import { PlayerAI } from './player/PlayerAI';
 import type { PlayerSnapshot } from '../network/StateSnapshot';
+import { StateMachine } from '../state/StateMachine';
 import type { Throwable } from './Throwable';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 
@@ -37,6 +38,9 @@ export class Player extends Fighter {
     public set isAttacking(value: boolean) { this._isAttacking = value; }
 
     public combat: PlayerCombat;
+
+    // FSM — State Machine (Phase 2 forward declaration, wired in Phase 3)
+    public fsm: StateMachine = new StateMachine();
 
     // Animation key for network sync (used so remote players play correct animation)
     public animationKey: string = '';

@@ -68,7 +68,7 @@ export class MainMenuScene extends Phaser.Scene {
         }
 
         // Version Text
-        this.add.text(width - 20, height - 20, 'v1.0.0', {
+        this.add.text(this.cameras.main.width / 2, this.cameras.main.height - 20, 'v1.0.1', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(1, 1);        // Menu Items
         const startY = height - 280; // Moved lower
