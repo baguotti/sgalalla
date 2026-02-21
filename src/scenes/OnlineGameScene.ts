@@ -65,6 +65,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
     // Rollback netcode
     private localFrame: number = 0;
+    // Prediction history for server reconciliation (ring buffer)
+    private predictionHistory: Array<{ frame: number; x: number; y: number }> = [];
+    private readonly PREDICTION_BUFFER_SIZE = 128;
 
     // Network throttling
     private stateThrottleCounter: number = 0;
@@ -343,6 +346,16 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             this.localPlayer.updateLogic(delta);
 
+            // Store prediction for reconciliation
+            this.predictionHistory.push({
+                frame: this.networkManager.getLocalFrame(),
+                x: this.localPlayer.x,
+                y: this.localPlayer.y,
+            });
+            if (this.predictionHistory.length > this.PREDICTION_BUFFER_SIZE) {
+                this.predictionHistory.shift();
+            }
+
             // Blast zone check - respawn if player falls off
             this.checkBlastZone(this.localPlayer);
 
@@ -616,10 +629,13 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         });
     }
 
-    private checkAndReconcile(_serverPlayerState: NetPlayerState, _serverFrame: number): void {
-        // Hybrid mode: client is authoritative for local player.
-        // Server shadow physics runs in parallel for future validation.
-        // Phase 3 will implement full prediction + reconciliation.
+    private checkAndReconcile(_serverState: NetPlayerState, _serverFrame: number): void {
+        // Phase 5: Reconciliation DISABLED.
+        // Without input replay (rewind + resimulate), the server is always behind
+        // on input processing. This causes the lerp to fight client prediction,
+        // pulling the player down during jumps. Both client and server run identical
+        // stepPhysics() code, so predictions are accurate locally.
+        // Reconciliation will be re-enabled in Phase 6 with full input replay.
     }
 
     /**

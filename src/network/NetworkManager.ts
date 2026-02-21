@@ -313,9 +313,14 @@ class NetworkManager {
         });
     }
 
+    // Input redundancy ring buffer (last N frames sent with every packet)
+    private inputRedundancyBuffer: Array<{ frame: number; input: InputState }> = [];
+    private readonly INPUT_REDUNDANCY_COUNT = 10;
+
     /**
      * Record and send local input to server
      * Call this every frame with the local player's input
+     * Phase 6: Sends last N frames for UDP redundancy
      */
     public sendInput(input: InputState): void {
         if (!this.connected || !this.channel) return;
@@ -331,11 +336,20 @@ class NetworkManager {
         };
         this.inputBuffer.addInput(frameInput);
 
-        // Send to server
-        const netInput: NetInput = {
+        // Add to redundancy ring buffer
+        this.inputRedundancyBuffer.push({ frame: this.localFrame, input });
+        if (this.inputRedundancyBuffer.length > this.INPUT_REDUNDANCY_COUNT) {
+            this.inputRedundancyBuffer.shift();
+        }
+
+        // Send redundant inputs (last N frames) to survive packet loss
+        const netInput = {
             frame: this.localFrame,
             playerId: this.localPlayerId,
-            input: input
+            inputs: this.inputRedundancyBuffer.map(entry => ({
+                frame: entry.frame,
+                input: entry.input,
+            })),
         };
 
         this.channel.emit(NetMessageType.INPUT, netInput, { reliable: false });

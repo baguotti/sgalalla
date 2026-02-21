@@ -321,7 +321,8 @@ Part 2
 - **[S]** **STATUS**: Phase 2 Complete (Hybrid). Infrastructure for server authority is active and stable. Ready for Phase 3 (Full Prediction & Reconciliation).
 --------------------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------
-### [2026-02-21] v1.0.6 - Server-Authoritative Physics: Phase 3 (Real Physics Extraction) 🧪⚙️
+
+
 - **[V]** `v1.0.6`
 - **[Arch]** **Real Physics Extraction**:
     - **Logic Parity**: Rewrote `shared/PhysicsSimulation.ts` (~550 lines) to exactly replicate the 791-line logic from `PlayerPhysics.ts`. Replaced approximations with the actual client-side implementation.
@@ -332,4 +333,23 @@ Part 2
 - **[Build]** **Toolchain Verification**:
     - **Cross-Platform Compile**: Verified both client (`vite build`) and server (`tsc --noEmit`) builds pass with the new shared logic.
 - **[S]** **STATUS**: Phase 3 Complete. The shared simulation now provides 1:1 logic parity between client and server. Ready for Phase 4 (Wiring).
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-21] v1.0.8 - Server-Authoritative Physics: Phase 6 (Input Redundancy) 📡🛠️
+- **[V]** `v1.0.8`
+- **[Net]** **Input Redundancy Implementation**:
+    - **Client**: Modified `sendInput` to include a ring buffer of the last 10 frames of input in every UDP packet. This ensures that even if 9/10 packets are dropped, the server can still recover the missed inputs.
+    - **Server**: Implemented an `inputQueue` (Map<frame, SimInput>) per player. The server now deduplicates incoming redundant inputs and processes them in chronological order.
+    - **Fast-Forward**: The server can now "fast-forward" through multiple queued inputs in a single tick (capped at 5) to catch up after packet burst arrivals.
+- **[UX]** **Reconciliation Tuning**: Temporarily disabled client-side lerp reconciliation to prevent "downward force" glitches during jumps until Phase 6C (Client Replay) is fully implemented.
+- **[S]** **STATUS**: Step 6B Complete. UDP packet loss issues significantly mitigated. Ready for Step 6C (Prediction Replay).
+------------------------------------------------------------------------------------------------------------------------------------
+
+- **[V]** `v1.0.7`
+- **[Arch]** **Thin Wrapper Implementation**:
+    - **Delegation**: Rewrote `PlayerPhysics.ts` (791 → ~420 lines). It now contains zero physics math, acting as a thin wrapper that delegates to `shared/stepPhysics()`.
+    - **State Sync**: Implemented high-fidelity state syncing (`syncToBody`/`syncFromBody`) ensuring `SimBody` is perfectly aligned with Phaser's `Player` and `PlayerPhysics` public API.
+    - **Event Handling**: Integrated the `PhysicsEvent` system to trigger SFX, FSM state changes (e.g., `Dodge`, `Recovery`), and visual effects (ghost sprites) from the shared simulation.
+- **[Net]** **Foundation for Authority**:
+    - **Logic Parity**: Confirmed both client and server now execute the exact same physics code, eliminating the desync-by-logic issues from earlier phases.
+- **[S]** **STATUS**: Phase 4 Complete. The client is now "physics-agnostic," preparing for server-driven reconciliation in Phase 5.
 ------------------------------------------------------------------------------------------------------------------------------------
