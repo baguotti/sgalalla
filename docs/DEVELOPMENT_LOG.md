@@ -305,3 +305,18 @@ Part 2
     - **TypeScript**: Updated both client and server `tsconfig.json` to resolve the `shared/` directory. Verified clean builds for both environments.
 - **[S]** **STATUS**: Phase 1 Complete. The foundation for server authority is laid. Shared code is verified and operational.
 --------------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-21] v0.1.5 - Server-Authoritative Physics: Phase 2 (Hybrid Game Loop) 🔌🕹️
+- **[V]** `v0.1.5`
+- **[Arch]** **Hybrid Server-Authoritative Logic**:
+    - **Shadow Simulation**: Implemented a parallel physics loop on the server using `shared/PhysicsSimulation.ts`. The server now calculates player states at 60Hz.
+    - **Relay Fallback**: Reverted to hybrid mode where the server relays client-reported positions to ensure smooth gameplay while the shared physics is refined.
+    - **Input Mapping**: Implemented `INPUT` message handling on the server, mapping client `InputState` to the shared `SimInput` for authoritative validation.
+- **[Sync]** **Multiplayer Fixes & Polish**:
+    - **Interpolation Tuning**: Increased remote player snapshot buffer from 10 to 20 entries to handle the 60Hz server tick rate more smoothly.
+    - **Grounding Fix**: Resolved the "idle/fall" animation flicker by implementing a 1px grounding epsilon and a tiny downward "grounding force" in the shared simulation.
+    - **Animation Resolution**: Added `deriveAnimationKey()` to the server to translate physics state into animation keys for remote players.
+    - **Visual Sync**: Introduced `updateRemoteVisuals()` to separate visual timers from FSM-driven animation logic, preventing client-side overrides of server animations.
+- **[Fix]** **Spawn Consistency**: Aligned spawn points between client and server to prevent initial desynchronization.
+- **[S]** **STATUS**: Phase 2 Complete (Hybrid). Infrastructure for server authority is active and stable. Ready for Phase 3 (Full Prediction & Reconciliation).
+--------------------------------------------------------------------------------------------------------------------------------------------------

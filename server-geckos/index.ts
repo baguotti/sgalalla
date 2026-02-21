@@ -6,6 +6,11 @@
 import geckos, { GeckosServer, ServerChannel } from '@geckos.io/server';
 import http from 'http';
 
+// ─── Shared Physics (Phase 2: Server-Authoritative) ───
+import { stepPhysics, checkPlatformCollisions, checkWallCollisions, checkBlastZone, createBody, NULL_INPUT } from '../shared/PhysicsSimulation.js';
+import type { SimInput, SimBody } from '../shared/PhysicsSimulation.js';
+import { ADRIA_STAGE } from '../shared/StageData.js';
+
 // Network message types (mirrored from client)
 const NetMessageType = {
     INPUT: 'input',
@@ -51,6 +56,9 @@ interface PlayerState {
     lives: number;
     character: string;
     isConfirmed?: boolean;
+    // ─── Server-Authoritative Physics (Phase 2) ───
+    body: SimBody;              // Authoritative physics body
+    latestInput: SimInput;      // Most recent input from client
 }
 
 type RoomPhase = 'WAITING' | 'SELECTING' | 'PLAYING';
@@ -84,6 +92,23 @@ const ANIMATION_KEYS = [
     '', 'idle', 'run', 'jump', 'fall', 'attack_light', 'attack_heavy',
     'attack_up', 'hurt', 'slide', 'dash', 'block', 'charge', 'spot_dodge'
 ];
+
+/**
+ * Derive animation key from SimBody state.
+ * The server doesn't run Phaser animations, but needs to tell clients
+ * which animation the character should be in based on physics state.
+ */
+function deriveAnimationKey(body: SimBody): string {
+    if (body.isHitStunned) return 'hurt';
+    if (body.isSpotDodging) return 'spot_dodge';
+    if (body.isDodging) return 'dash';
+    if (body.isAttacking) return 'attack_light'; // Simplified — Phase 4 will track attack type
+    if (!body.isGrounded) {
+        return body.vy < 0 ? 'jump' : 'fall';
+    }
+    if (body.isRunning) return 'run';
+    return 'idle';
+}
 
 function decodeBinaryPlayerState(buffer: ArrayBuffer): Partial<PlayerState> | null {
     if (buffer.byteLength !== 15) return null;
@@ -210,19 +235,25 @@ io.onConnection((channel: ServerChannel) => {
     // Initialize player state
     const spawnPoints = [400, 1520, 800, 1120];
     const spawnX = spawnPoints[playerId % 4];
+    const facing = playerId % 2 === 0 ? 1 : -1;
+    const body = createBody(spawnX, 780, facing);
+    body.isGrounded = true;
+
     const playerState: PlayerState = {
         playerId,
         x: spawnX,
         y: 780,
         velocityX: 0,
         velocityY: 0,
-        facingDirection: playerId % 2 === 0 ? 1 : -1,
+        facingDirection: facing,
         isGrounded: true,
         isAttacking: false,
         animationKey: '',
         damagePercent: 0,
         lives: 3,
-        character: 'fok'
+        character: 'fok',
+        body,
+        latestInput: { ...NULL_INPUT },
     };
 
     room.players.set(channelId, playerState);
@@ -316,7 +347,33 @@ io.onConnection((channel: ServerChannel) => {
         }
     });
 
-    // Position update (client-authoritative)
+    // ─── INPUT HANDLER (Phase 2: Server-Authoritative) ───
+    // Client sends raw input each frame; server stores it for next physics tick.
+    channel.on(NetMessageType.INPUT, (data: any) => {
+        const player = room.players.get(channelId);
+        if (!player || room.phase !== 'PLAYING') return;
+
+        const input = data?.input;
+        if (!input) return;
+
+        // Map client InputState → SimInput
+        player.latestInput = {
+            moveLeft: !!input.moveLeft,
+            moveRight: !!input.moveRight,
+            jump: !!input.jump,
+            jumpHeld: !!input.jumpHeld,
+            dodge: !!input.dodge,
+            lightAttack: !!input.lightAttack,
+            heavyAttack: !!input.heavyAttack,
+            down: !!input.moveDown || !!input.aimDown,
+            up: !!input.moveUp || !!input.aimUp,
+        };
+    });
+
+    // Client-authoritative position update (relay mode)
+    // Server accepts client-reported state and relays to other clients.
+    // The server ALSO runs physics in parallel (shadow simulation) for
+    // future validation and server-authority transition.
     channel.on(NetMessageType.POSITION_UPDATE, (data: any) => {
         const player = room.players.get(channelId);
         if (!player) return;
@@ -327,7 +384,6 @@ io.onConnection((channel: ServerChannel) => {
         } else if (data instanceof ArrayBuffer) {
             decoded = decodeBinaryPlayerState(data);
         }
-
         const src = decoded || data;
         if (src) {
             player.x = src.x ?? player.x;
@@ -377,7 +433,8 @@ io.onConnection((channel: ServerChannel) => {
             const spawnPoints = [400, 1520, 800, 1120];
             let idx = 0;
             room.players.forEach((p) => {
-                p.x = spawnPoints[idx % spawnPoints.length];
+                const sx = spawnPoints[idx % spawnPoints.length];
+                p.x = sx;
                 p.y = 780;
                 p.velocityX = 0;
                 p.velocityY = 0;
@@ -385,6 +442,12 @@ io.onConnection((channel: ServerChannel) => {
                 p.isAttacking = false;
                 p.damagePercent = 0;
                 p.lives = 3;
+                // Reset physics body
+                const newBody = createBody(sx, 780, p.facingDirection);
+                newBody.isGrounded = true;
+                newBody.lives = 3;
+                p.body = newBody;
+                p.latestInput = { ...NULL_INPUT };
                 idx++;
             });
             room.frame = 0;
@@ -425,63 +488,55 @@ io.onConnection((channel: ServerChannel) => {
     });
 });
 
-// Game loop - 60Hz state broadcast for smoother gameplay
-const TICK_MS = 1000 / 60; // ~16.67ms
+// ─── Game Loop — Server-Authoritative Physics (Phase 2) ───
+const TICK_RATE = 60;
+const TICK_MS = 1000 / TICK_RATE;
+const DT = 1 / TICK_RATE; // Fixed timestep in seconds
 
 setInterval(() => {
     rooms.forEach((room) => {
         if (room.phase !== 'PLAYING') return;
         room.frame++;
 
+        // === SHADOW PHYSICS SIMULATION (runs in parallel, not used for broadcast yet) ===
+        // This runs the shared physics engine alongside the client-authoritative relay.
+        // Future phases will switch to using these results for authoritative state.
+        room.players.forEach((player) => {
+            if (player.lives <= 0) return;
+            const body = player.body;
+            const input = player.latestInput;
+
+            // Sync client-reported position INTO body (so shadow stays in sync)
+            body.x = player.x;
+            body.y = player.y;
+            body.vx = player.velocityX;
+            body.vy = player.velocityY;
+            body.facingDirection = player.facingDirection;
+            body.isGrounded = player.isGrounded;
+            body.isAttacking = player.isAttacking;
+
+            // Run shadow physics step (results stored in body but NOT copied back to player)
+            stepPhysics(body, input, DT);
+            checkPlatformCollisions(body, ADRIA_STAGE);
+            checkWallCollisions(body, ADRIA_STAGE);
+            checkBlastZone(body, ADRIA_STAGE);
+        });
+
         // === CHEST SPAWNING ===
         room.chestSpawnTimer -= TICK_MS;
         if (room.chestSpawnTimer <= 0) {
             if (Math.random() < 0.35) {
-                // Constrain to center platform (Width 1920 -> 600 to 1320)
                 const chestX = 600 + Math.random() * 720;
                 emitToRoom(NetMessageType.CHEST_SPAWN, { x: Math.round(chestX) });
                 console.log(`[Server] Chest spawned at x=${Math.round(chestX)}`);
             }
-            room.chestSpawnTimer = 30000; // Reset: 30 seconds
+            room.chestSpawnTimer = 30000;
         }
-
-        // === BOMB SPAWNING (PAUSED) ===
-        /*
-        room.bombSpawnTimer -= TICK_MS;
-        if (room.bombSpawnTimer <= 0) {
-            // Spawn a bomb at random position
-            const bombX = 200 + Math.random() * 1520; // 200-1720 (central area)
-            const bombY = 100; // Drop from top
-
-            const bomb: BombState = {
-                id: room.nextBombId++,
-                x: bombX,
-                y: bombY,
-                velocityX: 0,
-                velocityY: 0,
-                fuseTimer: 5000, // 5 seconds fuse
-                isThrown: false,
-                holderId: null
-            };
-            room.bombs.push(bomb);
-
-            // Broadcast spawn to all clients
-            emitToRoom(NetMessageType.BOMB_SPAWN, {
-                id: bomb.id,
-                x: bomb.x,
-                y: bomb.y
-            });
-
-            // Next spawn: random 15-25 seconds
-            room.bombSpawnTimer = 15000 + Math.random() * 10000;
-        }
-        */
 
         // === BOMB FUSE COUNTDOWN ===
         const explodedBombs: number[] = [];
         room.bombs.forEach(bomb => {
             if (bomb.holderId === null) {
-                // Only countdown if not held
                 bomb.fuseTimer -= TICK_MS;
                 if (bomb.fuseTimer <= 0) {
                     explodedBombs.push(bomb.id);
@@ -489,7 +544,6 @@ setInterval(() => {
             }
         });
 
-        // Broadcast explosions
         explodedBombs.forEach(bombId => {
             const bomb = room.bombs.find(b => b.id === bombId);
             if (bomb) {
@@ -500,16 +554,26 @@ setInterval(() => {
                 });
             }
         });
-
-        // Remove exploded bombs
         room.bombs = room.bombs.filter(b => !explodedBombs.includes(b.id));
 
-        // === STATE BROADCAST ===
+        // === STATE BROADCAST (Server-Authoritative) ===
         const state = {
             frame: room.frame,
             timestamp: Date.now(),
             confirmedInputFrame: room.frame,
-            players: Array.from(room.players.values())
+            players: Array.from(room.players.values()).map(p => ({
+                playerId: p.playerId,
+                x: p.x,
+                y: p.y,
+                velocityX: p.velocityX,
+                velocityY: p.velocityY,
+                facingDirection: p.facingDirection,
+                isGrounded: p.isGrounded,
+                isAttacking: p.isAttacking,
+                animationKey: p.animationKey,
+                damagePercent: p.damagePercent,
+                lives: p.lives,
+            })),
         };
 
         emitToRoom(NetMessageType.STATE_UPDATE, state);

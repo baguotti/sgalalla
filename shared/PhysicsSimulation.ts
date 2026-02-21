@@ -294,6 +294,12 @@ function applyPhysics(body: SimBody, dt: number): void {
             gravity *= PhysicsConfig.FAST_FALL_MULTIPLIER;
         }
         body.vy += gravity * dt;
+    } else {
+        // Grounding force: apply a tiny downward nudge to keep the player
+        // slightly embedded in the platform surface. This prevents the
+        // classic "ground oscillation" bug where the player alternates
+        // between grounded/airborne every other frame.
+        body.vy = 1;
     }
 
     // Speed cap
@@ -360,9 +366,10 @@ export function checkPlatformCollisions(body: SimBody, stage: SimStage): SimBody
         const bodyTop = body.y - halfH;
         const bodyBottom = body.y + halfH;
 
-        // AABB overlap check
+        // AABB overlap check (1px epsilon for ground-sticking tolerance)
+        const GROUND_EPS = 1;
         if (bodyRight <= platLeft || bodyLeft >= platRight) continue;
-        if (bodyBottom <= platTop || bodyTop >= platBottom) continue;
+        if (bodyBottom < platTop - GROUND_EPS || bodyTop >= platBottom) continue;
 
         // For soft platforms, only land from above
         if (plat.isSoft) {

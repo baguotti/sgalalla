@@ -391,6 +391,17 @@ export class Player extends Fighter {
         this.updateHeldItemPosition();
     }
 
+    /**
+     * Minimal update for remote players in server-authoritative mode.
+     * Skips updateAnimation() because animations are derived on the server
+     * via deriveAnimationKey() and applied through snapshot interpolation.
+     */
+    public updateRemoteVisuals(delta: number): void {
+        this.updateTimers(delta);
+        this.updateDamageDisplay();
+        this.updateHeldItemPosition();
+    }
+
 
 
     private updateTimers(delta: number): void {

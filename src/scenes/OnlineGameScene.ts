@@ -585,8 +585,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 buffer.push(snapshot);
             }
 
-            // Cap buffer size (keeping 10 snapshots = 500ms at 20Hz)
-            if (buffer.length > 10) {
+            // Cap buffer size (keeping 20 snapshots = ~333ms at 60Hz)
+            if (buffer.length > 20) {
                 buffer.shift();
             }
 
@@ -617,8 +617,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     }
 
     private checkAndReconcile(_serverPlayerState: NetPlayerState, _serverFrame: number): void {
-        // Intentionally empty - client is authoritative for local player
-        // Server physics is too simplified to correct client state
+        // Hybrid mode: client is authoritative for local player.
+        // Server shadow physics runs in parallel for future validation.
+        // Phase 3 will implement full prediction + reconciliation.
     }
 
     /**
@@ -1499,8 +1500,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.matchHUD.addToCameraIgnore(this.cameras.main);
 
         // Spawn players with their selected characters
-        // Updated for 4-player spawn points (pulled inwards for safety)
-        const spawnPoints = [520, 1400, 800, 1120];
+        // Spawn points MUST match server (server-geckos/index.ts)
+        const spawnPoints = [400, 1520, 800, 1120];
         players.forEach(p => {
             // Validate character against loaded textures. Fallback to 'fok' if invalid.
             const char = ALL_CHARACTERS.includes(p.character) ? p.character : 'fok';
