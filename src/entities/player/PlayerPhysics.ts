@@ -96,6 +96,7 @@ export class PlayerPhysics {
             dodgeBuffered: this.player.inputBuffer.has('dodge'),
             aimUp: input.aimUp,
             aimDown: input.aimDown,
+            recoveryRequested: false, // Handled by PlayerCombat on client
         };
 
         // Run shared physics

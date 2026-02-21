@@ -334,7 +334,16 @@ Part 2
     - **Cross-Platform Compile**: Verified both client (`vite build`) and server (`tsc --noEmit`) builds pass with the new shared logic.
 - **[S]** **STATUS**: Phase 3 Complete. The shared simulation now provides 1:1 logic parity between client and server. Ready for Phase 4 (Wiring).
 ------------------------------------------------------------------------------------------------------------------------------------
-### [2026-02-21] v1.0.8 - Server-Authoritative Physics: Phase 6 (Input Redundancy) 📡🛠️
+### [2026-02-21] v1.0.9 - Rollback to Client-Authoritative Physics 🔙🏃‍♂️
+- **[V]** `v1.0.9`
+- **[Net]** **Physics Authority Revert**:
+    - **Revert**: Transitioned back from Server-Authoritative to Client-Authoritative physics for player positions.
+    - **Rationale**: Independent clock drift (RAF vs setInterval) and variable deltas caused irreversible simulation divergence. 
+    - **Hybrid Retention**: Kept Input Redundancy (last 10 frames) and FSM State Transmission for improved reliability and animation sync.
+    - **Stability**: Restored the "offline-feel" lag-free local experience while maintaining robust network relay for remote players.
+- **[S]** **STATUS**: Phase 6 conclusion. Physics authority shifted back to client for stability. Ready for production deployment.
+------------------------------------------------------------------------------------------------------------------------------------
+
 - **[V]** `v1.0.8`
 - **[Net]** **Input Redundancy Implementation**:
     - **Client**: Modified `sendInput` to include a ring buffer of the last 10 frames of input in every UDP packet. This ensures that even if 9/10 packets are dropped, the server can still recover the missed inputs.

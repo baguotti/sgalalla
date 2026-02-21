@@ -7,7 +7,7 @@ import geckos, { GeckosServer, ServerChannel } from '@geckos.io/server';
 import http from 'http';
 
 // ─── Shared Physics (Phase 2: Server-Authoritative) ───
-import { stepPhysics, checkPlatformCollisions, checkWallCollisions, checkBlastZone, createBody, NULL_INPUT } from '../shared/PhysicsSimulation.js';
+import { stepPhysics, checkPlatformCollisions, checkWallCollisions, checkBlastZone, createBody, NULL_INPUT, startRecovery } from '../shared/PhysicsSimulation.js';
 import type { SimInput, SimBody } from '../shared/PhysicsSimulation.js';
 import { ADRIA_STAGE } from '../shared/StageData.js';
 
@@ -56,11 +56,12 @@ interface PlayerState {
     lives: number;
     character: string;
     isConfirmed?: boolean;
-    // ─── Server-Authoritative Physics (Phase 6) ───
+    // ─── Server-Authoritative Physics ───
     body: SimBody;
-    latestInput: SimInput;              // Fallback input (last known)
-    inputQueue: Map<number, SimInput>;  // frame → input (ordered queue)
-    lastProcessedInputFrame: number;    // Last input frame processed
+    latestInput: SimInput;       // Most recent input from client
+    lastReceivedFrame: number;   // Highest client frame we've seen (for dedup)
+    fsmState: string;            // Client's current FSM state
+    prevFsmState: string;        // Previous FSM state (for edge detection)
 }
 
 type RoomPhase = 'WAITING' | 'SELECTING' | 'PLAYING';
@@ -256,8 +257,9 @@ io.onConnection((channel: ServerChannel) => {
         character: 'fok',
         body,
         latestInput: { ...NULL_INPUT },
-        inputQueue: new Map(),
-        lastProcessedInputFrame: 0,
+        lastReceivedFrame: 0,
+        fsmState: 'Idle',
+        prevFsmState: 'Idle',
     };
 
     room.players.set(channelId, playerState);
@@ -351,8 +353,9 @@ io.onConnection((channel: ServerChannel) => {
         }
     });
 
-    // ─── INPUT HANDLER (Phase 6: Redundant Input Processing) ───
-    // Client sends last N frames of input in every packet for UDP redundancy.
+    // ─── INPUT HANDLER (Most-Recent-Input + Edge-Trigger Scanning) ───
+    // Client sends last N frames for UDP redundancy.
+    // Server picks the newest input and scans ALL entries for edge-triggered events.
     channel.on(NetMessageType.INPUT, (data: any) => {
         const player = room.players.get(channelId);
         if (!player || room.phase !== 'PLAYING') return;
@@ -360,37 +363,63 @@ io.onConnection((channel: ServerChannel) => {
         const inputs = data?.inputs;
         if (!inputs || !Array.isArray(inputs)) return;
 
-        // Process each redundant input, deduplicating by frame
+        let newestFrame = player.lastReceivedFrame;
+        let newestInput: SimInput | null = null;
+        let pendingJump = false;
+        let pendingDodge = false;
+        let pendingRecovery = false;
+
         for (const entry of inputs) {
             const frame = entry.frame;
             const input = entry.input;
             if (!frame || !input) continue;
 
-            // Only accept frames we haven't processed yet
-            if (frame <= player.lastProcessedInputFrame) continue;
+            // Only look at frames newer than what we've already seen
+            if (frame <= player.lastReceivedFrame) continue;
 
-            // Deduplicate: don't overwrite if we already have this frame
-            if (player.inputQueue.has(frame)) continue;
+            // Scan for edge-triggered events across the entire window
+            if (input.jump) pendingJump = true;
+            if (input.dodge) pendingDodge = true;
+            if (input.recovery) pendingRecovery = true;
 
-            const simInput: SimInput = {
-                moveLeft: !!input.moveLeft,
-                moveRight: !!input.moveRight,
-                moveDown: !!input.moveDown,
-                moveUp: !!input.moveUp,
-                jumpBuffered: !!input.jump,
-                jumpHeld: !!input.jumpHeld,
-                dodgeBuffered: !!input.dodge,
-                aimUp: !!input.aimUp,
-                aimDown: !!input.aimDown,
-            };
+            // Track the newest frame's continuous state
+            if (frame > newestFrame) {
+                newestFrame = frame;
+                newestInput = {
+                    moveLeft: !!input.moveLeft,
+                    moveRight: !!input.moveRight,
+                    moveDown: !!input.moveDown,
+                    moveUp: !!input.moveUp,
+                    jumpBuffered: !!input.jump,
+                    jumpHeld: !!input.jumpHeld,
+                    dodgeBuffered: !!input.dodge,
+                    aimUp: !!input.aimUp,
+                    aimDown: !!input.aimDown,
+                    recoveryRequested: !!input.recovery,
+                };
+            }
+        }
 
-            player.inputQueue.set(frame, simInput);
-            player.latestInput = simInput; // Update fallback
+        if (newestInput) {
+            // Merge edge-triggers: if ANY frame in the window had jump/dodge/recovery, carry it
+            newestInput.jumpBuffered = newestInput.jumpBuffered || pendingJump;
+            newestInput.dodgeBuffered = newestInput.dodgeBuffered || pendingDodge;
+            newestInput.recoveryRequested = newestInput.recoveryRequested || pendingRecovery;
+
+            player.latestInput = newestInput;
+            player.lastReceivedFrame = newestFrame;
+
+            // Update FSM state from the newest entry
+            const newestEntry = inputs.reduce((best: any, e: any) =>
+                (e.frame > (best?.frame ?? 0)) ? e : best, null);
+            if (newestEntry?.fsmState) {
+                player.fsmState = newestEntry.fsmState;
+            }
         }
     });
 
-    // POSITION_UPDATE: Phase 5 — accept COMBAT state only (animations, damage, lives).
-    // Physics (position, velocity) is server-authoritative via the game loop.
+    // POSITION_UPDATE: Client-Authoritative — accept ALL state from client.
+    // Server relays client-reported position to other clients.
     channel.on(NetMessageType.POSITION_UPDATE, (data: any) => {
         const player = room.players.get(channelId);
         if (!player) return;
@@ -403,12 +432,18 @@ io.onConnection((channel: ServerChannel) => {
         }
         const src = decoded || data;
         if (src) {
+            // Position & physics (client-authoritative)
+            if (typeof src.x === 'number') player.x = src.x;
+            if (typeof src.y === 'number') player.y = src.y;
+            if (typeof src.velocityX === 'number') player.velocityX = src.velocityX;
+            if (typeof src.velocityY === 'number') player.velocityY = src.velocityY;
+            if (typeof src.facingDirection === 'number') player.facingDirection = src.facingDirection;
+            if (typeof src.isGrounded === 'boolean') player.isGrounded = src.isGrounded;
             // Combat state (client-authoritative)
             player.isAttacking = src.isAttacking ?? player.isAttacking;
             player.animationKey = src.animationKey ?? player.animationKey;
             player.damagePercent = src.damagePercent ?? player.damagePercent;
             player.lives = src.lives ?? player.lives;
-            // NOTE: position/velocity intentionally NOT accepted — server physics is authoritative
         }
     });
 
@@ -511,55 +546,9 @@ setInterval(() => {
         if (room.phase !== 'PLAYING') return;
         room.frame++;
 
-        // === AUTHORITATIVE PHYSICS (Phase 6: Input Queue Processing) ===
-        // Process all queued inputs in order. If no new inputs, use latestInput as fallback.
-        room.players.forEach((player) => {
-            if (player.lives <= 0) return;
-            const body = player.body;
-
-            // Get sorted frame numbers from input queue
-            const queuedFrames = Array.from(player.inputQueue.keys()).sort((a, b) => a - b);
-
-            if (queuedFrames.length > 0) {
-                // Process each queued input frame (fast-forward)
-                // Cap at 5 frames per tick to prevent CPU spikes
-                const framesToProcess = queuedFrames.slice(0, 5);
-
-                for (const frame of framesToProcess) {
-                    const input = player.inputQueue.get(frame)!;
-                    player.inputQueue.delete(frame);
-
-                    stepPhysics(body, input, DT);
-                    checkPlatformCollisions(body, ADRIA_STAGE);
-                    checkWallCollisions(body, ADRIA_STAGE);
-
-                    player.lastProcessedInputFrame = frame;
-                    player.latestInput = input;
-                }
-            } else {
-                // No new inputs — run one tick with last known input (input prediction)
-                stepPhysics(body, player.latestInput, DT);
-                checkPlatformCollisions(body, ADRIA_STAGE);
-                checkWallCollisions(body, ADRIA_STAGE);
-            }
-
-            // Copy authoritative results → PlayerState for broadcast
-            player.x = body.x;
-            player.y = body.y;
-            player.velocityX = body.vx;
-            player.velocityY = body.vy;
-            player.isGrounded = body.isGrounded;
-
-            // Derive facing direction from last input
-            if (player.latestInput.moveLeft && !player.latestInput.moveRight) body.facingDirection = -1;
-            else if (player.latestInput.moveRight && !player.latestInput.moveLeft) body.facingDirection = 1;
-            player.facingDirection = body.facingDirection;
-
-            // Blast zone check
-            if (checkBlastZone(body, ADRIA_STAGE)) {
-                // Player died — handled by client via lives sync
-            }
-        });
+        // === CLIENT-AUTHORITATIVE: No server physics for broadcast ===
+        // Server physics runs in shadow mode only (not used for broadcast).
+        // Player positions come from POSITION_UPDATE (client-reported).
 
         // === CHEST SPAWNING ===
         room.chestSpawnTimer -= TICK_MS;
@@ -595,7 +584,7 @@ setInterval(() => {
         });
         room.bombs = room.bombs.filter(b => !explodedBombs.includes(b.id));
 
-        // === STATE BROADCAST (Server-Authoritative) ===
+        // === STATE BROADCAST (Client-Authoritative) ===
         const state = {
             frame: room.frame,
             timestamp: Date.now(),
@@ -611,7 +600,7 @@ setInterval(() => {
                 animationKey: p.animationKey,
                 damagePercent: p.damagePercent,
                 lives: p.lives,
-                lastProcessedInputFrame: p.lastProcessedInputFrame,
+                lastProcessedInputFrame: p.lastReceivedFrame,
             })),
         };
 

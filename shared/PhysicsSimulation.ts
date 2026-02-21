@@ -117,6 +117,7 @@ export interface SimInput {
     dodgeBuffered: boolean;  // client: inputBuffer.has('dodge'); server: raw dodge
     aimUp: boolean;
     aimDown: boolean;
+    recoveryRequested: boolean; // client: up+heavy in air triggers recovery
 }
 
 // ─── Constants ───
@@ -131,6 +132,7 @@ export const NULL_INPUT: SimInput = {
     dodgeBuffered: false,
     aimUp: false,
     aimDown: false,
+    recoveryRequested: false,
 };
 
 // ─── Factory ───

@@ -321,7 +321,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.inputThrottleCounter++;
         if (this.inputThrottleCounter >= this.INPUT_SEND_INTERVAL) {
             this.inputThrottleCounter = 0;
-            this.networkManager.sendInput(input);
+            const fsmState = this.localPlayer?.fsm.getCurrentStateName() ?? '';
+            this.networkManager.sendInput(input, fsmState);
         }
 
         // Save snapshot every 3 frames (reduce GC pressure)

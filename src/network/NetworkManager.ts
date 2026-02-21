@@ -314,15 +314,15 @@ class NetworkManager {
     }
 
     // Input redundancy ring buffer (last N frames sent with every packet)
-    private inputRedundancyBuffer: Array<{ frame: number; input: InputState }> = [];
+    private inputRedundancyBuffer: Array<{ frame: number; input: InputState; fsmState: string }> = [];
     private readonly INPUT_REDUNDANCY_COUNT = 10;
 
     /**
      * Record and send local input to server
      * Call this every frame with the local player's input
-     * Phase 6: Sends last N frames for UDP redundancy
+     * Phase 6: Sends last N frames for UDP redundancy + FSM state
      */
-    public sendInput(input: InputState): void {
+    public sendInput(input: InputState, fsmState: string = ''): void {
         if (!this.connected || !this.channel) return;
 
         this.localFrame++;
@@ -337,7 +337,7 @@ class NetworkManager {
         this.inputBuffer.addInput(frameInput);
 
         // Add to redundancy ring buffer
-        this.inputRedundancyBuffer.push({ frame: this.localFrame, input });
+        this.inputRedundancyBuffer.push({ frame: this.localFrame, input, fsmState });
         if (this.inputRedundancyBuffer.length > this.INPUT_REDUNDANCY_COUNT) {
             this.inputRedundancyBuffer.shift();
         }
@@ -346,9 +346,11 @@ class NetworkManager {
         const netInput = {
             frame: this.localFrame,
             playerId: this.localPlayerId,
+            fsmState, // Current FSM state for state-aware server physics
             inputs: this.inputRedundancyBuffer.map(entry => ({
                 frame: entry.frame,
                 input: entry.input,
+                fsmState: entry.fsmState,
             })),
         };
 
