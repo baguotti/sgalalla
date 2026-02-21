@@ -231,9 +231,20 @@ Part 2
     - Integrated `clearChargeState()` into `applyHitStun()` and added a hard failsafe timeout to the sound cleanup routine to ensure looping sounds are always destroyed.
 - **[Polish]** **Audio Transitions**: Balanced charge sound fade-out to trail off naturally while remaining technically solid against interruptions.
  
-+### [2026-02-21] v0.14.5 - UI Clarity & Training Metadata ℹ️
-+- **[V]** `v0.14.5`
-+- **[Feat]** **Controls Overlay**:
-+    - Added 'T' key information to the `COMANDI` overlay.
-+    - Explicitly documented the **Dummy Hostility Toggle** for Training Mode.
-+
+### [2026-02-21] v1.0.0 - THE MASSIVE MILESTONE 🚀
+- **[V]** `v1.0.0`
+- **[Feat]** **Full Online Synchronization**:
+    - **Chest Sync**: Rewrote chest interactions to be server-authoritative. Opening and closing are now relayed via Geckos, ensuring all players see the same rewards at the same time.
+    - **Death Sync**: Added remote death effects (sounds, crowd reactions, camera shake) so opponents' deaths feel impactful for all players.
+    - **Character Sync**: Fixed the critical bug where newer characters (Greg, Pe, Nock) would default to Fok in online rooms.
+- **[Feat]** **Visual Overhaul**:
+    - **Main Menu**: Swapped the background video to a high-fidelity `.webm` animation (`Main_Menu_Animation_001_webM.webm`) for better performance and visual punch.
+- **[Fix]** **Network Stability**:
+    - **Idle Logic**: Resolved "Connection Refused" issues by better managing server idle timeouts and file-watcher restarts.
+- **[S]** **STATUS**: Stable v1.0.0 release. Competitive platform fighting is now fully synchronized online.
+
+### [2026-02-21] v0.14.5 - UI Clarity & Training Metadata ℹ️
+- **[V]** `v0.14.5`
+- **[Feat]** **Controls Overlay**:
+    - Added 'T' key information to the `COMANDI` overlay.
+    - Explicitly documented the **Dummy Hostility Toggle** for Training Mode.

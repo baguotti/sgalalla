@@ -19,6 +19,7 @@ import { AnimationHelpers } from '../managers/AnimationHelpers';
 import { AudioManager } from '../managers/AudioManager';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
+import { ALL_CHARACTERS } from '../config/CharacterConfig';
 import { createStage as createSharedStage } from '../stages/StageFactory';
 import type { StageResult } from '../stages/StageFactory';
 
@@ -207,6 +208,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.networkManager.onCharacterConfirm((playerId) => this.handleCharacterConfirm(playerId));
         this.networkManager.onGameStart((players) => this.handleGameStart(players));
         this.networkManager.onChestSpawn((x) => this.spawnChestAt(x));
+        this.networkManager.onChestOpen((imageIndex) => this.handleRemoteChestOpen(imageIndex));
+        this.networkManager.onChestClose(() => this.handleRemoteChestClose());
 
         // Silence unused but maintained state
         void this.selectionCountdown;
@@ -247,6 +250,11 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         // F1 Controls Overlay
         this.controlsOverlay = new ControlsOverlay(this);
         this.cameras.main.ignore(this.controlsOverlay.getElements());
+
+        // Listen for chest close from the Chest entity directly
+        this.events.on('chest_close_local', () => {
+            this.networkManager.sendChestClose();
+        });
 
         // Debug Toggle Key
         this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
@@ -535,7 +543,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Create player if new
             if (!player) {
-                player = this.createPlayer(netPlayer.playerId, netPlayer.x, netPlayer.y);
+                const char = this.playerCharacters.get(netPlayer.playerId) || 'fok';
+                player = this.createPlayer(netPlayer.playerId, netPlayer.x, netPlayer.y, char);
                 this.players.set(netPlayer.playerId, player);
 
                 if (netPlayer.playerId === this.localPlayerId) {
@@ -589,6 +598,16 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Sync stats (stateless)
             if (typeof netPlayer.lives === 'number' && player.lives !== netPlayer.lives) {
+                // Trigger death effects if a remote player lost a life
+                if (netPlayer.lives < player.lives && netPlayer.playerId !== this.localPlayerId) {
+                    AudioManager.getInstance().playSFX('sfx_death', { volume: 0.8 });
+                    if (Math.random() > 0.5) {
+                        AudioManager.getInstance().playSFX('sfx_death_crowd_1', { volume: 0.5 });
+                    } else {
+                        AudioManager.getInstance().playSFX('sfx_death_crowd_2', { volume: 0.5 });
+                    }
+                    this.cameras.main.shake(300, 0.02);
+                }
                 player.lives = netPlayer.lives;
             }
             if (typeof netPlayer.damagePercent === 'number') {
@@ -682,37 +701,62 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     }
 
     /**
+     * Handle remote chest open sync
+     */
+    private handleRemoteChestOpen(imageIndex: number): void {
+        const chest = this.chests.getFirstAlive() as Chest; // Assume 1 chest for now
+        if (chest && !chest.isOpened) {
+            chest.open(imageIndex);
+        }
+    }
+
+    /**
+     * Handle remote chest close sync
+     */
+    private handleRemoteChestClose(): void {
+        const chest = this.chests.getFirstAlive() as Chest;
+        if (chest && chest.isOverlayOpen) {
+            chest.forceCloseOverlay();
+        }
+    }
+
+    /**
      * Check if any attacking player is near a chest and open it
      */
     private checkChestInteractions(): void {
         if (!this.chests || this.chests.getLength() === 0) return;
 
         const interactRange = 120;
+        const player = this.localPlayer;
 
-        this.players.forEach((player) => {
-            if (!player.isAttacking) return;
+        if (!player || !player.isAttacking) return;
 
-            for (const chest of (this.chests.getChildren() as Chest[])) {
-                const dist = Phaser.Math.Distance.Between(player.x, player.y, chest.x, chest.y);
+        for (const chest of (this.chests.getChildren() as Chest[])) {
+            const dist = Phaser.Math.Distance.Between(player.x, player.y, chest.x, chest.y);
 
-                if (!chest.isOpened) {
-                    if (dist < interactRange) {
-                        chest.open();
-                    }
-                } else {
-                    // Opened: knock it around! (if cooldown is over)
-                    if (dist < interactRange && chest.canBePunched) {
-                        const angle = Phaser.Math.Angle.Between(player.x, player.y, chest.x, chest.y);
-                        // Pulse force to match GameScene
-                        const force = 2.0;
-                        chest.applyForce(new Phaser.Math.Vector2(
-                            Math.cos(angle) * force,
-                            Math.sin(angle) * force - 0.15
-                        ));
+            if (!chest.isOpened) {
+                if (dist < interactRange) {
+                    // Local player initiated open. We pass no index, so it picks randomly.
+                    // The chest.ts open() will need to return the chosen index, or we pick it here.
+                    const imageIndex = chest.open();
+                    // Tell the server this local player opened it, with the specific image chosen.
+                    if (imageIndex !== undefined) {
+                        this.networkManager.sendChestOpen(imageIndex);
                     }
                 }
+            } else {
+                // Opened: knock it around! (if cooldown is over)
+                if (dist < interactRange && chest.canBePunched) {
+                    const angle = Phaser.Math.Angle.Between(player.x, player.y, chest.x, chest.y);
+                    // Pulse force to match GameScene
+                    const force = 2.0;
+                    chest.applyForce(new Phaser.Math.Vector2(
+                        Math.cos(angle) * force,
+                        Math.sin(angle) * force - 0.15
+                    ));
+                }
             }
-        });
+        }
     }
 
     /**
@@ -1071,7 +1115,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
     }
 
-    private createPlayer(playerId: number, x: number, y: number, character: string = 'fok'): Player {
+    private createPlayer(playerId: number, x: number, y: number, character: string): Player {
         const isLocal = playerId === this.localPlayerId;
 
         const player = new Player(this, x, y, {
@@ -1458,9 +1502,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         // Updated for 4-player spawn points (pulled inwards for safety)
         const spawnPoints = [520, 1400, 800, 1120];
         players.forEach(p => {
-            // Validate character against loaded textures. Fallback to 'fok_v3' if invalid.
-            const validChars = ['fok', 'sgu', 'sga'];
-            const char = validChars.includes(p.character) ? p.character : 'fok';
+            // Validate character against loaded textures. Fallback to 'fok' if invalid.
+            const char = ALL_CHARACTERS.includes(p.character) ? p.character : 'fok';
 
             const spawnX = spawnPoints[p.playerId % spawnPoints.length];
             const player = this.createPlayer(p.playerId, spawnX, 780, char);

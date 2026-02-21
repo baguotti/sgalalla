@@ -342,13 +342,13 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
      * Image is derived deterministically from chest position to stay synced online.
      * Optionally accepts an explicit imageIndex for server-driven sync.
      */
-    public open(imageIndex?: number): void {
-        if (this.isOpened) return;
+    public open(imageIndex?: number): number | undefined {
+        if (this.isOpened) return undefined;
 
         // Ground check: ensure chest is not falling
         const body = this.body as MatterJS.BodyType;
         if (Math.abs(body.velocity.y) > 0.5) {
-            return;
+            return undefined;
         }
 
         this.isOpened = true;
@@ -465,12 +465,19 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
         let closed = false;
 
         // Cleanup function
-        const closeOverlay = () => {
+        this._forceCloseCallback = () => {
             // BLOCKING: Cannot close if animation handles haven't released us
             if (!this.canClose) return;
             if (closed) return;
 
             closed = true;
+
+            // Optional: Tell server if we initiated this close locally
+            // (If this gets called by remote event, it's fine, it will short-circuit on the other end)
+            // But realistically, only emit if we're OnlineGameScene. We can do that by checking the NetworkManager
+            // Or simply importing it. But since Chest is an entity, it's safer to just emit a generic event or let GameScene handle it.
+            // Let's emit a local scene event that OnlineGameScene can listen to.
+            this.scene.events.emit('chest_close_local', this);
 
             // Animate out
             this.scene.tweens.add({
@@ -505,7 +512,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
                 if (pads) {
                     for (const pad of pads) {
                         if (pad && pad.B) {
-                            closeOverlay();
+                            if (this._forceCloseCallback) this._forceCloseCallback();
                             return;
                         }
                     }
@@ -516,7 +523,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
         // Key listener (J or ESC to close)
         const onKey = (event: KeyboardEvent) => {
             if (event.key === 'j' || event.key === 'J' || event.key === 'Escape') {
-                closeOverlay();
+                if (this._forceCloseCallback) this._forceCloseCallback();
             }
         };
         this.scene.input.keyboard?.on('keydown', onKey);
@@ -524,6 +531,16 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
         // Visual feedback: switch to open texture, keep dynamic so players can push it around
         this.setTexture('chest_open');
         this.setDensity(0.01); // Ultra-light once opened — flies far when punched
+
+        return idx; // Return the randomly chosen index to sync to NetworkManager
+    }
+
+    private _forceCloseCallback?: () => void;
+
+    public forceCloseOverlay(): void {
+        if (this._forceCloseCallback) {
+            this._forceCloseCallback();
+        }
     }
 
     // ==========================================

@@ -32,7 +32,9 @@ const NetMessageType = {
     BOMB_THROW: 'bomb_throw',
     BOMB_EXPLODE: 'bomb_explode',
     // Chest mechanic
-    CHEST_SPAWN: 'chest_spawn'
+    CHEST_SPAWN: 'chest_spawn',
+    CHEST_OPEN: 'chest_open',
+    CHEST_CLOSE: 'chest_close'
 } as const;
 
 interface PlayerState {
@@ -354,6 +356,15 @@ io.onConnection((channel: ServerChannel) => {
     // Hit relay
     channel.on(NetMessageType.HIT_EVENT, (data: any) => {
         emitToRoom(NetMessageType.HIT_EVENT, data);
+    });
+
+    // === CHEST MECHANICS ===
+    channel.on(NetMessageType.CHEST_OPEN, (data: any) => {
+        emitToRoom(NetMessageType.CHEST_OPEN, data);
+    });
+
+    channel.on(NetMessageType.CHEST_CLOSE, (data: any) => {
+        emitToRoom(NetMessageType.CHEST_CLOSE, data);
     });
 
     // Rematch vote

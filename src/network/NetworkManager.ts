@@ -36,7 +36,9 @@ export const NetMessageType = {
     SELECTION_TICK: 'selection_tick',
     CHARACTER_CONFIRM: 'character_confirm',
     // Chest mechanic
-    CHEST_SPAWN: 'chest_spawn'
+    CHEST_SPAWN: 'chest_spawn',
+    CHEST_OPEN: 'chest_open',
+    CHEST_CLOSE: 'chest_close'
 } as const;
 
 // Serialized input for network transmission
@@ -100,6 +102,8 @@ export type CharacterSelectCallback = (playerId: number, character: string) => v
 export type CharacterConfirmCallback = (playerId: number) => void;
 export type GameStartCallback = (players: { playerId: number; character: string }[]) => void;
 export type ChestSpawnCallback = (x: number) => void;
+export type ChestOpenCallback = (imageIndex: number) => void;
+export type ChestCloseCallback = () => void;
 
 class NetworkManager {
     private static instance: NetworkManager    // Singleton pattern
@@ -133,6 +137,8 @@ class NetworkManager {
     private onCharacterConfirmCallback: CharacterConfirmCallback | null = null;
     private onGameStartCallback: GameStartCallback | null = null;
     private onChestSpawnCallback: ChestSpawnCallback | null = null;
+    private onChestOpenCallback: ChestOpenCallback | null = null;
+    private onChestCloseCallback: ChestCloseCallback | null = null;
 
     // Latency tracking with smoothing
     private lastPingTime: number = 0;
@@ -296,6 +302,15 @@ class NetworkManager {
             const { x } = data as { x: number };
             this.onChestSpawnCallback?.(x);
         });
+
+        this.channel.on(NetMessageType.CHEST_OPEN, (data: any) => {
+            const { imageIndex } = data as { imageIndex: number };
+            this.onChestOpenCallback?.(imageIndex);
+        });
+
+        this.channel.on(NetMessageType.CHEST_CLOSE, () => {
+            this.onChestCloseCallback?.();
+        });
     }
 
     /**
@@ -452,6 +467,8 @@ class NetworkManager {
     public onCharacterConfirm(callback: CharacterConfirmCallback): void { this.onCharacterConfirmCallback = callback; }
     public onGameStart(callback: GameStartCallback): void { this.onGameStartCallback = callback; }
     public onChestSpawn(callback: ChestSpawnCallback): void { this.onChestSpawnCallback = callback; }
+    public onChestOpen(callback: ChestOpenCallback): void { this.onChestOpenCallback = callback; }
+    public onChestClose(callback: ChestCloseCallback): void { this.onChestCloseCallback = callback; }
 
     /**
      * Send rematch vote to server
@@ -475,6 +492,22 @@ class NetworkManager {
     public sendCharacterConfirm(): void {
         if (!this.connected || !this.channel) return;
         this.channel.emit(NetMessageType.CHARACTER_CONFIRM, {}, { reliable: true });
+    }
+
+    /**
+     * Notify server that local player opened a chest
+     */
+    public sendChestOpen(imageIndex: number): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.CHEST_OPEN, { imageIndex }, { reliable: true });
+    }
+
+    /**
+     * Notify server that local player closed a chest
+     */
+    public sendChestClose(): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.CHEST_CLOSE, {}, { reliable: true });
     }
 }
 
