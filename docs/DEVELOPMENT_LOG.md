@@ -305,7 +305,7 @@ Part 2
     - **TypeScript**: Updated both client and server `tsconfig.json` to resolve the `shared/` directory. Verified clean builds for both environments.
 - **[S]** **STATUS**: Phase 1 Complete. The foundation for server authority is laid. Shared code is verified and operational.
 --------------------------------------------------------------------------------------------------------------------------------------------------
---------------------------------------------------------------------------------------------------------------------------------------------------
+
 ### [2026-02-21] v0.1.5 - Server-Authoritative Physics: Phase 2 (Hybrid Game Loop) 🔌🕹️
 - **[V]** `v0.1.5`
 - **[Arch]** **Hybrid Server-Authoritative Logic**:
@@ -320,3 +320,16 @@ Part 2
 - **[Fix]** **Spawn Consistency**: Aligned spawn points between client and server to prevent initial desynchronization.
 - **[S]** **STATUS**: Phase 2 Complete (Hybrid). Infrastructure for server authority is active and stable. Ready for Phase 3 (Full Prediction & Reconciliation).
 --------------------------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-21] v1.0.6 - Server-Authoritative Physics: Phase 3 (Real Physics Extraction) 🧪⚙️
+- **[V]** `v1.0.6`
+- **[Arch]** **Real Physics Extraction**:
+    - **Logic Parity**: Rewrote `shared/PhysicsSimulation.ts` (~550 lines) to exactly replicate the 791-line logic from `PlayerPhysics.ts`. Replaced approximations with the actual client-side implementation.
+    - **Full State Isolation**: Expanded `SimBody` and `SimInput` to include every state variable needed for identical simulation: `jumpsRemaining`, `dodgeTimer`, `isWallSliding`, `recoveryTimer`, etc.
+    - **Event-Driven Visuals**: Implemented a `PhysicsEvent` system (SFX, Landing, DodgeStart) allowing the shared physics to remain pure and platform-agnostic while triggering client-side feedback.
+- **[Net]** **Protocol Refinement**:
+    - **Input Consistency**: Updated the server `INPUT` message handler to support the expanded `SimInput` shape (`jumpBuffered`, `dodgeBuffered`, etc.), ensuring the authoritative loop receives the same data as the client.
+- **[Build]** **Toolchain Verification**:
+    - **Cross-Platform Compile**: Verified both client (`vite build`) and server (`tsc --noEmit`) builds pass with the new shared logic.
+- **[S]** **STATUS**: Phase 3 Complete. The shared simulation now provides 1:1 logic parity between client and server. Ready for Phase 4 (Wiring).
+------------------------------------------------------------------------------------------------------------------------------------

@@ -356,17 +356,17 @@ io.onConnection((channel: ServerChannel) => {
         const input = data?.input;
         if (!input) return;
 
-        // Map client InputState → SimInput
+        // Map client InputState → SimInput (Phase 3: expanded fields)
         player.latestInput = {
             moveLeft: !!input.moveLeft,
             moveRight: !!input.moveRight,
-            jump: !!input.jump,
+            moveDown: !!input.moveDown,
+            moveUp: !!input.moveUp,
+            jumpBuffered: !!input.jump,
             jumpHeld: !!input.jumpHeld,
-            dodge: !!input.dodge,
-            lightAttack: !!input.lightAttack,
-            heavyAttack: !!input.heavyAttack,
-            down: !!input.moveDown || !!input.aimDown,
-            up: !!input.moveUp || !!input.aimUp,
+            dodgeBuffered: !!input.dodge,
+            aimUp: !!input.aimUp,
+            aimDown: !!input.aimDown,
         };
     });
 
