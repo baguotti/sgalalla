@@ -230,3 +230,10 @@ Part 2
     - Fixed a bug where `sfx_fight_charge` would loop forever if a player was hit mid-charge.
     - Integrated `clearChargeState()` into `applyHitStun()` and added a hard failsafe timeout to the sound cleanup routine to ensure looping sounds are always destroyed.
 - **[Polish]** **Audio Transitions**: Balanced charge sound fade-out to trail off naturally while remaining technically solid against interruptions.
+ 
++### [2026-02-21] v0.14.5 - UI Clarity & Training Metadata ℹ️
++- **[V]** `v0.14.5`
++- **[Feat]** **Controls Overlay**:
++    - Added 'T' key information to the `COMANDI` overlay.
++    - Explicitly documented the **Dummy Hostility Toggle** for Training Mode.
++

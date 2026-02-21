@@ -109,7 +109,10 @@ export class ControlsOverlay {
             'SPECIALI & OGGETTI',
             '• Recovery: Salto + Su + Pesante',
             '• Ground Pound: Salto + Giù + Pesante',
-            '• Apri Cassa: Attacco vicino alla cassa'
+            '• Apri Cassa: Attacco vicino alla cassa',
+            '',
+            'SOLO TRAINING',
+            '• Dummy Hostile: Tasto [T]'
         ].join('\n');
 
         const movesetContent = this.scene.add.text(col2X, contentY, movesetText, {
