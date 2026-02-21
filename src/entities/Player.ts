@@ -11,6 +11,13 @@ import { Attack, AttackPhase, AttackType, AttackDirection } from '../combat/Atta
 import { PlayerAI } from './player/PlayerAI';
 import type { PlayerSnapshot } from '../network/StateSnapshot';
 import { StateMachine } from '../state/StateMachine';
+import {
+    IdleState, RunState, JumpState, FallState, WallSlideState,
+    AttackState, ChargingState, HitStunState,
+    DodgeState, AirDodgeState,
+    RecoveryState, GroundPoundState,
+    TauntState, WinState, RespawningState
+} from '../state/states';
 import type { Throwable } from './Throwable';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 
@@ -279,6 +286,24 @@ export class Player extends Fighter {
 
         this.resetVisuals(); // Ensure clean visual state (no tints)
         scene.add.existing(this);
+
+        // ─── FSM: Register all states ───
+        this.fsm.register(new IdleState());
+        this.fsm.register(new RunState());
+        this.fsm.register(new JumpState());
+        this.fsm.register(new FallState());
+        this.fsm.register(new WallSlideState());
+        this.fsm.register(new AttackState());
+        this.fsm.register(new ChargingState());
+        this.fsm.register(new HitStunState());
+        this.fsm.register(new DodgeState());
+        this.fsm.register(new AirDodgeState());
+        this.fsm.register(new RecoveryState());
+        this.fsm.register(new GroundPoundState());
+        this.fsm.register(new TauntState());
+        this.fsm.register(new WinState());
+        this.fsm.register(new RespawningState());
+        this.fsm.changeState('Idle', this);
     }
 
     /**
@@ -323,24 +348,17 @@ export class Player extends Fighter {
         // Remote players don't run combat logic (it's synced from network)
         // Only local players run combat update/handleInput
         if (this.currentInput) {
-            if (this.currentInput.taunt && this.isGrounded && !this.isAttacking && !this.isHitStunned && !this.isDodging) {
-                this.isTaunting = !this.isTaunting;
-            }
+            // ─── FSM: Delegate state logic ───
+            this.fsm.update(this, delta, this.currentInput);
 
-            // Cancel taunt on movement/actions
-            if (this.isTaunting) {
-                if (this.currentInput.moveLeft || this.currentInput.moveRight || this.currentInput.jump ||
-                    this.currentInput.lightAttack || this.currentInput.heavyAttack || this.currentInput.dodge ||
-                    this.isHitStunned || !this.isGrounded) {
-                    this.isTaunting = false;
-                }
-            }
-
-            // Update Combat Component
+            // Update Combat Component (timers, attack phases, hitboxes)
             this.combat.update(delta);
 
-            // Handle input for combat
-            if (!this.isTaunting) {
+            // Handle input for combat (attacks, charge, throw)
+            // Only if the current state allows it (not taunting, hitstun, etc.)
+            const currentStateName = this.fsm.getCurrentStateName();
+            const combatBlockedStates = ['HitStun', 'Taunt', 'Win', 'Respawning'];
+            if (!combatBlockedStates.includes(currentStateName)) {
                 this.combat.handleInput(this.currentInput);
             }
         }
@@ -829,17 +847,9 @@ export class Player extends Fighter {
 
     public applyHitStun(): void {
         super.applyHitStun();
-        this.isAttacking = false;
-        if (this.combat) {
-            this.combat.clearChargeState(); // Must be called BEFORE resetting flags to properly clean up charge sound
-            this.combat.isGroundPounding = false;
-            this.combat.currentAttack = null;
-            this.combat.deactivateHitbox();
-        }
-        this.isDodging = false;
-        this.resetVisuals();
-        // Trigger subtle damage flash
-        this.flashDamageColor(this.damagePercent);
+        // ─── FSM: Transition to HitStun ───
+        // HitStunState.enter() handles clearing all combat/dodge flags
+        this.fsm.changeState('HitStun', this);
     }
 
 

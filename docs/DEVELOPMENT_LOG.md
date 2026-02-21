@@ -266,3 +266,14 @@ Part 2
 - **[Polish]** **Code Hygiene**: Cleaned up over 50 linting warnings related to unused parameters across the new state implementations to maintain high code standards.
 - **[S]** **STATUS**: Phase 2 Complete. All state logic is defined and ready for Phase 3 (wiring and logic migration).
 --------------------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-21] v1.0.2 - Player State Machine Refactor: Phase 3 (Integration) 🔗
+- **[V]** `v1.0.2`
+- **[Arch]** **FSM Integration**:
+    - **Wiring `Player.ts`**: Successfully integrated the `StateMachine` into the core `Player` class, wiring all 15 states in the constructor.
+    - **Logic Delegation**: Refactored `updateLogic()` to delegate state-dependent logic (movement, animations, combat availability) to the FSM, removing a large cluster of complex `if-else` branches.
+    - **HitStun Refactor**: Simplified `applyHitStun()` to execute a clean state transition, leveraging `HitStunState.enter()` to automatically handle flag resetting and sound cleanup.
+    - **Network Preservation**: Ensured `isAttacking` and `animationKey` properties remain synchronized for online play, maintaining full compatibility with `OnlineGameScene` and `server-geckos`.
+- **[Fix]** **Network Recovery**: Identified and fixed an issue where the local Geckos server would shut down due to a 5-minute idle timeout, ensuring persistent local online testing capability.
+- **[Verification]** **System Stability**: Verified through `npx tsc --noEmit` and `npm run build` that the project remains type-safe and production-ready.
+- **[S]** **STATUS**: Phase 3 Complete. The character's core logic is now officially driven by the FSM.
+--------------------------------------------------------------------------------------------------------------------------------------------------
