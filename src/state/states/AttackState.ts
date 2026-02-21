@@ -36,8 +36,9 @@ export class AttackState implements IState {
         }
     }
 
-    exit(player: Player): void {
-        player.isAttacking = false;
+    exit(_player: Player): void {
+        // Let PlayerCombat.endAttack() clear isAttacking.
+        // Forcing player.isAttacking = false here can interrupt the flag too early.
     }
 
     getAnimationKey(player: Player): string {

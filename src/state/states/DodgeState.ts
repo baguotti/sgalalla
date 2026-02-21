@@ -17,16 +17,19 @@ export class DodgeState implements IState {
     }
 
     update(player: Player, _delta: number, _input: InputState): void {
-        // Dodge end is detected when the physics system clears isDodging
         if (!player.isDodging) {
-            player.fsm.changeState('Idle', player);
+            const isMoving = _input.moveLeft || _input.moveRight;
+            if (player.isGrounded) {
+                player.fsm.changeState(isMoving ? 'Run' : 'Idle', player);
+            } else {
+                player.fsm.changeState('Fall', player);
+            }
             return;
         }
     }
 
-    exit(player: Player): void {
-        // Ensure flag is cleared if exiting for another reason (e.g. hitstun)
-        player.isDodging = false;
+    exit(_player: Player): void {
+        // Let PlayerPhysics clear isDodging when the timer expires.
     }
 
     getAnimationKey(player: Player): string {

@@ -200,6 +200,7 @@ export class PlayerCombat {
 
             // All other heavy attacks (including grounded neutral sig): Start charging
             this.isCharging = true;
+            this.player.fsm.changeState('Charging', this.player);
             this.chargeTime = 0;
 
             // Play Charge Sound Loop
@@ -257,6 +258,7 @@ export class PlayerCombat {
 
             this.currentAttack = new Attack(attackKey, facing);
             this.player.isAttacking = true;
+            this.player.fsm.changeState('Attack', this.player);
             this.hitTargets.clear();
 
 
@@ -312,6 +314,7 @@ export class PlayerCombat {
 
             this.currentAttack = new Attack(attackKey, facing); // Removed chargePercent
             this.player.isAttacking = true;
+            this.player.fsm.changeState('Attack', this.player);
             this.hitTargets.clear();
 
             // Trigger network callback (was missing — heavy attacks were never broadcast!)
@@ -557,6 +560,7 @@ export class PlayerCombat {
         try {
             this.currentAttack = new Attack(attackKey, facing);
             this.player.isAttacking = true;
+            this.player.fsm.changeState('GroundPound', this.player);
             this.hitTargets.clear();
         } catch (e) {
             console.warn('Ground pound attack not found');
@@ -642,6 +646,7 @@ export class PlayerCombat {
     }
 
     public endAttack(): void {
+        console.log(`[PlayerCombat] endAttack()`);
         this.player.isAttacking = false;
         this.isGroundPounding = false;
         this.currentAttack = null;

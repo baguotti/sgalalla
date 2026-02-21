@@ -177,6 +177,11 @@ export class PlayerPhysics {
             friction = PhysicsConfig.HITSTUN_FRICTION;
         }
 
+        // BRAWLHALLA STYLE: Dash should maintain its exact velocity to cover the intended DodgeDistance.
+        if (this.player.isDodging && !this.isSpotDodging) {
+            friction = 1.0;
+        }
+
         velocity.x *= friction;
 
         velocity.x *= friction;
@@ -397,6 +402,7 @@ export class PlayerPhysics {
         this.isRecovering = true;
         this.recoveryAvailable = false; // Consumed until grounded
         this.recoveryTimer = PhysicsConfig.RECOVERY_DURATION;
+        this.player.fsm.changeState('Recovery', this.player);
 
         this.player.velocity.y = PhysicsConfig.RECOVERY_FORCE_Y;
         // Horizontal drift
@@ -541,6 +547,7 @@ export class PlayerPhysics {
         this.isDodging = true;
         this.player.isInvincible = true;
         this.player.isDodging = true; // Sync with Player state
+        this.player.fsm.changeState(this.player.isGrounded ? 'Dodge' : 'AirDodge', this.player);
 
         const hasDirectionalInput = input.moveLeft || input.moveRight;
 

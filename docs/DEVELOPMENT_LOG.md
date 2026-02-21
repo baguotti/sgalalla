@@ -277,3 +277,19 @@ Part 2
 - **[Verification]** **System Stability**: Verified through `npx tsc --noEmit` and `npm run build` that the project remains type-safe and production-ready.
 - **[S]** **STATUS**: Phase 3 Complete. The character's core logic is now officially driven by the FSM.
 --------------------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-21] v1.0.3 - Player FSM Refactor: Phase 4 (Cleanup & Polish) 🧹✨
+- **[V]** `v1.0.3`
+- **[Arch]** **FSM Cleanup & Refinement**:
+    - **Optimization**: Replaced the 190-line `updateAnimation()` cascade in `Player.ts` with a streamlined 40-line FSM-driven logic. Removed ~140 lines of redundant code.
+    - **Convenience**: Added `getAnimationKey()` to `StateMachine.ts` for centralized animation resolution.
+    - **State Sync**: Modernized `getState()` to utilize FSM state names, improving the reliability of priority mapping for UI and Network snapshots.
+- **[Fix]** **Animation Integrity**:
+    - **Sprite Visibility**: Resolved "Missing Sprite" bugs for dodges, charges, and light attacks by correctly injecting `fsm.changeState()` hooks into `PlayerCombat` and `PlayerPhysics`.
+    - **No-Interrupt**: Removed early boolean clearing from FSM `exit()` states to prevent premature animation termination.
+    - **HitStun Cleanup**: Fixed a duplicate `isHitStunned` reset bug in `updateTimers()`.
+- **[Feat]** **Dash Physics Polish**:
+    - **Momentum Carryover**: Disabled friction decay during dashes, allowing players to maintain constant velocity throughout the dash duration.
+    - **Seamless Transitions**: Re-wired `DodgeState` and `AirDodgeState` to transition directly into the `Run` state if movement keys are held, eliminating 1-frame "idle" jitters.
+    - **Tuning**: Adjusted `DODGE_DISTANCE` to `210` px for a snappier, more balanced feel.
+- **[S]** **STATUS**: FSM Transition successfully completed. Character movement and state management are now robust, clean, and highly extensible.
+--------------------------------------------------------------------------------------------------------------------------------------------------

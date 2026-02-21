@@ -36,6 +36,8 @@ export class StateMachine {
             return;
         }
 
+        console.log(`[FSM] State Change: ${this.currentState?.name} -> ${name}`);
+
         if (this.currentState) {
             this._previousStateName = this.currentState.name;
             this.currentState.exit(player);
@@ -70,5 +72,10 @@ export class StateMachine {
     /** Check if a state is registered. */
     public hasState(name: string): boolean {
         return this.states.has(name);
+    }
+
+    /** Get the animation key from the current state. */
+    public getAnimationKey(player: Player): string {
+        return this.currentState?.getAnimationKey(player) ?? '';
     }
 }

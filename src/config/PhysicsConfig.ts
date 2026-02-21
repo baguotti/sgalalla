@@ -54,7 +54,7 @@ export const PhysicsConfig = {
   HEAVY_HITBOX_HEIGHT: 120,
 
   // Dodge/Dash - Brawlhalla style
-  DODGE_DISTANCE: 400, // Reduced from 450
+  DODGE_DISTANCE: 210, // Adjusted based on testing
   DODGE_DURATION: 180,
   DODGE_COOLDOWN: 800,
   DODGE_INVINCIBILITY: 150,

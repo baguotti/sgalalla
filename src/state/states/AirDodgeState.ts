@@ -16,9 +16,9 @@ export class AirDodgeState implements IState {
     }
 
     update(player: Player, _delta: number, _input: InputState): void {
-        // Landed during air dodge
         if (player.isGrounded) {
-            player.fsm.changeState('Idle', player);
+            const isMoving = _input.moveLeft || _input.moveRight;
+            player.fsm.changeState(isMoving ? 'Run' : 'Idle', player);
             return;
         }
 
@@ -29,8 +29,8 @@ export class AirDodgeState implements IState {
         }
     }
 
-    exit(player: Player): void {
-        player.isDodging = false;
+    exit(_player: Player): void {
+        // Let PlayerPhysics clear isDodging when the timer expires.
     }
 
     getAnimationKey(player: Player): string {

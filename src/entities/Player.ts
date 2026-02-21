@@ -7,7 +7,7 @@ import { InputBuffer } from '../input/InputBuffer';
 import { Fighter } from './Fighter';
 import { PlayerPhysics } from './player/PlayerPhysics';
 import { PlayerCombat } from './player/PlayerCombat';
-import { Attack, AttackPhase, AttackType, AttackDirection } from '../combat/Attack';
+import { Attack, AttackPhase } from '../combat/Attack';
 import { PlayerAI } from './player/PlayerAI';
 import type { PlayerSnapshot } from '../network/StateSnapshot';
 import { StateMachine } from '../state/StateMachine';
@@ -398,7 +398,6 @@ export class Player extends Fighter {
 
         if (this.hitStunTimer <= 0 && this.isHitStunned) {
             this.isHitStunned = false;
-            this.isHitStunned = false;
             this.resetVisuals();
         }
 
@@ -561,186 +560,39 @@ export class Player extends Fighter {
     }
 
     private updateAnimation(): void {
-        // onFloor removed (unused)
         const velocity = this.velocity;
 
-        // Dynamic Run Speed
-        // Aggressively separate Walk vs Run using physics state
+        // Dynamic Run Speed scaling for run animation
         if (this.sprite.anims.currentAnim && this.sprite.anims.currentAnim.key.includes('run')) {
             const speed = Math.abs(velocity.x);
-
             if (this.physics.isRunning) {
-                // RUNNING: Fast playback logic
-                // Previous: 1.2 + (speed / 2000)
-                // New: 0.8 + (speed / 3000) -> Matches ground speed better
                 const normalizedSpeed = 0.8 + (speed / 3000);
                 this.sprite.anims.timeScale = normalizedSpeed;
             } else {
-                // Should not happen if isRunning covers all grounded movement, 
-                // but if we are decelerating, default to normal speed?
-                // Or just keep the scaling logic if speed > 0
                 this.sprite.anims.timeScale = 1;
             }
         } else {
-            // Reset timeScale for non-run animations
             this.sprite.anims.timeScale = 1;
         }
 
-        // Priority 1: Combat / Hittable (Locked animations)
-        // If an attack or hitstun is playing, ensure timeScale is reset.
-        // DO NOT RETURN HERE: Let the logic below select and play the specific 'attack' or 'hurt' animation key.
+        // Reset timeScale for combat/hitstun
         if (this.isAttacking || this.isHitStunned) {
             this.sprite.anims.timeScale = 1;
         }
 
-        // Priority 0: End of match winning pose
-        if (this.isWinner) {
-            this.sprite.anims.timeScale = 1;
-            const winAnimKey = `${this.character}_win`;
-            if (this.scene.anims.exists(winAnimKey)) {
-                this.animationKey = 'win';
-                this.playAnim('win', true);
-            } else {
-                this.animationKey = 'idle';
-                this.playAnim('idle', true);
-            }
-            return;
-        }
-
-        // Priority 0.5: Taunting
-        if (this.isTaunting) {
-            this.sprite.anims.timeScale = 1;
-            const winAnimKey = `${this.character}_win`;
-            if (this.scene.anims.exists(winAnimKey)) {
-                this.animationKey = 'win';
-                this.playAnim('win', true);
-            } else {
-                this.animationKey = 'idle';
-                this.playAnim('idle', true);
-            }
-            return;
-        }
-
-        // Remote players use synced animationKey directly (set from network)
-        // We detect remote players by checking if they have no current input
-        const isRemotePlayer = !this.currentInput;
-
-        if (isRemotePlayer) {
-            // Only play if we have a valid animation key from the network
+        // Remote players: use synced animationKey directly
+        if (!this.currentInput) {
             if (this.animationKey) {
                 this.playAnim(this.animationKey, true);
             }
-            return; // ALWAYS return for remote players — never fall through to local logic
-        }
-
-        // Local player: calculate animation from state and set animationKey for sync
-        if (this.isHitStunned) {
-            this.animationKey = 'hurt';
-            this.playAnim('hurt', true);
             return;
         }
 
-        if (this.combat.isCharging) {
-            this.animationKey = 'charging';
-            this.playAnim('charging', true);
-            return;
-        }
-
-        if (this.combat.isGroundPounding) {
-            this.animationKey = 'ground_pound';
-            this.playAnim('ground_pound', true);
-            return;
-        }
-
-        if (this.isAttacking) {
-            // Determine attack animation from currentAttack
-            const currentAttack = this.getCurrentAttack();
-            if (currentAttack) {
-                if (currentAttack.data.type === AttackType.HEAVY) {
-                    if (currentAttack.data.direction === AttackDirection.DOWN) {
-                        this.animationKey = 'attack_heavy_down';
-                    } else if (currentAttack.data.direction === AttackDirection.SIDE) {
-                        this.animationKey = 'attack_heavy_side';
-                    } else if (currentAttack.data.direction === AttackDirection.UP) {
-                        this.animationKey = 'attack_heavy_up';
-                    } else {
-                        this.animationKey = 'attack_heavy_neutral';
-                    }
-                } else {
-                    // LIGHT ATTACKS
-                    if (currentAttack.data.direction === AttackDirection.RUN) {
-                        this.animationKey = 'attack_light_run';
-                    } else if (currentAttack.data.direction === AttackDirection.UP) {
-                        if (!this.isGrounded) {
-                            this.animationKey = 'attack_light_up_air';
-                        } else {
-                            this.animationKey = 'attack_light_up';
-                        }
-                    } else if (currentAttack.data.direction === AttackDirection.DOWN) {
-                        this.animationKey = 'attack_light_down';
-                    } else if (currentAttack.data.direction === AttackDirection.SIDE) {
-                        if (!this.isGrounded) {
-                            this.animationKey = 'attack_light_side_air';
-                        } else {
-                            this.animationKey = 'attack_light_side';
-                        }
-                    } else {
-                        // Neutral Light
-                        this.animationKey = 'attack_light_neutral';
-                    }
-                }
-            } else {
-                this.animationKey = 'attack_light_neutral';
-            }
-            this.playAnim(this.animationKey, true);
-            return;
-        }
-
-        if (this.isDodging) {
-            // User Request 5: Dash if moving, Spot Dodge if still
-            // Using logic similar to run threshold
-            if (Math.abs(this.velocity.x) > 10) {
-                this.animationKey = 'dash';
-                this.playAnim('dash', true);
-            } else {
-                this.animationKey = 'spot_dodge';
-                this.playAnim('spot_dodge', true);
-            }
-            return;
-        }
-
-        // Airborne
-        if (!this.isGrounded) {
-            if (this.physics.isRecovering) {
-                this.animationKey = 'recovery';
-                this.playAnim('recovery', true);
-                return;
-            }
-
-            if (this.physics.isWallSliding) {
-                this.animationKey = 'wall_slide';
-                this.playAnim('wall_slide', true);
-                return;
-            }
-
-            if (this.velocity.y < 0) {
-                this.animationKey = 'jump';
-                this.playAnim('jump', true);
-            } else {
-                this.animationKey = 'fall';
-                this.playAnim('fall', true);
-            }
-            return;
-        }
-
-        // Grounded
-        // This prevents the "slide completely into stop" look
-        if (Math.abs(this.velocity.x) > 20) { // Reverted to 20 per request (user says "sliding")
-            this.animationKey = 'run';
-            this.playAnim('run', true);
-        } else {
-            this.animationKey = 'idle';
-            this.playAnim('idle', true);
+        // ─── FSM-driven animation ───
+        const fsmAnimKey = this.fsm.getAnimationKey(this);
+        if (fsmAnimKey) {
+            this.animationKey = fsmAnimKey;
+            this.playAnim(fsmAnimKey, true);
         }
 
         // Apply offsets every frame (catch-all)
@@ -810,14 +662,26 @@ export class Player extends Fighter {
     getVelocity(): Phaser.Math.Vector2 { return this.velocity; }
 
     getState(): PlayerState {
-        if (this.isHitStunned) return PlayerState.HIT_STUN;
-        if (this.isDodging) return PlayerState.DODGING;
-        if (this.combat.isGroundPounding) return PlayerState.GROUND_POUND;
-        if (this.isAttacking) return PlayerState.ATTACKING;
-        if (this.physics.isRecovering) return PlayerState.RECOVERING;
-        if (this.isGrounded) return PlayerState.GROUNDED;
-        if (this.physics.isFastFalling) return PlayerState.FAST_FALLING;
-        return PlayerState.AIRBORNE;
+        const stateName = this.fsm.getCurrentStateName();
+
+        switch (stateName) {
+            case 'HitStun': return PlayerState.HIT_STUN;
+            case 'Dodge':
+            case 'AirDodge': return PlayerState.DODGING;
+            case 'GroundPound': return PlayerState.GROUND_POUND;
+            case 'Attack': return PlayerState.ATTACKING;
+            case 'Recovery': return PlayerState.RECOVERING;
+            case 'Idle':
+            case 'Run':
+            case 'Taunt':
+            case 'Win': return PlayerState.GROUNDED;
+            case 'Fall':
+            case 'WallSlide':
+                if (this.physics.isFastFalling) return PlayerState.FAST_FALLING;
+                return PlayerState.AIRBORNE;
+            case 'Jump': return PlayerState.AIRBORNE;
+            default: return this.isGrounded ? PlayerState.GROUNDED : PlayerState.AIRBORNE;
+        }
     }
 
     getRecoveryAvailable(): boolean { return this.physics.recoveryAvailable; }
