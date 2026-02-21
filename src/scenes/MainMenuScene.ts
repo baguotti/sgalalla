@@ -25,12 +25,16 @@ export class MainMenuScene extends Phaser.Scene {
 
 
     preload(): void {
-        this.load.audio('ui_menu_hover', 'assets/audio/ui/ui_menu_hover.wav');
-        this.load.audio('ui_confirm', 'assets/audio/ui/ui_confirm.wav');
-        this.load.audio('ui_back', 'assets/audio/ui/ui_back.wav');
+        const cb = `?v=${Date.now() + 1}`;
+        this.load.audio('ui_menu_hover', 'assets/audio/ui/ui_menu_hover.wav' + cb);
+        this.load.audio('ui_confirm', 'assets/audio/sfx/ui/ui_confirm.wav' + cb);
+        this.load.audio('ui_back', 'assets/audio/ui/ui_back.wav' + cb);
+        this.load.audio('sfx_ui_press_start', 'assets/audio/sfx/ui/ui_press_start.wav' + cb);
     }
 
     create(): void {
+        this.cameras.main.setBackgroundColor('#2d2d2d');
+
         const { width, height } = this.scale;
 
         // Ensure Global Music is playing and at correct volume
@@ -64,7 +68,7 @@ export class MainMenuScene extends Phaser.Scene {
         }
 
         // Version Text
-        this.add.text(width - 20, height - 20, 'v0.14.3', {
+        this.add.text(width - 20, height - 20, 'v0.14.4', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(1, 1);        // Menu Items
         const startY = height - 280; // Moved lower
@@ -118,6 +122,7 @@ export class MainMenuScene extends Phaser.Scene {
         } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
             this.changeSelection(1);
         } else if (Phaser.Input.Keyboard.JustDown(this.startKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+            // Sound removed per user request
             this.selectOption('KEYBOARD');
         }
 
@@ -200,6 +205,7 @@ export class MainMenuScene extends Phaser.Scene {
             this.prevGamepadA.set(pad.index, !!aPressed);
 
             if (aPressed && !wasPressed) {
+                // Sound removed per user request
                 this.selectOption('GAMEPAD', pad.index);
                 this.lastGamepadInputTime = now;
             }

@@ -3,7 +3,7 @@ import { Player, PlayerState } from '../entities/Player';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
-import { Bomb } from '../entities/Bomb';
+import { ControlsOverlay } from '../components/ControlsOverlay';
 import { Chest } from '../entities/Chest';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
@@ -23,7 +23,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
     private sidePlatforms: Phaser.GameObjects.Rectangle[] = []; // Track side platforms
-    public bombs!: Phaser.GameObjects.Group;
     public chests!: Phaser.GameObjects.Group;
     public seals: any[] = []; // Seal projectiles
     private background!: Phaser.GameObjects.Graphics;
@@ -38,8 +37,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private debugLabels: Phaser.GameObjects.Text[] = [];
     private debugToggleKey!: Phaser.Input.Keyboard.Key;
     private trainingToggleKey!: Phaser.Input.Keyboard.Key;
-    // Debug bomb spawn key
-    private spawnKey!: Phaser.Input.Keyboard.Key;
 
     // Kill tracking
     // private player1HUD!: PlayerHUD;
@@ -56,6 +53,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     // Pause menu
     private isPaused: boolean = false;
     private pauseMenu!: PauseMenu;
+    private controlsOverlay!: ControlsOverlay;
     private pauseKey!: Phaser.Input.Keyboard.Key;
 
     // Game Over State
@@ -93,17 +91,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         AnimationHelpers.createAnimations(this);
     }
 
-    public addBomb(_bomb: Bomb): void {
-        // No-op: Group handles list management
-    }
 
-    public removeBomb(_bomb: Bomb): void {
-        // No-op: Group handles list management
-    }
-
-    public getBombs(): Bomb[] {
-        return this.bombs.getChildren().filter(b => b.active) as Bomb[];
-    }
 
     public getPlayers(): Player[] {
         return this.players;
@@ -157,13 +145,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.walls = [];
             this.stageTextures = [];
 
-            // Re-create bomb group
-            // (Old group is destroyed by scene shutdown, just overwrite reference)
-            this.bombs = this.add.group({
-                classType: Bomb,
-                runChildUpdate: true,
-                maxSize: 20 // Reasonable limit for performance
-            });
 
             if (Array.isArray(this.chests)) {
                 this.chests.forEach(c => c.destroy());
@@ -375,16 +356,29 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
             this.trainingToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
             this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-            // Debug Spawn Key
-            this.spawnKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R);
 
             // Create pause menu
             this.pauseMenu = new PauseMenu(this);
             this.cameras.main.ignore(this.pauseMenu.getElements());
 
+            // Create F1 controls overlay
+            this.controlsOverlay = new ControlsOverlay(this);
+            this.cameras.main.ignore(this.controlsOverlay.getElements());
+
             // Pause menu event listeners
             this.events.on('pauseMenuResume', () => this.togglePause());
             this.events.on('pauseMenuRestart', () => this.restartMatch());
+            this.events.on('pauseMenuSettings', () => {
+                this.pauseMenu.hide();
+                this.scene.launch('SettingsScene', { returnScene: 'GameScene' });
+                this.scene.bringToTop('SettingsScene'); // Guarantee overlay visibility
+
+                const settingsScene = this.scene.get('SettingsScene');
+                settingsScene.events.off('shutdown');
+                settingsScene.events.once('shutdown', () => {
+                    this.pauseMenu.show();
+                });
+            });
             this.events.on('pauseMenuLobby', () => {
                 this.time.delayedCall(10, () => {
                     try {
@@ -442,30 +436,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
     }
 
-    private spawnBomb(): void {
-        if (this.isPaused) return;
-
-        const { width } = this.scale;
-
-        // Random X position within central area (500-1420) so it's likely visible
-        const padding = 500;
-        const x = Phaser.Math.Between(padding, width - padding);
-        const y = 0; // Top of screen (inside bounds)
-
-        const bomb = this.bombs.get(x, y) as Bomb;
-        if (bomb) {
-            bomb.enable(x, y);
-            if (this.uiCamera) {
-                this.uiCamera.ignore(bomb);
-            }
-        }
-    }
-
     private spawnChest(): void {
         if (this.isPaused) return;
 
         const { width } = this.scale;
-        const padding = 500;
+        const padding = 600; // Constrain to center stage (-600 from edges)
         const x = Phaser.Math.Between(padding, width - padding);
         const y = 0;
 
@@ -698,11 +673,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             }
         }
 
-        // Handle Bomb Spawn (R)
-        if (Phaser.Input.Keyboard.JustDown(this.spawnKey)) {
-            this.spawnBomb();
-        }
-
         // 1. Update Physics (Move)
         this.players.forEach(p => p.updatePhysics(delta));
 
@@ -784,8 +754,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     private checkBlastZones(): void {
         const checkPlayer = (player: Player, playerId: number) => {
-            // Skip checks if player is already dead/eliminated
-            if (!player.active) return; // Phaser active flag
+            // Skip checks if player is already dead/eliminated or respawning
+            if (!player.active || player.isRespawning) return; // Phaser active flag
 
             const bounds = player.getBounds();
             if (bounds.left < MapConfig.BLAST_ZONE_LEFT ||
@@ -803,6 +773,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
                 // Use generic red for now.
                 this.effectManager.spawnDeathExplosion(impactX, impactY, 0xff4444);
+
+                // Audio
+                AudioManager.getInstance().playSFX('sfx_death', { volume: 0.8 });
+                if (Math.random() > 0.5) {
+                    AudioManager.getInstance().playSFX('sfx_death_crowd_1', { volume: 0.5 });
+                } else {
+                    AudioManager.getInstance().playSFX('sfx_death_crowd_2', { volume: 0.5 });
+                }
                 // --- DEATH IMPACT END ---
 
                 // Score update (lives)
@@ -845,6 +823,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const offsetX = Phaser.Math.Between(-50, 50);
         const spawnX = 960 + offsetX;
         const spawnY = 200; // Drop from a safe height above the center
+
+        // Grant invulnerability
+        player.isRespawning = true;
+        this.time.delayedCall(1500, () => {
+            player.isRespawning = false;
+        });
 
         // Reset physics and state
         console.log(`[Respawn] Player ${playerId} respawning at ${spawnX}, ${spawnY}`);
@@ -938,6 +922,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private togglePause(): void {
         this.isPaused = !this.isPaused;
         if (this.isPaused) {
+            AudioManager.getInstance().playSFX('ui_player_found', { volume: 0.6 });
             this.pauseMenu.show();
         } else {
             this.pauseMenu.hide();
@@ -1095,6 +1080,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Kill event listeners
         this.events.off('pauseMenuResume');
         this.events.off('pauseMenuRestart');
+        this.events.off('pauseMenuSettings');
         this.events.off('pauseMenuLobby');
         this.events.off('pauseMenuExit');
         this.events.off('spawnDummy');
@@ -1139,6 +1125,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         let winner: Player | undefined;
 
         if (winnerId >= 0) {
+            AudioManager.getInstance().playSFX('sfx_knockout', { volume: 0.8 });
             winnerText += `\nPLAYER ${winnerId + 1} HA ARATO!`; // Custom Text
             winner = this.players.find(p => p.playerId === winnerId);
 

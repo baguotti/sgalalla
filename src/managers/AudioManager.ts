@@ -84,6 +84,10 @@ export class AudioManager {
             volume: (config.volume || 1) * this.sfxVolume
         };
 
-        this.scene.sound.play(key, finalConfig);
+        try {
+            this.scene.sound.play(key, finalConfig);
+        } catch (e) {
+            console.warn(`[AudioManager] SFX key "${key}" not found in cache, skipping.`);
+        }
     }
 }

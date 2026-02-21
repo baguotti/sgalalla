@@ -21,7 +21,7 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true
   },
-  scene: [PreloadScene, MainMenuScene, SettingsScene, LobbyScene, GameScene, OnlineGameScene],
+  scene: [PreloadScene, MainMenuScene, LobbyScene, GameScene, OnlineGameScene, SettingsScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

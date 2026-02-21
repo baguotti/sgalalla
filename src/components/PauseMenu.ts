@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 const MenuOption = {
     RESUME: 0,
     CONTROLS: 1,
+    SETTINGS: 8,
     TRAINING: 3,
     SPAWN_DUMMY: 6,
     RESTART: 4,
@@ -27,6 +28,7 @@ export class PauseMenu {
     private menuOptions = [
         { label: 'RIPRENDI', value: MenuOption.RESUME },
         { label: 'COMANDI', value: MenuOption.CONTROLS },
+        { label: 'IMPOSTAZIONI', value: MenuOption.SETTINGS },
         // Training Options removed
         { label: 'SPAWN CPU', value: MenuOption.SPAWN_DUMMY },
         { label: 'RIAVVIA PARTITA', value: MenuOption.RESTART },
@@ -136,72 +138,77 @@ export class PauseMenu {
         const centerY = this.scene.scale.height / 2;
 
         // -- Layout Configuration --
-        const col1X = -300; // Relative to center
-        const col2X = 100;
-        const headerY = -150;
-        const contentY = -100;
+        const col1X = -250; // Relative to center
+        const col2X = 200;
+        const headerY = -200;
+        const contentY = -150;
 
         // == COL 1: INPUTS ==
-        const inputsHeader = this.scene.add.text(col1X, headerY, 'INPUTS', {
-            fontSize: '28px',
+        const inputsHeader = this.scene.add.text(col1X, headerY, 'TASTI & COMANDI', {
+            fontSize: '32px',
             color: '#8ab4f8', // Pastel Blue
             fontStyle: 'bold',
             fontFamily: '"Pixeloid Sans"'
-        });
+        }).setOrigin(0.5, 0);
+
+        // Add a subtle drop shadow to the header
+        inputsHeader.setShadow(2, 2, '#000000', 0, false, true);
 
         const inputsText = [
-            'ACTION       | KEYBOARD | GAMEPAD',
-            '-------------+----------+--------',
-            'Move         | WASD/Arr | Stick/Pad',
-            'Jump         | Space/Z  | A (Cross)',
-            'Light Attack | J / X    | X (Square)',
-            'Heavy Attack | K / C    | B (Circle)',
-            'Dodge        | L / Shift| Triggers',
-            'Move/Aim     | WASD     | Stick',
-            '',
-            'Debug        | Q        | Select',
-            'Toggle AI    | O        | -',
-            'Spawn Dummy  | T        | -'
+            'AZIONE       | TASTIERA   | GAMEPAD',
+            '-------------+------------+-----------',
+            'Muovi        | WASD/Frec. | Stick L',
+            'Salta        | Spazio/Su  | A (Cross)',
+            'Att. Leggero | J / C      | X (Square)',
+            'Att. Pesante | K / X      | B (Circle)',
+            'Schivata     | L / Z      | Grilletti',
+            'Interagisci  | J / C      | X (Square)'
         ].join('\n');
 
         const inputsContent = this.scene.add.text(col1X, contentY, inputsText, {
             fontSize: '18px',
-            color: '#cccccc',
+            color: '#ffffff',
             fontFamily: '"Pixeloid Sans"',
-            lineSpacing: 8
-        });
+            lineSpacing: 8,
+            align: 'center'
+        }).setOrigin(0.5, 0);
 
         // == COL 2: MOVESET GUIDE ==
         const movesetHeader = this.scene.add.text(col2X, headerY, 'MOVESET GUIDE', {
-            fontSize: '28px',
+            fontSize: '32px',
             color: '#f28b82', // Pastel Red
             fontStyle: 'bold',
             fontFamily: '"Pixeloid Sans"'
-        });
+        }).setOrigin(0.5, 0);
+
+        // Add a subtle drop shadow to the header
+        movesetHeader.setShadow(2, 2, '#000000', 0, false, true);
 
         const movesetText = [
-            'LIGHT ATTACKS (Quick)',
-            '• NLight: Standing Light (Neutral)',
-            '• SLight: Moving Forward + Light',
-            '• DLight: Hold Down + Light',
-            '• Air Light: Jump + Light',
+            'ATTACCHI LEGGERI (Veloci)',
+            '• NLight: Fermo + Leggero',
+            '• SLight: Destra/Sinistra + Leggero',
+            '• DLight: Giù + Leggero',
+            '• Air Light: Salto + Leggero',
             '',
-            'HEAVY ATTACKS (Signatures)',
-            '• NSig: Neutral Heavy (Anti-Air)',
-            '• SSig: Side Heavy (Kill Move)',
-            '• DSig: Down Heavy (Area Control)',
+            'ATTACCHI PESANTI (Signature)',
+            '• NSig: Fermo + Pesante (Anti-Air/Caricabile)',
+            '• SSig: Lati + Pesante (Kill Move/Caricabile)',
+            '• DSig: Giù + Pesante (Area Control)',
             '',
-            'SPECIAL AIR',
-            '• Recovery: Air + Up + Heavy',
-            '• Ground Pound: Air + Down + Heavy'
+            'SPECIALI & OGGETTI',
+            '• Recovery: Salto + Su + Pesante',
+            '• Ground Pound: Salto + Giù + Pesante',
+            '• Apri Cassa: Attacco vicino alla cassa'
         ].join('\n');
 
         const movesetContent = this.scene.add.text(col2X, contentY, movesetText, {
             fontSize: '18px',
-            color: '#eeeeee',
+            color: '#ffffff',
             fontFamily: '"Pixeloid Sans"', // Readable font for text
-            lineSpacing: 6
-        });
+            lineSpacing: 8,
+            align: 'center'
+        }).setOrigin(0.5, 0);
 
         // Add to container
         this.controlsContainer.add([inputsHeader, inputsContent, movesetHeader, movesetContent]);
@@ -366,6 +373,9 @@ export class PauseMenu {
             case MenuOption.CONTROLS:
                 this.menuState = 'CONTROLS';
                 this.showControlsMenu();
+                break;
+            case MenuOption.SETTINGS:
+                this.scene.events.emit('pauseMenuSettings');
                 break;
             case MenuOption.SPAWN_DUMMY:
                 this.scene.events.emit('spawnDummy');

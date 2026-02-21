@@ -95,8 +95,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES + 30,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES + 50,
-        hitboxWidth: 99, // Wider for slide (was 90)
-        hitboxHeight: 25, // Flatter (was 30)
+        hitboxWidth: 148, // 1.5x wider for slide (was 99)
+        hitboxHeight: 37, // 1.5x flatter (was 25)
         hitboxOffsetX: 30,
         hitboxOffsetY: 65, // Lower to feet (was 35)
     },
@@ -188,8 +188,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.LIGHT_STARTUP_FRAMES + 50,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_FRAMES + 80,
-        hitboxWidth: 99, // Cloned from Down Light
-        hitboxHeight: 25,
+        hitboxWidth: 148, // 1.5x Cloned from Down Light (was 99)
+        hitboxHeight: 37, // 1.5x (was 25)
         hitboxOffsetX: 30,
         hitboxOffsetY: 65,
     },
@@ -224,7 +224,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES,
-        hitboxWidth: 80,
+        hitboxWidth: 100,
         hitboxHeight: 90,
         hitboxOffsetX: 20,
         hitboxOffsetY: -40,
@@ -241,7 +241,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES + 50,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES + 100,
-        hitboxWidth: 100,
+        hitboxWidth: 120,
         hitboxHeight: 70,
         hitboxOffsetX: 0,
         hitboxOffsetY: 0,
@@ -258,7 +258,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES + 30,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES + 80,
-        hitboxWidth: 100,
+        hitboxWidth: 120,
         hitboxHeight: 60,
         hitboxOffsetX: 40,
         hitboxOffsetY: 25,
@@ -276,7 +276,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES,
-        hitboxWidth: 80,
+        hitboxWidth: 100,
         hitboxHeight: 90,
         hitboxOffsetX: 20,
         hitboxOffsetY: -40,
@@ -295,7 +295,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES,
-        hitboxWidth: 80,
+        hitboxWidth: 100,
         hitboxHeight: 80,
         hitboxOffsetX: 30,
         hitboxOffsetY: 0,
@@ -312,7 +312,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES,
-        hitboxWidth: 90,
+        hitboxWidth: 110,
         hitboxHeight: 60,
         hitboxOffsetX: 40,
         hitboxOffsetY: 0,
@@ -329,7 +329,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.GROUND_POUND_STARTUP,
         activeDuration: 500,
         recoveryDuration: 150,
-        hitboxWidth: 80,
+        hitboxWidth: 100,
         hitboxHeight: 90,
         hitboxOffsetX: 0,
         hitboxOffsetY: 40,
@@ -346,7 +346,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.HEAVY_STARTUP_FRAMES,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_FRAMES,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_FRAMES,
-        hitboxWidth: 70,
+        hitboxWidth: 90,
         hitboxHeight: 70,
         hitboxOffsetX: 0,
         hitboxOffsetY: -40,

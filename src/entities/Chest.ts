@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 import { PhysicsConfig } from '../config/PhysicsConfig';
 import type { Throwable } from './Throwable';
+import { AudioManager } from '../managers/AudioManager';
 
 // List of scrin image filenames (loaded in GameScene preload)
 const SCRIN_IMAGES = [
@@ -41,6 +42,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
     private throwPowerMultiplier: number = 1;
     private armingTimer: number = 0;
     private blurEffect?: Phaser.FX.Blur;
+    private timerSound: Phaser.Sound.BaseSound | null = null;
 
     constructor(scene: Phaser.Scene, x: number, y: number) {
         const textureKey = 'chest_closed'; // New asset
@@ -168,10 +170,13 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
         if (other.isStatic) {
             // Stop falling hitbox on ground landing
             const isFirstLanding = this.isFalling;
-            if (this.isFalling) this.isFalling = false;
+            if (this.isFalling) {
+                this.isFalling = false;
+            }
 
             const body = this.body as MatterJS.BodyType;
             if (body && body.speed > PhysicsConfig.CHEST_SPEED_THRESHOLD) {
+                AudioManager.getInstance().playSFX('sfx_chest_drop', { volume: 0.6 });
                 // Full shake on first landing, much reduced on bounces
                 const intensity = isFirstLanding
                     ? PhysicsConfig.CHEST_GROUND_SHAKE_INTENSITY
@@ -347,6 +352,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
         }
 
         this.isOpened = true;
+        AudioManager.getInstance().playSFX('sfx_chest_open', { volume: 0.8 });
 
         // Prevent immediate punching
         this.canBePunched = false;
@@ -400,6 +406,9 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
         // ---------------------------------------------------------
         // ANIMATION SEQUENCE: POP + FOCUS
         // ---------------------------------------------------------
+
+        // SFX: Reveal card
+        AudioManager.getInstance().playSFX('sfx_chest_reveal', { volume: 0.8 });
 
         // 1. Parallel: Pop Up + Fade In + De-Blur + Straighten
         this.scene.tweens.add({
@@ -534,6 +543,14 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
         if (this.postFX) {
             this.blurEffect = this.postFX.addBlur(0, 0, 0, 1, 0xffffff, 4);
         }
+
+        // Start ticking sound
+        try {
+            this.timerSound = this.scene.sound.add('sfx_chest_timer', { loop: true, volume: 0.6 });
+            this.timerSound.play();
+        } catch (e) {
+            console.warn('Timer sound not found');
+        }
     }
 
     public onThrown(thrower: any, power: number): void {
@@ -555,10 +572,18 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
         if (this.isExploded) return;
         this.isExploded = true;
 
+        if (this.timerSound) {
+            this.timerSound.stop();
+            this.timerSound.destroy();
+            this.timerSound = null;
+        }
+
+        AudioManager.getInstance().playSFX('sfx_chest_explode', { volume: 0.8 });
+
         const gameScene = this.scene as GameSceneInterface;
         const blastRadius = 120;
         const explosionDamage = 30 * this.throwPowerMultiplier;
-        const baseKnockback = 4000 * this.throwPowerMultiplier;
+        const baseKnockback = 3000 * this.throwPowerMultiplier;
 
         // Explosion visual
         if (gameScene.effectManager) {
@@ -594,6 +619,12 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
     }
 
     destroy(fromScene?: boolean): void {
+        if (this.timerSound) {
+            this.timerSound.stop();
+            this.timerSound.destroy();
+            this.timerSound = null;
+        }
+
         if (this.scene) {
             this.scene.events.off('update', this.updateHitboxVisual, this);
             const gameScene = this.scene as GameSceneInterface;

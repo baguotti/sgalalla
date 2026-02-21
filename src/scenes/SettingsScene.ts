@@ -19,9 +19,19 @@ export class SettingsScene extends Phaser.Scene {
     private keySpace!: Phaser.Input.Keyboard.Key;
     private canInput: boolean = false;
 
+    private returnScene: string = 'MainMenuScene';
+
     constructor() {
         super({ key: 'SettingsScene' });
         this.audioManager = AudioManager.getInstance();
+    }
+
+    init(data: any): void {
+        if (data && data.returnScene) {
+            this.returnScene = data.returnScene;
+        } else {
+            this.returnScene = 'MainMenuScene';
+        }
     }
 
     create(): void {
@@ -32,7 +42,8 @@ export class SettingsScene extends Phaser.Scene {
         this.valueTexts = [];
 
         // Background (Black overlay)
-        this.add.rectangle(0, 0, width, height, 0x000000).setOrigin(0);
+        const bgAlpha = this.returnScene !== 'MainMenuScene' ? 0.9 : 1.0;
+        this.add.rectangle(0, 0, width, height, 0x000000, bgAlpha).setOrigin(0);
 
         // Title
         this.add.text(width / 2, 100, 'IMPOSTAZIONI', {
@@ -244,7 +255,11 @@ export class SettingsScene extends Phaser.Scene {
 
     private goBack(): void {
         this.audioManager.playSFX('ui_back', { volume: 0.5 });
-        this.scene.start('MainMenuScene');
+        if (this.returnScene === 'MainMenuScene') {
+            this.scene.start('MainMenuScene');
+        } else {
+            this.scene.stop();
+        }
     }
 
     private updateSelection(): void {

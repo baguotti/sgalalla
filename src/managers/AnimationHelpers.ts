@@ -52,6 +52,9 @@ export class AnimationHelpers {
         scene.load.image('chest_open', 'assets/items/chest_open.png');
         scene.load.image('chest_dynamite', 'assets/items/chest_dynamite_001.png');
 
+        // FX
+        scene.load.image('fx_explosion', 'assets/images/fx/explosion.png');
+
         // Scrin Images (Rewards)
         const scrinFiles = [
             'scrin_001.jpg', 'scrin_002.jpg', 'scrin_003.jpg', 'scrin_004.jpg', 'scrin_005.jpg',
@@ -86,25 +89,49 @@ export class AnimationHelpers {
      * @param scene The scene to load assets into.
      */
     public static loadUIAudio(scene: Phaser.Scene): void {
-        scene.load.audio('ui_player_found', 'assets/audio/ui/ui_player_found.wav');
-        scene.load.audio('ui_change_character', 'assets/audio/ui/ui_change_character.wav');
-        scene.load.audio('ui_confirm_character', 'assets/audio/ui/ui_confirm_character.wav');
-        scene.load.audio('ui_back', 'assets/audio/ui/ui_back.wav');
-        scene.load.audio('ui_player_ready', 'assets/audio/ui/ui_player_ready.wav');
-        scene.load.audio('ui_menu_hover', 'assets/audio/ui/ui_menu_hover.wav');
-        scene.load.audio('ui_confirm', 'assets/audio/ui/ui_confirm.wav');
-        scene.load.audio('ui_move_cursor', 'assets/audio/ui/ui_move_cursor.wav');
-        scene.load.audio('ui_match_begin', 'assets/audio/ui/ui_match_begin.wav');
+        // --- UI ---
+        scene.load.audio('ui_player_found', 'assets/audio/sfx/ui/ui_player_found.wav');
+        scene.load.audio('ui_change_character', 'assets/audio/sfx/ui/ui_change_character.wav');
+        // keep old names if there's no new file for it, but assuming all are mapped to new folders
+        scene.load.audio('ui_confirm_character', 'assets/audio/sfx/ui/ui_change_character.wav'); // Fallback to change char if no file
+        scene.load.audio('ui_back', 'assets/audio/sfx/ui/ui_back.wav');
+        scene.load.audio('ui_player_ready', 'assets/audio/sfx/ui/ui_player_ready.wav');
+        scene.load.audio('ui_menu_hover', 'assets/audio/sfx/ui/ui_menu_hover.wav');
+        const cb = `?v=${Date.now() + 1}`;
+        scene.load.audio('ui_confirm', 'assets/audio/sfx/ui/ui_confirm.wav' + cb);
+        scene.load.audio('ui_move_cursor', 'assets/audio/sfx/ui/ui_move_cursor.wav' + cb);
+        scene.load.audio('ui_match_begin', 'assets/audio/sfx/ui/ui_match_begin.wav' + cb);
+        scene.load.audio('sfx_ui_press_start', 'assets/audio/sfx/ui/ui_press_start.wav' + cb);
+        scene.load.audio('ui_title_loop', 'assets/audio/sfx/ui/ui_title_loop.wav' + cb);
 
-        // Combat SFX
-        scene.load.audio('sfx_jump_1', 'assets/audio/sfx/fight_jump_1.wav');
-        scene.load.audio('sfx_jump_2', 'assets/audio/sfx/fight_jump_2.wav');
-        scene.load.audio('sfx_landing', 'assets/audio/sfx/fight_landing.wav');
-        scene.load.audio('sfx_dash', 'assets/audio/sfx/fight_dash.wav');
-        scene.load.audio('sfx_run_light_miss', 'assets/audio/sfx/fight_run_light_miss.wav');
-        scene.load.audio('sfx_run_light_hit', 'assets/audio/sfx/fight_run_light_hit.wav');
-        scene.load.audio('sfx_side_light_miss', 'assets/audio/sfx/fight_side_light_miss.wav');
-        scene.load.audio('sfx_side_light_hit', 'assets/audio/sfx/fight_side_light_hit.wav');
+        // --- Fight / Action ---
+        scene.load.audio('sfx_jump_1', 'assets/audio/sfx/fight/fight_jump_1.wav');
+        scene.load.audio('sfx_jump_2', 'assets/audio/sfx/fight/fight_jump_2.wav');
+        scene.load.audio('sfx_landing', 'assets/audio/sfx/fight/fight_landing.wav');
+        scene.load.audio('sfx_dash', 'assets/audio/sfx/fight/fight_dash.wav');
+        scene.load.audio('sfx_run_light_miss', 'assets/audio/sfx/fight/fight_run_light_miss.wav');
+        scene.load.audio('sfx_run_light_hit', 'assets/audio/sfx/fight/fight_run_light_hit.wav');
+        scene.load.audio('sfx_side_light_miss', 'assets/audio/sfx/fight/fight_side_light_miss.wav');
+        scene.load.audio('sfx_side_light_hit', 'assets/audio/sfx/fight/fight_side_light_hit.wav');
+        scene.load.audio('sfx_death', 'assets/audio/sfx/fight/fight_death.wav');
+        scene.load.audio('sfx_death_crowd_1', 'assets/audio/sfx/fight/fight_death_crowd_1.wav');
+        scene.load.audio('sfx_death_crowd_2', 'assets/audio/sfx/fight/fight_death_crowd_2.wav');
+        scene.load.audio('sfx_knockout', 'assets/audio/sfx/fight/fight_knockout.wav');
+        scene.load.audio('sfx_fight_charge', 'assets/audio/sfx/fight/fight_charge.aac');
+
+        // --- Sigs ---
+        scene.load.audio('sfx_sigs_hurt', 'assets/audio/sfx/fight/sigs_hurt.wav');
+        scene.load.audio('sfx_nock_sig', 'assets/audio/sfx/sigs/nock_sig.wav');
+        scene.load.audio('sfx_sga_sig', 'assets/audio/sfx/sigs/sga_sig.wav');
+        scene.load.audio('sfx_fok_sig', 'assets/audio/sfx/sigs/fok_sig.wav');
+
+        // --- Misc ---
+        scene.load.audio('sfx_chest_drop', 'assets/audio/sfx/misc/chest_drop.wav');
+        scene.load.audio('sfx_chest_explode', 'assets/audio/sfx/misc/chest_explode.wav');
+        scene.load.audio('sfx_chest_open', 'assets/audio/sfx/misc/chest_open.wav');
+        scene.load.audio('sfx_chest_timer', 'assets/audio/sfx/misc/chest_timer.aac');
+        scene.load.audio('sfx_chest_reveal', 'assets/audio/sfx/misc/chest_reveal.wav');
+        scene.load.audio('sfx_chest_throw', 'assets/audio/sfx/misc/chest_throw.wav');
     }
 
     /**

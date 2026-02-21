@@ -11,11 +11,12 @@
 import { EffectManager } from '../effects/EffectManager';
 import Phaser from 'phaser';
 import { Player, PlayerState } from '../entities/Player';
-import { Bomb } from '../entities/Bomb';
+
 import { Chest } from '../entities/Chest';
 import NetworkManager from '../network/NetworkManager';
 import type { NetGameState, NetPlayerState, NetAttackEvent, NetHitEvent } from '../network/NetworkManager';
 import { AnimationHelpers } from '../managers/AnimationHelpers';
+import { AudioManager } from '../managers/AudioManager';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
 import { createStage as createSharedStage } from '../stages/StageFactory';
@@ -27,6 +28,7 @@ import { InputManager } from '../input/InputManager';
 import type { GameSnapshot, PlayerSnapshot } from '../network/StateSnapshot';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { DebugOverlay } from '../components/DebugOverlay';
+import { ControlsOverlay } from '../components/ControlsOverlay';
 
 import type { GameSceneInterface } from './GameSceneInterface';
 
@@ -53,8 +55,6 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
 
-    // Bombs (synced from server)
-    public bombs: Map<number, Bomb> = new Map();
     public chests!: Phaser.GameObjects.Group;
 
     // UI
@@ -91,6 +91,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
     // Debug Overlay
     private debugOverlay!: DebugOverlay;
+    private controlsOverlay!: ControlsOverlay;
     private debugVisible: boolean = false;
     private debugToggleKey!: Phaser.Input.Keyboard.Key;
     private previousSelectPressed: boolean = false;
@@ -126,28 +127,6 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     constructor() {
         super({ key: 'OnlineGameScene' });
         this.networkManager = NetworkManager.getInstance();
-    }
-
-    public addBomb(_bomb: Bomb): void {
-        // Online bombs are managed by NetworkManager typically.
-        // If this is a local visual bomb, we might not track it in the main map?
-        // Or if it's predicted...
-        // For now, no-op or simple log as strictly local bombs shouldn't exist online?
-        // Actually, preventing crash is the goal.
-    }
-
-    public removeBomb(bomb: Bomb): void {
-        // Find by value and remove?
-        for (const [id, b] of this.bombs.entries()) {
-            if (b === bomb) {
-                this.bombs.delete(id);
-                break;
-            }
-        }
-    }
-
-    public getBombs(): Bomb[] {
-        return Array.from(this.bombs.values());
     }
 
     public getPlayers(): Player[] {
@@ -264,6 +243,10 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         // Debug Overlay
         this.debugOverlay = new DebugOverlay(this);
         this.debugOverlay.setCameraIgnore(this.cameras.main);
+
+        // F1 Controls Overlay
+        this.controlsOverlay = new ControlsOverlay(this);
+        this.cameras.main.ignore(this.controlsOverlay.getElements());
 
         // Debug Toggle Key
         this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
@@ -736,7 +719,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
      * Check if player is outside blast zones and respawn if so
      */
     private checkBlastZone(player: Player): void {
-        if (!player.active) return;
+        if (!player.active || player.isRespawning) return;
 
         // ONLY Local player logic determines death for self (Client Authoritative)
         const isLocal = player === this.localPlayer;
@@ -755,10 +738,12 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             // IMPACT POLISH (Local only for shake, visual for all? Actually local visual is fine for now)
             // Ideally we broadcast this event, but for now client-side prediction visual is okay.
             this.cameras.main.shake(300, 0.02);
-            // Clamp impact position
-            // const impactX = Phaser.Math.Clamp(bounds.centerX, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
-            // const impactY = Phaser.Math.Clamp(bounds.centerY, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
-            // this.effectManager.spawnDeathExplosion(impactX, impactY, 0xff4444);
+            AudioManager.getInstance().playSFX('sfx_death', { volume: 0.8 });
+            if (Math.random() > 0.5) {
+                AudioManager.getInstance().playSFX('sfx_death_crowd_1', { volume: 0.5 });
+            } else {
+                AudioManager.getInstance().playSFX('sfx_death_crowd_2', { volume: 0.5 });
+            }
 
             // Hide immediately
             player.setActive(false);
@@ -785,6 +770,12 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         const spawn = { x: 960 + offsetX, y: 200 };
 
         player.setPosition(spawn.x, 300);
+
+        // Grant invulnerability
+        player.isRespawning = true;
+        this.time.delayedCall(1500, () => {
+            player.isRespawning = false;
+        });
 
         // Re-add body if removed (critical for physics to resume)
         if (player.body) {
@@ -868,6 +859,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
         let winnerText = "GAME!";
         if (winnerId >= 0) {
+            AudioManager.getInstance().playSFX('sfx_knockout', { volume: 0.8 });
             winnerText += `\nPLAYER ${winnerId + 1} HA ARATO!`; // Custom Text
 
             // ZOOM LOGIC for Online

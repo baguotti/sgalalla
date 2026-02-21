@@ -4,6 +4,7 @@ import { PhysicsConfig } from '../../config/PhysicsConfig';
 import type { InputState } from '../../input/InputManager';
 import { AttackPhase, AttackType } from '../../combat/Attack';
 import { AudioManager } from '../../managers/AudioManager';
+import type { GameSceneInterface } from '../../scenes/GameSceneInterface';
 
 export class PlayerPhysics {
     private player: Player;
@@ -25,6 +26,7 @@ export class PlayerPhysics {
     public recoveryAvailable: boolean = true;
     public lastRecoveryTime: number = 0;
     public recoveryTimer: number = 0;
+    public recoveryGhost: Phaser.GameObjects.Sprite | null = null;
 
     // Wall Mechanics
     public isWallSliding: boolean = false;
@@ -236,6 +238,13 @@ export class PlayerPhysics {
         // Physics Update for Recovery State
         if (this.isRecovering) {
             this.recoveryTimer -= deltaSeconds * 1000;
+
+            // Track ghost
+            if (this.recoveryGhost && this.recoveryGhost.active) {
+                // Keep ghost fixed relative to player visually (offset 30px up)
+                this.recoveryGhost.setPosition(this.player.x, this.player.y - 30);
+            }
+
             if (this.recoveryTimer <= 0) {
                 this.isRecovering = false;
                 this.player.resetVisuals();
@@ -401,8 +410,90 @@ export class PlayerPhysics {
         // SFX - Recovery is basically a jump/launch
         AudioManager.getInstance().playSFX('sfx_jump_2', { volume: 0.6 });
 
-        // Visuals
-        // this.player.setVisualTint(0x00ffff); // Removed: User request "remove color change effect"
+        // Spawn Recovery Ghost
+        this.spawnRecoveryGhost();
+    }
+
+    private spawnRecoveryGhost(): void {
+        const char = this.player.character;
+        const facing = this.player.getFacingDirection();
+        const scene = this.player.scene as GameSceneInterface;
+
+        // Use the vertical sig ghost
+        const initialFrame = `${char}_up_sig_ghost_000`;
+        const animKey = `${char}_up_sig_ghost`;
+
+        let ghost: Phaser.GameObjects.Sprite | null = null;
+
+        if (scene.effectManager) {
+            ghost = scene.effectManager.spawnGhost(this.player.x, this.player.y, char, initialFrame, animKey, facing);
+        } else {
+            ghost = scene.add.sprite(this.player.x, this.player.y, char, initialFrame);
+            ghost.setDepth(this.player.depth - 1);
+            ghost.play(animKey);
+            ghost.setScale(facing, 1);
+        }
+
+        if (!ghost) return;
+
+        ghost.setDepth(this.player.depth - 1);
+
+        // Scale nock_up_sig_ghost to 1.2x as requested in combat
+        if (char === 'nock') {
+            ghost.setScale(facing * 1.2, 1.2);
+        }
+
+        if (scene.uiCamera) {
+            scene.uiCamera.ignore(ghost);
+        }
+
+        // Adjust Start Y
+        let startX = this.player.x;
+        let startY = this.player.y - 30; // Offset 30px up
+        ghost.setAngle(0);
+        ghost.setPosition(startX, startY);
+
+        // Apply Glow/Blur FX
+        let blurFx: any = null;
+        if (ghost.preFX) {
+            ghost.preFX.clear();
+            ghost.preFX.addGlow(0xffffff, 0.4, 0, false, 0.05, 5);
+            blurFx = ghost.preFX.addBlur(0, 0, 0, 1);
+        }
+
+        const baseScaleX = (char === 'nock') ? facing * 1.2 : facing;
+        const baseScaleY = (char === 'nock') ? 1.2 : 1;
+
+        // Apply scale immediately
+        ghost.setScale(baseScaleX, baseScaleY);
+
+        // Store reference for tracking
+        this.recoveryGhost = ghost;
+
+        // Tween 1: Fade Out
+        scene.tweens.add({
+            targets: ghost,
+            alpha: 0,
+            delay: 150,
+            duration: 250,
+            onUpdate: () => {
+                if (blurFx && ghost) {
+                    blurFx.x = 0.5 + (1 - ghost.alpha) * 3;
+                    blurFx.y = 0.5 + (1 - ghost.alpha) * 3;
+                }
+            },
+            onComplete: () => {
+                if (this.recoveryGhost === ghost) {
+                    this.recoveryGhost = null;
+                }
+
+                if (scene.effectManager) {
+                    scene.effectManager.releaseGhost(ghost!);
+                } else {
+                    ghost!.destroy();
+                }
+            }
+        });
     }
 
     private wallJump(): void {
@@ -451,9 +542,6 @@ export class PlayerPhysics {
         this.player.isInvincible = true;
         this.player.isDodging = true; // Sync with Player state
 
-        // SFX
-        AudioManager.getInstance().playSFX('sfx_dash', { volume: 0.5 });
-
         const hasDirectionalInput = input.moveLeft || input.moveRight;
 
         // Spot Dodge conditions: No horizontal input, OR holding Up/Down without horizontal
@@ -461,7 +549,7 @@ export class PlayerPhysics {
         const isSpotDodge = !hasDirectionalInput || ((input.aimUp || input.aimDown) && !input.moveLeft && !input.moveRight);
 
         if (isSpotDodge) {
-            // SPOT DODGE
+            // SPOT DODGE — no SFX (stationary dodge, dash sound causes phasing glitch)
             this.isSpotDodging = true;
             this.dodgeDirection = 0;
             this.dodgeTimer = PhysicsConfig.SPOT_DODGE_DURATION;
@@ -475,7 +563,9 @@ export class PlayerPhysics {
             this.player.setVisualTint(0xffffff);
             this.player.spriteObject.setAlpha(PhysicsConfig.SPOT_DODGE_ALPHA);
         } else {
-            // DIRECTIONAL DODGE
+            // DIRECTIONAL DODGE — play dash SFX
+            AudioManager.getInstance().playSFX('sfx_dash', { volume: 0.5 });
+
             this.isSpotDodging = false;
             this.dodgeTimer = PhysicsConfig.DODGE_DURATION;
 
@@ -540,6 +630,28 @@ export class PlayerPhysics {
 
 
 
+    private clearRecoveryGhost(): void {
+        const scene = this.player.scene as GameSceneInterface;
+        if (this.recoveryGhost) {
+            // Need a quick fade out then release
+            const ghostToClear = this.recoveryGhost;
+            this.recoveryGhost = null; // Clear immediately so tracking stops
+
+            scene.tweens.add({
+                targets: ghostToClear,
+                alpha: 0,
+                duration: 150,
+                onComplete: () => {
+                    if (scene.effectManager) {
+                        scene.effectManager.releaseGhost(ghostToClear);
+                    } else {
+                        ghostToClear.destroy();
+                    }
+                }
+            });
+        }
+    }
+
     public checkPlatformCollision(platform: Phaser.GameObjects.Rectangle, isSoft: boolean = false): void {
         const playerBounds = this.player.getBounds();
         const platBounds = platform.getBounds();
@@ -580,7 +692,12 @@ export class PlayerPhysics {
             this.player.velocity.y = 0;
             this.player.isGrounded = true;
             this.isFastFalling = false;
-            this.isRecovering = false;
+
+            if (this.isRecovering) {
+                this.isRecovering = false;
+                this.clearRecoveryGhost();
+            }
+
             this.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
             this.recoveryAvailable = true;
             this.droppingThroughPlatform = null;
@@ -592,7 +709,7 @@ export class PlayerPhysics {
             // SFX: Play landing sound if we weren't grounded before
             // We use a debounce or verify we were actually falling to prevent spam
             if (!this.wasGroundedLastFrame) {
-                AudioManager.getInstance().playSFX('sfx_landing', { volume: 0.3 });
+                AudioManager.getInstance().playSFX('sfx_landing', { volume: 0.8 });
             }
         }
     }
@@ -640,6 +757,7 @@ export class PlayerPhysics {
         this.wallTouchesExhausted = false;
         this.droppingThroughPlatform = null;
         this.droppingThroughY = null;
+        this.clearRecoveryGhost();
     }
 
     public reset(): void {
@@ -647,6 +765,7 @@ export class PlayerPhysics {
             this.player.body.velocity.x = 0;
             this.player.body.velocity.y = 0;
         }
+        this.player.velocity.set(0, 0); // Crucial: Reset logic velocity to prevent huge gravity accumulation
         this.acceleration.set(0, 0);
         this.isGrounded = false;
         this.jumpsRemaining = PhysicsConfig.MAX_JUMPS;
@@ -659,5 +778,6 @@ export class PlayerPhysics {
         this.recoveryAvailable = true;
         this.dodgeTimer = 0;
         this.dodgeCooldownTimer = 0;
+        this.clearRecoveryGhost();
     }
 }

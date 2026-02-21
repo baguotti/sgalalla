@@ -221,10 +221,12 @@ Part 2
     - Increased `pickupRange` significantly (from 60 to 100) to make item grabbing faster and more reliable.
     - Precented opened chests from being punched/kicked to ensure they remain interactable as items only.
 
-### [2026-02-21] v0.14.3 - Ghost Visuals & Input Refinements
-- **[V]** `v0.14.3`
-- **[Feat]** **Visual Polish**:
-    - Added highly subtle WebGL glow, fade blur, and a 1-pixel positional shake to the ghost sprites.
-    - Adjusted ghost spawn offsets (moved forward 25px for most, 35px for Nock) to prevent overlapping with the main character.
-- **[Fix]** **Input Priority**:
-    - Fixed an issue where pressing Down + Light Attack while running would execute a Running Light Attack instead of a Down Light Attack.
+### [2026-02-21] v0.14.4 - Audio Glitch Refinements 🔊
+- **[V]** `v0.14.4`
+- **[Fix]** **Spot Dodge Audio**:
+    - Removed the `sfx_dash` whoosh sound from stationary spot dodges.
+    - Prevents the "phasing" audio glitch caused by overlapping dash sounds during the 300ms dodge window.
+- **[Fix]** **Charge Sound Persistence**:
+    - Fixed a bug where `sfx_fight_charge` would loop forever if a player was hit mid-charge.
+    - Integrated `clearChargeState()` into `applyHitStun()` and added a hard failsafe timeout to the sound cleanup routine to ensure looping sounds are always destroyed.
+- **[Polish]** **Audio Transitions**: Balanced charge sound fade-out to trail off naturally while remaining technically solid against interruptions.

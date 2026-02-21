@@ -133,9 +133,9 @@ export const PhysicsConfig = {
   SHORT_HOP_VELOCITY_DAMP: 0.5,     // Velocity multiplier when releasing jump early
 
   // Combat hitbox overrides (per-attack-type dimension tweaks)
-  DOWN_SIG_HITBOX_WIDTH: 160,
+  DOWN_SIG_HITBOX_WIDTH: 180,
   DOWN_SIG_HITBOX_HEIGHT: 30,
-  UP_SIG_HITBOX_WIDTH: 127,
+  UP_SIG_HITBOX_WIDTH: 147,
   UP_SIG_HITBOX_HEIGHT: 34,
   SIDE_LIGHT_HITBOX_WIDTH: 81,
   SIDE_LIGHT_OFFSET_EXTRA: 20,      // Extra forward offset for side/neutral/up light attacks

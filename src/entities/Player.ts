@@ -80,6 +80,7 @@ export class Player extends Fighter {
     public isDead: boolean = false;
     public isWinner: boolean = false;
     public isTaunting: boolean = false;
+    public isRespawning: boolean = false; // Prevents double-deaths and damage immediately after spawning
     private ai: PlayerAI | null = null;
     private aiInput: any = {}; // Store AI generated input
     public isTrainingDummy: boolean = false; // Toggle for training mode
@@ -103,27 +104,6 @@ export class Player extends Fighter {
 
     public checkItemPickup(): boolean {
         const gameScene = this.scene as GameSceneInterface;
-
-        // Check bombs first
-        const bombs = gameScene.getBombs ? gameScene.getBombs() : [];
-        if (bombs && bombs.length > 0) {
-            const pickupRange = 100;
-            let closest: Throwable | null = null;
-            let minDist = pickupRange;
-
-            for (const bomb of bombs) {
-                const dist = Phaser.Math.Distance.Between(this.x, this.y, bomb.x, bomb.y);
-                if (dist < minDist) {
-                    minDist = dist;
-                    closest = bomb;
-                }
-            }
-
-            if (closest) {
-                this.pickupItem(closest);
-                return true;
-            }
-        }
 
         // Check throwable chests (bomb mode)
         const chests = gameScene.getThrowableChests ? gameScene.getThrowableChests() : [];
@@ -163,6 +143,8 @@ export class Player extends Fighter {
 
         const item = this.heldItem;
         this.heldItem = null;
+        // Play throw SFX
+        this.scene.sound.play('sfx_chest_throw', { volume: 0.6 });
 
         // Re-enable physics
         item.setSensor(false);
@@ -179,8 +161,8 @@ export class Player extends Fighter {
     public updateHeldItemPosition(): void {
         if (this.heldItem) {
             // Position in front of the character, towards the bottom
-            const offsetForward = 55 * this.getFacingDirection(); // Increased from 25 to 55
-            const offsetDown = 25; // Relative to center (Bottom is 45)
+            const offsetForward = 50 * this.getFacingDirection(); // Decreased from 55 to 50
+            const offsetDown = 22; // Decreased from 25 to 22 (moves 3px up)
 
             this.heldItem.setPosition(this.x + offsetForward, this.y + offsetDown);
             this.heldItem.setVelocity(0, 0); // Force stay
@@ -371,6 +353,7 @@ export class Player extends Fighter {
 
     // Legacy update for safety (deprecate?)
     update(delta: number): void {
+        if (!this.active) return;
         this.updatePhysics(delta);
         this.updateLogic(delta);
     }
@@ -844,7 +827,7 @@ export class Player extends Fighter {
         super.applyHitStun();
         this.isAttacking = false;
         if (this.combat) {
-            this.combat.isCharging = false;
+            this.combat.clearChargeState(); // Must be called BEFORE resetting flags to properly clean up charge sound
             this.combat.isGroundPounding = false;
             this.combat.currentAttack = null;
             this.combat.deactivateHitbox();

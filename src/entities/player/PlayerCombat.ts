@@ -47,6 +47,7 @@ export class PlayerCombat {
     private hasSpawnedGhost: boolean = false;
     private chargeGhostSprite: Phaser.GameObjects.Sprite | null = null;
     private chargeBlurFx: any = null;
+    private chargeSound: Phaser.Sound.BaseSound | null = null;
 
     constructor(player: Player, scene: Phaser.Scene) {
         this.player = player;
@@ -201,6 +202,10 @@ export class PlayerCombat {
             this.isCharging = true;
             this.chargeTime = 0;
 
+            // Play Charge Sound Loop
+            this.chargeSound = this.scene.sound.add('sfx_fight_charge', { volume: 0.6, loop: true });
+            this.chargeSound.play();
+
             // Remap Grounded Down Sig -> Side Sig (User Request)
             if (direction === AttackDirection.DOWN && !isAerial) {
                 this.chargeDirection = AttackDirection.SIDE;
@@ -289,6 +294,9 @@ export class PlayerCombat {
                 } else {
                     AudioManager.getInstance().playSFX('sfx_side_light_miss', { volume: 0.5 });
                 }
+            } else if (this.currentAttack.data.type === AttackType.HEAVY) {
+                // All characters play sigs_hurt on startup
+                AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.5 });
             }
         } catch (e) {
             console.warn('Unknown attack:', attackKey);
@@ -318,6 +326,19 @@ export class PlayerCombat {
 
             // Set cooldown
             this.attackCooldownTimer = this.currentAttack.data.recoveryDuration;
+
+            // SFX: Play signature sounds on Release
+            if (this.currentAttack.data.direction === AttackDirection.SIDE ||
+                this.currentAttack.data.direction === AttackDirection.UP) {
+
+                if (this.player.character === 'nock') {
+                    AudioManager.getInstance().playSFX('sfx_nock_sig', { volume: 0.5 });
+                } else if (this.player.character === 'sga') {
+                    AudioManager.getInstance().playSFX('sfx_sga_sig', { volume: 0.5 });
+                } else if (this.player.character === 'fok' || this.player.character === 'fok_v3') {
+                    AudioManager.getInstance().playSFX('sfx_fok_sig', { volume: 0.5 });
+                }
+            }
         } catch (e) {
             console.warn(`Attack ${attackKey} not found`);
         }
@@ -416,6 +437,35 @@ export class PlayerCombat {
             this.chargeGhostSprite.destroy();
             this.chargeGhostSprite = null;
             this.chargeBlurFx = null;
+        }
+
+        if (this.chargeSound) {
+            const soundToFade = this.chargeSound as any;
+            this.chargeSound = null; // Clear reference so new charges can start cleanly
+
+            // Fade out the sound for a natural trail-off
+            this.scene.tweens.add({
+                targets: soundToFade,
+                volume: 0,
+                duration: 200,
+                ease: 'Linear',
+                onComplete: () => {
+                    try {
+                        soundToFade.stop();
+                        soundToFade.destroy();
+                    } catch (e) { }
+                }
+            });
+
+            // Failsafe: if tween system hangs or scene pauses, statically destroy it after 250ms
+            setTimeout(() => {
+                try {
+                    if (soundToFade && soundToFade.stop) {
+                        soundToFade.stop();
+                        soundToFade.destroy();
+                    }
+                } catch (e) { }
+            }, 250);
         }
     }
 
@@ -794,8 +844,8 @@ export class PlayerCombat {
         // Already hit this target?
         if (this.hitTargets.has(target)) return;
 
-        // Cannot hit self, invincible targets, or respawning targets
-        if (target === this.player || target.isInvincible || target.isInvulnerable) return;
+        // Cannot hit self
+        if (target === this.player) return;
 
         // Need source data (Attack or Recovery)
         if (!this.currentAttack && !this.player.physics.isRecovering) return;
@@ -806,7 +856,15 @@ export class PlayerCombat {
 
         const targetBounds = target.getBounds();
         if (this.activeHitbox.checkCollision(targetBounds)) {
+            // Register target so we don't hit them again this swing
             this.hitTargets.add(target);
+
+            // If invincible / dodging, DO NOT apply damage/knockback or hit sounds
+            if (target.isInvincible || target.isInvulnerable) {
+                return;
+            }
+
+            // Normal hit
             this.applyHitTo(target);
         }
     }
@@ -828,7 +886,7 @@ export class PlayerCombat {
             knockbackAngle = data.knockbackAngle;
             isHeavy = data.type === AttackType.HEAVY;
 
-            // Side Sig Knockback Scaling (Fok/Nock/Pe/Sgu/Greg) — reward for risky full charge
+            // Side Sig Knockback Scaling (Fok/Nock/Pe/Sgu/Greg) \u2014 reward for risky full charge
             if ((this.player.character === 'fok' || this.player.character === 'nock' || this.player.character === 'pe' || this.player.character === 'sgu' || this.player.character === 'sga' || this.player.character === 'greg') &&
                 data.type === AttackType.HEAVY &&
                 data.direction === AttackDirection.SIDE) {
@@ -847,6 +905,8 @@ export class PlayerCombat {
                 } else {
                     AudioManager.getInstance().playSFX('sfx_side_light_hit', { volume: 0.6 });
                 }
+            } else if (this.currentAttack.data.type === AttackType.HEAVY) {
+                AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.6 });
             }
 
         } else if (this.player.physics.isRecovering) {
@@ -856,6 +916,8 @@ export class PlayerCombat {
             knockbackGrowth = 8;
             knockbackAngle = 80; // Upwards
             isHeavy = false;
+
+            AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.6 });
         } else {
             return;
         }
@@ -887,8 +949,6 @@ export class PlayerCombat {
 
         // Apply damage and knockback (also calls applyHitStun)
         DamageSystem.applyDamage(target, damage, knockbackVector);
-
-
 
         // Reset air action counter on hit - Check if target is Player
         if (target instanceof Player) {
