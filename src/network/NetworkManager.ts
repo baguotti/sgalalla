@@ -159,7 +159,7 @@ class NetworkManager {
      */
     public async connect(): Promise<boolean> {
         return new Promise((resolve) => {
-            const hostname = window.location.hostname;
+            const hostname = 'localhost';
 
             // Geckos.io: Always connect to same hostname on port 9208
             // Self-hosted: Client and Server both on DigitalOcean Droplet

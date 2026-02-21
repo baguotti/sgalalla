@@ -293,3 +293,15 @@ Part 2
     - **Tuning**: Adjusted `DODGE_DISTANCE` to `210` px for a snappier, more balanced feel.
 - **[S]** **STATUS**: FSM Transition successfully completed. Character movement and state management are now robust, clean, and highly extensible.
 --------------------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-21] v1.0.4 - Server-Authoritative Physics: Phase 1 (Shared Module Extraction) 🏗️⚙️
+- **[V]** `v1.0.4`
+- **[Arch]** **Shared Physics Extraction**:
+    - **Shared Modules**: Created `shared/` directory to house platform-agnostic code. Extracted `PhysicsConfig.ts`, `MapConfig.ts`, and `StageData.ts` as pure-data/constant modules.
+    - **Simulation Logic**: Extracted core movement and collision logic from `PlayerPhysics.ts` into `shared/PhysicsSimulation.ts`. This module contains pure functions (`stepPhysics`, `checkPlatformCollisions`) that run identically on both client and server.
+    - **Import Refactor**: Reconfigured `src/config/` modules to re-export from `shared/`, ensuring 0% breakage for existing client code while establishing a single source of truth.
+- **[Net]** **Local Testing Readiness**:
+    - **Local Connectivity**: Configured `NetworkManager.ts` to connect to `localhost` by default, enabling full-stack local testing of multiplayer mechanics during this transition.
+- **[Build]** **Toolchain Updates**:
+    - **TypeScript**: Updated both client and server `tsconfig.json` to resolve the `shared/` directory. Verified clean builds for both environments.
+- **[S]** **STATUS**: Phase 1 Complete. The foundation for server authority is laid. Shared code is verified and operational.
+--------------------------------------------------------------------------------------------------------------------------------------------------

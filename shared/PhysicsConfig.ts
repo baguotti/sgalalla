@@ -1,0 +1,187 @@
+/**
+ * Shared Physics Configuration
+ * Single source of truth for all physics constants.
+ * Used by both client (Phaser) and server (Node.js headless).
+ * NO PHASER DEPENDENCIES — pure constants only.
+ */
+export const PhysicsConfig = {
+    // Gravity - high value for fast, heavy feel (like Brawlhalla)
+    GRAVITY: 2200,
+
+    // Movement - acceleration-based for responsive feel with slight slide
+    MOVE_ACCEL: 6500,
+    GLOBAL_KNOCKBACK_SCALING: 5.0,
+    FRICTION: 0.60,
+    RUN_FRICTION: 0.93,
+    SLIDE_ATTACK_SPEED: 2200,
+    SLIDE_ATTACK_DECELERATION: 0.96,
+    MAX_SPEED: 1400,
+    MAX_FALL_SPEED: 1800,
+
+    // Jump mechanics
+    JUMP_FORCE: -1050,
+    SHORT_HOP_FORCE: -540,
+    JUMP_HOLD_THRESHOLD: 150,
+    DOUBLE_JUMP_FORCE: -900,
+    MAX_JUMPS: 3,
+
+    // Fast-fall
+    FAST_FALL_MULTIPLIER: 1.7,
+    FAST_FALL_THRESHOLD: 300,
+
+    // Recovery attack
+    RECOVERY_FORCE_Y: -1760,
+    RECOVERY_FORCE_X: 550,
+    RECOVERY_COOLDOWN: 1000,
+    RECOVERY_DURATION: 300,
+
+    // Platform drop-through
+    PLATFORM_DROP_GRACE_PERIOD: 200,
+
+    // Attack system
+    LIGHT_ATTACK_DAMAGE: 4,
+    HEAVY_ATTACK_DAMAGE: 9,
+    LIGHT_ATTACK_KNOCKBACK: 25000,
+    HEAVY_ATTACK_KNOCKBACK: 45000,
+    LIGHT_ATTACK_DURATION: 200,
+    HEAVY_ATTACK_DURATION: 400,
+    LIGHT_ATTACK_COOLDOWN: 300,
+    HEAVY_ATTACK_COOLDOWN: 600,
+
+    // Hitbox sizes
+    LIGHT_HITBOX_WIDTH: 120,
+    LIGHT_HITBOX_HEIGHT: 80,
+    HEAVY_HITBOX_WIDTH: 600,
+    HEAVY_HITBOX_HEIGHT: 120,
+
+    // Dodge/Dash - Brawlhalla style
+    DODGE_DISTANCE: 210,
+    DODGE_DURATION: 180,
+    DODGE_COOLDOWN: 800,
+    DODGE_INVINCIBILITY: 150,
+    SPOT_DODGE_DURATION: 300,
+
+    // Run mechanics
+    RUN_SPEED_MULT: 2.25,
+    RUN_ACCEL_MULT: 1.2,
+
+    // Damage system
+    MAX_DAMAGE: 999,
+    HIT_STUN_DURATION: 300,
+
+    // Ledge detection
+    LEDGE_SNAP_DISTANCE: 30,
+
+    // Player dimensions
+    PLAYER_WIDTH: 120,
+    PLAYER_HEIGHT: 184,
+    NOSE_SIZE: 24,
+
+    // Attack frame timing
+    LIGHT_STARTUP_FRAMES: 50,
+    LIGHT_ACTIVE_FRAMES: 100,
+    LIGHT_RECOVERY_FRAMES: 50,
+
+    // Heavy attacks
+    HEAVY_STARTUP_FRAMES: 30,
+    HEAVY_ACTIVE_FRAMES: 300,
+    HEAVY_RECOVERY_FRAMES: 200,
+
+    // Ground pound
+    GROUND_POUND_STARTUP: 200,
+    GROUND_POUND_SPEED: 3200,
+    GROUND_POUND_DAMAGE: 8,
+    GROUND_POUND_KNOCKBACK: 500,
+
+    // Directional attack hitbox offsets
+    SIDE_ATTACK_OFFSET_X: 300,
+    UP_ATTACK_OFFSET_Y: -150,
+    DOWN_ATTACK_OFFSET_Y: 150,
+
+    // Chargeable heavy attacks
+    CHARGE_MAX_TIME: 1500,
+    CHARGE_DAMAGE_MULT: 2.0,
+    CHARGE_KNOCKBACK_MULT: 1.8,
+
+    // Wall mechanics
+    WALL_SLIDE_SPEED: 400,
+    WALL_JUMP_FORCE_X: 1600,
+    WALL_JUMP_FORCE_Y: -1050,
+    WALL_FRICTION: 0.7,
+    WALL_COYOTE_TIME: 200,
+
+    // Edge grab mechanics
+    EDGE_GRAB_HORIZONTAL_RANGE: 60,
+    EDGE_GRAB_VERTICAL_RANGE: 90,
+    LEDGE_HANG_OFFSET_X: 45,
+    LEDGE_HANG_OFFSET_Y: 45,
+    LEDGE_CLIMB_SPEED: -1000,
+    LEDGE_JUMP_X: 1200,
+    LEDGE_JUMP_Y: -1600,
+
+    // State-dependent friction multipliers
+    AIR_FRICTION: 0.91,
+    CHARGE_FRICTION: 0.2,
+    CHARGE_GRAVITY_CANCEL: 0.5,
+    ATTACK_RECOVERY_FRICTION: 0.75,
+    ATTACK_ACTIVE_FRICTION: 0.95,
+    AERIAL_STALL_GRAVITY_DAMP: 0.6,
+    AERIAL_STALL_HORIZONTAL_DAMP: 0.9,
+    HITSTUN_FRICTION: 0.95,
+    SHORT_HOP_VELOCITY_DAMP: 0.5,
+
+    // Combat hitbox overrides
+    DOWN_SIG_HITBOX_WIDTH: 180,
+    DOWN_SIG_HITBOX_HEIGHT: 30,
+    UP_SIG_HITBOX_WIDTH: 147,
+    UP_SIG_HITBOX_HEIGHT: 34,
+    SIDE_LIGHT_HITBOX_WIDTH: 81,
+    SIDE_LIGHT_OFFSET_EXTRA: 20,
+    GHOST_HITBOX_SCALE: 0.65,
+    RECOVERY_HITBOX_SIZE: 60,
+    RECOVERY_DAMAGE: 8,
+
+    // Side Sig damage scaling
+    SIDE_SIG_MIN_DAMAGE: 6,
+    SIDE_SIG_MAX_DAMAGE: 20,
+
+    // Movement thresholds
+    HIGH_SPEED_THRESHOLD_MULT: 1.2,
+    MAX_AIR_ACTIONS: 9,
+
+    // Platform mechanics
+    PLATFORM_DROP_NUDGE_Y: 1,
+    PLATFORM_DROP_PUSH_Y: 100,
+    PLATFORM_SNAP_THRESHOLD: 45,
+
+    // Dodge mechanics
+    SPOT_DODGE_AERIAL_Y_DAMP: 0.2,
+    SPOT_DODGE_ALPHA: 0.7,
+    AIR_DODGE_VERTICAL_DAMP: 0.3,
+
+    // Bomb item properties
+    BOMB_RADIUS: 30,
+    BOMB_BOUNCE: 0.8,
+    BOMB_FRICTION: 0.005,
+    BOMB_DENSITY: 0.01,
+    BOMB_FUSE_TIME: 3000,
+    BOMB_GRACE_TIME: 200,
+    BOMB_EXPLOSION_VISUAL_RADIUS: 60,
+    BOMB_EXPLOSION_FADE_MS: 150,
+    BOMB_BLAST_RADIUS: 160,
+    BOMB_EXPLOSION_DAMAGE: 15,
+    BOMB_EXPLOSION_KNOCKBACK: 12,
+    BOMB_CONTACT_THRESHOLD: 90,
+    BOMB_SHAKE_DURATION: 150,
+    BOMB_SHAKE_INTENSITY: 0.01,
+
+    CHEST_DAMAGE: 25,
+    CHEST_PROJECTILE_DAMAGE: 15,
+    CHEST_PROJECTILE_SPEED_THRESHOLD: 8,
+    CHEST_KNOCKBACK_FORCE: 2500,
+    CHEST_SHAKE_DURATION: 150,
+    CHEST_SHAKE_INTENSITY: 0.01,
+    CHEST_GROUND_SHAKE_INTENSITY: 0.008,
+    CHEST_GROUND_SHAKE_DURATION: 150,
+    CHEST_SPEED_THRESHOLD: 2,
+} as const;
