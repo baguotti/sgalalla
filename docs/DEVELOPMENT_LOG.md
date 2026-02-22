@@ -403,3 +403,17 @@ Part 2
     - **Render Delay**: Reduced base `RENDER_DELAY_MS` to a tight 60ms (down from 100ms). The timeline architecture fix was so effective we no longer need the massive buffer.
     - **Drift Bounds**: Tightened `clockSpeed` drift adjustments from `0.90 - 1.10` to `0.95 - 1.05`, eliminating the "floaty" or "sluggish" feeling caused by the client over-correcting the jitter timeline.
 ------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-22] v1.0.15 - Targeted Revert to Proven Interpolation 🔙✅
+- **[V]** `v1.0.15`
+- **[Net]** **Revert to v1.0.9 Proven Logic**:
+    - **Reverted**: `clientFrame * TICK_MS` mathematical timeline back to `performance.now()` arrival timestamps. The mathematical approach broke because a single global interpolation clock cannot handle independent per-player frame epochs.
+    - **Reverted**: Client-Side Hit Prediction removed. It caused animation desync (stuck "hurt" poses) and violent position snapback when hitstun ended.
+    - **Reverted**: Direct velocity extrapolation back to lazy lerp (`Linear(player.x, predictedX, 0.15)`).
+    - **Reverted**: Clock drift gain from `0.005` back to `0.002`.
+- **[Net]** **Retained Improvements from v1.0.11+**:
+    - **Kept**: 30Hz server broadcast rate (per-room `broadcastCounter`).
+    - **Kept**: 30Hz client send rate.
+    - **Kept**: `RENDER_DELAY_MS = 60` flat (simpler than adaptive).
+    - **Kept**: Per-room `broadcastCounter` bug fix.
+- **[S]** **STATUS**: Restored v1.0.9 reliability with v1.0.11 broadcast improvements.
+------------------------------------------------------------------------------------------------------------------------------------

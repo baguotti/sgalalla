@@ -361,7 +361,6 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Send local player's actual position to server for relay to other clients
             const stateToSend = {
-                clientFrame: this.localFrame,
                 playerId: this.localPlayerId,
                 x: this.localPlayer.x,
                 y: this.localPlayer.y,
@@ -414,35 +413,18 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Smooth continuous clock speed curve (eliminates discrete jumps)
             const leadError = targetLead - this.RENDER_DELAY_MS;
-            // Tightened bounds: 0.95 to 1.05 to prevent "floaty" visual physics
             const clockSpeed = Phaser.Math.Clamp(
-                1.0 + (leadError * 0.005),
-                0.95,
-                1.05
+                1.0 + (leadError * 0.002), // Gentle adjustment factor
+                0.95,  // Lower bound (slow down when buffer is low)
+                1.05   // Upper bound (speed up when buffer is high)
             );
 
             this.interpolationTime += delta * clockSpeed;
         }
 
-        // 2. Interpolate Remote Players (or Predict if Hit)
+        // 2. Interpolate Remote Players
         this.players.forEach((player, playerId) => {
             if (playerId !== this.localPlayerId) {
-                // CLIENT-SIDE HIT PREDICTION
-                // If we locally hit this player, we temporarily suspend network interpolation
-                // and let the local physics engine simulate their knockback for instant visual feedback.
-                if (player.isHitStunned) {
-                    player.updatePhysics(delta);
-
-                    // Collisions to prevent flying through walls during local knockback
-                    this.platforms.forEach(platform => player.checkPlatformCollision(platform, false));
-                    this.softPlatforms.forEach(platform => player.checkPlatformCollision(platform, true));
-                    player.checkWallCollision(this.walls);
-
-                    // Update hit logic timers (so hitStun eventually expires and interpolation resumes)
-                    player.updateLogic(delta);
-                    player.updateVisuals(delta);
-                    return; // Skip interpolation entirely this frame
-                }
 
                 const buffer = this.snapshotBuffer.get(playerId);
 
@@ -475,13 +457,15 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                         }
                         player.setFacingDirection(fromSnap.facingDirection);
                     } else if (buffer.length > 0) {
-                        // Dead-reckoning: extrapolate using velocity directly
+                        // Smooth extrapolation using last known velocity
                         const latest = buffer[buffer.length - 1];
-                        const timeSinceLast = Math.min(this.interpolationTime - latest.serverTime, 200); // Cap at 200ms
+                        const timeSinceLast = this.interpolationTime - latest.serverTime;
 
-                        // Direct velocity projection (no lazy lerp)
-                        player.x = latest.x + (latest.velocityX || 0) * (timeSinceLast / 1000);
-                        player.y = latest.y + (latest.velocityY || 0) * (timeSinceLast / 1000);
+                        const predictedX = latest.x + (latest.velocityX || 0) * (timeSinceLast / 1000);
+                        const predictedY = latest.y + (latest.velocityY || 0) * (timeSinceLast / 1000);
+
+                        player.x = Phaser.Math.Linear(player.x, predictedX, 0.15);
+                        player.y = Phaser.Math.Linear(player.y, predictedY, 0.15);
 
                         if (latest.animationKey) player.playAnim(latest.animationKey, true);
                         player.setFacingDirection(latest.facingDirection);
@@ -602,17 +586,12 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 this.snapshotBuffer.set(netPlayer.playerId, buffer);
             }
 
-            // Create a snapshot with MATHEMATICAL ORIGIN TIMELINE timestamp
-            // Use the originating client's frame to perfectly reconstruct their timeline
-            // Under normal circumstances, 60 physics frames = exactly 16.66ms.
-            // This renders Client B entirely immune to network UDP jitter or server droplet clock drifts.
-            const TICK_MS = 1000 / 60;
-            const theoreticalClientTime = (netPlayer.clientFrame || serverFrame) * TICK_MS;
-
+            // Create a snapshot with CLIENT ARRIVAL timestamp
+            const arrivalTime = performance.now();
             const snapshot: NetPlayerSnapshot = {
                 ...netPlayer,
-                frame: netPlayer.clientFrame || serverFrame,
-                serverTime: theoreticalClientTime
+                frame: serverFrame,
+                serverTime: arrivalTime
             };
 
             // Add to buffer in chronological order
@@ -627,7 +606,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Initialize clock
             if (!this.isBufferInitialized && buffer.length >= 2) {
-                this.interpolationTime = theoreticalClientTime - this.RENDER_DELAY_MS;
+                this.interpolationTime = arrivalTime - this.RENDER_DELAY_MS;
                 this.isBufferInitialized = true;
             }
 
