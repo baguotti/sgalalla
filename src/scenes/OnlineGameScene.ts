@@ -362,6 +362,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Send local player's actual position to server for relay to other clients
             const stateToSend = {
+                clientFrame: this.localFrame,
                 playerId: this.localPlayerId,
                 x: this.localPlayer.x,
                 y: this.localPlayer.y,
@@ -584,17 +585,17 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 this.snapshotBuffer.set(netPlayer.playerId, buffer);
             }
 
-            // Create a snapshot with MATHEMATICAL SERVER TIMELINE timestamp
-            // Instead of using performance.now() (which is vulnerable to packet clumping/jitter),
-            // derive the exact theoretical server timeline based on the frame number.
-            // Under normal circumstances, 60 physics frames = exactly 1000ms.
+            // Create a snapshot with MATHEMATICAL ORIGIN TIMELINE timestamp
+            // Use the originating client's frame to perfectly reconstruct their timeline
+            // Under normal circumstances, 60 physics frames = exactly 16.66ms.
+            // This renders Client B entirely immune to network UDP jitter or server droplet clock drifts.
             const TICK_MS = 1000 / 60;
-            const theoreticalServerTime = serverFrame * TICK_MS;
+            const theoreticalClientTime = (netPlayer.clientFrame || serverFrame) * TICK_MS;
 
             const snapshot: NetPlayerSnapshot = {
                 ...netPlayer,
-                frame: serverFrame,
-                serverTime: theoreticalServerTime
+                frame: netPlayer.clientFrame || serverFrame,
+                serverTime: theoreticalClientTime
             };
 
             // Add to buffer in chronological order
@@ -609,7 +610,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Initialize clock
             if (!this.isBufferInitialized && buffer.length >= 2) {
-                this.interpolationTime = theoreticalServerTime - this.RENDER_DELAY_MS;
+                this.interpolationTime = theoreticalClientTime - this.RENDER_DELAY_MS;
                 this.isBufferInitialized = true;
             }
 

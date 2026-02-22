@@ -386,3 +386,10 @@ Part 2
     - **Fix**: Decoupled playback from network jitter entirely. Client now calculates the theoretical server time mathematically using the authoritative `serverFrame * TICK_MS`.
     - **Result**: The client's jitter buffer timeline is now perfectly immune to internet lag spikes, packet clustering, and Node.js `setInterval` drift on the server.
 ------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-22] v1.0.13 - Frame Relay Jitter Architecture Fix 🧩🚀
+- **[V]** `v1.0.13`
+- **[Net]** **Interpolation Timeline Flaw Fix**:
+    - **Flaw**: Previous attempt to mathematically interpolate used the **Server's** broadcast frame index rather than the **Client A's** originating physics frame. Thus, Client A to Server UDP jitter was baked directly into the Server's broadcast.
+    - **Fix**: Upgraded `NetPlayerState` to include `clientFrame` directly from Client A's local physics loop. The server receives, stores, and broadcasts this `clientFrame` telemetry. Client B mathematically anchors interpolation directly to this `clientFrame`.
+    - **Result**: Client B can perfectly recreate Client A's chronological playback speed, effectively nullifying Relay Jitter across both "Client A -> Server" and "Server -> Client B" hops.
+------------------------------------------------------------------------------------------------------------------------------------

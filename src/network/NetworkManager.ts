@@ -50,6 +50,7 @@ export interface NetInput {
 
 // Minimal player state for sync
 export interface NetPlayerState {
+    clientFrame: number; // Originating client's frame when position was sampled
     playerId: number;
     x: number;
     y: number;

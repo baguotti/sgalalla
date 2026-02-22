@@ -75,6 +75,7 @@ export function decodePlayerState(buffer: ArrayBuffer): NetPlayerState {
     const animIndex = view.getUint8(11);
 
     return {
+        clientFrame: 0, // Binary encoding for POSITION_UPDATE is currently deferred to JSON
         playerId: view.getUint8(0),
         x: view.getInt16(1, true) / 10,
         y: view.getInt16(3, true) / 10,

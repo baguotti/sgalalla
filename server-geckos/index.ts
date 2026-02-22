@@ -62,6 +62,7 @@ interface PlayerState {
     lastReceivedFrame: number;   // Highest client frame we've seen (for dedup)
     fsmState: string;            // Client's current FSM state
     prevFsmState: string;        // Previous FSM state (for edge detection)
+    clientFrame?: number;        // The originating client's local frame when position was sampled
 }
 
 type RoomPhase = 'WAITING' | 'SELECTING' | 'PLAYING';
@@ -435,6 +436,7 @@ io.onConnection((channel: ServerChannel) => {
         const src = decoded || data;
         if (src) {
             // Position & physics (client-authoritative)
+            if (typeof src.clientFrame === 'number') player.clientFrame = src.clientFrame;
             if (typeof src.x === 'number') player.x = src.x;
             if (typeof src.y === 'number') player.y = src.y;
             if (typeof src.velocityX === 'number') player.velocityX = src.velocityX;
@@ -606,6 +608,7 @@ setInterval(() => {
                     animationKey: p.animationKey,
                     damagePercent: p.damagePercent,
                     lives: p.lives,
+                    clientFrame: p.clientFrame,
                     lastProcessedInputFrame: p.lastReceivedFrame,
                 })),
             };
