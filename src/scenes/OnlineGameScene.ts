@@ -39,9 +39,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
     private interpolationTime: number = 0; // Stable playback timeline (milliseconds)
     private isBufferInitialized: boolean = false;
-    // Adaptive buffer: 60ms for local (optimal), 80ms for production (user requested balance)
+    // Adaptive buffer: 60ms for local (optimal), 100ms for production (absorbs internet jitter)
     private readonly RENDER_DELAY_MS = (window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1') ? 60 : 80;
+        window.location.hostname === '127.0.0.1') ? 60 : 100;
     private localPlayerId: number = -1;
     private isConnected: boolean = false;
 
@@ -71,7 +71,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
     // Network throttling
     private stateThrottleCounter: number = 0;
-    private readonly STATE_SEND_INTERVAL: number = 1; // sendState every frame (60Hz)
+    private readonly STATE_SEND_INTERVAL: number = 3; // sendState every 3rd frame (~20Hz, matches server broadcast)
     private inputThrottleCounter: number = 0;
     private readonly INPUT_SEND_INTERVAL: number = 1; // sendInput every frame (~60Hz)
 

@@ -334,14 +334,14 @@ Part 2
     - **Cross-Platform Compile**: Verified both client (`vite build`) and server (`tsc --noEmit`) builds pass with the new shared logic.
 - **[S]** **STATUS**: Phase 3 Complete. The shared simulation now provides 1:1 logic parity between client and server. Ready for Phase 4 (Wiring).
 ------------------------------------------------------------------------------------------------------------------------------------
-### [2026-02-21] v1.0.9 - Rollback to Client-Authoritative Physics 🔙🏃‍♂️
-- **[V]** `v1.0.9`
-- **[Net]** **Physics Authority Revert**:
-    - **Revert**: Transitioned back from Server-Authoritative to Client-Authoritative physics for player positions.
-    - **Rationale**: Independent clock drift (RAF vs setInterval) and variable deltas caused irreversible simulation divergence. 
-    - **Hybrid Retention**: Kept Input Redundancy (last 10 frames) and FSM State Transmission for improved reliability and animation sync.
-    - **Stability**: Restored the "offline-feel" lag-free local experience while maintaining robust network relay for remote players.
-- **[S]** **STATUS**: Phase 6 conclusion. Physics authority shifted back to client for stability. Ready for production deployment.
+ **[V]** `v1.0.7`
+- **[Arch]** **Thin Wrapper Implementation**:
+    - **Delegation**: Rewrote `PlayerPhysics.ts` (791 → ~420 lines). It now contains zero physics math, acting as a thin wrapper that delegates to `shared/stepPhysics()`.
+    - **State Sync**: Implemented high-fidelity state syncing (`syncToBody`/`syncFromBody`) ensuring `SimBody` is perfectly aligned with Phaser's `Player` and `PlayerPhysics` public API.
+    - **Event Handling**: Integrated the `PhysicsEvent` system to trigger SFX, FSM state changes (e.g., `Dodge`, `Recovery`), and visual effects (ghost sprites) from the shared simulation.
+- **[Net]** **Foundation for Authority**:
+    - **Logic Parity**: Confirmed both client and server now execute the exact same physics code, eliminating the desync-by-logic issues from earlier phases.
+- **[S]** **STATUS**: Phase 4 Complete. The client is now "physics-agnostic," preparing for server-driven reconciliation in Phase 5.
 ------------------------------------------------------------------------------------------------------------------------------------
 
 - **[V]** `v1.0.8`
@@ -353,12 +353,14 @@ Part 2
 - **[S]** **STATUS**: Step 6B Complete. UDP packet loss issues significantly mitigated. Ready for Step 6C (Prediction Replay).
 ------------------------------------------------------------------------------------------------------------------------------------
 
-- **[V]** `v1.0.7`
-- **[Arch]** **Thin Wrapper Implementation**:
-    - **Delegation**: Rewrote `PlayerPhysics.ts` (791 → ~420 lines). It now contains zero physics math, acting as a thin wrapper that delegates to `shared/stepPhysics()`.
-    - **State Sync**: Implemented high-fidelity state syncing (`syncToBody`/`syncFromBody`) ensuring `SimBody` is perfectly aligned with Phaser's `Player` and `PlayerPhysics` public API.
-    - **Event Handling**: Integrated the `PhysicsEvent` system to trigger SFX, FSM state changes (e.g., `Dodge`, `Recovery`), and visual effects (ghost sprites) from the shared simulation.
-- **[Net]** **Foundation for Authority**:
-    - **Logic Parity**: Confirmed both client and server now execute the exact same physics code, eliminating the desync-by-logic issues from earlier phases.
-- **[S]** **STATUS**: Phase 4 Complete. The client is now "physics-agnostic," preparing for server-driven reconciliation in Phase 5.
+-
+
+### [2026-02-21] v1.0.9 - Rollback to Client-Authoritative Physics 🔙🏃‍♂️
+- **[V]** `v1.0.9`
+- **[Net]** **Physics Authority Revert**:
+    - **Revert**: Transitioned back from Server-Authoritative to Client-Authoritative physics for player positions.
+    - **Rationale**: Independent clock drift (RAF vs setInterval) and variable deltas caused irreversible simulation divergence. 
+    - **Hybrid Retention**: Kept Input Redundancy (last 10 frames) and FSM State Transmission for improved reliability and animation sync.
+    - **Stability**: Restored the "offline-feel" lag-free local experience while maintaining robust network relay for remote players.
+- **[S]** **STATUS**: Phase 6 conclusion. Physics authority shifted back to client for stability. Ready for production deployment.
 ------------------------------------------------------------------------------------------------------------------------------------

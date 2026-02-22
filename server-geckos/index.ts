@@ -540,6 +540,8 @@ io.onConnection((channel: ServerChannel) => {
 const TICK_RATE = 60;
 const TICK_MS = 1000 / TICK_RATE;
 const DT = 1 / TICK_RATE; // Fixed timestep in seconds
+const BROADCAST_EVERY_N_TICKS = 3; // Broadcast STATE_UPDATE every 3rd tick = 20Hz
+let broadcastCounter = 0;
 
 setInterval(() => {
     rooms.forEach((room) => {
@@ -584,26 +586,30 @@ setInterval(() => {
         });
         room.bombs = room.bombs.filter(b => !explodedBombs.includes(b.id));
 
-        // === STATE BROADCAST (Client-Authoritative) ===
-        const state = {
-            frame: room.frame,
-            timestamp: Date.now(),
-            players: Array.from(room.players.values()).map(p => ({
-                playerId: p.playerId,
-                x: p.x,
-                y: p.y,
-                velocityX: p.velocityX,
-                velocityY: p.velocityY,
-                facingDirection: p.facingDirection,
-                isGrounded: p.isGrounded,
-                isAttacking: p.isAttacking,
-                animationKey: p.animationKey,
-                damagePercent: p.damagePercent,
-                lives: p.lives,
-                lastProcessedInputFrame: p.lastReceivedFrame,
-            })),
-        };
+        // === STATE BROADCAST (Client-Authoritative, 20Hz) ===
+        broadcastCounter++;
+        if (broadcastCounter >= BROADCAST_EVERY_N_TICKS) {
+            broadcastCounter = 0;
+            const state = {
+                frame: room.frame,
+                timestamp: Date.now(),
+                players: Array.from(room.players.values()).map(p => ({
+                    playerId: p.playerId,
+                    x: p.x,
+                    y: p.y,
+                    velocityX: p.velocityX,
+                    velocityY: p.velocityY,
+                    facingDirection: p.facingDirection,
+                    isGrounded: p.isGrounded,
+                    isAttacking: p.isAttacking,
+                    animationKey: p.animationKey,
+                    damagePercent: p.damagePercent,
+                    lives: p.lives,
+                    lastProcessedInputFrame: p.lastReceivedFrame,
+                })),
+            };
 
-        emitToRoom(NetMessageType.STATE_UPDATE, state);
+            emitToRoom(NetMessageType.STATE_UPDATE, state);
+        }
     });
 }, TICK_MS);
