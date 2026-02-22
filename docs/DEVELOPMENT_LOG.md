@@ -364,3 +364,18 @@ Part 2
     - **Stability**: Restored the "offline-feel" lag-free local experience while maintaining robust network relay for remote players.
 - **[S]** **STATUS**: Phase 6 conclusion. Physics authority shifted back to client for stability. Ready for production deployment.
 ------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-21] v1.0.10 - Connection Hostname Fix 🌐🔧
+- **[V]** `v1.0.10`
+- **[Net]** **Hostname Awareness**:
+    - **Fix**: Replaced hardcoded `localhost` with `window.location.hostname` in `NetworkManager.ts`.
+    - **Result**: Fixed `net::ERR_BLOCKED_BY_CLIENT` when running on production IP, allowing clients to correctly connect to the droplet.
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-21] v1.0.11 - Jitter Optimization & Interpolation Tuning 📡✨
+- **[V]** `v1.0.11`
+- **[Net]** **Interpolation Smoothing**:
+    - **Broadcast Rate**: Reduced server `STATE_UPDATE` frequency to 20Hz (every 3rd tick) to prevent UDP congestion and packet bursting.
+    - **Render Delay**: Increased production `RENDER_DELAY_MS` to 100ms, providing enough buffer to absorb network jitter over the internet.
+    - **Sync**: Reduced client `POSITION_UPDATE` frequency to 20Hz to match server broadcast rate.
+    - **Result**: Significant reduction in remote player jitter and "teleporting" while maintaining local responsiveness.
+- **[S]** **STATUS**: Deployment successful. Closing session.
+------------------------------------------------------------------------------------------------------------------------------------
