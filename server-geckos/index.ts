@@ -540,7 +540,7 @@ io.onConnection((channel: ServerChannel) => {
 const TICK_RATE = 60;
 const TICK_MS = 1000 / TICK_RATE;
 const DT = 1 / TICK_RATE; // Fixed timestep in seconds
-const BROADCAST_EVERY_N_TICKS = 3; // Broadcast STATE_UPDATE every 3rd tick = 20Hz
+const BROADCAST_EVERY_N_TICKS = 2; // Broadcast STATE_UPDATE every 2nd tick = 30Hz
 let broadcastCounter = 0;
 
 setInterval(() => {

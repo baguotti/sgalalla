@@ -71,7 +71,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
     // Network throttling
     private stateThrottleCounter: number = 0;
-    private readonly STATE_SEND_INTERVAL: number = 3; // sendState every 3rd frame (~20Hz, matches server broadcast)
+    private readonly STATE_SEND_INTERVAL: number = 2; // sendState every 2nd frame (~30Hz, matches server broadcast)
     private inputThrottleCounter: number = 0;
     private readonly INPUT_SEND_INTERVAL: number = 1; // sendInput every frame (~60Hz)
 
@@ -415,9 +415,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             // Smooth continuous clock speed curve (eliminates discrete jumps)
             const leadError = targetLead - this.RENDER_DELAY_MS;
             const clockSpeed = Phaser.Math.Clamp(
-                1.0 + (leadError * 0.002), // Gentle adjustment factor
-                0.95,  // Lower bound (slow down when buffer is low)
-                1.05   // Upper bound (speed up when buffer is high)
+                1.0 + (leadError * 0.003), // Slightly more responsive adjustment
+                0.90,  // Lower bound (slow down when buffer is low)
+                1.10   // Upper bound (speed up when buffer is high)
             );
 
             this.interpolationTime += delta * clockSpeed;
@@ -457,15 +457,13 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                         }
                         player.setFacingDirection(fromSnap.facingDirection);
                     } else if (buffer.length > 0) {
-                        // Smooth extrapolation using last known velocity
+                        // Dead-reckoning: extrapolate using velocity directly
                         const latest = buffer[buffer.length - 1];
-                        const timeSinceLast = this.interpolationTime - latest.serverTime;
+                        const timeSinceLast = Math.min(this.interpolationTime - latest.serverTime, 200); // Cap at 200ms
 
-                        const predictedX = latest.x + (latest.velocityX || 0) * (timeSinceLast / 1000);
-                        const predictedY = latest.y + (latest.velocityY || 0) * (timeSinceLast / 1000);
-
-                        player.x = Phaser.Math.Linear(player.x, predictedX, 0.15);
-                        player.y = Phaser.Math.Linear(player.y, predictedY, 0.15);
+                        // Direct velocity projection (no lazy lerp)
+                        player.x = latest.x + (latest.velocityX || 0) * (timeSinceLast / 1000);
+                        player.y = latest.y + (latest.velocityY || 0) * (timeSinceLast / 1000);
 
                         if (latest.animationKey) player.playAnim(latest.animationKey, true);
                         player.setFacingDirection(latest.facingDirection);
