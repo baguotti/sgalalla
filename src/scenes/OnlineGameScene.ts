@@ -584,12 +584,17 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 this.snapshotBuffer.set(netPlayer.playerId, buffer);
             }
 
-            // Create a snapshot with CLIENT ARRIVAL timestamp (not reconstructed from frame)
-            const arrivalTime = performance.now();
+            // Create a snapshot with MATHEMATICAL SERVER TIMELINE timestamp
+            // Instead of using performance.now() (which is vulnerable to packet clumping/jitter),
+            // derive the exact theoretical server timeline based on the frame number.
+            // Under normal circumstances, 60 physics frames = exactly 1000ms.
+            const TICK_MS = 1000 / 60;
+            const theoreticalServerTime = serverFrame * TICK_MS;
+
             const snapshot: NetPlayerSnapshot = {
                 ...netPlayer,
                 frame: serverFrame,
-                serverTime: arrivalTime
+                serverTime: theoreticalServerTime
             };
 
             // Add to buffer in chronological order
@@ -604,7 +609,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Initialize clock
             if (!this.isBufferInitialized && buffer.length >= 2) {
-                this.interpolationTime = arrivalTime - this.RENDER_DELAY_MS;
+                this.interpolationTime = theoreticalServerTime - this.RENDER_DELAY_MS;
                 this.isBufferInitialized = true;
             }
 

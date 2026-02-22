@@ -89,6 +89,7 @@ interface GameRoom {
     bombs: BombState[];
     nextBombId: number;
     bombSpawnTimer: number; // ms until next spawn
+    broadcastCounter: number;
 }
 
 const ANIMATION_KEYS = [
@@ -212,7 +213,8 @@ io.onConnection((channel: ServerChannel) => {
             chestSpawnTimer: 30000,
             bombs: [],
             nextBombId: 1,
-            bombSpawnTimer: 15000 + Math.random() * 10000 // 15-25 seconds initial
+            bombSpawnTimer: 15000 + Math.random() * 10000, // 15-25 seconds initial
+            broadcastCounter: 0
         });
     }
     const room = rooms.get(roomId)!;
@@ -541,7 +543,6 @@ const TICK_RATE = 60;
 const TICK_MS = 1000 / TICK_RATE;
 const DT = 1 / TICK_RATE; // Fixed timestep in seconds
 const BROADCAST_EVERY_N_TICKS = 2; // Broadcast STATE_UPDATE every 2nd tick = 30Hz
-let broadcastCounter = 0;
 
 setInterval(() => {
     rooms.forEach((room) => {
@@ -587,9 +588,9 @@ setInterval(() => {
         room.bombs = room.bombs.filter(b => !explodedBombs.includes(b.id));
 
         // === STATE BROADCAST (Client-Authoritative, 20Hz) ===
-        broadcastCounter++;
-        if (broadcastCounter >= BROADCAST_EVERY_N_TICKS) {
-            broadcastCounter = 0;
+        room.broadcastCounter++;
+        if (room.broadcastCounter >= BROADCAST_EVERY_N_TICKS) {
+            room.broadcastCounter = 0;
             const state = {
                 frame: room.frame,
                 timestamp: Date.now(),

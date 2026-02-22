@@ -379,3 +379,10 @@ Part 2
     - **Result**: Significant reduction in remote player jitter and "teleporting" while maintaining local responsiveness.
 - **[S]** **STATUS**: Deployment successful. Closing session.
 ------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-22] v1.0.12 - Decoupled Interpolation Timeline ⏱️💯
+- **[V]** `v1.0.12`
+- **[Net]** **Mathematical Timeline Fixing**:
+    - **Flaw**: Previous interpolation anchored snapshots to their `performance.now()` arrival times. This caused massive teleportation glitches whenever the internet or the DO Droplet clustered UDP packets together.
+    - **Fix**: Decoupled playback from network jitter entirely. Client now calculates the theoretical server time mathematically using the authoritative `serverFrame * TICK_MS`.
+    - **Result**: The client's jitter buffer timeline is now perfectly immune to internet lag spikes, packet clustering, and Node.js `setInterval` drift on the server.
+------------------------------------------------------------------------------------------------------------------------------------
