@@ -6,13 +6,7 @@ import { AudioManager } from '../managers/AudioManager';
 
 // List of scrin image filenames (loaded in GameScene preload)
 const SCRIN_IMAGES = [
-    'scrin_001', 'scrin_002', 'scrin_003', 'scrin_004', 'scrin_005',
-    'scrin_006', 'scrin_007', 'scrin_008', 'scrin_009', 'scrin_0010',
-    'scrin_0011', 'scrin_0012', 'scrin_0013', 'scrin_0014', 'scrin_0015',
-    'scrin_0016', 'scrin_0017', 'scrin_0018', 'scrin_0019', 'scrin_0020',
-    'scrin_0021', 'scrin_0022', 'scrin_0023', 'scrin_0024', 'scrin_0025',
-    'scrin_0026', 'scrin_0027', 'scrin_0028', 'scrin_0029', 'scrin_0030',
-    'scrin_0031'
+    'scrins_00001', 'scrins_00002', 'scrins_00003', 'scrins_00004', 'scrins_00005', 'scrins_00006', 'scrins_00007', 'scrins_00008', 'scrins_00009', 'scrins_00010', 'scrins_00011', 'scrins_00012', 'scrins_00013', 'scrins_00014', 'scrins_00015', 'scrins_00016', 'scrins_00017', 'scrins_00018', 'scrins_00019', 'scrins_00020', 'scrins_00021', 'scrins_00022', 'scrins_00023', 'scrins_00024', 'scrins_00025', 'scrins_00026', 'scrins_00027', 'scrins_00028', 'scrins_00029', 'scrins_00030', 'scrins_00031', 'scrins_00032', 'scrins_00033', 'scrins_00034', 'scrins_00035', 'scrins_00036', 'scrins_00037', 'scrins_00038', 'scrins_00039', 'scrins_00040', 'scrins_00041', 'scrins_00042', 'scrins_00043', 'scrins_00044', 'scrins_00045', 'scrins_00046', 'scrins_00047', 'scrins_00048', 'scrins_00049', 'scrins_00050', 'scrins_00051', 'scrins_00052', 'scrins_00053', 'scrins_00054', 'scrins_00055', 'scrins_00056', 'scrins_00057', 'scrins_00058', 'scrins_00059', 'scrins_00060', 'scrins_00061', 'scrins_00062', 'scrins_00063', 'scrins_00064', 'scrins_00065', 'scrins_00066', 'scrins_00067', 'scrins_00068', 'scrins_00069', 'scrins_00070', 'scrins_00071', 'scrins_00072', 'scrins_00073', 'scrins_00074', 'scrins_00075', 'scrins_00076', 'scrins_00077', 'scrins_00078', 'scrins_00079', 'scrins_00080', 'scrins_00081', 'scrins_00082', 'scrins_00083', 'scrins_00084', 'scrins_00085', 'scrins_00086', 'scrins_00087', 'scrins_00088', 'scrins_00089', 'scrins_00090', 'scrins_00091', 'scrins_00092', 'scrins_00093', 'scrins_00094', 'scrins_00095', 'scrins_00096', 'scrins_00097', 'scrins_00098', 'scrins_00099', 'scrins_00100', 'scrins_00101', 'scrins_00102', 'scrins_00103', 'scrins_00104', 'scrins_00105', 'scrins_00106', 'scrins_00107', 'scrins_00108', 'scrins_00109', 'scrins_00110', 'scrins_00111', 'scrins_00112', 'scrins_00113', 'scrins_00114', 'scrins_00115', 'scrins_00116', 'scrins_00117', 'scrins_00118', 'scrins_00119', 'scrins_00120', 'scrins_00121', 'scrins_00122', 'scrins_00123', 'scrins_00124', 'scrins_00125', 'scrins_00126', 'scrins_00127', 'scrins_00128', 'scrins_00129', 'scrins_00130', 'scrins_00131', 'scrins_00132', 'scrins_00133', 'scrins_00134'
 ];
 
 /**

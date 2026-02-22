@@ -36,7 +36,7 @@ export class StateMachine {
             return;
         }
 
-        console.log(`[FSM] State Change: ${this.currentState?.name} -> ${name}`);
+        // console.log(`[FSM] State Change: ${this.currentState?.name} -> ${name}`);
 
         if (this.currentState) {
             this._previousStateName = this.currentState.name;

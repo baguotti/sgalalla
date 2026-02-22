@@ -57,17 +57,11 @@ export class AnimationHelpers {
 
         // Scrin Images (Rewards)
         const scrinFiles = [
-            'scrin_001.jpg', 'scrin_002.jpg', 'scrin_003.jpg', 'scrin_004.jpg', 'scrin_005.jpg',
-            'scrin_006.jpg', 'scrin_007.jpg', 'scrin_008.jpg', 'scrin_009.jpg', 'scrin_0010.jpg',
-            'scrin_0011.jpg', 'scrin_0012.jpg', 'scrin_0013.jpg', 'scrin_0014.jpg', 'scrin_0015.jpg',
-            'scrin_0016.jpg', 'scrin_0017.jpg', 'scrin_0018.jpg', 'scrin_0019.jpg', 'scrin_0020.jpg',
-            'scrin_0021.jpg', 'scrin_0022.jpg', 'scrin_0023.jpg', 'scrin_0024.jpg', 'scrin_0025.jpg',
-            'scrin_0026.jpg', 'scrin_0027.jpg', 'scrin_0028.jpg', 'scrin_0029.jpg', 'scrin_0030.jpg',
-            'scrin_0031.jpg'
+            'scrins_00001.webp', 'scrins_00002.webp', 'scrins_00003.webp', 'scrins_00004.webp', 'scrins_00005.webp', 'scrins_00006.webp', 'scrins_00007.webp', 'scrins_00008.webp', 'scrins_00009.webp', 'scrins_00010.webp', 'scrins_00011.webp', 'scrins_00012.webp', 'scrins_00013.webp', 'scrins_00014.webp', 'scrins_00015.webp', 'scrins_00016.webp', 'scrins_00017.webp', 'scrins_00018.webp', 'scrins_00019.webp', 'scrins_00020.webp', 'scrins_00021.webp', 'scrins_00022.webp', 'scrins_00023.webp', 'scrins_00024.webp', 'scrins_00025.webp', 'scrins_00026.webp', 'scrins_00027.webp', 'scrins_00028.webp', 'scrins_00029.webp', 'scrins_00030.webp', 'scrins_00031.webp', 'scrins_00032.webp', 'scrins_00033.webp', 'scrins_00034.webp', 'scrins_00035.webp', 'scrins_00036.webp', 'scrins_00037.webp', 'scrins_00038.webp', 'scrins_00039.webp', 'scrins_00040.webp', 'scrins_00041.webp', 'scrins_00042.webp', 'scrins_00043.webp', 'scrins_00044.webp', 'scrins_00045.webp', 'scrins_00046.webp', 'scrins_00047.webp', 'scrins_00048.webp', 'scrins_00049.webp', 'scrins_00050.webp', 'scrins_00051.webp', 'scrins_00052.webp', 'scrins_00053.webp', 'scrins_00054.webp', 'scrins_00055.webp', 'scrins_00056.webp', 'scrins_00057.webp', 'scrins_00058.webp', 'scrins_00059.webp', 'scrins_00060.webp', 'scrins_00061.webp', 'scrins_00062.webp', 'scrins_00063.webp', 'scrins_00064.webp', 'scrins_00065.webp', 'scrins_00066.webp', 'scrins_00067.webp', 'scrins_00068.webp', 'scrins_00069.webp', 'scrins_00070.webp', 'scrins_00071.webp', 'scrins_00072.webp', 'scrins_00073.webp', 'scrins_00074.webp', 'scrins_00075.webp', 'scrins_00076.webp', 'scrins_00077.webp', 'scrins_00078.webp', 'scrins_00079.webp', 'scrins_00080.webp', 'scrins_00081.webp', 'scrins_00082.webp', 'scrins_00083.webp', 'scrins_00084.webp', 'scrins_00085.webp', 'scrins_00086.webp', 'scrins_00087.webp', 'scrins_00088.webp', 'scrins_00089.webp', 'scrins_00090.webp', 'scrins_00091.webp', 'scrins_00092.webp', 'scrins_00093.webp', 'scrins_00094.webp', 'scrins_00095.webp', 'scrins_00096.webp', 'scrins_00097.webp', 'scrins_00098.webp', 'scrins_00099.webp', 'scrins_00100.webp', 'scrins_00101.webp', 'scrins_00102.webp', 'scrins_00103.webp', 'scrins_00104.webp', 'scrins_00105.webp', 'scrins_00106.webp', 'scrins_00107.webp', 'scrins_00108.webp', 'scrins_00109.webp', 'scrins_00110.webp', 'scrins_00111.webp', 'scrins_00112.webp', 'scrins_00113.webp', 'scrins_00114.webp', 'scrins_00115.webp', 'scrins_00116.webp', 'scrins_00117.webp', 'scrins_00118.webp', 'scrins_00119.webp', 'scrins_00120.webp', 'scrins_00121.webp', 'scrins_00122.webp', 'scrins_00123.webp', 'scrins_00124.webp', 'scrins_00125.webp', 'scrins_00126.webp', 'scrins_00127.webp', 'scrins_00128.webp', 'scrins_00129.webp', 'scrins_00130.webp', 'scrins_00131.webp', 'scrins_00132.webp', 'scrins_00133.webp', 'scrins_00134.webp'
         ];
 
         scrinFiles.forEach(file => {
-            const key = file.replace('.jpg', '').replace('.png', '');
+            const key = file.replace('.webp', '');
             scene.load.image(key, `assets/scrins/${file}`);
         });
 
@@ -124,6 +118,10 @@ export class AnimationHelpers {
         scene.load.audio('sfx_nock_sig', 'assets/audio/sfx/sigs/nock_sig.wav');
         scene.load.audio('sfx_sga_sig', 'assets/audio/sfx/sigs/sga_sig.wav');
         scene.load.audio('sfx_fok_sig', 'assets/audio/sfx/sigs/fok_sig.wav');
+        scene.load.audio('sfx_greg_sig', 'assets/audio/sfx_greg_sig.wav');
+        scene.load.audio('sfx_sgu_sig', 'assets/audio/sfx_sgu_sig.wav');
+        scene.load.audio('sfx_pe_sig', 'assets/audio/sfx_pe_sig.wav');
+        scene.load.audio('sfx_pe_charge', 'assets/audio/sfx_pe_charge.mp3');
 
         // --- Misc ---
         scene.load.audio('sfx_chest_drop', 'assets/audio/sfx/misc/chest_drop.wav');

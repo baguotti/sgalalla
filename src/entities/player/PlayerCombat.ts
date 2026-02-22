@@ -47,7 +47,7 @@ export class PlayerCombat {
     private hasSpawnedGhost: boolean = false;
     private chargeGhostSprite: Phaser.GameObjects.Sprite | null = null;
     private chargeBlurFx: any = null;
-    private chargeSound: Phaser.Sound.BaseSound | null = null;
+    private chargeSounds: Phaser.Sound.BaseSound[] = [];
 
     constructor(player: Player, scene: Phaser.Scene) {
         this.player = player;
@@ -203,9 +203,17 @@ export class PlayerCombat {
             this.player.fsm.changeState('Charging', this.player);
             this.chargeTime = 0;
 
-            // Play Charge Sound Loop
-            this.chargeSound = this.scene.sound.add('sfx_fight_charge', { volume: 0.6, loop: true });
-            this.chargeSound.play();
+            // Play Charge Sounds
+            const mainCharge = this.scene.sound.add('sfx_fight_charge', { volume: 0.6, loop: true });
+            mainCharge.play();
+            this.chargeSounds.push(mainCharge);
+
+            // Pe has a special layered charge hum
+            if (this.player.character === 'pe') {
+                const peCharge = this.scene.sound.add('sfx_pe_charge', { volume: 0.6, loop: true });
+                peCharge.play();
+                this.chargeSounds.push(peCharge);
+            }
 
             // Remap Grounded Down Sig -> Side Sig (User Request)
             if (direction === AttackDirection.DOWN && !isAerial) {
@@ -330,9 +338,8 @@ export class PlayerCombat {
             // Set cooldown
             this.attackCooldownTimer = this.currentAttack.data.recoveryDuration;
 
-            // SFX: Play signature sounds on Release
-            if (this.currentAttack.data.direction === AttackDirection.SIDE ||
-                this.currentAttack.data.direction === AttackDirection.UP) {
+            // SFX: Play signature sounds on execution
+            if (this.currentAttack.data.type === AttackType.HEAVY) {
 
                 if (this.player.character === 'nock') {
                     AudioManager.getInstance().playSFX('sfx_nock_sig', { volume: 0.5 });
@@ -340,6 +347,15 @@ export class PlayerCombat {
                     AudioManager.getInstance().playSFX('sfx_sga_sig', { volume: 0.5 });
                 } else if (this.player.character === 'fok' || this.player.character === 'fok_v3') {
                     AudioManager.getInstance().playSFX('sfx_fok_sig', { volume: 0.5 });
+                } else if (this.player.character === 'greg') {
+                    AudioManager.getInstance().playSFX('sfx_greg_sig', { volume: 0.5 });
+                } else if (this.player.character === 'sgu') {
+                    AudioManager.getInstance().playSFX('sfx_sgu_sig', { volume: 0.5 });
+                } else if (this.player.character === 'pe') {
+                    AudioManager.getInstance().playSFX('sfx_pe_sig', { volume: 0.5 });
+                } else {
+                    // Fallback generic sound
+                    AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.5 });
                 }
             }
         } catch (e) {
@@ -442,33 +458,35 @@ export class PlayerCombat {
             this.chargeBlurFx = null;
         }
 
-        if (this.chargeSound) {
-            const soundToFade = this.chargeSound as any;
-            this.chargeSound = null; // Clear reference so new charges can start cleanly
+        if (this.chargeSounds.length > 0) {
+            this.chargeSounds.forEach(sound => {
+                const soundToFade = sound as any;
 
-            // Fade out the sound for a natural trail-off
-            this.scene.tweens.add({
-                targets: soundToFade,
-                volume: 0,
-                duration: 200,
-                ease: 'Linear',
-                onComplete: () => {
-                    try {
-                        soundToFade.stop();
-                        soundToFade.destroy();
-                    } catch (e) { }
-                }
-            });
-
-            // Failsafe: if tween system hangs or scene pauses, statically destroy it after 250ms
-            setTimeout(() => {
-                try {
-                    if (soundToFade && soundToFade.stop) {
-                        soundToFade.stop();
-                        soundToFade.destroy();
+                // Fade out the sound for a natural trail-off
+                this.scene.tweens.add({
+                    targets: soundToFade,
+                    volume: 0,
+                    duration: 200,
+                    ease: 'Linear',
+                    onComplete: () => {
+                        try {
+                            soundToFade.stop();
+                            soundToFade.destroy();
+                        } catch (e) { }
                     }
-                } catch (e) { }
-            }, 250);
+                });
+
+                // Failsafe: if tween system hangs or scene pauses, statically destroy it after 250ms
+                setTimeout(() => {
+                    try {
+                        if (soundToFade && soundToFade.stop) {
+                            soundToFade.stop();
+                            soundToFade.destroy();
+                        }
+                    } catch (e) { }
+                }, 250);
+            });
+            this.chargeSounds = []; // Clear references so new charges can start cleanly
         }
     }
 

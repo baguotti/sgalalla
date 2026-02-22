@@ -417,3 +417,18 @@ Part 2
     - **Kept**: Per-room `broadcastCounter` bug fix.
 - **[S]** **STATUS**: Restored v1.0.9 reliability with v1.0.11 broadcast improvements.
 ------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-22] v1.0.16 - Signatures & Scrin Expansion 🎭📦
+- **[V]** `v1.0.16`
+- **[Audio]** **Signature SFX**:
+    - Added unique `sfx_greg_sig`, `sfx_sgu_sig`, and `sfx_pe_sig`.
+    - Implemented layered charge SFX for **Pe** (`sfx_pe_charge` layered over base hum).
+    - Restructured `PlayerCombat.ts` to handle an array of active charge sounds for graceful fade-outs.
+- **[Content]** **Scrin Massive Expansion**:
+    - Replaced 31 legacy images with **134 new high-quality rewards**.
+    - **Optimization**: Converted all images to **WebP** at 1000px height (Total folder size: 5.7MB).
+    - Updated `Chest.ts` and `AnimationHelpers.ts` to support the new 134-image inventory.
+- **[UI]** **Polish**:
+    - Moved version string in Main Menu to the bottom-right for a cleaner title layout.
+    - Removed FSM state change debug logs to keep the console noise-free.
+- **[S]** **STATUS**: Ready for rewards-focused playtesting.
+------------------------------------------------------------------------------------------------------------------------------------
