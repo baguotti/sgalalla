@@ -99,7 +99,7 @@ export function createStage(scene: Phaser.Scene): StageResult {
 
     // Floor Collision (Invisible Walkable Box):
     // Match visual center initially: 40, 450. Size scaled ~389x731.
-    const leftPlatFloor = scene.add.rectangle(5, 450, 315, 590
+    const leftPlatFloor = scene.add.rectangle(30, 450, 315, 590
     );
     leftPlatFloor.setVisible(false);
     (scene as any).matter.add.gameObject(leftPlatFloor, { isStatic: true });
@@ -144,25 +144,28 @@ export function createStage(scene: Phaser.Scene): StageResult {
     // ---------------------------------------------------------
     const wallCollisionRects = [
         // Walls 1 & 2 (Main Stage)
-        new Phaser.Geom.Rectangle(375, 890, 20, 500),
-        new Phaser.Geom.Rectangle(1505, 890, 20, 500),
+        new Phaser.Geom.Rectangle(425, 890, 20, 500),
+        new Phaser.Geom.Rectangle(1475, 890, 20, 500),
 
         // --- Left Platform Walls ---
         // WALL 3 (Inner/Right side of Left Plat): 
         // Match Visual (40, 450) -> X = 175-20. 
         // Height Extended to 625 to reach closer to bottom, leaving 60px gap for corner chop.
-        new Phaser.Geom.Rectangle(180 - 15, 160, 20, 450),
+        new Phaser.Geom.Rectangle(165 - 50, 160, 20, 450),
         // WALL 4 (Outer/Left side of Left Plat):
         // X = 40 - (389/2) approx = -154.
-        new Phaser.Geom.Rectangle(-110, 160, 20, 680),
+        new Phaser.Geom.Rectangle(-60, 160, 20, 680),
 
         // WALL 5 (Horizontal Bottom Wall):
         // Connects Wall 4 (x=-135) to Wall 3 (x=175). Width ~310.
         // Y Position: Below Wall 3 (110 + 445 = 555).
         // Let's place it at Y=555 with height 40.
-        new Phaser.Geom.Rectangle(-110, 555, 250, 20),
+        new Phaser.Geom.Rectangle(-60, 555, 170, 20),
 
-
+        // WALL 6 (Main Stage Bottom Wall):
+        // Connects Wall 1 (x=425) to Wall 2 (x=1475). Width = 1475 - 425 + 20 = 1070.
+        // Y Position: Bottom of Wall 1/2 (890 + 500 = 1390).
+        new Phaser.Geom.Rectangle(425, 1370, 1070, 20),
     ];
 
     // --- Camera ---

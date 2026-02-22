@@ -147,6 +147,9 @@ export class Player extends Fighter {
         item.setIgnoreGravity(true);
         item.setVelocity(0, 0);
         item.setAngularVelocity(0);
+
+        // Emit event for network sync
+        this.scene.events.emit('bomb_pickup', this);
     }
 
     public throwItem(velocityX: number, velocityY: number): void {
@@ -606,28 +609,12 @@ export class Player extends Fighter {
             this.playAnim(fsmAnimKey, true);
         }
 
-        // Apply offsets every frame (catch-all)
-        this.updateSpriteOffset();
+        // Removed custom updateSpriteOffset to standardize characters
     }
 
 
 
-    private updateSpriteOffset(): void {
-        const anim = this.sprite.anims.currentAnim;
-        if (!anim) return;
 
-        // Reset offset by default
-        this.sprite.x = 0;
-        // this.sprite.y = 0; // If we ever need Y offset
-
-        if (anim.key.includes('wall_slide')) {
-            // Use facingDirection (which is guaranteed to be away from wall during slide)
-            // If facing Right (1), wall is Left (-1). Offset should be -7 (Left).
-            // If facing Left (-1), wall is Right (1). Offset should be 7 (Right).
-            // So: -facingDirection * 7
-            this.sprite.x = -this.getFacingDirection() * 7;
-        }
-    }
 
     public playAnim(key: string, ignoreIfPlaying: boolean = true): void {
         const fullKey = `${this.animPrefix}_${key}`;
@@ -645,8 +632,7 @@ export class Player extends Fighter {
 
         this.sprite.anims.play(fullKey, ignoreIfPlaying);
 
-        // Offset is now handled per-frame in updateSpriteOffset
-        this.updateSpriteOffset();
+        // Removed custom updateSpriteOffset to standardize characters
     }
 
     private updateDamageDisplay(): void {

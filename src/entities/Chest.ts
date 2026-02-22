@@ -29,7 +29,7 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
     public isBombMode: boolean = false;
     private isThrown: boolean = false;
     private bombFuseTimer: number = 0;
-    private isExploded: boolean = false;
+    public isExploded: boolean = false;
     private thrower: any = null;
     private graceTimer: number = 0;
     private bombPulseTimer: number = 0;
@@ -49,9 +49,9 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
         this.setRectangle(width, 40); // Physics height (40) < visual height (69) for ~15px sink
         this.setBounce(0.0); // No bounce for heavy feel
         this.setFriction(0.9); // High friction to stop sliding
-        this.setFrictionAir(0.0); // No air resistance (falls faster)
         this.setDensity(1.0); // Very heavy (was 0.1) ~ Metal box weight
-        this.setVelocityY(20); // Initial downward velocity
+        this.setVelocityY(15); // Faster initial downward velocity
+        this.setFrictionAir(0.005); // Less air resistance for faster fall
 
         // Origin centered for symmetric rotation (upside-down looks identical)
         this.setOrigin(0.5, 0.5);
@@ -116,7 +116,8 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
         // Re-enable physics
         if (this.body) {
             this.scene.matter.world.add(this.body as MatterJS.BodyType);
-            this.setVelocity(0, 20); // Initial downward velocity
+            this.setVelocity(0, 15); // Faster initial downward velocity
+            this.setFrictionAir(0.005);
             this.setAngularVelocity(0);
             this.setIgnoreGravity(false);
             this.setSensor(false);
@@ -284,17 +285,9 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
                     if (this.graceTimer > 0 && player === this.thrower) continue;
                     const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
                     if (dist < 60) {
-                        // CATCH MECHANIC: 6-frame window (via InputBuffer)
-                        if (player.inputBuffer && player.inputBuffer.consumeLightAttack() && !player.heldItem) {
-                            this.isThrown = false;
-                            this.bombFuseTimer = 4000; // Reset fuse on catch
-                            this.armingTimer = 0;
-                            player.pickupItem(this);
-                            return;
-                        } else {
-                            this.explode();
-                            return;
-                        }
+                        // Contact explosion (no catch mechanic for online compatibility)
+                        this.explode();
+                        return;
                     }
                 }
             }
@@ -582,6 +575,9 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
     public explode(): void {
         if (this.isExploded) return;
         this.isExploded = true;
+
+        // Emit event for network sync
+        this.scene.events.emit('bomb_explode', this.x, this.y);
 
         if (this.timerSound) {
             this.timerSound.stop();

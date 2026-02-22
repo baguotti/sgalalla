@@ -224,6 +224,10 @@ export class PlayerCombat {
 
             // Create charge glow effect
             // Removed charge glow
+
+            // Emit event for network sync
+            this.scene.events.emit('charge_start', this.player, this.chargeDirection);
+
             return;
         }
 
@@ -259,6 +263,11 @@ export class PlayerCombat {
     public startAttack(attackKey: string): void {
         try {
             const facing = this.player.getFacingDirection();
+
+            // Clear charge state first (prevents double ghost on remote clients)
+            if (this.isCharging) {
+                this.clearChargeState();
+            }
 
             // Clear any previous ghost before new attack
             this.clearGhostEffect();
@@ -562,6 +571,9 @@ export class PlayerCombat {
             if (bomb.onThrown) {
                 bomb.onThrown(this.player, powerMultiplier);
             }
+
+            // Emit event for network sync
+            this.scene.events.emit('bomb_throw', this.player, bomb.x, bomb.y, throwVx, throwVy, powerMultiplier);
         }
 
         this.player.resetVisuals();
@@ -1007,6 +1019,18 @@ export class PlayerCombat {
         if ((dir === AttackDirection.UP || dir === AttackDirection.NEUTRAL) && ['pe', 'nock', 'fok', 'sgu', 'sga', 'greg'].includes(char)) return true;
 
         return false;
+    }
+
+    /**
+     * Called on remote clients to start the same gradual charge fade-in
+     * that the local player sees via updateChargeState().
+     */
+    public startRemoteCharge(direction: AttackDirection): void {
+        this.isCharging = true;
+        this.chargeTime = 0;
+        this.chargeDirection = direction;
+        // The existing updateChargeState() in the update loop will now
+        // create and fade-in the chargeGhostSprite automatically each frame.
     }
 
     private updateGhostEffect(): void {

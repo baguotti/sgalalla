@@ -39,7 +39,14 @@ const NetMessageType = {
     // Chest mechanic
     CHEST_SPAWN: 'chest_spawn',
     CHEST_OPEN: 'chest_open',
-    CHEST_CLOSE: 'chest_close'
+    CHEST_CLOSE: 'chest_close',
+    // Chest bomb mode
+    CHEST_BOMB_PICKUP: 'chest_bomb_pickup',
+    CHEST_BOMB_THROW: 'chest_bomb_throw',
+    CHEST_BOMB_EXPLODE: 'chest_bomb_explode',
+    // Missing ghost visuals
+    RECOVERY_START: 'recovery_start',
+    CHARGE_START: 'charge_start'
 } as const;
 
 interface PlayerState {
@@ -210,7 +217,7 @@ io.onConnection((channel: ServerChannel) => {
             phase: 'WAITING',
             selectionTimer: null,
             selectionCountdown: 30,
-            chestSpawnTimer: 30000,
+            chestSpawnTimer: 10000,
             bombs: [],
             nextBombId: 1,
             bombSpawnTimer: 15000 + Math.random() * 10000, // 15-25 seconds initial
@@ -464,13 +471,40 @@ io.onConnection((channel: ServerChannel) => {
         emitToRoom(NetMessageType.HIT_EVENT, data);
     });
 
-    // === CHEST MECHANICS ===
-    channel.on(NetMessageType.CHEST_OPEN, (data: any) => {
+    // --- Chest Mechanics ---
+    channel.on(NetMessageType.CHEST_SPAWN, (data: unknown) => {
+        const { x } = data as { x: number };
+        emitToRoom(NetMessageType.CHEST_SPAWN, { x });
+    });
+
+    channel.on(NetMessageType.CHEST_OPEN, (data: unknown) => {
         emitToRoom(NetMessageType.CHEST_OPEN, data);
     });
 
-    channel.on(NetMessageType.CHEST_CLOSE, (data: any) => {
-        emitToRoom(NetMessageType.CHEST_CLOSE, data);
+    channel.on(NetMessageType.CHEST_CLOSE, () => {
+        emitToRoom(NetMessageType.CHEST_CLOSE, {});
+    });
+
+    // --- Chest Bomb Mechanics ---
+    channel.on(NetMessageType.CHEST_BOMB_PICKUP, (playerId: unknown) => {
+        emitToRoom(NetMessageType.CHEST_BOMB_PICKUP, playerId as number);
+    });
+
+    channel.on(NetMessageType.CHEST_BOMB_THROW, (data: unknown) => {
+        emitToRoom(NetMessageType.CHEST_BOMB_THROW, data);
+    });
+
+    channel.on(NetMessageType.CHEST_BOMB_EXPLODE, (data: unknown) => {
+        emitToRoom(NetMessageType.CHEST_BOMB_EXPLODE, data);
+    });
+
+    // --- Missing Ghost Visuals ---
+    channel.on(NetMessageType.RECOVERY_START, (playerId: unknown) => {
+        emitToRoom(NetMessageType.RECOVERY_START, playerId as number);
+    });
+
+    channel.on(NetMessageType.CHARGE_START, (data: unknown) => {
+        emitToRoom(NetMessageType.CHARGE_START, data);
     });
 
     // Rematch vote

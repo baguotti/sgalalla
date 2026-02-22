@@ -432,3 +432,13 @@ Part 2
     - Removed FSM state change debug logs to keep the console noise-free.
 - **[S]** **STATUS**: Ready for rewards-focused playtesting.
 ------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-22] v1.1.0 - Online Ghost Visuals Sync & Spawning Balance 👻📦
+- **[V]** `v1.1.0`
+- **[Net]** **Ghost Visuals Sync**:
+    - **Recovery Sync**: Implemented `RECOVERY_START` network event. Remote players now see the upward ghost sprite, which correctly follows the player's vertical movement via tween position updates.
+    - **Charge Sync**: Replaced instant-spawn logic with a proper `startRemoteCharge` state. Remote clients now see the same gradual alpha fade-in as the local player, driven by the `updateChargeState` loop.
+    - **Stability**: Added `clearChargeState()` to `startAttack()` to prevent "double ghosting" (charge ghost + attack ghost overlapping) on remote clients upon release.
+- **[Tuning]** **Chest Spawning**:
+    - **Rate Adjustment**: Updated chest spawn rules to a **35% chance every 30 seconds** across all modes.
+    - **Implementation**: Aligned the server's 10s interval in `server-geckos/index.ts` with the client's 30s standard and verified `GameScene` timer consistency.
+- **[S]** **STATUS**: Online visual integrity significantly improved; spawning frequency balanced for competitive play.

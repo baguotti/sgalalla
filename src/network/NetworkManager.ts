@@ -38,7 +38,14 @@ export const NetMessageType = {
     // Chest mechanic
     CHEST_SPAWN: 'chest_spawn',
     CHEST_OPEN: 'chest_open',
-    CHEST_CLOSE: 'chest_close'
+    CHEST_CLOSE: 'chest_close',
+    // Chest bomb mode
+    CHEST_BOMB_PICKUP: 'chest_bomb_pickup',
+    CHEST_BOMB_THROW: 'chest_bomb_throw',
+    CHEST_BOMB_EXPLODE: 'chest_bomb_explode',
+    // Missing ghost visuals
+    RECOVERY_START: 'recovery_start',
+    CHARGE_START: 'charge_start'
 } as const;
 
 // Serialized input for network transmission
@@ -102,8 +109,16 @@ export type CharacterSelectCallback = (playerId: number, character: string) => v
 export type CharacterConfirmCallback = (playerId: number) => void;
 export type GameStartCallback = (players: { playerId: number; character: string }[]) => void;
 export type ChestSpawnCallback = (x: number) => void;
-export type ChestOpenCallback = (imageIndex: number) => void;
+export type ChestOpenCallback = (imageIndex: number, chestX: number, chestY: number) => void;
 export type ChestCloseCallback = () => void;
+// Chest bomb mode
+export type ChestBombPickupCallback = (playerId: number) => void;
+export type ChestBombThrowCallback = (playerId: number, x: number, y: number, vx: number, vy: number, power: number) => void;
+export type ChestBombExplodeCallback = (x: number, y: number) => void;
+
+// Missing ghost visuals
+export type RecoveryStartCallback = (playerId: number) => void;
+export type ChargeStartCallback = (playerId: number, direction: number) => void;
 
 class NetworkManager {
     private static instance: NetworkManager    // Singleton pattern
@@ -139,6 +154,13 @@ class NetworkManager {
     private onChestSpawnCallback: ChestSpawnCallback | null = null;
     private onChestOpenCallback: ChestOpenCallback | null = null;
     private onChestCloseCallback: ChestCloseCallback | null = null;
+    // Chest bomb mode
+    private onChestBombPickupCallback: ChestBombPickupCallback | null = null;
+    private onChestBombThrowCallback: ChestBombThrowCallback | null = null;
+    private onChestBombExplodeCallback: ChestBombExplodeCallback | null = null;
+
+    private onRecoveryStartCallback: RecoveryStartCallback | null = null;
+    private onChargeStartCallback: ChargeStartCallback | null = null;
 
     // Latency tracking with smoothing
     private lastPingTime: number = 0;
@@ -303,12 +325,38 @@ class NetworkManager {
         });
 
         this.channel.on(NetMessageType.CHEST_OPEN, (data: any) => {
-            const { imageIndex } = data as { imageIndex: number };
-            this.onChestOpenCallback?.(imageIndex);
+            const { imageIndex, chestX, chestY } = data as { imageIndex: number; chestX: number; chestY: number };
+            this.onChestOpenCallback?.(imageIndex, chestX, chestY);
         });
 
         this.channel.on(NetMessageType.CHEST_CLOSE, () => {
             this.onChestCloseCallback?.();
+        });
+
+        // Chest bomb mode
+        this.channel.on(NetMessageType.CHEST_BOMB_PICKUP, (data: any) => {
+            const { playerId } = data as { playerId: number };
+            this.onChestBombPickupCallback?.(playerId);
+        });
+
+        this.channel.on(NetMessageType.CHEST_BOMB_THROW, (data: any) => {
+            const { playerId, x, y, vx, vy, power } = data as { playerId: number; x: number; y: number; vx: number; vy: number; power: number };
+            this.onChestBombThrowCallback?.(playerId, x, y, vx, vy, power);
+        });
+
+        this.channel.on(NetMessageType.CHEST_BOMB_EXPLODE, (data: any) => {
+            const { x, y } = data as { x: number; y: number };
+            this.onChestBombExplodeCallback?.(x, y);
+        });
+
+        // Missing ghost visuals
+        this.channel.on(NetMessageType.RECOVERY_START, (playerId: any) => {
+            this.onRecoveryStartCallback?.(playerId as number);
+        });
+
+        this.channel.on(NetMessageType.CHARGE_START, (data: any) => {
+            const { playerId, direction } = data as { playerId: number; direction: number };
+            this.onChargeStartCallback?.(playerId, direction);
         });
     }
 
@@ -405,6 +453,22 @@ class NetworkManager {
     }
 
     /**
+     * Missing ghost visuals - send recovery start
+     */
+    public sendRecoveryStart(playerId: number): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.RECOVERY_START, playerId, { reliable: true });
+    }
+
+    /**
+     * Missing ghost visuals - send charge start
+     */
+    public sendChargeStart(playerId: number, direction: number): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.CHARGE_START, { playerId, direction }, { reliable: true });
+    }
+
+    /**
      * Store a game state snapshot for potential rollback
      */
     public saveSnapshot(snapshot: GameSnapshot): void {
@@ -484,6 +548,23 @@ class NetworkManager {
     public onChestSpawn(callback: ChestSpawnCallback): void { this.onChestSpawnCallback = callback; }
     public onChestOpen(callback: ChestOpenCallback): void { this.onChestOpenCallback = callback; }
     public onChestClose(callback: ChestCloseCallback): void { this.onChestCloseCallback = callback; }
+    // Chest bomb mode
+    public onChestBombPickup(callback: ChestBombPickupCallback): void { this.onChestBombPickupCallback = callback; }
+    public onChestBombThrow(callback: ChestBombThrowCallback): void {
+        this.onChestBombThrowCallback = callback;
+    }
+
+    public onChestBombExplode(callback: ChestBombExplodeCallback): void {
+        this.onChestBombExplodeCallback = callback;
+    }
+
+    public onRecoveryStart(callback: RecoveryStartCallback): void {
+        this.onRecoveryStartCallback = callback;
+    }
+
+    public onChargeStart(callback: ChargeStartCallback): void {
+        this.onChargeStartCallback = callback;
+    }
 
     /**
      * Send rematch vote to server
@@ -512,9 +593,9 @@ class NetworkManager {
     /**
      * Notify server that local player opened a chest
      */
-    public sendChestOpen(imageIndex: number): void {
+    public sendChestOpen(imageIndex: number, chestX: number, chestY: number): void {
         if (!this.connected || !this.channel) return;
-        this.channel.emit(NetMessageType.CHEST_OPEN, { imageIndex }, { reliable: true });
+        this.channel.emit(NetMessageType.CHEST_OPEN, { imageIndex, chestX, chestY }, { reliable: true });
     }
 
     /**
@@ -523,6 +604,31 @@ class NetworkManager {
     public sendChestClose(): void {
         if (!this.connected || !this.channel) return;
         this.channel.emit(NetMessageType.CHEST_CLOSE, {}, { reliable: true });
+    }
+
+    /**
+     * Request a chest spawn (debug/testing)
+     */
+    public sendChestSpawn(x: number): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.CHEST_SPAWN, { x }, { reliable: true });
+    }
+
+    // === Chest Bomb Mode ===
+
+    sendChestBombPickup(playerId: number): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.CHEST_BOMB_PICKUP, { playerId }, { reliable: true });
+    }
+
+    sendChestBombThrow(playerId: number, x: number, y: number, vx: number, vy: number, power: number): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.CHEST_BOMB_THROW, { playerId, x, y, vx, vy, power }, { reliable: true });
+    }
+
+    sendChestBombExplode(x: number, y: number): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.CHEST_BOMB_EXPLODE, { x, y }, { reliable: true });
     }
 }
 

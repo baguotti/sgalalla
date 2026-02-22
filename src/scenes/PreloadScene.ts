@@ -7,8 +7,8 @@ export class PreloadScene extends Phaser.Scene {
     }
 
     preload(): void {
-        this.load.image('title_card', 'assets/ui/main_title.jpg');
-        this.load.video('title_card_video', 'assets/ui/Main_menu/Main_Menu_Animation_001_webM.webm'); // Load video
+        this.load.image('title_card', 'assets/ui/Press_Start.png');
+        this.load.video('title_card_video', 'assets/ui/Main_menu/Main_Menu_003_webm.webm'); // Load video
 
         this.load.atlas('fok', 'assets/fok/fok.png', 'assets/fok/fok.json');
         this.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');

@@ -168,7 +168,11 @@ export class PlayerPhysics {
         if (events.length > 0) {
             this.player.fsm.changeState('Recovery', this.player);
             this.processEvents(events);
+
             this.spawnRecoveryGhost();
+
+            // Emit event for network sync
+            this.player.scene.events.emit('recovery_start', this.player);
         }
     }
 
@@ -405,7 +409,7 @@ export class PlayerPhysics {
     //  VISUAL EFFECTS (Phaser-only, not in shared physics)
     // ═══════════════════════════════════════════════════════
 
-    private spawnRecoveryGhost(): void {
+    public spawnRecoveryGhost(): void {
         const char = this.player.character;
         const facing = this.player.getFacingDirection();
         const scene = this.player.scene as GameSceneInterface;
@@ -460,6 +464,10 @@ export class PlayerPhysics {
             delay: 150,
             duration: 250,
             onUpdate: () => {
+                if (ghost) {
+                    // Follow the player during recovery
+                    ghost.setPosition(this.player.x, this.player.y - 30);
+                }
                 if (blurFx && ghost) {
                     blurFx.x = 0.5 + (1 - ghost.alpha) * 3;
                     blurFx.y = 0.5 + (1 - ghost.alpha) * 3;

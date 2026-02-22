@@ -54,6 +54,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     // Stage
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
+    private sidePlatforms: Phaser.GameObjects.Rectangle[] = [];
 
     public chests!: Phaser.GameObjects.Group;
 
@@ -137,7 +138,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     }
 
     public getThrowableChests(): Chest[] {
-        return []; // Bomb-mode chests are local only
+        return (this.chests.getChildren() as Chest[]).filter(
+            chest => chest.active && chest.isBombMode && !chest.isExploded
+        );
     }
 
     preload(): void {
@@ -210,7 +213,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.networkManager.onCharacterConfirm((playerId) => this.handleCharacterConfirm(playerId));
         this.networkManager.onGameStart((players) => this.handleGameStart(players));
         this.networkManager.onChestSpawn((x) => this.spawnChestAt(x));
-        this.networkManager.onChestOpen((imageIndex) => this.handleRemoteChestOpen(imageIndex));
+        this.networkManager.onChestOpen((imageIndex, chestX, chestY) => this.handleRemoteChestOpen(imageIndex, chestX, chestY));
         this.networkManager.onChestClose(() => this.handleRemoteChestClose());
 
         // Silence unused but maintained state
@@ -253,13 +256,110 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.controlsOverlay = new ControlsOverlay(this);
         this.cameras.main.ignore(this.controlsOverlay.getElements());
 
-        // Listen for chest close from the Chest entity directly
+        // Listen for chest close        // Chest Interaction (attack near chest to open)
         this.events.on('chest_close_local', () => {
             this.networkManager.sendChestClose();
         });
 
+        // --- Chest Bomb Mode ---
+        this.events.on('bomb_pickup', (chest: Chest) => {
+            if (chest.isBombMode && !chest.isExploded) {
+                this.networkManager.sendChestBombPickup(this.localPlayerId);
+            }
+        });
+
+        this.events.on('bomb_throw', (player: Player, x: number, y: number, vx: number, vy: number, power: number) => {
+            if (player.playerId === this.localPlayerId) {
+                this.networkManager.sendChestBombThrow(this.localPlayerId, x, y, vx, vy, power);
+            }
+        });
+
+        this.events.on('bomb_explode', (x: number, y: number) => {
+            // Only sender determines explosion to prevent double messages, OR if it's our bomb
+            const localChest = (this.chests.getChildren() as Chest[]).find(c => c.isBombMode && c.isExploded && c.x === x && c.y === y);
+            if (localChest) {
+                this.networkManager.sendChestBombExplode(x, y);
+            }
+        });
+
+        // --- Missing Ghost Visuals ---
+        this.events.on('recovery_start', (player: Player) => {
+            if (player.playerId === this.localPlayerId) {
+                this.networkManager.sendRecoveryStart(this.localPlayerId);
+            }
+        });
+
+        this.events.on('charge_start', (player: Player, direction: number) => {
+            if (player.playerId === this.localPlayerId) {
+                this.networkManager.sendChargeStart(this.localPlayerId, direction);
+            }
+        });
+
+        // ==========================================
+        //  INBOUND NETWORK (Receive)
+        // ==========================================
+        // --- Missing Ghost Visuals ---
+        this.networkManager.onRecoveryStart((playerId: number) => {
+            const remotePlayer = this.players.get(playerId);
+            if (!remotePlayer || remotePlayer.playerId === this.localPlayerId) return;
+            remotePlayer.physics.spawnRecoveryGhost();
+        });
+
+        this.networkManager.onChargeStart((playerId: number, direction: number) => {
+            const remotePlayer = this.players.get(playerId);
+            if (!remotePlayer || remotePlayer.playerId === this.localPlayerId) return;
+            remotePlayer.combat.startRemoteCharge(direction as any);
+        });
+
+        this.networkManager.onChestBombPickup((playerId: number) => {
+            const remotePlayer = this.players.get(playerId);
+            if (!remotePlayer || remotePlayer === this.localPlayer) return;
+
+            // Find the active bomb-mode chest
+            const chest = (this.chests.getChildren() as Chest[]).find(
+                c => c.active && c.isBombMode && !c.isExploded
+            );
+            if (chest) {
+                remotePlayer.pickupItem(chest);
+            }
+        });
+
+        this.networkManager.onChestBombThrow((playerId: number, x: number, y: number, vx: number, vy: number, power: number) => {
+            const remotePlayer = this.players.get(playerId);
+            if (!remotePlayer || remotePlayer === this.localPlayer) return;
+
+            // Find the chest this player is holding
+            if (remotePlayer.heldItem) {
+                const bomb = remotePlayer.heldItem;
+                // Snap position to the synced coordinates
+                bomb.setPosition(x, y);
+                remotePlayer.throwItem(vx, vy);
+                if (bomb.onThrown) {
+                    bomb.onThrown(remotePlayer, power);
+                }
+            }
+        });
+
+        this.networkManager.onChestBombExplode((x: number, y: number) => {
+            // Find the active bomb-mode chest and force-explode it at the synced position
+            const chest = (this.chests.getChildren() as Chest[]).find(
+                c => c.active && c.isBombMode && !c.isExploded
+            );
+            if (chest) {
+                chest.setPosition(x, y);
+                chest.explode();
+            }
+        });
+
         // Debug Toggle Key
         this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+
+        // Manual Chest Spawn (Y key — testing)
+        this.input.keyboard?.on('keydown-Y', () => {
+            const padding = 600;
+            const x = Phaser.Math.Between(padding, this.scale.width - padding);
+            this.networkManager.sendChestSpawn(x);
+        });
 
         // Initialize EffectManager
         this.effectManager = new EffectManager(this);
@@ -317,6 +417,31 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
         // Poll and send local input (throttled to ~30Hz)
         const input = this.inputManager.poll();
+
+        // If escape prompt is open, steal input for menu navigation
+        if (this.escapePromptVisible) {
+            const now = this.time.now;
+            // 200ms debounce
+            if (now - this.lastEscapeInputTime > 200) {
+                if (input.moveLeft) {
+                    this.escapeSelectedIndex = 0; // YES
+                    this.updateEscapePromptSelection();
+                    this.lastEscapeInputTime = now;
+                } else if (input.moveRight) {
+                    this.escapeSelectedIndex = 1; // NO
+                    this.updateEscapePromptSelection();
+                    this.lastEscapeInputTime = now;
+                } else if (input.jump || input.lightAttack || input.heavyAttack) {
+                    this.lastEscapeInputTime = now;
+                    if (this.escapeSelectedIndex === 0) {
+                        this.confirmEscape();
+                    } else {
+                        this.dismissEscapePrompt();
+                    }
+                }
+            }
+            return; // Block game input while prompt is open
+        }
         this.inputThrottleCounter++;
         if (this.inputThrottleCounter >= this.INPUT_SEND_INTERVAL) {
             this.inputThrottleCounter = 0;
@@ -339,8 +464,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             this.localPlayer.setInput(input);
             this.localPlayer.updatePhysics(delta);
 
-            // Collisions
+            // Resolve platform collisions
             this.platforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, false));
+            this.sidePlatforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, false));
             this.softPlatforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, true));
             this.localPlayer.checkWallCollision(this.walls);
 
@@ -481,6 +607,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
                 // Update Visuals (Timers, Blink, etc.) — ALWAYS run, even without buffer
                 player.updateVisuals(delta);
+
+                // Update combat visuals (charge ghost fade-in) for remote players
+                player.combat.update(delta);
 
                 // Check blast zone for remote players
                 this.checkBlastZone(player);
@@ -721,9 +850,12 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     /**
      * Handle remote chest open sync
      */
-    private handleRemoteChestOpen(imageIndex: number): void {
+    private handleRemoteChestOpen(imageIndex: number, chestX: number, chestY: number): void {
         const chest = this.chests.getFirstAlive() as Chest; // Assume 1 chest for now
         if (chest && !chest.isOpened) {
+            // Snap chest to the synced position to fix physics divergence
+            chest.setPosition(chestX, chestY);
+            chest.setVelocity(0, 0);
             chest.open(imageIndex);
         }
     }
@@ -750,30 +882,19 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         if (!player || !player.isAttacking) return;
 
         for (const chest of (this.chests.getChildren() as Chest[])) {
-            const dist = Phaser.Math.Distance.Between(player.x, player.y, chest.x, chest.y);
-
             if (!chest.isOpened) {
+                const dist = Phaser.Math.Distance.Between(player.x, player.y, chest.x, chest.y);
                 if (dist < interactRange) {
-                    // Local player initiated open. We pass no index, so it picks randomly.
-                    // The chest.ts open() will need to return the chosen index, or we pick it here.
+                    // Local player initiated open.
                     const imageIndex = chest.open();
                     // Tell the server this local player opened it, with the specific image chosen.
                     if (imageIndex !== undefined) {
-                        this.networkManager.sendChestOpen(imageIndex);
+                        this.networkManager.sendChestOpen(imageIndex, chest.x, chest.y);
                     }
                 }
-            } else {
-                // Opened: knock it around! (if cooldown is over)
-                if (dist < interactRange && chest.canBePunched) {
-                    const angle = Phaser.Math.Angle.Between(player.x, player.y, chest.x, chest.y);
-                    // Pulse force to match GameScene
-                    const force = 2.0;
-                    chest.applyForce(new Phaser.Math.Vector2(
-                        Math.cos(angle) * force,
-                        Math.sin(angle) * force - 0.15
-                    ));
-                }
             }
+            // No punch logic — matches offline GameScene exactly.
+            // After opening, the chest goes into bomb mode when the UI is closed.
         }
     }
 
@@ -1637,6 +1758,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         // Store references
         this.platforms.push(stage.mainPlatform);
         this.softPlatforms.push(...stage.softPlatforms);
+        this.sidePlatforms = stage.sidePlatforms || [];
         this.walls = stage.wallCollisionRects;
 
         // Camera exclusions
@@ -1660,6 +1782,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
     private escapePromptVisible: boolean = false;
     private escapeContainer!: Phaser.GameObjects.Container;
+    private escapeSelectedIndex: number = 1; // 0 for YES, 1 for NO (default)
+    private escapeOptions: Phaser.GameObjects.Text[] = [];
+    private lastEscapeInputTime: number = 0;
 
     private setupEscapeKey(): void {
         this.input.keyboard?.on('keydown-ESC', () => {
@@ -1681,6 +1806,10 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
     private showEscapePrompt(): void {
         this.escapePromptVisible = true;
+        this.escapeSelectedIndex = 1; // Default to NO
+        this.escapeOptions = [];
+        this.lastEscapeInputTime = this.time.now;
+
         const { width, height } = this.scale;
 
         this.escapeContainer = this.add.container(width / 2, height / 2);
@@ -1691,9 +1820,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.7);
         this.escapeContainer.add(overlay);
 
-        // Prompt box
-        const box = this.add.rectangle(0, 0, 500, 200, 0x1a1a2e, 1);
-        box.setStrokeStyle(3, 0x4a90d9);
+        // Prompt box (pure black with white border)
+        const box = this.add.rectangle(0, 0, 500, 200, 0x000000, 1);
+        box.setStrokeStyle(3, 0xffffff);
         this.escapeContainer.add(box);
 
         const title = this.add.text(0, -50, 'Leave Match?', {
@@ -1702,29 +1831,35 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.escapeContainer.add(title);
 
         const yesBtn = this.add.text(-80, 40, 'YES', {
-            fontSize: '28px', color: '#ff4444', fontFamily: '"Pixeloid Sans"', fontStyle: 'bold',
-            backgroundColor: '#333333', padding: { x: 20, y: 8 }
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        yesBtn.on('pointerdown', () => this.confirmEscape());
+            fontSize: '28px', color: '#ffffff', fontFamily: '"Pixeloid Sans"', fontStyle: 'bold',
+            backgroundColor: '#000000', padding: { x: 20, y: 8 }
+        }).setOrigin(0.5);
+        this.escapeOptions.push(yesBtn);
         this.escapeContainer.add(yesBtn);
 
         const noBtn = this.add.text(80, 40, 'NO', {
-            fontSize: '28px', color: '#00ff00', fontFamily: '"Pixeloid Sans"', fontStyle: 'bold',
-            backgroundColor: '#333333', padding: { x: 20, y: 8 }
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        noBtn.on('pointerdown', () => this.dismissEscapePrompt());
+            fontSize: '28px', color: '#ffffff', fontFamily: '"Pixeloid Sans"', fontStyle: 'bold',
+            backgroundColor: '#000000', padding: { x: 20, y: 8 }
+        }).setOrigin(0.5);
+        this.escapeOptions.push(noBtn);
         this.escapeContainer.add(noBtn);
 
-        // Keyboard shortcuts: Y = yes, N or ESC again = no
-        this.input.keyboard?.once('keydown-Y', () => {
-            if (this.escapePromptVisible) this.confirmEscape();
-        });
-        this.input.keyboard?.once('keydown-N', () => {
-            if (this.escapePromptVisible) this.dismissEscapePrompt();
-        });
+        this.updateEscapePromptSelection();
 
         // Make main camera ignore prompt
         this.cameras.main.ignore(this.escapeContainer);
+    }
+
+    private updateEscapePromptSelection(): void {
+        this.escapeOptions.forEach((option, index) => {
+            if (index === this.escapeSelectedIndex) {
+                option.setBackgroundColor('#ffffff');
+                option.setColor('#000000');
+            } else {
+                option.setBackgroundColor('#000000');
+                option.setColor('#ffffff');
+            }
+        });
     }
 
     private dismissEscapePrompt(): void {
