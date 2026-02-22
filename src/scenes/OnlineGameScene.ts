@@ -39,9 +39,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
     private interpolationTime: number = 0; // Stable playback timeline (milliseconds)
     private isBufferInitialized: boolean = false;
-    // Adaptive buffer: 60ms for local (optimal), 100ms for production (absorbs internet jitter)
-    private readonly RENDER_DELAY_MS = (window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1') ? 60 : 100;
+    // Adaptive buffer: 60ms provides a tight, responsive feel while absorbing standard jitter.
+    private readonly RENDER_DELAY_MS = 60;
     private localPlayerId: number = -1;
     private isConnected: boolean = false;
 
@@ -415,18 +414,36 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Smooth continuous clock speed curve (eliminates discrete jumps)
             const leadError = targetLead - this.RENDER_DELAY_MS;
+            // Tightened bounds: 0.95 to 1.05 to prevent "floaty" visual physics
             const clockSpeed = Phaser.Math.Clamp(
-                1.0 + (leadError * 0.003), // Slightly more responsive adjustment
-                0.90,  // Lower bound (slow down when buffer is low)
-                1.10   // Upper bound (speed up when buffer is high)
+                1.0 + (leadError * 0.005),
+                0.95,
+                1.05
             );
 
             this.interpolationTime += delta * clockSpeed;
         }
 
-        // 2. Interpolate Remote Players
+        // 2. Interpolate Remote Players (or Predict if Hit)
         this.players.forEach((player, playerId) => {
             if (playerId !== this.localPlayerId) {
+                // CLIENT-SIDE HIT PREDICTION
+                // If we locally hit this player, we temporarily suspend network interpolation
+                // and let the local physics engine simulate their knockback for instant visual feedback.
+                if (player.isHitStunned) {
+                    player.updatePhysics(delta);
+
+                    // Collisions to prevent flying through walls during local knockback
+                    this.platforms.forEach(platform => player.checkPlatformCollision(platform, false));
+                    this.softPlatforms.forEach(platform => player.checkPlatformCollision(platform, true));
+                    player.checkWallCollision(this.walls);
+
+                    // Update hit logic timers (so hitStun eventually expires and interpolation resumes)
+                    player.updateLogic(delta);
+                    player.updateVisuals(delta);
+                    return; // Skip interpolation entirely this frame
+                }
+
                 const buffer = this.snapshotBuffer.get(playerId);
 
                 if (buffer && buffer.length >= 2) {

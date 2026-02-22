@@ -393,3 +393,13 @@ Part 2
     - **Fix**: Upgraded `NetPlayerState` to include `clientFrame` directly from Client A's local physics loop. The server receives, stores, and broadcasts this `clientFrame` telemetry. Client B mathematically anchors interpolation directly to this `clientFrame`.
     - **Result**: Client B can perfectly recreate Client A's chronological playback speed, effectively nullifying Relay Jitter across both "Client A -> Server" and "Server -> Client B" hops.
 ------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-22] v1.0.14 - Client-Side Hit Prediction & Snappy Tuning ⚡🥊
+- **[V]** `v1.0.14`
+- **[Predict]** **Hit Prediction (Zero Latency Hits)**:
+    - **Flaw**: Hits felt extremely laggy because local knockback was immediately overwritten by the network interpolation buffer (which was 160ms+ in the past).
+    - **Fix**: Implemented Client-Side Hit Prediction. When a remote player is locally hit (`isHitStunned`), they are temporarily detached from the network interpolation buffer. The local physics engine takes over (`player.updatePhysics()`) to simulate instant knockback and collisions.
+    - **Result**: Hitting opponents offline or online feels absolutely identical. No massive latency or waiting for server confirmation.
+- **[Tuning]** **Floatiness Reduction**:
+    - **Render Delay**: Reduced base `RENDER_DELAY_MS` to a tight 60ms (down from 100ms). The timeline architecture fix was so effective we no longer need the massive buffer.
+    - **Drift Bounds**: Tightened `clockSpeed` drift adjustments from `0.90 - 1.10` to `0.95 - 1.05`, eliminating the "floaty" or "sluggish" feeling caused by the client over-correcting the jitter timeline.
+------------------------------------------------------------------------------------------------------------------------------------
