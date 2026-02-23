@@ -248,9 +248,10 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.matchHUD = new MatchHUD(this);
         this.matchHUD.addToCameraIgnore(this.cameras.main);
 
-        // Debug Overlay
+        // Debug Overlay (minimal: FPS + Ping only for online)
         this.debugOverlay = new DebugOverlay(this);
         this.debugOverlay.setCameraIgnore(this.cameras.main);
+        this.debugOverlay.setMinimalMode(true);
 
         // F1 Controls Overlay
         this.controlsOverlay = new ControlsOverlay(this);
@@ -628,7 +629,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         if (qKeyPressed || gamepadSelectPressed) {
             this.debugVisible = !this.debugVisible;
             this.debugOverlay.setVisible(this.debugVisible);
-            this.players.forEach(p => p.setDebug(this.debugVisible));
+            // Online: minimal mode — no hitbox/collision debug visuals
         }
 
         if (this.debugVisible && this.localPlayer) {

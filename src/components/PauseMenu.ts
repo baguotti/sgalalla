@@ -134,88 +134,111 @@ export class PauseMenu {
         this.controlsContainer.setDepth(1001);
         this.controlsContainer.setVisible(false);
 
-        const centerX = this.scene.scale.width / 2;
-        const centerY = this.scene.scale.height / 2;
+        // --- Layout: 3 columns (matches F1 ControlsOverlay) ---
+        const w = this.scene.scale.width;
+        const col1X = w * 0.18;
+        const col2X = w * 0.50;
+        const col3X = w * 0.82;
+        const topY = 120;
+        const headerStyle = { fontSize: '26px', fontStyle: 'bold', fontFamily: '"Pixeloid Sans"' };
+        const bodyStyle = { fontSize: '16px', color: '#ffffff', fontFamily: '"Pixeloid Sans"', lineSpacing: 7 };
 
-        // -- Layout Configuration --
-        const col1X = -250; // Relative to center
-        const col2X = 200;
-        const headerY = -200;
-        const contentY = -150;
-
-        // == COL 1: INPUTS ==
-        const inputsHeader = this.scene.add.text(col1X, headerY, 'TASTI & COMANDI', {
-            fontSize: '32px',
-            color: '#8ab4f8', // Pastel Blue
-            fontStyle: 'bold',
-            fontFamily: '"Pixeloid Sans"'
+        // ═══ COLUMN 1: INPUT MAPPINGS ═══
+        const col1Header = this.scene.add.text(col1X, topY, 'TASTI & GAMEPAD', {
+            ...headerStyle, color: '#8ab4f8'
         }).setOrigin(0.5, 0);
+        col1Header.setShadow(2, 2, '#000000', 0, false, true);
 
-        // Add a subtle drop shadow to the header
-        inputsHeader.setShadow(2, 2, '#000000', 0, false, true);
-
-        const inputsText = [
-            'AZIONE       | TASTIERA   | GAMEPAD',
-            '-------------+------------+-----------',
-            'Muovi        | WASD/Frec. | Stick L',
-            'Salta        | Spazio/Su  | A (Cross)',
-            'Att. Leggero | J / C      | X (Square)',
-            'Att. Pesante | K / X      | B (Circle)',
-            'Schivata     | L / Z      | Grilletti',
-            'Interagisci  | J / C      | X (Square)'
+        const inputLines = [
+            'AZIONE          TASTI        GAMEPAD',
+            '──────────────────────────────────────',
+            'Muovi           WASD/Frec.   Stick L / D-Pad',
+            'Salta           Spazio/Su    A',
+            'Att. Leggero    J / C        X',
+            'Att. Pesante    K / X        B / Y',
+            'Schivata        L / Z        LT / RT',
+            'Provoca         P            R3 (Click)',
+            'Pausa           ESC          Start',
+            '',
+            'INTERAZIONI',
+            '──────────────────────────────────────',
+            'Apri Cassa      J / C        X',
+            '  (vicino alla cassa)',
+            'Raccogli        J / C        X',
+            '  (vicino a oggetto)',
+            'Lancia          J / C        X / RB',
+            '  (con oggetto in mano)',
         ].join('\n');
 
-        const inputsContent = this.scene.add.text(col1X, contentY, inputsText, {
-            fontSize: '18px',
-            color: '#ffffff',
-            fontFamily: '"Pixeloid Sans"',
-            lineSpacing: 8,
-            align: 'center'
+        const col1Body = this.scene.add.text(col1X, topY + 48, inputLines, bodyStyle).setOrigin(0.5, 0);
+
+        // ═══ COLUMN 2: MOVESET GUIDE ═══
+        const col2Header = this.scene.add.text(col2X, topY, 'MOVESET', {
+            ...headerStyle, color: '#f28b82'
         }).setOrigin(0.5, 0);
+        col2Header.setShadow(2, 2, '#000000', 0, false, true);
 
-        // == COL 2: MOVESET GUIDE ==
-        const movesetHeader = this.scene.add.text(col2X, headerY, 'MOVESET GUIDE', {
-            fontSize: '32px',
-            color: '#f28b82', // Pastel Red
-            fontStyle: 'bold',
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0.5, 0);
-
-        // Add a subtle drop shadow to the header
-        movesetHeader.setShadow(2, 2, '#000000', 0, false, true);
-
-        const movesetText = [
+        const movesetLines = [
             'ATTACCHI LEGGERI (Veloci)',
-            '• NLight: Fermo + Leggero',
-            '• SLight: Destra/Sinistra + Leggero',
-            '• DLight: Giù + Leggero',
-            '• Air Light: Salto + Leggero',
+            '• NLight   Fermo + Leggero',
+            '• SLight   Lati + Leggero',
+            '• DLight   Giù + Leggero',
+            '• Air      Aria + Leggero',
             '',
             'ATTACCHI PESANTI (Signature)',
-            '• NSig: Fermo + Pesante (Anti-Air/Caricabile)',
-            '• SSig: Lati + Pesante (Kill Move/Caricabile)',
-            '• DSig: Giù + Pesante (Area Control)',
+            '• NSig     Fermo + Pesante',
+            '             (Caricabile)',
+            '• SSig     Lati + Pesante',
+            '             (Kill Move / Caricabile)',
+            '• DSig     Giù + Pesante',
             '',
-            'SPECIALI & OGGETTI',
-            '• Recovery: Salto + Su + Pesante',
-            '• Ground Pound: Salto + Giù + Pesante',
-            '• Apri Cassa: Attacco vicino alla cassa'
+            'SPECIALI',
+            '• Recovery       Su + Pesante',
+            '                   (in aria)',
+            '• Ground Pound   Giù + Pesante',
+            '                   (in aria)',
+            '• Doppio Salto   Salta x2',
+            '• Wall Slide     Verso il muro',
+            '                   (in aria)',
+            '• Wall Jump      Salta dal muro',
         ].join('\n');
 
-        const movesetContent = this.scene.add.text(col2X, contentY, movesetText, {
-            fontSize: '18px',
-            color: '#ffffff',
-            fontFamily: '"Pixeloid Sans"', // Readable font for text
-            lineSpacing: 8,
-            align: 'center'
+        const col2Body = this.scene.add.text(col2X, topY + 48, movesetLines, bodyStyle).setOrigin(0.5, 0);
+
+        // ═══ COLUMN 3: SYSTEM & DEBUG ═══
+        const col3Header = this.scene.add.text(col3X, topY, 'SISTEMA', {
+            ...headerStyle, color: '#81c995'
         }).setOrigin(0.5, 0);
+        col3Header.setShadow(2, 2, '#000000', 0, false, true);
 
-        // Add to container
-        this.controlsContainer.add([inputsHeader, inputsContent, movesetHeader, movesetContent]);
+        const systemLines = [
+            'COMUNE',
+            '──────────────────────────────',
+            'F1       Comandi (questo)',
+            'ESC      Pausa',
+            'Q        FPS / Ping',
+            '',
+            'SOLO TRAINING',
+            '──────────────────────────────',
+            'Q        Debug Completo',
+            '           (hitbox, stati,',
+            '            velocità...)',
+            'T        Dummy Ostile On/Off',
+            'Y        Genera Cassa',
+            '',
+            'NOTE',
+            '──────────────────────────────',
+            '• Switch Pro Controller',
+            '  supportato (remap auto)',
+            '• La carica si attiva',
+            '  tenendo premuto Pesante',
+            '• Gli attacchi si bufferizzano',
+            '  automaticamente',
+        ].join('\n');
 
-        // Use a relative positioning trick for container when screen resizes? 
-        // For now, assume fixed center relative.
-        this.controlsContainer.setPosition(centerX, centerY);
+        const col3Body = this.scene.add.text(col3X, topY + 48, systemLines, bodyStyle).setOrigin(0.5, 0);
+
+        this.controlsContainer.add([col1Header, col1Body, col2Header, col2Body, col3Header, col3Body]);
     }
 
     private updateLayout(): void {
@@ -224,9 +247,6 @@ export class PauseMenu {
 
         this.titleText.setPosition(centerX, centerY - 250);
         this.hintText.setPosition(centerX, this.scene.scale.height - 50);
-
-        // Position controls container center
-        this.controlsContainer.setPosition(centerX, centerY);
 
         const startY = centerY - 100;
         const spacing = 50;
@@ -281,7 +301,11 @@ export class PauseMenu {
     }
 
     private showMainMenu(): void {
+        const centerX = this.scene.scale.width / 2;
+        const centerY = this.scene.scale.height / 2;
+
         this.titleText.setText('PAUSED');
+        this.titleText.setPosition(centerX, centerY - 250);
         this.titleText.setVisible(true);
         this.hintText.setText('[ESC / START to Resume]');
         this.hintText.setVisible(true);
@@ -297,11 +321,12 @@ export class PauseMenu {
     }
 
     private showControlsMenu(): void {
-        this.titleText.setText('CONTROLS');
+        const centerX = this.scene.scale.width / 2;
+
+        this.titleText.setText('COMANDI DI GIOCO');
+        this.titleText.setPosition(centerX, 60); // Matches F1 overlay exactly
         this.titleText.setVisible(true);
 
-        // Center controls container
-        this.controlsContainer.setPosition(this.scene.scale.width / 2, this.scene.scale.height / 2);
         this.controlsContainer.setVisible(true);
 
         this.hintText.setText('[ESC / B to Back]');

@@ -339,6 +339,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.debugOverlay = new DebugOverlay(this);
             this.debugOverlay.setCameraIgnore(this.cameras.main);
 
+            // Versus mode: only show FPS/Ping. Full debug is training-only.
+            const isTrainingMode = this.playerData.some((p: any) => p.isTrainingDummy);
+            if (!isTrainingMode) {
+                this.debugOverlay.setMinimalMode(true);
+            }
+
             // Debug Graphics for Platform Visualization
             this.debugGraphics = this.add.graphics();
             this.debugGraphics.setDepth(9999);
@@ -643,9 +649,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         if (qKeyPressed || gamepadSelectPressed) {
             this.debugVisible = !this.debugVisible;
             this.debugOverlay.setVisible(this.debugVisible);
-            this.toggleDebugVisuals(this.debugVisible);
-            this.players.forEach(p => p.setDebug(this.debugVisible));
-            this.seals.forEach(s => s.setDebug(this.debugVisible));
+
+            // Full debug visuals (hitboxes, collision rects) only in training
+            if (!this.debugOverlay.isMinimalMode()) {
+                this.toggleDebugVisuals(this.debugVisible);
+                this.players.forEach(p => p.setDebug(this.debugVisible));
+                this.seals.forEach(s => s.setDebug(this.debugVisible));
+            }
         }
 
         // Handle Training Toggle (T)

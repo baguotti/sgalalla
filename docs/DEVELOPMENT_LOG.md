@@ -456,3 +456,19 @@ Part 2
     - **Geometry Pooling**: Unified `_boundsRect` into `Fighter` base class as a pooled resource (Zero-allocation `getBounds()`).
     - **Vector Pooling**: Replaced `new Vector2` allocations in `Chest.ts` and `NetworkManager.ts` with reusable/shared instances.
 - **[S]** **STATUS**: Critical performance bottlenecks removed; GC pressure significantly reduced.
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-23] v1.1.2 - Debug Mode Awareness & Controls Overhaul 🎮🛠️
+- **[V]** `v1.1.2`
+- **[Feat]** **Debug Mode Awareness**:
+    - **Contextual Toggle**: The [Q] debug toggle is now mode-aware. 
+        - **Botte in Locale / Online**: Shows only FPS and Ping for a clean competitive experience.
+        - **Training Mode**: Shows full technical data (State, Velocity, Hitboxes, Recovery state, etc.).
+    - **Performance**: Disabled heavy debug visual updates (physics geometries/hitboxes) when in minimal mode.
+- **[Feat]** **Controls Overlay (F1) Rewrite**:
+    - **3-Column Layout**: Completely redesigned the [F1] overlay with a denser, more organized "Overwatch-style" layout.
+    - **Coverage**: Documented 100% of inputs, including Keyboard (WASD/Arrows/SPACE/Brawlhalla defaults) and Gamepad mappings.
+    - **Moveset**: Added a comprehensive moveset reference (NLight, SSig, Recovery, etc.) and interaction guide (Chests/Items).
+- **[UX]** **Pause Menu Parity**:
+    - **Synchronization**: Rewrote the "COMANDI" section of the Pause Menu to exactly match the new F1 overlay content and layout.
+    - **Layout Fix**: Corrected the title positioning in the Pause Menu to prevent overlaps with the new 3-column content.
+- **[S]** **STATUS**: Game UX significantly improved with high-fidelity control references and cleaner performance monitoring.

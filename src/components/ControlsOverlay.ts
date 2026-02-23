@@ -15,115 +15,142 @@ export class ControlsOverlay {
     private createOverlay(): void {
         this.container = this.scene.add.container(0, 0);
         this.container.setScrollFactor(0);
-        this.container.setDepth(1001); // High depth to render over UI
+        this.container.setDepth(1001);
         this.container.setVisible(false);
 
-        // Dark background overlay just for the controls screen
+        // Dark background overlay
         this.overlayBg = this.scene.add.graphics();
-        this.overlayBg.fillStyle(0x000000, 0.85); // Overwatch style dark transparency
+        this.overlayBg.fillStyle(0x000000, 0.88);
         this.overlayBg.fillRect(0, 0, this.scene.scale.width, this.scene.scale.height);
         this.container.add(this.overlayBg);
 
         const centerX = this.scene.scale.width / 2;
-        // Move content up slightly to make room for Title
-        const centerY = this.scene.scale.height / 2;
 
-        const titleText = this.scene.add.text(centerX, 80, 'COMANDI DI GIOCO', {
-            fontSize: '48px',
+        const titleText = this.scene.add.text(centerX, 60, 'COMANDI DI GIOCO', {
+            fontSize: '44px',
             color: '#ffffff',
             fontStyle: 'bold',
             fontFamily: '"Pixeloid Sans"'
-        });
-        titleText.setOrigin(0.5);
+        }).setOrigin(0.5);
         this.container.add(titleText);
 
-        const hintText = this.scene.add.text(centerX, this.scene.scale.height - 50, '[F1] per chiudere', {
-            fontSize: '18px',
+        const hintText = this.scene.add.text(centerX, this.scene.scale.height - 40, '[F1] per chiudere', {
+            fontSize: '16px',
             color: '#8ab4f8',
             fontFamily: '"Pixeloid Sans"'
-        });
-        hintText.setOrigin(0.5);
+        }).setOrigin(0.5);
         this.container.add(hintText);
 
-        // -- Layout Configuration --
-        // Use a wrapper container to easily center everything
-        const contentContainer = this.scene.add.container(centerX, centerY);
-        this.container.add(contentContainer);
+        // --- Layout: 3 columns ---
+        const topY = 120;
+        const col1X = this.scene.scale.width * 0.18;
+        const col2X = this.scene.scale.width * 0.50;
+        const col3X = this.scene.scale.width * 0.82;
+        const headerStyle = { fontSize: '26px', fontStyle: 'bold', fontFamily: '"Pixeloid Sans"' };
+        const bodyStyle = { fontSize: '16px', color: '#ffffff', fontFamily: '"Pixeloid Sans"', lineSpacing: 7 };
 
-        const col1X = -250; // Modified to move right (-350 to -250)
-        const col2X = 200;  // Modified to move right (50 to 200)
-        const headerY = -200; // Modified to move up (-150 to -200)
-        const contentY = -150; // Modified to move up (-100 to -150)
-
-        // == COL 1: INPUTS ==
-        const inputsHeader = this.scene.add.text(col1X, headerY, 'TASTI & COMANDI', {
-            fontSize: '32px',
-            color: '#8ab4f8', // Pastel Blue
-            fontStyle: 'bold',
-            fontFamily: '"Pixeloid Sans"'
+        // ═══════════════════════════════════
+        // COLUMN 1: INPUT MAPPINGS
+        // ═══════════════════════════════════
+        const col1Header = this.scene.add.text(col1X, topY, 'TASTI & GAMEPAD', {
+            ...headerStyle, color: '#8ab4f8'
         }).setOrigin(0.5, 0);
+        col1Header.setShadow(2, 2, '#000000', 0, false, true);
 
-        inputsHeader.setShadow(2, 2, '#000000', 0, false, true);
-
-        const inputsText = [
-            'AZIONE       | TASTIERA   | GAMEPAD',
-            '-------------+------------+-----------',
-            'Muovi        | WASD/Frec. | Stick L',
-            'Salta        | Spazio/Su  | A (Cross)',
-            'Att. Leggero | J / C      | X (Square)',
-            'Att. Pesante | K / X      | B (Circle)',
-            'Schivata     | L / Z      | Grilletti',
-            'Interagisci  | J / C      | X (Square)'
+        const inputLines = [
+            'AZIONE          TASTI        GAMEPAD',
+            '──────────────────────────────────────',
+            'Muovi           WASD/Frec.   Stick L / D-Pad',
+            'Salta           Spazio/Su    A',
+            'Att. Leggero    J / C        X',
+            'Att. Pesante    K / X        B / Y',
+            'Schivata        L / Z        LT / RT',
+            'Provoca         P            R3 (Click)',
+            'Pausa           ESC          Start',
+            '',
+            'INTERAZIONI',
+            '──────────────────────────────────────',
+            'Apri Cassa      J / C        X',
+            '  (vicino alla cassa)',
+            'Raccogli        J / C        X',
+            '  (vicino a oggetto)',
+            'Lancia          J / C        X / RB',
+            '  (con oggetto in mano)',
         ].join('\n');
 
-        const inputsContent = this.scene.add.text(col1X, contentY, inputsText, {
-            fontSize: '18px',
-            color: '#ffffff',
-            fontFamily: '"Pixeloid Sans"',
-            lineSpacing: 8,
-            align: 'center'
+        const col1Body = this.scene.add.text(col1X, topY + 48, inputLines, bodyStyle).setOrigin(0.5, 0);
+
+        // ═══════════════════════════════════
+        // COLUMN 2: MOVESET GUIDE
+        // ═══════════════════════════════════
+        const col2Header = this.scene.add.text(col2X, topY, 'MOVESET', {
+            ...headerStyle, color: '#f28b82'
         }).setOrigin(0.5, 0);
+        col2Header.setShadow(2, 2, '#000000', 0, false, true);
 
-        // == COL 2: MOVESET GUIDE ==
-        const movesetHeader = this.scene.add.text(col2X, headerY, 'MOVESET GUIDE', {
-            fontSize: '32px',
-            color: '#f28b82', // Pastel Red
-            fontStyle: 'bold',
-            fontFamily: '"Pixeloid Sans"'
-        }).setOrigin(0.5, 0);
-
-        movesetHeader.setShadow(2, 2, '#000000', 0, false, true);
-
-        const movesetText = [
+        const movesetLines = [
             'ATTACCHI LEGGERI (Veloci)',
-            '• NLight: Fermo + Leggero',
-            '• SLight: Destra/Sinistra + Leggero',
-            '• DLight: Giù + Leggero',
-            '• Air Light: Salto + Leggero',
+            '• NLight   Fermo + Leggero',
+            '• SLight   Lati + Leggero',
+            '• DLight   Giù + Leggero',
+            '• Air      Aria + Leggero',
             '',
             'ATTACCHI PESANTI (Signature)',
-            '• NSig: Fermo + Pesante (Anti-Air/Caricabile)',
-            '• SSig: Lati + Pesante (Kill Move/Caricabile)',
-            '• DSig: Giù + Pesante (Area Control)',
+            '• NSig     Fermo + Pesante',
+            '             (Caricabile)',
+            '• SSig     Lati + Pesante',
+            '             (Kill Move / Caricabile)',
+            '• DSig     Giù + Pesante',
             '',
-            'SPECIALI & OGGETTI',
-            '• Recovery: Salto + Su + Pesante',
-            '• Ground Pound: Salto + Giù + Pesante',
-            '• Apri Cassa: Attacco vicino alla cassa',
-            '',
-            'SOLO TRAINING',
-            '• Dummy Hostile: Tasto [T]'
+            'SPECIALI',
+            '• Recovery       Su + Pesante',
+            '                   (in aria)',
+            '• Ground Pound   Giù + Pesante',
+            '                   (in aria)',
+            '• Doppio Salto   Salta x2',
+            '• Wall Slide     Verso il muro',
+            '                   (in aria)',
+            '• Wall Jump      Salta dal muro',
         ].join('\n');
 
-        const movesetContent = this.scene.add.text(col2X, contentY, movesetText, {
-            fontSize: '18px',
-            color: '#ffffff',
-            fontFamily: '"Pixeloid Sans"', // Readable font for text
-            lineSpacing: 8,
-            align: 'center'
-        }).setOrigin(0.5, 0);
+        const col2Body = this.scene.add.text(col2X, topY + 48, movesetLines, bodyStyle).setOrigin(0.5, 0);
 
-        contentContainer.add([inputsHeader, inputsContent, movesetHeader, movesetContent]);
+        // ═══════════════════════════════════
+        // COLUMN 3: SYSTEM & DEBUG
+        // ═══════════════════════════════════
+        const col3Header = this.scene.add.text(col3X, topY, 'SISTEMA', {
+            ...headerStyle, color: '#81c995'
+        }).setOrigin(0.5, 0);
+        col3Header.setShadow(2, 2, '#000000', 0, false, true);
+
+        const systemLines = [
+            'COMUNE',
+            '──────────────────────────────',
+            'F1       Comandi (questo)',
+            'ESC      Pausa',
+            'Q        FPS / Ping',
+            '',
+            'SOLO TRAINING',
+            '──────────────────────────────',
+            'Q        Debug Completo',
+            '           (hitbox, stati,',
+            '            velocità...)',
+            'T        Dummy Ostile On/Off',
+            'Y        Genera Cassa',
+            '',
+            'NOTE',
+            '──────────────────────────────',
+            '• Switch Pro Controller',
+            '  supportato (remap auto)',
+            '• La carica si attiva',
+            '  tenendo premuto Pesante',
+            '• Gli attacchi si bufferizzano',
+            '  automaticamente',
+        ].join('\n');
+
+        const col3Body = this.scene.add.text(col3X, topY + 48, systemLines, bodyStyle).setOrigin(0.5, 0);
+
+        this.container.add([col1Header, col1Body, col2Header, col2Body, col3Header, col3Body]);
     }
 
     private setupInput(): void {

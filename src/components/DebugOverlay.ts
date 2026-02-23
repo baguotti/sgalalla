@@ -110,14 +110,29 @@ export class DebugOverlay {
         this.gamepadText.setText(`Gamepad: ${gamepadConnected ? '🎮 Connected' : 'Not connected'}`);
     }
 
+    private _minimalMode: boolean = false;
+
+    /** When true, only FPS and Ping are shown (for versus/online). Full debug is training-only. */
+    public setMinimalMode(minimal: boolean): void {
+        this._minimalMode = minimal;
+    }
+
+    public isMinimalMode(): boolean {
+        return this._minimalMode;
+    }
+
     setVisible(visible: boolean): void {
-        this.velocityText.setVisible(visible);
-        this.stateText.setVisible(visible);
+        // FPS and Ping always follow the toggle
         this.fpsText.setVisible(visible);
         this.pingText.setVisible(visible);
-        this.recoveryText.setVisible(visible);
-        this.attackText.setVisible(visible);
-        this.gamepadText.setVisible(visible);
+
+        // Full debug fields only visible in non-minimal mode
+        const fullVisible = visible && !this._minimalMode;
+        this.velocityText.setVisible(fullVisible);
+        this.stateText.setVisible(fullVisible);
+        this.recoveryText.setVisible(fullVisible);
+        this.attackText.setVisible(fullVisible);
+        this.gamepadText.setVisible(fullVisible);
     }
 
     // Set which camera renders these UI elements
