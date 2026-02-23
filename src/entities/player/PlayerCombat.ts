@@ -676,7 +676,6 @@ export class PlayerCombat {
     }
 
     public endAttack(): void {
-        console.log(`[PlayerCombat] endAttack()`);
         this.player.isAttacking = false;
         this.isGroundPounding = false;
         this.currentAttack = null;

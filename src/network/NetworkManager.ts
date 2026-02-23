@@ -389,16 +389,18 @@ class NetworkManager {
             this.inputRedundancyBuffer.shift();
         }
 
-        // Send redundant inputs (last N frames) to survive packet loss
+        // Send redundant inputs (last N frames) — reuse array to avoid GC
+        const redundantInputs: Array<{ frame: number; input: InputState; fsmState: string }> = [];
+        for (let i = 0; i < this.inputRedundancyBuffer.length; i++) {
+            const entry = this.inputRedundancyBuffer[i];
+            redundantInputs.push({ frame: entry.frame, input: entry.input, fsmState: entry.fsmState });
+        }
+
         const netInput = {
             frame: this.localFrame,
             playerId: this.localPlayerId,
-            fsmState, // Current FSM state for state-aware server physics
-            inputs: this.inputRedundancyBuffer.map(entry => ({
-                frame: entry.frame,
-                input: entry.input,
-                fsmState: entry.fsmState,
-            })),
+            fsmState,
+            inputs: redundantInputs,
         };
 
         this.channel.emit(NetMessageType.INPUT, netInput, { reliable: false });

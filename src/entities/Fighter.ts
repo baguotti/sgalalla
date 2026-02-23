@@ -84,15 +84,19 @@ export abstract class Fighter extends Phaser.GameObjects.Container implements Da
 
     protected onHitStunEnd(): void { }
 
+    // Pre-allocated for getBounds() — avoids per-call GC
+    protected readonly _boundsRect = new Phaser.Geom.Rectangle(0, 0, 0, 0);
+
     /**
-     * Get bounding box
+     * Get bounding box (pooled — do NOT store the returned reference)
      */
     public getBounds(): Phaser.Geom.Rectangle {
-        return new Phaser.Geom.Rectangle(
+        this._boundsRect.setTo(
             this.x - this.width / 2,
             this.y - this.height / 2,
             this.width,
             this.height
         );
+        return this._boundsRect;
     }
 }

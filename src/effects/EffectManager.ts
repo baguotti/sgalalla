@@ -8,6 +8,7 @@ export class EffectManager {
     private explosions!: Phaser.GameObjects.Group;
     // private hitSparks!: Phaser.GameObjects.Group; // Reserved for future use
     private ghosts!: Phaser.GameObjects.Group;
+    private dustPool!: Phaser.GameObjects.Group;
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
@@ -39,6 +40,12 @@ export class EffectManager {
             maxSize: 20
         });
         */
+
+        // --- Dust (Circles) ---
+        this.dustPool = this.scene.add.group({
+            maxSize: 10,
+            runChildUpdate: false
+        });
     }
 
     public spawnExplosion(x: number, y: number, _radius: number, _color: number): void {
@@ -109,20 +116,29 @@ export class EffectManager {
     }
 
     public spawnWallDust(x: number, y: number, facing: number): void {
-        // Simple "puff" cloud
-        const p = this.scene.add.circle(x + (facing * 10), y, 3, 0xffffff);
+        // Reuse pooled circle or create if pool empty
+        let p = this.dustPool.getFirstDead(false) as Phaser.GameObjects.Arc | null;
+        if (!p) {
+            p = this.scene.add.circle(0, 0, 3, 0xffffff);
+            this.dustPool.add(p);
+        }
+        p.setPosition(x + (facing * 10), y);
         p.setAlpha(0.6);
+        p.setScale(1);
         p.setDepth(20);
+        p.setActive(true);
+        p.setVisible(true);
 
         this.scene.tweens.add({
             targets: p,
-            x: p.x + (facing * 15), // Drift away from wall
-            y: p.y - 10,            // Drift up
+            x: p.x + (facing * 15),
+            y: p.y - 10,
             alpha: 0,
             scale: 0.1,
             duration: 300,
             onComplete: () => {
-                p.destroy();
+                p!.setActive(false);
+                p!.setVisible(false);
             }
         });
     }

@@ -16,9 +16,6 @@ import type { GameSceneInterface } from './GameSceneInterface';
 
 
 export class GameScene extends Phaser.Scene implements GameSceneInterface {
-    // private player1!: Player;
-    // private player2!: Player;
-
     private debugOverlay!: DebugOverlay;
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
@@ -39,8 +36,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private trainingToggleKey!: Phaser.Input.Keyboard.Key;
 
     // Kill tracking
-    // private player1HUD!: PlayerHUD;
-    // private player2HUD!: PlayerHUD;
 
 
     // Wall configuration
@@ -59,8 +54,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     // Game Over State
     private isGameOver: boolean = false;
     private previousAButtonPressed: boolean = false;
-    private previousSelectPressed: boolean = false; // Moved here for logical grouping
-    private previousStartPressed: boolean = false; // Moved here for logical grouping
+    private previousSelectPressed: boolean = false;
+    private previousStartPressed: boolean = false;
+
+    // Pre-allocated for update() — avoids per-frame GC
+    private readonly hudPlayerMap: Map<number, Player> = new Map();
+    private gameOverSpaceKey!: Phaser.Input.Keyboard.Key;
+    private gameOverEscKey!: Phaser.Input.Keyboard.Key;
 
     constructor() {
         super({ key: 'GameScene' });
@@ -73,8 +73,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private loadCharacterAssets(): void {
         AnimationHelpers.loadCharacterAssets(this);
         AnimationHelpers.loadCommonAssets(this);
-        AnimationHelpers.loadUIAudio(this);
-
         AnimationHelpers.loadUIAudio(this);
 
         // Music is now global (loaded in PreloadScene)
@@ -356,6 +354,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
             this.trainingToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
             this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+            this.gameOverSpaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+            this.gameOverEscKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
             // Create pause menu
             this.pauseMenu = new PauseMenu(this);
@@ -431,8 +431,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         } catch (e: any) {
             console.error("CRITICAL ERROR in GameScene.create:", e);
-            const errT = this.add.text(this.scale.width / 2, this.scale.height / 2, "CRASH: " + e?.message || String(e), { fontSize: '32px', color: '#ff0000', backgroundColor: '#000' });
-            errT.setOrigin(0.5).setDepth(9999);
         }
     }
 
@@ -607,8 +605,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Stop updates if game over
         if (this.isGameOver) {
             // Allow restarting via SPACE, ESC, or Gamepad A Button (0)
-            const spacePressed = Phaser.Input.Keyboard.JustDown(this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE));
-            const escPressed = Phaser.Input.Keyboard.JustDown(this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC));
+            const spacePressed = Phaser.Input.Keyboard.JustDown(this.gameOverSpaceKey);
+            const escPressed = Phaser.Input.Keyboard.JustDown(this.gameOverEscKey);
             const aButtonPressed = this.checkGamepadA();
 
             if (spacePressed || escPressed || aButtonPressed) {
@@ -745,9 +743,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Update HUDs
         if (this.matchHUD) {
             // Create a map for MatchHUD
-            const playerMap = new Map<number, Player>();
-            this.players.forEach(p => playerMap.set(p.playerId, p));
-            this.matchHUD.updatePlayers(playerMap);
+            this.hudPlayerMap.clear();
+            this.players.forEach(p => this.hudPlayerMap.set(p.playerId, p));
+            this.matchHUD.updatePlayers(this.hudPlayerMap);
         }
 
     }

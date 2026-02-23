@@ -195,10 +195,6 @@ export class PlayerHudSlot {
         this.container.add(this.percentText);
 
 
-        this.container.add(this.bigDamageText);
-        this.container.add(this.percentText);
-
-
         // --- 5. Stocks (Under Name Tag) ---
         // Visual Hearts logic
         // We'll manage hearts in update() to ensure they match live stock count

@@ -38,6 +38,9 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
     private blurEffect?: Phaser.FX.Blur;
     private timerSound: Phaser.Sound.BaseSound | null = null;
 
+    // Pre-allocated for knockback calculations — avoids per-hit GC
+    private readonly _knockbackVec = new Phaser.Math.Vector2(0, 0);
+
     constructor(scene: Phaser.Scene, x: number, y: number) {
         const textureKey = 'chest_closed'; // New asset
         const width = 88; // Matches chest_closed.png
@@ -205,13 +208,13 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
                     const knockbackForce = PhysicsConfig.CHEST_KNOCKBACK_FORCE; // 2500
                     const angle = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
 
-                    const knockback = new Phaser.Math.Vector2(
+                    this._knockbackVec.set(
                         Math.cos(angle) * knockbackForce,
                         Math.sin(angle) * knockbackForce
                     );
 
                     player.setDamage(player.damagePercent + damage);
-                    player.setKnockback(knockback.x, knockback.y);
+                    player.setKnockback(this._knockbackVec.x, this._knockbackVec.y);
                     player.applyHitStun();
                     this.scene.cameras.main.shake(PhysicsConfig.CHEST_SHAKE_DURATION, PhysicsConfig.CHEST_SHAKE_INTENSITY);
 
@@ -305,11 +308,11 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
                     const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
                     if (dist < contactRange) {
                         const damage = PhysicsConfig.CHEST_PROJECTILE_DAMAGE;
-                        const velocity = new Phaser.Math.Vector2(body.velocity.x, body.velocity.y).normalize();
+                        this._knockbackVec.set(body.velocity.x, body.velocity.y).normalize();
                         const knockbackForce = PhysicsConfig.CHEST_KNOCKBACK_FORCE * 0.8;
 
                         player.setDamage(player.damagePercent + damage);
-                        player.setKnockback(velocity.x * knockbackForce, velocity.y * knockbackForce);
+                        player.setKnockback(this._knockbackVec.x * knockbackForce, this._knockbackVec.y * knockbackForce);
                         player.applyHitStun();
                         this.scene.cameras.main.shake(PhysicsConfig.CHEST_SHAKE_DURATION, PhysicsConfig.CHEST_SHAKE_INTENSITY);
 
@@ -607,13 +610,13 @@ export class Chest extends Phaser.Physics.Matter.Sprite implements Throwable {
                 // Variable force based on target's damage percent
                 const finalKnockback = baseKnockback * (1 + (player.damagePercent / 100));
 
-                const knockback = new Phaser.Math.Vector2(
+                this._knockbackVec.set(
                     Math.cos(angle) * finalKnockback,
                     Math.sin(angle) * finalKnockback
                 );
 
                 player.setDamage(player.damagePercent + explosionDamage);
-                player.setKnockback(knockback.x, knockback.y);
+                player.setKnockback(this._knockbackVec.x, this._knockbackVec.y);
                 player.applyHitStun();
             }
         }

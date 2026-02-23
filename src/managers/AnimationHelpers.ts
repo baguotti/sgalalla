@@ -91,12 +91,11 @@ export class AnimationHelpers {
         scene.load.audio('ui_back', 'assets/audio/sfx/ui/ui_back.wav');
         scene.load.audio('ui_player_ready', 'assets/audio/sfx/ui/ui_player_ready.wav');
         scene.load.audio('ui_menu_hover', 'assets/audio/sfx/ui/ui_menu_hover.wav');
-        const cb = `?v=${Date.now() + 1}`;
-        scene.load.audio('ui_confirm', 'assets/audio/sfx/ui/ui_confirm.wav' + cb);
-        scene.load.audio('ui_move_cursor', 'assets/audio/sfx/ui/ui_move_cursor.wav' + cb);
-        scene.load.audio('ui_match_begin', 'assets/audio/sfx/ui/ui_match_begin.wav' + cb);
-        scene.load.audio('sfx_ui_press_start', 'assets/audio/sfx/ui/ui_press_start.wav' + cb);
-        scene.load.audio('ui_title_loop', 'assets/audio/sfx/ui/ui_title_loop.wav' + cb);
+        scene.load.audio('ui_confirm', 'assets/audio/sfx/ui/ui_confirm.wav');
+        scene.load.audio('ui_move_cursor', 'assets/audio/sfx/ui/ui_move_cursor.wav');
+        scene.load.audio('ui_match_begin', 'assets/audio/sfx/ui/ui_match_begin.wav');
+        scene.load.audio('sfx_ui_press_start', 'assets/audio/sfx/ui/ui_press_start.wav');
+        scene.load.audio('ui_title_loop', 'assets/audio/sfx/ui/ui_title_loop.wav');
 
         // --- Fight / Action ---
         scene.load.audio('sfx_jump_1', 'assets/audio/sfx/fight/fight_jump_1.wav');

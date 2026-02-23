@@ -105,9 +105,6 @@ export class Player extends Fighter {
     private animPrefix: string = 'alchemist';
     private debugRect!: Phaser.GameObjects.Rectangle;
 
-    // Pooled rectangle for getBounds() - avoids per-frame GC pressure
-    private _boundsRect: Phaser.Geom.Rectangle = new Phaser.Geom.Rectangle();
-
     public lightAttackVariant: number = 0;
 
     // Item Holding

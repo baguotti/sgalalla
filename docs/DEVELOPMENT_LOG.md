@@ -442,3 +442,17 @@ Part 2
     - **Rate Adjustment**: Updated chest spawn rules to a **35% chance every 30 seconds** across all modes.
     - **Implementation**: Aligned the server's 10s interval in `server-geckos/index.ts` with the client's 30s standard and verified `GameScene` timer consistency.
 - **[S]** **STATUS**: Online visual integrity significantly improved; spawning frequency balanced for competitive play.
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-23] v1.1.1 - Codebase Audit & Performance Sweep (Tier 1 & 2) 🧹⚡
+- **[V]** `v1.1.1`
+- **[Audit]** **Sanitation (Tier 1)**:
+    - **Dead Code**: Stripped commented-out properties and duplicate `loadUIAudio()` calls in `GameScene.ts`.
+    - **Visual Noise**: Removed production "Crash Splash" and duplicate HUD text additions.
+    - **Console**: Removed live `console.log` in `PlayerCombat.endAttack()` firing 60x/sec.
+    - **Cache**: Removed query-string cache-busting from audio URLs in `AnimationHelpers.ts`.
+- **[Perf]** **Optimization (Tier 2)**:
+    - **Allocation Reduction**: Hoisted `new Map()` and keyboard `addKey()` calls out of 60Hz `update()` loop.
+    - **GC Management**: Implemented object pooling for wall dust in `EffectManager.ts`.
+    - **Geometry Pooling**: Unified `_boundsRect` into `Fighter` base class as a pooled resource (Zero-allocation `getBounds()`).
+    - **Vector Pooling**: Replaced `new Vector2` allocations in `Chest.ts` and `NetworkManager.ts` with reusable/shared instances.
+- **[S]** **STATUS**: Critical performance bottlenecks removed; GC pressure significantly reduced.
