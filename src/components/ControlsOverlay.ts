@@ -5,6 +5,7 @@ export class ControlsOverlay {
     private container!: Phaser.GameObjects.Container;
     private overlayBg!: Phaser.GameObjects.Graphics;
     private isVisible: boolean = false;
+    private previousLBPressed: boolean = false;
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
@@ -34,7 +35,7 @@ export class ControlsOverlay {
         }).setOrigin(0.5);
         this.container.add(titleText);
 
-        const hintText = this.scene.add.text(centerX, this.scene.scale.height - 40, '[F1] per chiudere', {
+        const hintText = this.scene.add.text(centerX, this.scene.scale.height - 40, '[F1 / LB] tieni premuto per visualizzare', {
             fontSize: '16px',
             color: '#8ab4f8',
             fontFamily: '"Pixeloid Sans"'
@@ -126,7 +127,7 @@ export class ControlsOverlay {
         const systemLines = [
             'COMUNE',
             '──────────────────────────────',
-            'F1       Comandi (questo)',
+            'F1 / LB  Comandi (questo)',
             'ESC      Pausa',
             'Q        FPS / Ping',
             '',
@@ -154,25 +155,56 @@ export class ControlsOverlay {
     }
 
     private setupInput(): void {
-        // Phaser's default behavior is to preventDefault on keys. For F1, this usually stops browser help.
-        // We listen to the keydown event specifically.
-
-        // Use a generic listener because F1 isn't always captured well by addKey during certain states
+        // F1 hold: show on keydown, hide on keyup
         this.scene.input.keyboard!.on('keydown-F1', (event: KeyboardEvent) => {
-            event.preventDefault(); // Stop browser help menu
-            this.toggle();
+            event.preventDefault();
+            this.show();
+        });
+        this.scene.input.keyboard!.on('keyup-F1', (event: KeyboardEvent) => {
+            event.preventDefault();
+            this.hide();
         });
     }
 
-    public toggle(): void {
-        this.isVisible = !this.isVisible;
-        this.container.setVisible(this.isVisible);
-
-        if (this.isVisible) {
+    private show(): void {
+        if (!this.isVisible) {
+            this.isVisible = true;
+            this.container.setVisible(true);
             this.scene.sound.play('ui_confirm', { volume: 0.5 });
-        } else {
+        }
+    }
+
+    private hide(): void {
+        if (this.isVisible) {
+            this.isVisible = false;
+            this.container.setVisible(false);
             this.scene.sound.play('ui_back', { volume: 0.5 });
         }
+    }
+
+    public toggle(): void {
+        if (this.isVisible) this.hide(); else this.show();
+    }
+
+    /** Call from scene update() to poll LB gamepad button (hold-to-show) */
+    public update(): void {
+        const gamepads = navigator.getGamepads();
+        let lbHeld = false;
+
+        for (let i = 0; i < gamepads.length; i++) {
+            const gp = gamepads[i];
+            if (gp && gp.buttons[4]?.pressed) {
+                lbHeld = true;
+                break;
+            }
+        }
+
+        if (lbHeld && !this.previousLBPressed) {
+            this.show();
+        } else if (!lbHeld && this.previousLBPressed) {
+            this.hide();
+        }
+        this.previousLBPressed = lbHeld;
     }
 
     public getElements(): Phaser.GameObjects.GameObject[] {

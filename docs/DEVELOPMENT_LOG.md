@@ -481,4 +481,14 @@ Part 2
 - **[Deploy]** **Full Stack Release**:
     - Synchronized client and server builds for v1.1.3.
     - Verified online connectivity and versioning consistency.
-- **[S]** **STATUS**: Deployment successful. Systems operational.
+### [2026-02-24] v1.1.4 - Input Standardization & Combat Polish 🎮🥊
+- **[V]** `v1.1.4`
+- **[Refactor]** **Input Standardization**:
+    - **Gamepad Constants**: Migrated all hardcoded gamepad button indices (e.g. `buttons[0]`) to the `GamepadButton` enum for Xbox/Brawlhalla parity.
+    - **Joy-Con Support**: Integrated `JoyConMapper` to support L/R Joy-Con pairs.
+    - **Controls Overlay**: Refactored the [F1] and Pause Menu overlays to "Hold-to-show" behavior (F1 / LB).
+- **[Feat]** **Combat Polish**:
+    - **Ground Pound Sound**: Implemented a heavy landing "thud" (`sfx_landing` + `sfx_chest_drop`) for missed ground pounds with full network synchronization.
+- **[Fix]** **Animation Integrity**:
+    - **Jump Sprite**: Resolved a state machine transition bug where characters would skip the "jump" sprite and instantly show "fall" during ascent.
+- **[S]** **STATUS**: Competitive integrity and input flexibility reached new standards.

@@ -27,7 +27,11 @@ export class WallSlideState implements IState {
 
         // Detached from wall
         if (!player.physics.isWallSliding) {
-            player.fsm.changeState('Fall', player);
+            if (player.velocity.y < 0) {
+                player.fsm.changeState('Jump', player);
+            } else {
+                player.fsm.changeState('Fall', player);
+            }
             return;
         }
 

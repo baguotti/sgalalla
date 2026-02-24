@@ -730,6 +730,7 @@ export class Player extends Fighter {
 
     public onAttack: ((attackKey: string, facingDirection: number) => void) | null = null;
     public onHit: ((victim: Fighter, damage: number, knockbackX: number, knockbackY: number) => void) | null = null;
+    public onGroundPoundMiss: (() => void) | null = null;
 
     public playAttackAnimation(attackKey: string): void {
         // e.g. 'light_neutral_grounded' -> 'attack_light_0'

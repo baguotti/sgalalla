@@ -701,6 +701,16 @@ export class PlayerCombat {
     }
 
     private endGroundPound(): void {
+        // landing sound for miss - before clearing hitTargets
+        if (this.player.isGrounded && this.hitTargets.size === 0) {
+            AudioManager.getInstance().playSFX('sfx_landing', { volume: 1.0 });
+            AudioManager.getInstance().playSFX('sfx_chest_drop', { volume: 0.6 });
+
+            if (this.player.onGroundPoundMiss) {
+                this.player.onGroundPoundMiss();
+            }
+        }
+
         // End the ground pound and enter recovery state
         this.player.isAttacking = false;
         this.isGroundPounding = false;

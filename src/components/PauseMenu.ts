@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavY } from '../input/JoyConMapper';
 
 const MenuOption = {
     RESUME: 0,
@@ -228,8 +229,9 @@ export class PauseMenu {
             '',
             'NOTE',
             '──────────────────────────────',
-            '• Switch Pro Controller',
-            '  supportato (remap auto)',
+            '• Switch Pro Controller e',
+            '  Joy-Con singolo supportati',
+            '  (remap automatico)',
             '• La carica si attiva',
             '  tenendo premuto Pesante',
             '• Gli attacchi si bufferizzano',
@@ -427,22 +429,14 @@ export class PauseMenu {
         for (let i = 0; i < gamepads.length; i++) {
             const gamepad = gamepads[i];
             if (gamepad) {
-                const dpadUp = gamepad.buttons[12]?.pressed || false;
-                const dpadDown = gamepad.buttons[13]?.pressed || false;
-                const deadzone = 0.5;
-                const stickY = gamepad.axes[1] || 0;
-                const isSwitch = gamepad.id.toLowerCase().includes('nintendo') ||
-                    gamepad.id.toLowerCase().includes('switch') ||
-                    gamepad.id.toLowerCase().includes('joy-con') ||
-                    gamepad.id.toLowerCase().includes('pro controller');
+                const navY = getMenuNavY(gamepad);
+                const confirmIdx = getConfirmButtonIndex(gamepad);
+                const backIdx = getBackButtonIndex(gamepad);
 
-                const logicalAIndex = isSwitch ? 1 : 0;
-                const logicalBIndex = isSwitch ? 0 : 1;
-
-                currentState.up = dpadUp || stickY < -deadzone;
-                currentState.down = dpadDown || stickY > deadzone;
-                currentState.a = gamepad.buttons[logicalAIndex]?.pressed || false;
-                currentState.b = gamepad.buttons[logicalBIndex]?.pressed || false;
+                currentState.up = navY < 0;
+                currentState.down = navY > 0;
+                currentState.a = gamepad.buttons[confirmIdx]?.pressed || false;
+                currentState.b = gamepad.buttons[backIdx]?.pressed || false;
                 currentState.start = gamepad.buttons[9]?.pressed || false;
                 break;
             }
@@ -470,23 +464,14 @@ export class PauseMenu {
         for (let i = 0; i < gamepads.length; i++) {
             const gamepad = gamepads[i];
             if (gamepad) {
-                const dpadUp = gamepad.buttons[12]?.pressed || false;
-                const dpadDown = gamepad.buttons[13]?.pressed || false;
-                const deadzone = 0.5;
-                const stickY = gamepad.axes[1] || 0;
+                const navY = getMenuNavY(gamepad);
+                const confirmIdx = getConfirmButtonIndex(gamepad);
+                const backIdx = getBackButtonIndex(gamepad);
 
-                const isSwitch = gamepad.id.toLowerCase().includes('nintendo') ||
-                    gamepad.id.toLowerCase().includes('switch') ||
-                    gamepad.id.toLowerCase().includes('joy-con') ||
-                    gamepad.id.toLowerCase().includes('pro controller');
-
-                const logicalAIndex = isSwitch ? 1 : 0;
-                const logicalBIndex = isSwitch ? 0 : 1;
-
-                currentState.up = dpadUp || stickY < -deadzone;
-                currentState.down = dpadDown || stickY > deadzone;
-                currentState.a = gamepad.buttons[logicalAIndex]?.pressed || false;
-                currentState.b = gamepad.buttons[logicalBIndex]?.pressed || false;
+                currentState.up = navY < 0;
+                currentState.down = navY > 0;
+                currentState.a = gamepad.buttons[confirmIdx]?.pressed || false;
+                currentState.b = gamepad.buttons[backIdx]?.pressed || false;
                 currentState.start = gamepad.buttons[9]?.pressed || false;
                 break;
             }

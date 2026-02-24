@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Player, PlayerState } from '../entities/Player';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
+import { getConfirmButtonIndex } from '../input/JoyConMapper';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
@@ -581,7 +582,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
             const isYOU = (player.playerId === 0); // Only P1 is "YOU"
 
-            let name = `P${player.playerId + 1}`;
+            let name = `P${player.playerId + 1} `;
             if (player.isAI) {
                 name = "CPU"; // or player.character
             }
@@ -603,6 +604,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
 
     update(_time: number, delta: number): void {
+        // Poll LB for controls overlay toggle
+        this.controlsOverlay.update();
+
         // --- HITSTOP REMOVED --- 
         // Logic flows normally now.
 
@@ -816,7 +820,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.players.forEach(p => checkPlayer(p, p.playerId));
 
         // Debug Text
-        // this.debugText = this.add.text(10, 10, `Debug: ${this.VERSION}`, { font: '16px "Pixeloid Sans"', color: '#00ff00' });
+        // this.debugText = this.add.text(10, 10, `Debug: ${ this.VERSION } `, { font: '16px "Pixeloid Sans"', color: '#00ff00' });
         // this.debugText.setScrollFactor(0);
         // this.debugText.setDepth(1000);
     }
@@ -839,7 +843,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         });
 
         // Reset physics and state
-        console.log(`[Respawn] Player ${playerId} respawning at ${spawnX}, ${spawnY}`);
+        console.log(`[Respawn] Player ${playerId} respawning at ${spawnX}, ${spawnY} `);
         player.setPosition(spawnX, spawnY);
         // Explicitly reset body physics to prevent ghost velocity/position
         if (player.body) {
@@ -1140,6 +1144,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // DRAMATIC ZOOM
             if (winner) {
                 winner.isWinner = true;
+                winner.fsm.changeState('Win', winner); // Auto-taunt on victory
                 this.cameras.main.pan(winner.x, winner.y, 1500, 'Power2');
                 this.cameras.main.zoomTo(3.5, 1500, 'Power2');
             }
@@ -1298,11 +1303,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
     private checkGamepadA(): boolean {
-        // Restart/Confirm is usually A (0)
+        // Restart/Confirm - uses JoyConMapper for correct button on all controllers
         const gamepads = navigator.getGamepads();
         for (const gp of gamepads) {
             if (!gp) continue;
-            if (gp.buttons[0]?.pressed) {
+            const confirmIdx = getConfirmButtonIndex(gp);
+            if (gp.buttons[confirmIdx]?.pressed) {
                 if (!this.previousAButtonPressed) {
                     this.previousAButtonPressed = true;
                     return true;
@@ -1310,7 +1316,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             }
         }
 
-        const isAnyAPressed = Array.from(gamepads).some(gp => gp && gp.buttons[0]?.pressed);
+        const isAnyAPressed = Array.from(gamepads).some(gp => {
+            if (!gp) return false;
+            const idx = getConfirmButtonIndex(gp);
+            return gp.buttons[idx]?.pressed;
+        });
         if (!isAnyAPressed) {
             this.previousAButtonPressed = false;
         }

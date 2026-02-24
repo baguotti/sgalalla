@@ -45,7 +45,8 @@ export const NetMessageType = {
     CHEST_BOMB_EXPLODE: 'chest_bomb_explode',
     // Missing ghost visuals
     RECOVERY_START: 'recovery_start',
-    CHARGE_START: 'charge_start'
+    CHARGE_START: 'charge_start',
+    GROUND_POUND_LAND: 'ground_pound_land'
 } as const;
 
 // Serialized input for network transmission
@@ -119,6 +120,7 @@ export type ChestBombExplodeCallback = (x: number, y: number) => void;
 // Missing ghost visuals
 export type RecoveryStartCallback = (playerId: number) => void;
 export type ChargeStartCallback = (playerId: number, direction: number) => void;
+export type GroundPoundLandCallback = (playerId: number) => void;
 
 class NetworkManager {
     private static instance: NetworkManager    // Singleton pattern
@@ -161,6 +163,7 @@ class NetworkManager {
 
     private onRecoveryStartCallback: RecoveryStartCallback | null = null;
     private onChargeStartCallback: ChargeStartCallback | null = null;
+    private onGroundPoundLandCallback: GroundPoundLandCallback | null = null;
 
     // Latency tracking with smoothing
     private lastPingTime: number = 0;
@@ -358,6 +361,10 @@ class NetworkManager {
             const { playerId, direction } = data as { playerId: number; direction: number };
             this.onChargeStartCallback?.(playerId, direction);
         });
+
+        this.channel.on(NetMessageType.GROUND_POUND_LAND, (playerId: any) => {
+            this.onGroundPoundLandCallback?.(playerId as number);
+        });
     }
 
     // Input redundancy ring buffer (last N frames sent with every packet)
@@ -471,6 +478,14 @@ class NetworkManager {
     }
 
     /**
+     * Notify server of ground pound landing (miss)
+     */
+    public sendGroundPoundLand(playerId: number): void {
+        if (!this.connected || !this.channel) return;
+        this.channel.emit(NetMessageType.GROUND_POUND_LAND, playerId, { reliable: true });
+    }
+
+    /**
      * Store a game state snapshot for potential rollback
      */
     public saveSnapshot(snapshot: GameSnapshot): void {
@@ -566,6 +581,10 @@ class NetworkManager {
 
     public onChargeStart(callback: ChargeStartCallback): void {
         this.onChargeStartCallback = callback;
+    }
+
+    public onGroundPoundLand(callback: GroundPoundLandCallback): void {
+        this.onGroundPoundLandCallback = callback;
     }
 
     /**

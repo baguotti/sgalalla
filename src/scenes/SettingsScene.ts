@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
+import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavX, getMenuNavY } from '../input/JoyConMapper';
 
 export class SettingsScene extends Phaser.Scene {
     private options = ['MUSIC', 'SFX', 'BACK'];
@@ -164,8 +165,12 @@ export class SettingsScene extends Phaser.Scene {
             const pad = pads[i];
             if (!pad) continue;
 
-            const axisX = pad.axes[0].getValue();
-            const axisY = pad.axes[1].getValue();
+            // Use raw gamepad for JoyConMapper (Phaser pad wraps the native object)
+            const rawGp = navigator.getGamepads()[pad.index];
+            if (!rawGp) continue;
+
+            const navX = getMenuNavX(rawGp);
+            const navY = getMenuNavY(rawGp);
 
             // Init tracking
             if (!this.previousAxis.has(pad.index)) this.previousAxis.set(pad.index, { x: 0, y: 0 });
@@ -174,32 +179,17 @@ export class SettingsScene extends Phaser.Scene {
             const prevAxis = this.previousAxis.get(pad.index)!;
             const prevBtns = this.previousButtons.get(pad.index)!;
 
-            // NAV: Y Axis
-            if (axisY < -0.5 && prevAxis.y >= -0.5) this.changeSelection(-1);
-            else if (axisY > 0.5 && prevAxis.y <= 0.5) this.changeSelection(1);
+            // NAV: Y Axis (edge detect)
+            if (navY < 0 && prevAxis.y >= 0) this.changeSelection(-1);
+            else if (navY > 0 && prevAxis.y <= 0) this.changeSelection(1);
 
-            // NAV: X Axis
-            if (axisX < -0.5 && prevAxis.x >= -0.5) this.modifyValue(-1);
-            else if (axisX > 0.5 && prevAxis.x <= 0.5) this.modifyValue(1);
+            // NAV: X Axis (edge detect for volume sliders)
+            if (navX < 0 && prevAxis.x >= 0) this.modifyValue(-1);
+            else if (navX > 0 && prevAxis.x <= 0) this.modifyValue(1);
 
-            // D-Pad support (Up/Down/Left/Right)
-            // Up/Down
-            if (pad.buttons[12]?.pressed && !prevBtns['dpadUp']) { this.changeSelection(-1); prevBtns['dpadUp'] = true; }
-            else if (!pad.buttons[12]?.pressed) prevBtns['dpadUp'] = false;
-
-            if (pad.buttons[13]?.pressed && !prevBtns['dpadDown']) { this.changeSelection(1); prevBtns['dpadDown'] = true; }
-            else if (!pad.buttons[13]?.pressed) prevBtns['dpadDown'] = false;
-
-            // Left/Right
-            if (pad.buttons[14]?.pressed && !prevBtns['dpadLeft']) { this.modifyValue(-1); prevBtns['dpadLeft'] = true; }
-            else if (!pad.buttons[14]?.pressed) prevBtns['dpadLeft'] = false;
-
-            if (pad.buttons[15]?.pressed && !prevBtns['dpadRight']) { this.modifyValue(1); prevBtns['dpadRight'] = true; }
-            else if (!pad.buttons[15]?.pressed) prevBtns['dpadRight'] = false;
-
-
-            // A or Start (Confirm)
-            const isA = pad.buttons[0]?.pressed || pad.buttons[9]?.pressed;
+            // A / Start (Confirm) — edge detect
+            const confirmIdx = getConfirmButtonIndex(rawGp);
+            const isA = rawGp.buttons[confirmIdx]?.pressed || rawGp.buttons[9]?.pressed;
             if (isA && !prevBtns.a) {
                 this.confirmSelection();
                 prevBtns.a = true;
@@ -207,8 +197,9 @@ export class SettingsScene extends Phaser.Scene {
                 prevBtns.a = false;
             }
 
-            // B (Back)
-            const isB = pad.buttons[1]?.pressed;
+            // B (Back) — edge detect
+            const backIdx = getBackButtonIndex(rawGp);
+            const isB = rawGp.buttons[backIdx]?.pressed;
             if (isB && !prevBtns.b) {
                 this.goBack();
                 prevBtns.b = true;
@@ -217,7 +208,7 @@ export class SettingsScene extends Phaser.Scene {
             }
 
             // Update state
-            this.previousAxis.set(pad.index, { x: axisX, y: axisY });
+            this.previousAxis.set(pad.index, { x: navX, y: navY });
         }
     }
 

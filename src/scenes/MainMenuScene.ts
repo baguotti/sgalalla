@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
+import { getConfirmButtonIndex, getMenuNavY } from '../input/JoyConMapper';
 
 export class MainMenuScene extends Phaser.Scene {
     private startKey!: Phaser.Input.Keyboard.Key;
@@ -68,7 +69,7 @@ export class MainMenuScene extends Phaser.Scene {
         }
 
         // Version Text
-        this.add.text(this.cameras.main.width - 20, this.cameras.main.height - 20, 'v1.1.3', {
+        this.add.text(this.cameras.main.width - 20, this.cameras.main.height - 20, 'v1.1.4', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(1, 1);        // Menu Items
         const startY = height - 280; // Moved lower
@@ -136,13 +137,8 @@ export class MainMenuScene extends Phaser.Scene {
             const pad = gamepads[i];
             if (!pad) continue;
 
-            const isSwitch = pad.id.toLowerCase().includes('nintendo') ||
-                pad.id.toLowerCase().includes('switch') ||
-                pad.id.toLowerCase().includes('joy-con') ||
-                pad.id.toLowerCase().includes('pro controller');
-            const logicalAIndex = isSwitch ? 1 : 0;
-
-            const aPressed = pad.buttons[logicalAIndex]?.pressed || pad.buttons[9]?.pressed;
+            const confirmIdx = getConfirmButtonIndex(pad);
+            const aPressed = pad.buttons[confirmIdx]?.pressed || pad.buttons[9]?.pressed;
             if (!this.canInput) {
                 // During lockout, just record the state so held buttons are consumed
                 this.prevGamepadA.set(pad.index, !!aPressed);
@@ -165,42 +161,27 @@ export class MainMenuScene extends Phaser.Scene {
             const pad = gamepads[i];
             if (!pad) continue;
 
-            const axisY = pad.axes[1]; // float value
+            // Use JoyConMapper for vertical navigation (handles axis rotation for sideways Joy-Cons)
+            const navY = getMenuNavY(pad);
 
             let moved = false;
 
-            if (axisY < -0.5) {
+            if (navY < 0) {
                 this.changeSelection(-1);
                 moved = true;
-            } else if (axisY > 0.5) {
+            } else if (navY > 0) {
                 this.changeSelection(1);
                 moved = true;
-            }
-
-            // D-Pad support
-            if (!moved) {
-                if (pad.buttons[12].pressed) { // D-Pad Up
-                    this.changeSelection(-1);
-                    moved = true;
-                } else if (pad.buttons[13].pressed) { // D-Pad Down
-                    this.changeSelection(1);
-                    moved = true;
-                }
             }
 
             if (moved) {
                 this.lastGamepadInputTime = now;
             }
 
-            const isSwitch = pad.id.toLowerCase().includes('nintendo') ||
-                pad.id.toLowerCase().includes('switch') ||
-                pad.id.toLowerCase().includes('joy-con') ||
-                pad.id.toLowerCase().includes('pro controller');
+            const confirmIdx = getConfirmButtonIndex(pad);
 
-            const logicalAIndex = isSwitch ? 1 : 0;
-
-            // A Button (0/1) or Start (9) to select — EDGE DETECTION
-            const aPressed = pad.buttons[logicalAIndex]?.pressed || pad.buttons[9]?.pressed;
+            // A Button or Start (9) to select — EDGE DETECTION
+            const aPressed = pad.buttons[confirmIdx]?.pressed || pad.buttons[9]?.pressed;
             const wasPressed = this.prevGamepadA.get(pad.index) ?? false;
             this.prevGamepadA.set(pad.index, !!aPressed);
 

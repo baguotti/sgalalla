@@ -46,7 +46,8 @@ const NetMessageType = {
     CHEST_BOMB_EXPLODE: 'chest_bomb_explode',
     // Missing ghost visuals
     RECOVERY_START: 'recovery_start',
-    CHARGE_START: 'charge_start'
+    CHARGE_START: 'charge_start',
+    GROUND_POUND_LAND: 'ground_pound_land'
 } as const;
 
 interface PlayerState {
@@ -505,6 +506,10 @@ io.onConnection((channel: ServerChannel) => {
 
     channel.on(NetMessageType.CHARGE_START, (data: unknown) => {
         emitToRoom(NetMessageType.CHARGE_START, data);
+    });
+
+    channel.on(NetMessageType.GROUND_POUND_LAND, (playerId: unknown) => {
+        emitToRoom(NetMessageType.GROUND_POUND_LAND, playerId as number);
     });
 
     // Rematch vote

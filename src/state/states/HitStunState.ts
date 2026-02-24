@@ -35,7 +35,11 @@ export class HitStunState implements IState {
             if (player.isGrounded) {
                 player.fsm.changeState('Idle', player);
             } else {
-                player.fsm.changeState('Fall', player);
+                if (player.velocity.y < 0) {
+                    player.fsm.changeState('Jump', player);
+                } else {
+                    player.fsm.changeState('Fall', player);
+                }
             }
         }
     }

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
 import { SMASH_COLORS } from '../ui/PlayerHUD';
 import { charConfigs } from '../config/CharacterConfig';
+import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavX } from '../input/JoyConMapper';
 
 type CharacterType = 'fok' | 'dummy';
 
@@ -378,19 +379,16 @@ export class LobbyScene extends Phaser.Scene {
         for (let i = 0; i < gamepads.length; i++) {
             const gp = gamepads[i];
             if (gp) {
-                if (gp.buttons[1]?.pressed || gp.buttons[9]?.pressed) {
+                const backIdx = getBackButtonIndex(gp);
+                if (gp.buttons[backIdx]?.pressed || gp.buttons[9]?.pressed) {
                     goBack = true;
                 }
 
                 // During the input lock, we must update prevGamepadSelects 
                 // so that held buttons from the menu don't trigger as fresh presses later.
                 if (!this.canInput) {
-                    const isSwitch = gp.id.toLowerCase().includes('nintendo') ||
-                        gp.id.toLowerCase().includes('switch') ||
-                        gp.id.toLowerCase().includes('joy-con') ||
-                        gp.id.toLowerCase().includes('pro controller');
-                    const logicalAIndex = isSwitch ? 1 : 0;
-                    this.prevGamepadSelects.set(gp.index, gp.buttons[logicalAIndex]?.pressed ?? false);
+                    const confirmIdx = getConfirmButtonIndex(gp);
+                    this.prevGamepadSelects.set(gp.index, gp.buttons[confirmIdx]?.pressed ?? false);
                 }
             }
         }
@@ -430,15 +428,9 @@ export class LobbyScene extends Phaser.Scene {
             const isAssigned = this.slots.some(s => s.joined && s.input.type === 'GAMEPAD' && s.input.gamepadIndex === gp.index);
 
             if (!isAssigned) {
-                const isSwitch = gp.id.toLowerCase().includes('nintendo') ||
-                    gp.id.toLowerCase().includes('switch') ||
-                    gp.id.toLowerCase().includes('joy-con') ||
-                    gp.id.toLowerCase().includes('pro controller');
+                const confirmIdx = getConfirmButtonIndex(gp);
 
-                // Map logical A button: standard is index 0, Switch physical A is index 1
-                const logicalAIndex = isSwitch ? 1 : 0;
-
-                if (gp.buttons[logicalAIndex]?.pressed) {
+                if (gp.buttons[confirmIdx]?.pressed) {
                     this.joinPlayer('GAMEPAD', gp.index);
                 }
             }
@@ -514,17 +506,14 @@ export class LobbyScene extends Phaser.Scene {
                 const gp = navigator.getGamepads()[slot.input.gamepadIndex];
                 if (gp) {
                     if (canHoldInput) {
-                        left = gp.axes[0] < -0.5 || gp.buttons[14]?.pressed;
-                        right = gp.axes[0] > 0.5 || gp.buttons[15]?.pressed;
+                        // Use JoyConMapper for stick navigation (handles rotated axes)
+                        const navX = getMenuNavX(gp);
+                        left = navX < 0;
+                        right = navX > 0;
                     }
 
-                    const isSwitch = gp.id.toLowerCase().includes('nintendo') ||
-                        gp.id.toLowerCase().includes('switch') ||
-                        gp.id.toLowerCase().includes('joy-con') ||
-                        gp.id.toLowerCase().includes('pro controller');
-
-                    const logicalAIndex = isSwitch ? 1 : 0;
-                    const currentSelect = gp.buttons[logicalAIndex]?.pressed ?? false;
+                    const confirmIdx = getConfirmButtonIndex(gp);
+                    const currentSelect = gp.buttons[confirmIdx]?.pressed ?? false;
 
                     if (Date.now() - this.sceneStartTime > 800) {
                         select = currentSelect && !this.prevGamepadSelects.get(gp.index);
@@ -589,17 +578,14 @@ export class LobbyScene extends Phaser.Scene {
             const gp = navigator.getGamepads()[p1.input.gamepadIndex];
             if (gp) {
                 if (canHoldInput) {
-                    left = gp.axes[0] < -0.5 || gp.buttons[14]?.pressed;
-                    right = gp.axes[0] > 0.5 || gp.buttons[15]?.pressed;
+                    // Use JoyConMapper for stick navigation (handles rotated axes)
+                    const navX = getMenuNavX(gp);
+                    left = navX < 0;
+                    right = navX > 0;
                 }
-                // Edge detection for select: only trigger on button DOWN, not held
-                const isSwitch = gp.id.toLowerCase().includes('nintendo') ||
-                    gp.id.toLowerCase().includes('switch') ||
-                    gp.id.toLowerCase().includes('joy-con') ||
-                    gp.id.toLowerCase().includes('pro controller');
-
-                const logicalAIndex = isSwitch ? 1 : 0;
-                const currentSelect = gp.buttons[logicalAIndex]?.pressed ?? false;
+                // Edge detection for select
+                const confirmIdx = getConfirmButtonIndex(gp);
+                const currentSelect = gp.buttons[confirmIdx]?.pressed ?? false;
                 if (Date.now() - this.sceneStartTime > 800) {
                     select = currentSelect && !this.prevGamepadSelects.get(gp.index);
                 }

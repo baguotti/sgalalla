@@ -9,6 +9,7 @@
  * - Interpolates remote player positions
  */
 import { EffectManager } from '../effects/EffectManager';
+import { getMenuNavX, getConfirmButtonIndex } from '../input/JoyConMapper';
 import Phaser from 'phaser';
 import { Player, PlayerState } from '../entities/Player';
 
@@ -202,6 +203,21 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         // Setup network callbacks
         this.networkManager.onStateUpdate((state) => this.handleStateUpdate(state));
         this.networkManager.onDisconnect(() => this.handleDisconnect());
+        this.networkManager.onChargeStart((playerId, _dir) => {
+            const player = this.players.get(playerId);
+            if (player && player !== this.localPlayer) {
+                // Remote charge visual/sfx handled by state machine or specific trigger
+            }
+        });
+
+        this.networkManager.onGroundPoundLand((playerId) => {
+            if (playerId === this.localPlayerId) return;
+            const player = this.players.get(playerId);
+            if (player) {
+                this.sound.play('sfx_landing', { volume: 0.8 });
+                this.sound.play('sfx_chest_drop', { volume: 0.5 });
+            }
+        });
         this.networkManager.onAttack((event) => this.handleAttackEvent(event));
         this.networkManager.onHit((event) => this.handleHitEvent(event));
         this.networkManager.onRematchStart(() => this.handleRematchStart());
@@ -395,6 +411,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     }
 
     update(_time: number, delta: number): void {
+        // Poll LB for controls overlay toggle
+        this.controlsOverlay.update();
+
         if (!this.isConnected) return;
 
         // Handle selection phase input
@@ -1061,6 +1080,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             if (winner) {
                 winner.isWinner = true;
+                winner.fsm.changeState('Win', winner); // Auto-taunt on victory
                 this.cameras.main.pan(winner.x, winner.y, 1500, 'Power2');
                 this.cameras.main.zoomTo(3.5, 1500, 'Power2');
             }
@@ -1179,23 +1199,22 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         for (const gamepad of gamepads) {
             if (!gamepad) continue;
 
-            // D-pad or left stick for navigation
-            const leftStickX = gamepad.axes[0] || 0;
-            const dpadLeft = gamepad.buttons[14]?.pressed || false;
-            const dpadRight = gamepad.buttons[15]?.pressed || false;
+            // Use JoyConMapper for navigation (handles rotated axes for sideways Joy-Cons)
+            const navX = getMenuNavX(gamepad);
 
             if (now - this.lastGamepadNavTime > NAV_COOLDOWN) {
-                if (leftStickX < -0.5 || dpadLeft) {
+                if (navX < 0) {
                     this.navigateMenu(-1);
                     this.lastGamepadNavTime = now;
-                } else if (leftStickX > 0.5 || dpadRight) {
+                } else if (navX > 0) {
                     this.navigateMenu(1);
                     this.lastGamepadNavTime = now;
                 }
             }
 
-            // A button (button 0) or Start (button 9) to confirm
-            const aButton = gamepad.buttons[0]?.pressed || false;
+            // Confirm button (A or Start) — uses JoyConMapper
+            const confirmIdx = getConfirmButtonIndex(gamepad);
+            const aButton = gamepad.buttons[confirmIdx]?.pressed || false;
             const startButton = gamepad.buttons[9]?.pressed || false;
 
             if (aButton || startButton) {
@@ -1277,6 +1296,10 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 if (target instanceof Player) {
                     this.networkManager.sendHit(target.playerId, dmg, kx, ky);
                 }
+            };
+
+            player.onGroundPoundMiss = () => {
+                this.networkManager.sendGroundPoundLand(player.playerId);
             };
         }
 

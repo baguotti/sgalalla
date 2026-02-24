@@ -25,6 +25,12 @@ export class FallState implements IState {
             return;
         }
 
+        // Transition to Jump if moving up (e.g. double jump happened)
+        if (player.velocity.y < 0) {
+            player.fsm.changeState('Jump', player);
+            return;
+        }
+
         // Wall slide
         if (player.physics.isWallSliding) {
             player.fsm.changeState('WallSlide', player);

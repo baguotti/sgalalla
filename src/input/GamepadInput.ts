@@ -1,6 +1,7 @@
 /**
  * Gamepad Input System
  * Handles Xbox controller input with Brawlhalla-style button mapping
+ * Also supports individual Nintendo Switch Joy-Cons held sideways via JoyConMapper.
  *
  * Brawlhalla Xbox Default Controls:
  * - A: Jump
@@ -9,6 +10,8 @@
  * - LT/RT: Dodge
  * - Left Stick / D-pad: Movement
  */
+
+import { isSingleJoyCon, getMovementAxes, getNormalizedButtons } from './JoyConMapper';
 
 export interface GamepadState {
     // Movement (-1 to 1)
@@ -171,7 +174,73 @@ export class GamepadInput {
 
         state.connected = true;
 
-        const isSwitchController = gamepad.id.toLowerCase().includes('nintendo') ||
+        // ─── Single Joy-Con path (completely custom mapping) ───
+        if (isSingleJoyCon(gamepad.id)) {
+            return this.pollSingleJoyCon(gamepad, state);
+        }
+
+        // ─── Standard / Pro Controller path ───
+        return this.pollStandardGamepad(gamepad, state);
+    }
+
+    /**
+     * Custom polling for individual Joy-Cons held sideways.
+     * Uses JoyConMapper for axis rotation and button remapping.
+     */
+    private pollSingleJoyCon(gamepad: Gamepad, state: GamepadState): GamepadState {
+        const axes = getMovementAxes(gamepad);
+        const btns = getNormalizedButtons(gamepad);
+
+        // Movement (apply deadzone to the rotated axes)
+        const stickX = this.applyDeadzone(axes.moveX);
+        const stickY = this.applyDeadzone(axes.moveY);
+
+        state.moveX = stickX;
+        state.moveY = stickY;
+
+        // Aiming
+        state.aimUp = state.moveY < -0.5;
+        state.aimDown = state.moveY > 0.5;
+        state.aimLeft = state.moveX < -0.5;
+        state.aimRight = state.moveX > 0.5;
+
+        // Jump (top face button)
+        state.jump = btns.jump && !this.previousState.jumpHeld;
+        state.jumpHeld = btns.jump;
+
+        // Light Attack (left face button)
+        state.lightAttack = btns.lightAttack && !this.previousState.lightAttackHeld;
+        state.lightAttackHeld = btns.lightAttack;
+
+        // Heavy Attack (SR rail button)
+        state.heavyAttack = btns.heavyAttack && !this.previousState.heavyAttackHeld;
+        state.heavyAttackHeld = btns.heavyAttack;
+
+        // Dodge (SL rail button)
+        state.dodge = btns.dodge && !this.previousState.dodgeHeld;
+        state.dodgeHeld = btns.dodge;
+
+        // Pause
+        state.pause = btns.pause && !this.previousState.pause;
+
+        // Taunt (stick click)
+        state.taunt = btns.taunt && !this.previousState.taunt;
+
+        // Throw — map to light attack for Joy-Con (same button, context-dependent in game)
+        state.throw = state.lightAttack;
+
+        this.previousState = { ...state };
+        this.cacheButtonStates(gamepad);
+
+        return state;
+    }
+
+    /**
+     * Standard polling for Xbox / Pro Controller / paired Joy-Cons.
+     * Preserves the original A/B X/Y swap for Nintendo Switch Pro Controllers.
+     */
+    private pollStandardGamepad(gamepad: Gamepad, state: GamepadState): GamepadState {
+        const isSwitchCtrl = gamepad.id.toLowerCase().includes('nintendo') ||
             gamepad.id.toLowerCase().includes('switch') ||
             gamepad.id.toLowerCase().includes('pro controller') ||
             gamepad.id.toLowerCase().includes('joy-con');
@@ -203,7 +272,7 @@ export class GamepadInput {
         let yPressed = gamepad.buttons[XBOX_BUTTONS.Y]?.pressed || false;
 
         // Remap for Nintendo Switch (Swap A/B and X/Y)
-        if (isSwitchController) {
+        if (isSwitchCtrl) {
             const tempA = aPressed;
             aPressed = bPressed;
             bPressed = tempA;
@@ -224,10 +293,9 @@ export class GamepadInput {
 
         // Light Attack (X) - detect new press AND held state
         state.lightAttack = xPressed && !this.wasButtonPressed(XBOX_BUTTONS.X);
-        state.lightAttackHeld = xPressed; // Added held state support
+        state.lightAttackHeld = xPressed;
 
         // Heavy Attack (B or Y) - detect new press only
-        // User wants Y and B to be exactly the same: Heavy Attack
         const heavyNewPress = (bPressed && !this.wasButtonPressed(XBOX_BUTTONS.B)) ||
             (yPressed && !this.wasButtonPressed(XBOX_BUTTONS.Y));
         state.heavyAttack = heavyNewPress;
@@ -235,7 +303,7 @@ export class GamepadInput {
 
         // Dodge (LT or RT) - detect new press only
         state.dodge = triggerPressed && !this.wasTriggerPressed();
-        state.dodgeHeld = triggerPressed; // Track held state for running
+        state.dodgeHeld = triggerPressed;
 
         // Throw (Right Bumper/RB) - detect new press only
         const rbPressed = gamepad.buttons[XBOX_BUTTONS.RB]?.pressed || false;
