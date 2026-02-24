@@ -472,3 +472,13 @@ Part 2
     - **Synchronization**: Rewrote the "COMANDI" section of the Pause Menu to exactly match the new F1 overlay content and layout.
     - **Layout Fix**: Corrected the title positioning in the Pause Menu to prevent overlaps with the new 3-column content.
 - **[S]** **STATUS**: Game UX significantly improved with high-fidelity control references and cleaner performance monitoring.
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-24] v1.1.3 - Production Deployment & Maintenance 🚀📦
+- **[V]** `v1.1.3`
+- **[Maint]** **Workspace Cleanup**:
+    - Removed AppleDouble (`._*`) metadata files from the repository to prevent file-system pollution.
+    - Normalized file permissions across the source tree for better cross-platform compatibility.
+- **[Deploy]** **Full Stack Release**:
+    - Synchronized client and server builds for v1.1.3.
+    - Verified online connectivity and versioning consistency.
+- **[S]** **STATUS**: Deployment successful. Systems operational.
