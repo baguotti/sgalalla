@@ -34,7 +34,6 @@ export interface InputState {
     aimRight: boolean;
 
     // Input source
-    // Input source
     usingGamepad: boolean;
 }
 
@@ -43,6 +42,7 @@ export interface PlayerInputConfig {
     useKeyboard: boolean;
     gamepadIndex: number | null; // null = no gamepad, or auto-detect if P1? For specific P2, usually 1.
     enableGamepad?: boolean; // Explicitly enable/disable gamepad support
+    keyboardMapping?: 'wasd' | 'arrows' | 'all'; // For split keyboard local multiplayer
 }
 
 export class InputManager {
@@ -65,24 +65,28 @@ export class InputManager {
     private lKey!: Phaser.Input.Keyboard.Key;
     private pKey!: Phaser.Input.Keyboard.Key;
 
-    // Brawlhalla default keys
+    // Arrow keys actions (P2)
     private cKey!: Phaser.Input.Keyboard.Key; // Light attack
-    private xKey!: Phaser.Input.Keyboard.Key; // Heavy attack
-    private zKey!: Phaser.Input.Keyboard.Key; // Dodge
-    private vKey!: Phaser.Input.Keyboard.Key; // Recovery
+    private vKey!: Phaser.Input.Keyboard.Key; // Heavy attack
+    private bKey!: Phaser.Input.Keyboard.Key; // Dodge
+    private gKey!: Phaser.Input.Keyboard.Key; // Jump
+    private mKey!: Phaser.Input.Keyboard.Key; // Taunt
 
     // Track key states for single-press detection
     private jKeyWasPressed: boolean = false;
     private kKeyWasPressed: boolean = false;
     private lKeyWasPressed: boolean = false;
     private spaceWasPressed: boolean = false;
-    private upArrowWasPressed: boolean = false; // For arrow-based jump
-    private cKeyWasPressed: boolean = false;
-    private xKeyWasPressed: boolean = false;
-    private zKeyWasPressed: boolean = false;
-    private pKeyWasPressed: boolean = false;
 
-    constructor(scene: Phaser.Scene, config: PlayerInputConfig = { playerId: 0, useKeyboard: true, gamepadIndex: null, enableGamepad: true }) {
+    private pKeyWasPressed: boolean = false;
+    private mKeyWasPressed: boolean = false;
+
+    private gKeyWasPressed: boolean = false;
+    private cKeyWasPressed: boolean = false;
+    private vKeyWasPressed: boolean = false;
+    private bKeyWasPressed: boolean = false;
+
+    constructor(scene: Phaser.Scene, config: PlayerInputConfig = { playerId: 0, useKeyboard: true, gamepadIndex: null, enableGamepad: true, keyboardMapping: 'all' }) {
         this.scene = scene;
         this.config = { ...config, enableGamepad: config.enableGamepad !== undefined ? config.enableGamepad : true };
         this.gamepadInput = new GamepadInput(config.gamepadIndex);
@@ -108,13 +112,14 @@ export class InputManager {
         this.jKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
         this.kKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
         this.lKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L);
-        this.pKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
+        this.pKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P); // Taunt P1
 
-        // Brawlhalla defaults
+        // Arrow actions (P2)
         this.cKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
-        this.xKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
-        this.zKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
         this.vKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V);
+        this.bKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.B);
+        this.gKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G); // Jump P2
+        this.mKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M); // Taunt P2
     }
 
     /**
@@ -209,40 +214,50 @@ export class InputManager {
         // Safety check if setupKeyboard wasn't called or failed
         if (!this.cursors) return this.getEmptyInput();
 
-        const left = this.cursors.left.isDown || this.wasd.left.isDown;
-        const right = this.cursors.right.isDown || this.wasd.right.isDown;
-        const up = this.cursors.up.isDown || this.wasd.up.isDown;
-        const down = this.cursors.down.isDown || this.wasd.down.isDown;
+        const mapping = this.config.keyboardMapping || 'all';
+        const useAll = mapping === 'all';
+        const useWasd = mapping === 'wasd' || useAll;
+        const useArrows = mapping === 'arrows' || useAll;
 
-        const spaceDown = this.spaceKey.isDown;
-        const upArrowDown = this.cursors.up.isDown;
-        const jDown = this.jKey.isDown;
-        const kDown = this.kKey.isDown;
-        const lDown = this.lKey.isDown;
-        const pDown = this.pKey.isDown;
-        const cDown = this.cKey.isDown;
-        const xDown = this.xKey.isDown;
-        const zDown = this.zKey.isDown;
-        const vDown = this.vKey.isDown;
-        const shiftDown = this.shiftKey.isDown;
+        const left = (useArrows && this.cursors.left.isDown) || (useWasd && this.wasd.left.isDown);
+        const right = (useArrows && this.cursors.right.isDown) || (useWasd && this.wasd.right.isDown);
+        const up = (useArrows && this.cursors.up.isDown) || (useWasd && this.wasd.up.isDown);
+        const down = (useArrows && this.cursors.down.isDown) || (useWasd && this.wasd.down.isDown);
+
+        // WASD map (J/K/L/Space/P)
+        const spaceDown = useWasd && this.spaceKey.isDown;
+        const jDown = useWasd && this.jKey.isDown;
+        const kDown = useWasd && this.kKey.isDown;
+        const lDown = useWasd && this.lKey.isDown;
+        const pDown = useWasd && this.pKey.isDown;
+        const shiftDown = useWasd && this.shiftKey.isDown;
+
+        // Arrows map (C / V / B / G / M)
+        const gDown = useArrows && this.gKey.isDown;
+        const cDown = useArrows && this.cKey.isDown;
+        const vDown = useArrows && this.vKey.isDown;
+        const bDown = useArrows && this.bKey.isDown;
+        const mDown = useArrows && this.mKey.isDown;
 
         // Single press detection - support both control schemes
-        const jumpPressed = (spaceDown && !this.spaceWasPressed) || (upArrowDown && !this.upArrowWasPressed);
+        const jumpPressed = (spaceDown && !this.spaceWasPressed) || (gDown && !this.gKeyWasPressed);
         const lightPressed = (jDown && !this.jKeyWasPressed) || (cDown && !this.cKeyWasPressed);
-        const heavyPressed = (kDown && !this.kKeyWasPressed) || (xDown && !this.xKeyWasPressed);
-        const dodgePressed = (lDown && !this.lKeyWasPressed) || (zDown && !this.zKeyWasPressed);
-        const tauntPressed = pDown && !this.pKeyWasPressed;
+        const heavyPressed = (kDown && !this.kKeyWasPressed) || (vDown && !this.vKeyWasPressed);
+        const dodgePressed = (lDown && !this.lKeyWasPressed) || (bDown && !this.bKeyWasPressed);
+        const tauntPressed = (pDown && !this.pKeyWasPressed) || (mDown && !this.mKeyWasPressed);
 
         // Update previous states
         this.spaceWasPressed = spaceDown;
-        this.upArrowWasPressed = upArrowDown;
         this.jKeyWasPressed = jDown;
         this.kKeyWasPressed = kDown;
         this.lKeyWasPressed = lDown;
-        this.cKeyWasPressed = cDown;
-        this.xKeyWasPressed = xDown;
-        this.zKeyWasPressed = zDown;
         this.pKeyWasPressed = pDown;
+
+        this.gKeyWasPressed = gDown;
+        this.cKeyWasPressed = cDown;
+        this.vKeyWasPressed = vDown;
+        this.bKeyWasPressed = bDown;
+        this.mKeyWasPressed = mDown;
 
         return {
             moveLeft: left,
@@ -252,14 +267,14 @@ export class InputManager {
             moveX: left ? -1 : right ? 1 : 0,
             moveY: up ? -1 : down ? 1 : 0,
             jump: jumpPressed,
-            jumpHeld: spaceDown || upArrowDown,
+            jumpHeld: spaceDown || gDown,
             lightAttack: lightPressed,
             lightAttackHeld: jDown || cDown, // Track light attack held
             heavyAttack: heavyPressed,
-            heavyAttackHeld: kDown || xDown, // Track held state for charging
+            heavyAttackHeld: kDown || vDown, // Track held state for charging
             dodge: dodgePressed,
-            dodgeHeld: lDown || zDown, // Track dodge held for running
-            recovery: shiftDown || vDown, // Support both Shift and V for recovery
+            dodgeHeld: lDown || bDown, // Track dodge held for running
+            recovery: shiftDown, // Focus on shift for recovery on P1
             taunt: tauntPressed,
             aimUp: up,
             aimDown: down,
@@ -294,8 +309,6 @@ export class InputManager {
             usingGamepad: true,
         };
     }
-
-
 
     isGamepadConnected(): boolean {
         return this.gamepadInput.isConnected();

@@ -24,6 +24,7 @@ export class PlayerCombat {
 
     // Ground Pound
     public isGroundPounding: boolean = false;
+    public isGroundPoundLanding: boolean = false;
     public groundPoundStartupTimer: number = 0;
     private groundPoundReleaseBuffer: number = 0; // Buffer time before canceling on release
 
@@ -91,6 +92,9 @@ export class PlayerCombat {
     private updateTimers(delta: number): void {
         if (this.attackCooldownTimer > 0) {
             this.attackCooldownTimer -= delta;
+            if (this.attackCooldownTimer <= 0) {
+                this.isGroundPoundLanding = false;
+            }
         }
         if (this.groundPoundReleaseBuffer > 0) {
             this.groundPoundReleaseBuffer -= delta;
@@ -98,23 +102,12 @@ export class PlayerCombat {
     }
 
     public handleInput(input: InputState): void {
-        // Allow button release check during ground pound
-        if (this.isGroundPounding && this.groundPoundStartupTimer <= 0) {
-            // Check if player is still holding Down + Heavy
-            if (input.heavyAttackHeld && input.aimDown) {
-                // Reset buffer - player is still holding
-                this.groundPoundReleaseBuffer = 0;
-            } else {
-                // Buttons released - start buffer countdown
-                if (this.groundPoundReleaseBuffer === 0) {
-                    // Just released, start the buffer timer (150ms grace period)
-                    this.groundPoundReleaseBuffer = 150;
-                } else if (this.groundPoundReleaseBuffer < 0) {
-                    // Buffer expired, end ground pound
-                    this.endGroundPound();
-                    return;
-                }
-            }
+        // Ground pound always commits — no cancel on button release
+        if (this.isGroundPounding) return;
+
+        // During charge: suspend in air if charging a ground pound
+        if (this.isCharging && this.chargeDirection === AttackDirection.DOWN && !this.player.isGrounded) {
+            this.player.velocity.set(0, 0);
         }
 
         if (this.attackCooldownTimer > 0) return;
@@ -185,11 +178,8 @@ export class PlayerCombat {
             const direction = this.getInputDirection(input);
             const isAerial = !this.player.isGrounded;
 
-            // Special case: Down + Heavy in air = Ground Pound (starts immediately, no charge)
-            if (direction === AttackDirection.DOWN && isAerial) {
-                this.startGroundPound();
-                return;
-            }
+            // Down + Heavy in air = Chargeable Ground Pound
+            // Falls through to the charging system below (no bypass)
 
             // Special case: Up/Neutral + Heavy in air = Recovery (starts immediately, no charge)
             if ((direction === AttackDirection.UP || direction === AttackDirection.NEUTRAL) && isAerial) {
@@ -382,6 +372,13 @@ export class PlayerCombat {
         // Snapshot charge time BEFORE clearing (so damage calc can read it)
         this.lastChargeTime = this.chargeTime;
 
+        // Special case: Down + aerial = Charged Ground Pound
+        if (direction === AttackDirection.DOWN && isAerial) {
+            this.clearChargeState();
+            this.startGroundPound(chargePercent);
+            return;
+        }
+
         // Get attack key and start charged attack
         const attackKey = Attack.getAttackKey(AttackType.HEAVY, direction, isAerial);
         this.startChargedAttack(attackKey, chargePercent);
@@ -402,10 +399,29 @@ export class PlayerCombat {
 
         const chargePercent = Math.min(this.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
 
-        // --- Fade In Ghost ---
+        const isGPCharge = this.chargeDirection === AttackDirection.DOWN && !this.player.isGrounded;
+
+        // ── Ground Pound Charge: no ghost, use player's own sprite ──
+        if (isGPCharge) {
+            this.player.velocity.set(0, 0); // Suspend in air
+
+            // Set player sprite to ground pound frame
+            const gpFrame = `${this.player.character}_ground_pound_000`;
+            this.player.spriteObject.setFrame(gpFrame);
+
+            // Shake intensity scales with charge
+            const maxShake = 2.5;
+            const intensity = chargePercent * maxShake;
+            const offsetX = (Math.random() - 0.5) * 2 * intensity;
+            const offsetY = (Math.random() - 0.5) * 2 * intensity;
+            this.player.setVisualOffset(offsetX, offsetY);
+            return;
+        }
+
+        // ── Side/Up Sig Charge: fade in ghost sprite ──
         if (!this.chargeGhostSprite) {
             const char = this.player.character;
-            const initialFrame = `${char}_side_sig_ghost_000`; // Always side_sig_ghost_000 for charging
+            const initialFrame = `${char}_side_sig_ghost_000`;
             this.chargeGhostSprite = this.scene.add.sprite(this.player.x, this.player.y, char, initialFrame);
             this.chargeGhostSprite.setDepth(this.player.depth - 1);
             this.chargeGhostSprite.setAlpha(0);
@@ -579,10 +595,14 @@ export class PlayerCombat {
         this.player.resetVisuals();
     }
 
-    private startGroundPound(): void {
+    // Ground pound charge ratio (0 = quick tap, 1 = full charge)
+    private groundPoundChargeRatio: number = 0;
+
+    private startGroundPound(chargePercent: number = 0): void {
         this.isGroundPounding = true;
+        this.groundPoundChargeRatio = chargePercent;
         this.groundPoundStartupTimer = PhysicsConfig.GROUND_POUND_STARTUP;
-        this.player.velocity.set(0, 0); // Pause in air
+        this.player.velocity.set(0, 0); // Brief pause before slam
 
         // Start the attack for hitbox purposes
         const facing = this.player.getFacingDirection();
@@ -714,6 +734,7 @@ export class PlayerCombat {
         // End the ground pound and enter recovery state
         this.player.isAttacking = false;
         this.isGroundPounding = false;
+        this.isGroundPoundLanding = true;
         this.currentAttack = null;
         this.deactivateHitbox();
         this.player.resetVisuals();
@@ -805,6 +826,10 @@ export class PlayerCombat {
                     height = this.ghostSprite.height * PhysicsConfig.GHOST_HITBOX_SCALE;
                 }
             }
+        } else if (this.shouldSpawnGhost() && this.hasSpawnedGhost) {
+            // Ghost was spawned but has already faded out — do NOT snap hitbox back to body
+            this.deactivateHitbox();
+            return;
         }
 
         this.updateActiveHitbox(hitboxX, hitboxY, width, height);
@@ -826,6 +851,13 @@ export class PlayerCombat {
                 const maxCharge = PhysicsConfig.CHARGE_MAX_TIME;
                 const chargeRatio = Math.min(this.lastChargeTime / maxCharge, 1);
                 damage = PhysicsConfig.SIDE_SIG_MIN_DAMAGE + (chargeRatio * (PhysicsConfig.SIDE_SIG_MAX_DAMAGE - PhysicsConfig.SIDE_SIG_MIN_DAMAGE));
+            }
+
+            // Ground Pound Damage Scaling: 4 (quick tap) -> 12 (full charge)
+            if (this.isGroundPounding) {
+                const minDmg = 4;
+                const maxDmg = 12;
+                damage = minDmg + (this.groundPoundChargeRatio * (maxDmg - minDmg));
             }
             return Math.floor(damage);
         } else if (this.player.physics.isRecovering) {
@@ -940,6 +972,12 @@ export class PlayerCombat {
                 // Scale knockback: 1.0x at no charge -> 1.5x at full charge
                 baseKnockback = baseKnockback * (1.0 + (chargeRatio * 0.5));
                 knockbackGrowth = knockbackGrowth * (1.0 + (chargeRatio * 0.3));
+            }
+
+            // Ground Pound Knockback Scaling: 1.0x (quick tap) -> 1.8x (full charge)
+            if (this.isGroundPounding) {
+                baseKnockback = baseKnockback * (1.0 + (this.groundPoundChargeRatio * 0.8));
+                knockbackGrowth = knockbackGrowth * (1.0 + (this.groundPoundChargeRatio * 0.5));
             }
 
             // SFX: Attack Hit (Impact)

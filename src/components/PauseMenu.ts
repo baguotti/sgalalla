@@ -426,6 +426,7 @@ export class PauseMenu {
             a: false, b: false, start: false
         };
 
+        // Aggregate input from ALL connected gamepads (any player can navigate)
         for (let i = 0; i < gamepads.length; i++) {
             const gamepad = gamepads[i];
             if (gamepad) {
@@ -433,12 +434,11 @@ export class PauseMenu {
                 const confirmIdx = getConfirmButtonIndex(gamepad);
                 const backIdx = getBackButtonIndex(gamepad);
 
-                currentState.up = navY < 0;
-                currentState.down = navY > 0;
-                currentState.a = gamepad.buttons[confirmIdx]?.pressed || false;
-                currentState.b = gamepad.buttons[backIdx]?.pressed || false;
-                currentState.start = gamepad.buttons[9]?.pressed || false;
-                break;
+                if (navY < 0) currentState.up = true;
+                if (navY > 0) currentState.down = true;
+                if (gamepad.buttons[confirmIdx]?.pressed) currentState.a = true;
+                if (gamepad.buttons[backIdx]?.pressed) currentState.b = true;
+                if (gamepad.buttons[9]?.pressed) currentState.start = true;
             }
         }
 
@@ -468,12 +468,11 @@ export class PauseMenu {
                 const confirmIdx = getConfirmButtonIndex(gamepad);
                 const backIdx = getBackButtonIndex(gamepad);
 
-                currentState.up = navY < 0;
-                currentState.down = navY > 0;
-                currentState.a = gamepad.buttons[confirmIdx]?.pressed || false;
-                currentState.b = gamepad.buttons[backIdx]?.pressed || false;
-                currentState.start = gamepad.buttons[9]?.pressed || false;
-                break;
+                if (navY < 0) currentState.up = true;
+                if (navY > 0) currentState.down = true;
+                if (gamepad.buttons[confirmIdx]?.pressed) currentState.a = true;
+                if (gamepad.buttons[backIdx]?.pressed) currentState.b = true;
+                if (gamepad.buttons[9]?.pressed) currentState.start = true;
             }
         }
         this.previousGamepadState = currentState;

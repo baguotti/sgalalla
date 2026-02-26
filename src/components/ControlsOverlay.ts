@@ -51,35 +51,58 @@ export class ControlsOverlay {
         const bodyStyle = { fontSize: '16px', color: '#ffffff', fontFamily: '"Pixeloid Sans"', lineSpacing: 7 };
 
         // ═══════════════════════════════════
-        // COLUMN 1: INPUT MAPPINGS
+        // COLUMN 1: INPUT MAPPINGS (P1 / P2 / Gamepad)
         // ═══════════════════════════════════
-        const col1Header = this.scene.add.text(col1X, topY, 'TASTI & GAMEPAD', {
+        const col1Header = this.scene.add.text(col1X, topY, 'COMANDI', {
             ...headerStyle, color: '#8ab4f8'
         }).setOrigin(0.5, 0);
         col1Header.setShadow(2, 2, '#000000', 0, false, true);
 
-        const inputLines = [
-            'AZIONE          TASTI        GAMEPAD',
-            '──────────────────────────────────────',
-            'Muovi           WASD/Frec.   Stick L / D-Pad',
-            'Salta           Spazio/Su    A',
-            'Att. Leggero    J / C        X',
-            'Att. Pesante    K / X        B / Y',
-            'Schivata        L / Z        LT / RT',
-            'Provoca         P            R3 (Click)',
-            'Pausa           ESC          Start',
-            '',
-            'INTERAZIONI',
-            '──────────────────────────────────────',
-            'Apri Cassa      J / C        X',
-            '  (vicino alla cassa)',
-            'Raccogli        J / C        X',
-            '  (vicino a oggetto)',
-            'Lancia          J / C        X / RB',
-            '  (con oggetto in mano)',
-        ].join('\n');
+        // Sub-column positions (left-aligned within left third of screen)
+        const col1Left = this.scene.scale.width * 0.04; // Action labels
+        const subP1X = this.scene.scale.width * 0.17;   // P1
+        const subP2X = this.scene.scale.width * 0.23;   // P2
+        const subGPX = this.scene.scale.width * 0.30;   // Gamepad
+        const subHeaderStyle = { fontSize: '14px', fontStyle: 'bold', fontFamily: '"Pixeloid Sans"' };
+        const rowStyle = { fontSize: '15px', color: '#cccccc', fontFamily: '"Pixeloid Sans"', lineSpacing: 8 };
+        const labelStyle = { fontSize: '15px', color: '#888888', fontFamily: '"Pixeloid Sans"', lineSpacing: 8 };
 
-        const col1Body = this.scene.add.text(col1X, topY + 48, inputLines, bodyStyle).setOrigin(0.5, 0);
+        const tableY = topY + 52;
+
+        // Column sub-headers
+        const shAction = this.scene.add.text(col1Left, tableY, '', { ...subHeaderStyle, color: '#666666' });
+        const shP1 = this.scene.add.text(subP1X, tableY, 'P1', { ...subHeaderStyle, color: '#8ab4f8' });
+        const shP2 = this.scene.add.text(subP2X, tableY, 'P2', { ...subHeaderStyle, color: '#f28b82' });
+        const shGP = this.scene.add.text(subGPX, tableY, 'Gamepad', { ...subHeaderStyle, color: '#81c995' });
+
+        // Row data
+        const actions = ['Muovi', 'Salta', 'Leggero', 'Pesante', 'Schivata', 'Provoca', 'Recovery', 'Pausa'];
+        const p1Vals = ['WASD', 'Space', 'J', 'K', 'L', 'P', 'Shift', 'ESC'];
+        const p2Vals = ['Frecce', 'G', 'C', 'V', 'B', 'M', '—', 'ESC'];
+        const gpVals = ['Stick', 'A', 'X', 'B / Y', 'LT/RT', 'R3', 'RB', 'Start'];
+
+        const col1ActionCol = this.scene.add.text(col1Left, tableY + 22,
+            actions.join('\n'), labelStyle);
+        const col1P1Col = this.scene.add.text(subP1X, tableY + 22,
+            p1Vals.join('\n'), rowStyle);
+        const col1P2Col = this.scene.add.text(subP2X, tableY + 22,
+            p2Vals.join('\n'), rowStyle);
+        const col1GPCol = this.scene.add.text(subGPX, tableY + 22,
+            gpVals.join('\n'), rowStyle);
+
+        // Interactions section
+        const intY = tableY + 22 + actions.length * 23 + 30;
+        const intTitle = this.scene.add.text(col1Left, intY, 'INTERAZIONI', {
+            fontSize: '14px', fontStyle: 'bold', color: '#8ab4f8', fontFamily: '"Pixeloid Sans"'
+        });
+        const intBody = this.scene.add.text(col1Left, intY + 22, [
+            'Apri Cassa     J / C (vicino)',
+            'Raccogli       J / C (vicino)',
+            'Lancia         J / C (in mano)',
+        ].join('\n'), { fontSize: '14px', color: '#aaaaaa', fontFamily: '"Pixeloid Sans"', lineSpacing: 6 });
+
+        const col1Elements = [col1Header, shAction, shP1, shP2, shGP,
+            col1ActionCol, col1P1Col, col1P2Col, col1GPCol, intTitle, intBody];
 
         // ═══════════════════════════════════
         // COLUMN 2: MOVESET GUIDE
@@ -104,13 +127,10 @@ export class ControlsOverlay {
             '• DSig     Giù + Pesante',
             '',
             'SPECIALI',
-            '• Recovery       Su + Pesante',
-            '                   (in aria)',
-            '• Ground Pound   Giù + Pesante',
-            '                   (in aria)',
+            '• Recovery       Su + Pesante (aria)',
+            '• Ground Pound   Giù + Pesante (aria)',
             '• Doppio Salto   Salta x2',
-            '• Wall Slide     Verso il muro',
-            '                   (in aria)',
+            '• Wall Slide     Verso il muro (aria)',
             '• Wall Jump      Salta dal muro',
         ].join('\n');
 
@@ -130,6 +150,9 @@ export class ControlsOverlay {
             'F1 / LB  Comandi (questo)',
             'ESC      Pausa',
             'Q        FPS / Ping',
+            'F2       Input Debug',
+            '           (mostra controller',
+            '            e tasti in tempo reale)',
             '',
             'SOLO TRAINING',
             '──────────────────────────────',
@@ -145,13 +168,12 @@ export class ControlsOverlay {
             '  supportato (remap auto)',
             '• La carica si attiva',
             '  tenendo premuto Pesante',
-            '• Gli attacchi si bufferizzano',
-            '  automaticamente',
+            '• P2 entra con Enter o G',
         ].join('\n');
 
         const col3Body = this.scene.add.text(col3X, topY + 48, systemLines, bodyStyle).setOrigin(0.5, 0);
 
-        this.container.add([col1Header, col1Body, col2Header, col2Body, col3Header, col3Body]);
+        this.container.add([...col1Elements, col2Header, col2Body, col3Header, col3Body]);
     }
 
     private setupInput(): void {

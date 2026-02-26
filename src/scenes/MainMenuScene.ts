@@ -65,11 +65,11 @@ export class MainMenuScene extends Phaser.Scene {
             const video = this.add.video(width / 2, height / 2, 'title_card_video');
             // User requested scale 1.5 (likely to zoom in and crop, or fill specific aspect ratio)
             video.setMute(true); // Ensure autoplay works if the video has an audio track
-            video.setScale(1.5).play(true); // true = loop
+            video.setScale(1.505).play(true); // true = loop
         }
 
         // Version Text
-        this.add.text(this.cameras.main.width - 20, this.cameras.main.height - 20, 'v1.1.4', {
+        this.add.text(this.cameras.main.width - 20, this.cameras.main.height - 20, 'v1.2.0', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(1, 1);        // Menu Items
         const startY = height - 280; // Moved lower

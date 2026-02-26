@@ -7,7 +7,7 @@ import { InputBuffer } from '../input/InputBuffer';
 import { Fighter } from './Fighter';
 import { PlayerPhysics } from './player/PlayerPhysics';
 import { PlayerCombat } from './player/PlayerCombat';
-import { Attack, AttackPhase } from '../combat/Attack';
+import { Attack, AttackPhase, AttackDirection } from '../combat/Attack';
 import { PlayerAI } from './player/PlayerAI';
 import type { PlayerSnapshot } from '../network/StateSnapshot';
 import { StateMachine } from '../state/StateMachine';
@@ -73,7 +73,12 @@ export class Player extends Fighter {
     // Unified input system (keyboard + gamepad)
     private inputManager!: InputManager;
     private currentInput!: InputState;
+    public getCurrentInput(): InputState { return this.currentInput; }
     public inputBuffer: InputBuffer = new InputBuffer(6);
+
+    // Exposed input config for debug overlay
+    public inputType: 'keyboard' | 'gamepad' | 'ai' = 'keyboard';
+    public keyboardMapping: 'wasd' | 'arrows' | 'all' = 'all';
 
     // Network input injection
     public useExternalInput: boolean = false; // When true, updatePhysics skips internal polling
@@ -193,7 +198,7 @@ export class Player extends Fighter {
         }
     }
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, character?: string } = {}) {
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, keyboardMapping?: 'wasd' | 'arrows' | 'all', character?: string } = {}) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
@@ -265,12 +270,12 @@ export class Player extends Fighter {
         this.debugRect.setVisible(false);
         this.add(this.debugRect);
 
-        // Setup input manager
         const defaultKeyboard = this.playerId === 0 && !this.isAI;
         const useKeyboard = config.useKeyboard !== undefined ? config.useKeyboard : defaultKeyboard;
         const gamepadIdx = config.gamepadIndex !== undefined ? config.gamepadIndex : null;
         // STRICT ROUTING: enableGamepad only when gamepadIndex is explicitly assigned
         const enableGamepad = gamepadIdx !== null;
+        const keyboardMapping = config.keyboardMapping || 'all';
 
 
 
@@ -281,8 +286,19 @@ export class Player extends Fighter {
             playerId: this.playerId,
             useKeyboard: useKeyboard,
             gamepadIndex: gamepadIdx,
-            enableGamepad: enableGamepad
+            enableGamepad: enableGamepad,
+            keyboardMapping: keyboardMapping
         });
+
+        // Store input config for debug overlay
+        if (this.isAI) {
+            this.inputType = 'ai';
+        } else if (enableGamepad && !useKeyboard) {
+            this.inputType = 'gamepad';
+        } else {
+            this.inputType = 'keyboard';
+        }
+        this.keyboardMapping = keyboardMapping;
 
         this.resetVisuals(); // Ensure clean visual state (no tints)
         scene.add.existing(this);
@@ -445,7 +461,9 @@ export class Player extends Fighter {
 
         // Special case: Ground Pound sprite is inverted (faces LEFT?)
         // So we invert the flip logic: Flip if facing Right (1), Don't flip if facing Left (-1)
-        if (this.combat.isGroundPounding) {
+        // This applies during: charge, descent, and landing recovery
+        const isGPCharge = this.combat.isCharging && this.combat.chargeDirection === AttackDirection.DOWN && !this.isGrounded;
+        if (this.combat.isGroundPounding || this.combat.isGroundPoundLanding || isGPCharge) {
             this.sprite.setFlipX(this.facingDirection > 0);
             return;
         }

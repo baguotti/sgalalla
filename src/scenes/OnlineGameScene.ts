@@ -371,12 +371,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         // Debug Toggle Key
         this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
 
-        // Manual Chest Spawn (Y key — testing)
-        this.input.keyboard?.on('keydown-Y', () => {
-            const padding = 600;
-            const x = Phaser.Math.Between(padding, this.scale.width - padding);
-            this.networkManager.sendChestSpawn(x);
-        });
+
+
 
         // Initialize EffectManager
         this.effectManager = new EffectManager(this);

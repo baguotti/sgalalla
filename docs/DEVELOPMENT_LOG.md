@@ -492,3 +492,15 @@ Part 2
 - **[Fix]** **Animation Integrity**:
     - **Jump Sprite**: Resolved a state machine transition bug where characters would skip the "jump" sprite and instantly show "fall" during ascent.
 - **[S]** **STATUS**: Competitive integrity and input flexibility reached new standards.
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-02-26] v1.2.0 - Ground Pound Overhaul & Input Expansion 🔨🎮
+- **[V]** `v1.2.0`
+- **[Feat]** **Ground Pound Refinement**:
+    - **Charging**: Implemented full charge functionality for Ground Pound (Down + Heavy in air). Players can hold to suspend in mid-air and charge the attack.
+    - **Scaling**: Damage scales (4 → 12) and knockback scales (up to 1.8x base) based on charge duration.
+    - **Visuals**: Replaced ghost silhouette with character's actual Ground Pound pose during charge for better impact.
+    - **Fixes**: Fixed "double flip" glitch during charge/slam transitions and ensured orientation is preserved during landing recovery.
+- **[Feat]** **Pause Menu & Input**:
+    - **Aggregated Gamepad Input**: Refactored `PauseMenu.ts` to read from **all connected gamepads** simultaneously. Any player can now navigate and control the pause menu from any controller.
+    - **UI**: Adjusted Menu Background Video scale (1.505) for pixel-perfect framing.
+- **[S]** **STATUS**: Combat mechanics and UI input robustness significantly enhanced. Ready for next phase.

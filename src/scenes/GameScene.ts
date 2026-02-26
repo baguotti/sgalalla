@@ -3,6 +3,7 @@ import { Player, PlayerState } from '../entities/Player';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { getConfirmButtonIndex } from '../input/JoyConMapper';
 import { DebugOverlay } from '../components/DebugOverlay';
+import { InputDebugOverlay } from '../components/InputDebugOverlay';
 import { PauseMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
 import { Chest } from '../entities/Chest';
@@ -34,6 +35,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private debugGraphics!: Phaser.GameObjects.Graphics;
     private debugLabels: Phaser.GameObjects.Text[] = [];
     private debugToggleKey!: Phaser.Input.Keyboard.Key;
+    private inputDebugKey!: Phaser.Input.Keyboard.Key;
+    private inputDebugOverlay!: InputDebugOverlay;
     private trainingToggleKey!: Phaser.Input.Keyboard.Key;
 
     // Kill tracking
@@ -115,8 +118,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         } else {
             // Fallback defaults
             this.playerData = [
-                { playerId: 0, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok' },
-                { playerId: 1, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character: 'fok', isAI: true, isTrainingDummy: true }
+                { playerId: 0, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null, keyboardMapping: 'all' }, character: 'fok' },
+                { playerId: 1, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null, keyboardMapping: 'all' }, character: 'fok', isAI: true, isTrainingDummy: true }
             ];
         }
 
@@ -300,6 +303,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     isTrainingDummy: pData.isTrainingDummy, // Pass training dummy flag
                     gamepadIndex: pData.input.gamepadIndex,
                     useKeyboard: pData.input.type === 'KEYBOARD',
+                    keyboardMapping: pData.input.keyboardMapping,
                     character: pData.character
                 });
 
@@ -359,10 +363,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
             // Toggle key
             this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+            this.inputDebugKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F2);
             this.trainingToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
             this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
             this.gameOverSpaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
             this.gameOverEscKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+            // Input Debug Overlay (F2)
+            this.inputDebugOverlay = new InputDebugOverlay(this);
+            this.inputDebugOverlay.setCameraIgnore(this.cameras.main);
 
             // Create pause menu
             this.pauseMenu = new PauseMenu(this);
@@ -430,10 +439,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 loop: true
             });
 
-            // Manual Chest Spawn (Y key)
-            this.input.keyboard?.on('keydown-Y', () => {
-                this.spawnChest();
-            });
+            // Manual Chest Spawn (Y key) — training mode only
+            if (this.playerData.some((p: any) => p.isTrainingDummy)) {
+                this.input.keyboard?.on('keydown-Y', () => {
+                    this.spawnChest();
+                });
+            }
 
 
         } catch (e: any) {
@@ -751,6 +762,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             } else {
                 this.debugOverlay.setVisible(false);
             }
+        }
+
+        // Input Debug Overlay (F2 toggle)
+        if (Phaser.Input.Keyboard.JustDown(this.inputDebugKey)) {
+            this.inputDebugOverlay.toggle();
+        }
+        if (this.inputDebugOverlay.isVisible()) {
+            this.inputDebugOverlay.update(this.players);
         }
 
 

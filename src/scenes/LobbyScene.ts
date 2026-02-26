@@ -13,6 +13,7 @@ export interface PlayerSelection {
     input: {
         type: 'KEYBOARD' | 'GAMEPAD';
         gamepadIndex: number | null;
+        keyboardMapping?: 'wasd' | 'arrows' | 'all';
     };
     character: CharacterType;
     isAI?: boolean;
@@ -63,6 +64,12 @@ export class LobbyScene extends Phaser.Scene {
         a: Phaser.Input.Keyboard.Key;
         s: Phaser.Input.Keyboard.Key;
         d: Phaser.Input.Keyboard.Key;
+        p: Phaser.Input.Keyboard.Key;
+        g: Phaser.Input.Keyboard.Key;
+        c: Phaser.Input.Keyboard.Key;
+        v: Phaser.Input.Keyboard.Key;
+        b: Phaser.Input.Keyboard.Key;
+        m: Phaser.Input.Keyboard.Key;
     };
 
     constructor() {
@@ -132,7 +139,7 @@ export class LobbyScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Instructions (Moved to bottom to avoid overlap with panels)
-        const instructions = this.add.text(width / 2, height - 50, 'Join: [SPACE/ENTER] or [GAMEPAD A]  |  Ready: [SPACE/ENTER] or [GAMEPAD A]', {
+        const instructions = this.add.text(width / 2, height - 50, 'Join: [SPACE/ENTER/G] or [GAMEPAD A]  |  Ready: [SPACE/ENTER/G] or [GAMEPAD A]', {
             fontSize: '20px',
             color: '#8ab4f8',
             fontFamily: '"Pixeloid Sans"'
@@ -155,7 +162,7 @@ export class LobbyScene extends Phaser.Scene {
                 playerId: i,
                 joined: false,
                 ready: false,
-                input: { type: 'KEYBOARD', gamepadIndex: null },
+                input: { type: 'KEYBOARD', gamepadIndex: null, keyboardMapping: 'all' },
                 character: 'fok'
             });
         }
@@ -193,7 +200,13 @@ export class LobbyScene extends Phaser.Scene {
             w: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
             a: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
             s: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-            d: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D)
+            d: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+            p: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.P),
+            g: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.G),
+            c: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.C),
+            v: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.V),
+            b: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B),
+            m: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.M)
         };
 
         this.backKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
@@ -221,6 +234,7 @@ export class LobbyScene extends Phaser.Scene {
         const p2 = this.slots[1];
         p2.joined = true;
         p2.input.type = 'KEYBOARD'; // Placeholder
+        p2.input.keyboardMapping = 'all'; // Placeholder
         p2.isAI = true;
         p2.isTrainingDummy = true;
         p2.ready = false; // Dummy starts NOT ready (waiting for selection)
@@ -371,7 +385,11 @@ export class LobbyScene extends Phaser.Scene {
     update(time: number, _delta: number): void {
         // --- 1. ALWAYS clear Keyboard JustDown buffers ---
         this.frameInputs.space = Phaser.Input.Keyboard.JustDown(this.keys.space);
-        this.frameInputs.enter = Phaser.Input.Keyboard.JustDown(this.keys.enter);
+        const gPressed = Phaser.Input.Keyboard.JustDown(this.keys.g);
+        const enterPressed = Phaser.Input.Keyboard.JustDown(this.keys.enter);
+        // Map P2 join/ready to G or Enter
+        this.frameInputs.enter = gPressed || enterPressed;
+        // Also allow P and M for readiness
         let goBack = Phaser.Input.Keyboard.JustDown(this.backKey);
 
         // --- 2. Update Gamepads and evaluate Back ---
@@ -441,24 +459,38 @@ export class LobbyScene extends Phaser.Scene {
         if (this.mode === 'training' && this.slots[0].joined) return false; // P1 already joined in training
 
         // Check for join inputs using frame cache
-        const joinPressed = this.frameInputs.space || this.frameInputs.enter;
+        const spacePressed = this.frameInputs.space;
+        const enterPressed = this.frameInputs.enter;
 
-        if (joinPressed) {
-            const isAssigned = this.slots.some(s => s.joined && s.input.type === 'KEYBOARD');
-            if (!isAssigned) {
-                this.joinPlayer('KEYBOARD', null);
-                return true;
+        if (spacePressed || enterPressed) {
+            // Find existing mappings to prevent duplicate joins
+            const hasWasd = this.slots.some(s => s.joined && s.input.type === 'KEYBOARD' && s.input.keyboardMapping === 'wasd');
+            const hasArrows = this.slots.some(s => s.joined && s.input.type === 'KEYBOARD' && s.input.keyboardMapping === 'arrows');
+
+            let joined = false;
+
+            if (spacePressed && !hasWasd) {
+                this.joinPlayer('KEYBOARD', null, 'wasd');
+                joined = true;
             }
+
+            if (enterPressed && !hasArrows) {
+                this.joinPlayer('KEYBOARD', null, 'arrows');
+                joined = true;
+            }
+
+            return joined;
         }
         return false;
     }
 
-    private joinPlayer(type: 'KEYBOARD' | 'GAMEPAD', index: number | null): void {
+    private joinPlayer(type: 'KEYBOARD' | 'GAMEPAD', index: number | null, keyboardMapping: 'wasd' | 'arrows' | 'all' = 'all'): void {
         const slot = this.slots.find(s => !s.joined);
         if (slot) {
             slot.joined = true;
             slot.input.type = type;
             slot.input.gamepadIndex = index;
+            slot.input.keyboardMapping = keyboardMapping;
             slot.character = 'fok';
 
             AudioManager.getInstance().playSFX('ui_player_found', { volume: 0.5 }); // Join Sound
@@ -491,15 +523,36 @@ export class LobbyScene extends Phaser.Scene {
 
             if (slot.input.type === 'KEYBOARD') {
                 if (canHoldInput) {
-                    left = this.keys.left.isDown || this.keys.a.isDown;
-                    right = this.keys.right.isDown || this.keys.d.isDown;
+                    if (slot.input.keyboardMapping === 'wasd') {
+                        left = this.keys.a.isDown;
+                        right = this.keys.d.isDown;
+                    } else if (slot.input.keyboardMapping === 'arrows') {
+                        left = this.keys.left.isDown;
+                        right = this.keys.right.isDown;
+                    } else {
+                        // All/Training mode (combines both)
+                        left = this.keys.left.isDown || this.keys.a.isDown;
+                        right = this.keys.right.isDown || this.keys.d.isDown;
+                    }
                 }
+
+                const pPressed = Phaser.Input.Keyboard.JustDown(this.keys.p);
+                const mPressed = Phaser.Input.Keyboard.JustDown(this.keys.m);
 
                 // Use JustDown for Ready to prevent accidental double-tap from Join
                 // Guard: must be 600ms after inputs were unlocked to prevent carryover
+                // Guard 2: must be 500ms after the player joined to prevent instant-confirm
                 const timeSinceUnlock = time - this.inputUnlockTime;
-                if (timeSinceUnlock > 600) {
-                    select = this.frameInputs.space || this.frameInputs.enter;
+                const timeSinceJoin = time - (this.joinTime.get(slot.playerId) || 0);
+
+                if (timeSinceUnlock > 600 && timeSinceJoin > 500) {
+                    if (slot.input.keyboardMapping === 'wasd') {
+                        select = this.frameInputs.space || pPressed;
+                    } else if (slot.input.keyboardMapping === 'arrows') {
+                        select = this.frameInputs.enter || mPressed; // enter actually maps to G now due to the frameInputs overload above
+                    } else {
+                        select = this.frameInputs.space || this.frameInputs.enter || pPressed || mPressed;
+                    }
                 }
 
             } else if (slot.input.type === 'GAMEPAD' && slot.input.gamepadIndex !== null) {
@@ -515,7 +568,9 @@ export class LobbyScene extends Phaser.Scene {
                     const confirmIdx = getConfirmButtonIndex(gp);
                     const currentSelect = gp.buttons[confirmIdx]?.pressed ?? false;
 
-                    if (Date.now() - this.sceneStartTime > 800) {
+                    const timeSinceJoin = time - (this.joinTime.get(slot.playerId) || 0);
+
+                    if (Date.now() - this.sceneStartTime > 800 && timeSinceJoin > 500) {
                         select = currentSelect && !this.prevGamepadSelects.get(gp.index);
                     }
                     this.prevGamepadSelects.set(gp.index, currentSelect);

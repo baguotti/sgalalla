@@ -245,15 +245,37 @@ export class GamepadInput {
             gamepad.id.toLowerCase().includes('pro controller') ||
             gamepad.id.toLowerCase().includes('joy-con');
 
+        // Check if it's an official controller (Xbox, PS, Switch)
+        // If not, it's likely a generic USB dongle which often has inverted Y axes
+        const isOfficialCtrl = isSwitchCtrl ||
+            gamepad.id.toLowerCase().includes('xbox') ||
+            gamepad.id.toLowerCase().includes('xinput') ||
+            gamepad.id.toLowerCase().includes('playstation') ||
+            gamepad.id.toLowerCase().includes('dualshock') ||
+            gamepad.id.toLowerCase().includes('dualsense');
+
+        const isGenericUSB = !isOfficialCtrl;
+
         // Left Stick (axes 0 and 1)
         const leftStickX = this.applyDeadzone(gamepad.axes[0] || 0);
-        const leftStickY = this.applyDeadzone(gamepad.axes[1] || 0);
+        let leftStickY = this.applyDeadzone(gamepad.axes[1] || 0);
+
+        if (isGenericUSB) {
+            leftStickY = -leftStickY; // Invert Y axis for generic USB dongles
+        }
 
         // D-pad (buttons 12-15)
-        const dpadUp = gamepad.buttons[XBOX_BUTTONS.DPAD_UP]?.pressed || false;
-        const dpadDown = gamepad.buttons[XBOX_BUTTONS.DPAD_DOWN]?.pressed || false;
+        let dpadUp = gamepad.buttons[XBOX_BUTTONS.DPAD_UP]?.pressed || false;
+        let dpadDown = gamepad.buttons[XBOX_BUTTONS.DPAD_DOWN]?.pressed || false;
         const dpadLeft = gamepad.buttons[XBOX_BUTTONS.DPAD_LEFT]?.pressed || false;
         const dpadRight = gamepad.buttons[XBOX_BUTTONS.DPAD_RIGHT]?.pressed || false;
+
+        // Generic USB controllers may also have inverted D-pad Up/Down
+        if (isGenericUSB) {
+            const temp = dpadUp;
+            dpadUp = dpadDown;
+            dpadDown = temp;
+        }
 
         // Combine stick and D-pad for movement
         state.moveX = leftStickX || (dpadLeft ? -1 : dpadRight ? 1 : 0);
