@@ -13,7 +13,7 @@ export interface PlayerSelection {
     input: {
         type: 'KEYBOARD' | 'GAMEPAD';
         gamepadIndex: number | null;
-        keyboardMapping?: 'wasd' | 'arrows' | 'all';
+        keyboardMapping?: 'all';
     };
     character: CharacterType;
     isAI?: boolean;
@@ -64,12 +64,6 @@ export class LobbyScene extends Phaser.Scene {
         a: Phaser.Input.Keyboard.Key;
         s: Phaser.Input.Keyboard.Key;
         d: Phaser.Input.Keyboard.Key;
-        p: Phaser.Input.Keyboard.Key;
-        g: Phaser.Input.Keyboard.Key;
-        c: Phaser.Input.Keyboard.Key;
-        v: Phaser.Input.Keyboard.Key;
-        b: Phaser.Input.Keyboard.Key;
-        m: Phaser.Input.Keyboard.Key;
     };
 
     constructor() {
@@ -130,7 +124,7 @@ export class LobbyScene extends Phaser.Scene {
         // Title
         const centerY = height / 2 + 20;
         const titleY = centerY - 150 - 50;
-        const titleText = this.mode === 'training' ? 'TRAINING MODE' : 'SCEGLI IL TUO MANICO';
+        const titleText = this.mode === 'training' ? 'MODALITÀ ALLENAMENTO' : 'SCEGLI IL TUO MANICO';
         this.add.text(width / 2, titleY, titleText, {
             fontSize: '48px',
             color: '#ffffff',
@@ -139,7 +133,7 @@ export class LobbyScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Instructions (Moved to bottom to avoid overlap with panels)
-        const instructions = this.add.text(width / 2, height - 50, 'Join: [SPACE/ENTER/G] or [GAMEPAD A]  |  Ready: [SPACE/ENTER/G] or [GAMEPAD A]', {
+        const instructions = this.add.text(width / 2, height - 50, 'Entra: [SPAZIO/INVIO] o [GAMEPAD A]  |  Pronto: [SPAZIO/INVIO] o [GAMEPAD A]', {
             fontSize: '20px',
             color: '#8ab4f8',
             fontFamily: '"Pixeloid Sans"'
@@ -201,12 +195,6 @@ export class LobbyScene extends Phaser.Scene {
             a: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
             s: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
             d: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-            p: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.P),
-            g: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.G),
-            c: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.C),
-            v: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.V),
-            b: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B),
-            m: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.M)
         };
 
         this.backKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
@@ -317,7 +305,7 @@ export class LobbyScene extends Phaser.Scene {
             }).setOrigin(0.5);
 
             // State Text (Join / Select / Ready) - Moved to y=-45 to overlay sprite
-            const stateText = this.add.text(0, -45, 'Press Button\nto Join', {
+            const stateText = this.add.text(0, -45, 'Premi un tasto\nper entrare', {
                 fontSize: '22px',
                 color: '#888888',
                 fontFamily: '"Pixeloid Sans"',
@@ -385,11 +373,8 @@ export class LobbyScene extends Phaser.Scene {
     update(time: number, _delta: number): void {
         // --- 1. ALWAYS clear Keyboard JustDown buffers ---
         this.frameInputs.space = Phaser.Input.Keyboard.JustDown(this.keys.space);
-        const gPressed = Phaser.Input.Keyboard.JustDown(this.keys.g);
         const enterPressed = Phaser.Input.Keyboard.JustDown(this.keys.enter);
-        // Map P2 join/ready to G or Enter
-        this.frameInputs.enter = gPressed || enterPressed;
-        // Also allow P and M for readiness
+        this.frameInputs.enter = enterPressed;
         let goBack = Phaser.Input.Keyboard.JustDown(this.backKey);
 
         // --- 2. Update Gamepads and evaluate Back ---
@@ -456,35 +441,23 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private handleKeyboardJoin(): boolean {
-        if (this.mode === 'training' && this.slots[0].joined) return false; // P1 already joined in training
+        if (this.mode === 'training' && this.slots[0].joined) return false;
 
-        // Check for join inputs using frame cache
         const spacePressed = this.frameInputs.space;
         const enterPressed = this.frameInputs.enter;
 
         if (spacePressed || enterPressed) {
-            // Find existing mappings to prevent duplicate joins
-            const hasWasd = this.slots.some(s => s.joined && s.input.type === 'KEYBOARD' && s.input.keyboardMapping === 'wasd');
-            const hasArrows = this.slots.some(s => s.joined && s.input.type === 'KEYBOARD' && s.input.keyboardMapping === 'arrows');
-
-            let joined = false;
-
-            if (spacePressed && !hasWasd) {
-                this.joinPlayer('KEYBOARD', null, 'wasd');
-                joined = true;
+            // Only one keyboard player allowed
+            const hasKeyboard = this.slots.some(s => s.joined && s.input.type === 'KEYBOARD');
+            if (!hasKeyboard) {
+                this.joinPlayer('KEYBOARD', null, 'all');
+                return true;
             }
-
-            if (enterPressed && !hasArrows) {
-                this.joinPlayer('KEYBOARD', null, 'arrows');
-                joined = true;
-            }
-
-            return joined;
         }
         return false;
     }
 
-    private joinPlayer(type: 'KEYBOARD' | 'GAMEPAD', index: number | null, keyboardMapping: 'wasd' | 'arrows' | 'all' = 'all'): void {
+    private joinPlayer(type: 'KEYBOARD' | 'GAMEPAD', index: number | null, keyboardMapping: 'all' = 'all'): void {
         const slot = this.slots.find(s => !s.joined);
         if (slot) {
             slot.joined = true;
@@ -493,10 +466,8 @@ export class LobbyScene extends Phaser.Scene {
             slot.input.keyboardMapping = keyboardMapping;
             slot.character = 'fok';
 
-            AudioManager.getInstance().playSFX('ui_player_found', { volume: 0.5 }); // Join Sound
+            AudioManager.getInstance().playSFX('ui_player_found', { volume: 0.5 });
 
-            // Prevent immediate "Ready" input in the same frame
-            // Set input time to now so the debounce check in handlePlayerInput fails
             this.lastInputTime.set(slot.playerId, this.time.now);
             this.joinTime.set(slot.playerId, this.time.now);
         }
@@ -523,36 +494,15 @@ export class LobbyScene extends Phaser.Scene {
 
             if (slot.input.type === 'KEYBOARD') {
                 if (canHoldInput) {
-                    if (slot.input.keyboardMapping === 'wasd') {
-                        left = this.keys.a.isDown;
-                        right = this.keys.d.isDown;
-                    } else if (slot.input.keyboardMapping === 'arrows') {
-                        left = this.keys.left.isDown;
-                        right = this.keys.right.isDown;
-                    } else {
-                        // All/Training mode (combines both)
-                        left = this.keys.left.isDown || this.keys.a.isDown;
-                        right = this.keys.right.isDown || this.keys.d.isDown;
-                    }
+                    left = this.keys.left.isDown || this.keys.a.isDown;
+                    right = this.keys.right.isDown || this.keys.d.isDown;
                 }
 
-                const pPressed = Phaser.Input.Keyboard.JustDown(this.keys.p);
-                const mPressed = Phaser.Input.Keyboard.JustDown(this.keys.m);
-
-                // Use JustDown for Ready to prevent accidental double-tap from Join
-                // Guard: must be 600ms after inputs were unlocked to prevent carryover
-                // Guard 2: must be 500ms after the player joined to prevent instant-confirm
                 const timeSinceUnlock = time - this.inputUnlockTime;
                 const timeSinceJoin = time - (this.joinTime.get(slot.playerId) || 0);
 
                 if (timeSinceUnlock > 600 && timeSinceJoin > 500) {
-                    if (slot.input.keyboardMapping === 'wasd') {
-                        select = this.frameInputs.space || pPressed;
-                    } else if (slot.input.keyboardMapping === 'arrows') {
-                        select = this.frameInputs.enter || mPressed; // enter actually maps to G now due to the frameInputs overload above
-                    } else {
-                        select = this.frameInputs.space || this.frameInputs.enter || pPressed || mPressed;
-                    }
+                    select = this.frameInputs.space || this.frameInputs.enter;
                 }
 
             } else if (slot.input.type === 'GAMEPAD' && slot.input.gamepadIndex !== null) {
@@ -739,20 +689,20 @@ export class LobbyScene extends Phaser.Scene {
                 }
 
                 if (slot.ready) {
-                    stateText.setText('READY!');
+                    stateText.setText('PRONTO!');
                     stateText.setColor('#00ff00');
                     stateText.setFontSize(36);
                     stateText.setBackgroundColor('#004400'); // Overlay style
                     arrows.forEach(a => a.setVisible(false));
                 } else {
                     if (this.mode === 'training' && i === 1 && this.selectionPhase === 'P1') {
-                        stateText.setText('Waiting...');
+                        stateText.setText('In attesa...');
                         stateText.setColor('#888888');
                         stateText.setFontSize(20);
                         stateText.setBackgroundColor(''); // Clear bg
                         arrows.forEach(a => a.setVisible(false));
                     } else if (this.mode === 'training' && i === 1 && this.selectionPhase === 'CPU') {
-                        stateText.setText('SELECT CPU');
+                        stateText.setText('SCEGLI IL CPU');
                         stateText.setColor('#ffff00');
                         stateText.setFontSize(20);
                         stateText.setBackgroundColor('');
@@ -770,11 +720,11 @@ export class LobbyScene extends Phaser.Scene {
 
                 if (slot.isTrainingDummy) {
                     if (slot.ready) {
-                        stateText.setText('READY!');
+                        stateText.setText('PRONTO!');
                     } else if (this.selectionPhase === 'CPU') {
-                        stateText.setText('SELECT CPU');
+                        stateText.setText('SCEGLI IL CPU');
                     } else {
-                        stateText.setText('DUMMY');
+                        stateText.setText('MANICHINO');
                     }
                 }
 
@@ -786,7 +736,7 @@ export class LobbyScene extends Phaser.Scene {
                 card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
                 card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
 
-                stateText.setText('Press\nto Join');
+                stateText.setText('Premi\nper entrare');
                 stateText.setColor('#555555');
                 stateText.setFontSize(20);
                 stateText.setBackgroundColor('');

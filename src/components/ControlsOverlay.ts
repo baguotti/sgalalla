@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { KeyboardMapping, keyCodeToLabel } from '../input/KeyboardMapping';
 
 export class ControlsOverlay {
     private scene: Phaser.Scene;
@@ -51,18 +52,17 @@ export class ControlsOverlay {
         const bodyStyle = { fontSize: '16px', color: '#ffffff', fontFamily: '"Pixeloid Sans"', lineSpacing: 7 };
 
         // ═══════════════════════════════════
-        // COLUMN 1: INPUT MAPPINGS (P1 / P2 / Gamepad)
+        // COLUMN 1: INPUT MAPPINGS (Keyboard / Gamepad)
         // ═══════════════════════════════════
         const col1Header = this.scene.add.text(col1X, topY, 'COMANDI', {
             ...headerStyle, color: '#8ab4f8'
         }).setOrigin(0.5, 0);
         col1Header.setShadow(2, 2, '#000000', 0, false, true);
 
-        // Sub-column positions (left-aligned within left third of screen)
+        // Sub-column positions
         const col1Left = this.scene.scale.width * 0.04; // Action labels
-        const subP1X = this.scene.scale.width * 0.17;   // P1
-        const subP2X = this.scene.scale.width * 0.23;   // P2
-        const subGPX = this.scene.scale.width * 0.30;   // Gamepad
+        const subKBX = this.scene.scale.width * 0.19;   // Keyboard
+        const subGPX = this.scene.scale.width * 0.28;   // Gamepad
         const subHeaderStyle = { fontSize: '14px', fontStyle: 'bold', fontFamily: '"Pixeloid Sans"' };
         const rowStyle = { fontSize: '15px', color: '#cccccc', fontFamily: '"Pixeloid Sans"', lineSpacing: 8 };
         const labelStyle = { fontSize: '15px', color: '#888888', fontFamily: '"Pixeloid Sans"', lineSpacing: 8 };
@@ -71,22 +71,28 @@ export class ControlsOverlay {
 
         // Column sub-headers
         const shAction = this.scene.add.text(col1Left, tableY, '', { ...subHeaderStyle, color: '#666666' });
-        const shP1 = this.scene.add.text(subP1X, tableY, 'P1', { ...subHeaderStyle, color: '#8ab4f8' });
-        const shP2 = this.scene.add.text(subP2X, tableY, 'P2', { ...subHeaderStyle, color: '#f28b82' });
+        const shKB = this.scene.add.text(subKBX, tableY, 'Tastiera', { ...subHeaderStyle, color: '#8ab4f8' });
         const shGP = this.scene.add.text(subGPX, tableY, 'Gamepad', { ...subHeaderStyle, color: '#81c995' });
 
         // Row data
+        const km = KeyboardMapping.getInstance();
         const actions = ['Muovi', 'Salta', 'Leggero', 'Pesante', 'Schivata', 'Provoca', 'Recovery', 'Pausa'];
-        const p1Vals = ['WASD', 'Space', 'J', 'K', 'L', 'P', 'Shift', 'ESC'];
-        const p2Vals = ['Frecce', 'G', 'C', 'V', 'B', 'M', '—', 'ESC'];
+        const kbVals = [
+            'WASD / Frecce',
+            keyCodeToLabel(km.getKeyForAction('jump')),
+            keyCodeToLabel(km.getKeyForAction('lightAttack')),
+            keyCodeToLabel(km.getKeyForAction('heavyAttack')),
+            keyCodeToLabel(km.getKeyForAction('dodge')),
+            keyCodeToLabel(km.getKeyForAction('taunt')),
+            keyCodeToLabel(km.getKeyForAction('recovery')),
+            'ESC'
+        ];
         const gpVals = ['Stick', 'A', 'X', 'B / Y', 'LT/RT', 'R3', 'RB', 'Start'];
 
         const col1ActionCol = this.scene.add.text(col1Left, tableY + 22,
             actions.join('\n'), labelStyle);
-        const col1P1Col = this.scene.add.text(subP1X, tableY + 22,
-            p1Vals.join('\n'), rowStyle);
-        const col1P2Col = this.scene.add.text(subP2X, tableY + 22,
-            p2Vals.join('\n'), rowStyle);
+        const col1KBCol = this.scene.add.text(subKBX, tableY + 22,
+            kbVals.join('\n'), rowStyle);
         const col1GPCol = this.scene.add.text(subGPX, tableY + 22,
             gpVals.join('\n'), rowStyle);
 
@@ -95,14 +101,15 @@ export class ControlsOverlay {
         const intTitle = this.scene.add.text(col1Left, intY, 'INTERAZIONI', {
             fontSize: '14px', fontStyle: 'bold', color: '#8ab4f8', fontFamily: '"Pixeloid Sans"'
         });
+        const lightKey = keyCodeToLabel(km.getKeyForAction('lightAttack'));
         const intBody = this.scene.add.text(col1Left, intY + 22, [
-            'Apri Cassa     J / C (vicino)',
-            'Raccogli       J / C (vicino)',
-            'Lancia         J / C (in mano)',
+            `Apri Cassa     ${lightKey} (vicino)`,
+            `Raccogli       ${lightKey} (vicino)`,
+            `Lancia         ${lightKey} (in mano)`,
         ].join('\n'), { fontSize: '14px', color: '#aaaaaa', fontFamily: '"Pixeloid Sans"', lineSpacing: 6 });
 
-        const col1Elements = [col1Header, shAction, shP1, shP2, shGP,
-            col1ActionCol, col1P1Col, col1P2Col, col1GPCol, intTitle, intBody];
+        const col1Elements = [col1Header, shAction, shKB, shGP,
+            col1ActionCol, col1KBCol, col1GPCol, intTitle, intBody];
 
         // ═══════════════════════════════════
         // COLUMN 2: MOVESET GUIDE
@@ -168,7 +175,8 @@ export class ControlsOverlay {
             '  supportato (remap auto)',
             '• La carica si attiva',
             '  tenendo premuto Pesante',
-            '• P2 entra con Enter o G',
+            '• P2 entra solo con secondo',
+            '  controller o online',
         ].join('\n');
 
         const col3Body = this.scene.add.text(col3X, topY + 48, systemLines, bodyStyle).setOrigin(0.5, 0);

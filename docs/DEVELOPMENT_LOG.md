@@ -509,16 +509,31 @@ Part 2
 - **[V]** `v1.2.1`
 - **[Feat]** **CRT Advanced Visuals**:
     - **Intensity Levels**: Implemented 3 togglable intensity levels: **BASSO**, **MEDIO**, **ALTO**.
-    - **Highlight Glow**: Rearchitected the glow to use `mix-blend-mode: screen`, ensuring the warm phosphor glow only affects bright pixels/highlights.
-    - **ALTO Effects**: Added cinematic "Retro" extras: Heavy double-vignette, programmatic barrel/fisheye distortion (via SVG filter), and subtle 0.5px screen jitter.
+    - **Highlight Glow**: Rearchitected the glow to use a secondary canvas/filter layer ensuring the glow only affects bright highlights.
+    - **ALTO Effects**: Added cinematic extras: heavy vignette, programmatic barrel distortion, and subtle screen jitter.
 - **[Feat]** **Settings UI Restructure**:
-    - **Submenus**: Moved SFX and MUSIC controls into a dedicated **SONORO** submenu for better organization.
-    - **Video**: Created a **VIDEO** submenu for the CRT effect toggle and intensity selection.
+    - **Submenus**: Moved SFX and MUSIC controls into a dedicated **SONORO** submenu.
+    - **Video**: Created a **VIDEO** submenu for CRT effects.
 - **[Feat]** **Input Remapping**:
     - **Gamepad Polish**: Enabled remapping to the 'B' button (previously reserved for back).
-    - **Safety**: Implemented a mandatory "Press START to Remap" flow to prevent accidental key overrides.
-    - **UI**: Added "PREMI START PER REMAPPARE" instructional text.
+    - **Safety**: Implemented "Press START to Remap" flow to prevent accidental overrides.
 - **[Tuning]** **Combat & Balance**:
-    - **Neutral Light**: Refactored from a 3-hit combo to a single, snappier hit. Increased spamability for a faster combat feel.
-    - **Chests**: Drastically reduced spawn rate (10 -> 1) to make item discovery more rewarding and tactical.
-- **[S]** **STATUS**: Visual fidelity reached "Premium" standards; UI and Input flows refined for production.
+    - **Neutral Light**: Refactored to a single snappy hit for faster combat.
+    - **Chests**: Drastically reduced spawn rate for tactical discovery.
+- **[S]** **STATUS**: Visual fidelity and UI flows refined for production.
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-03-02] v1.2.2 - Keyboard Overhaul & UI Polish ⌨️✨
+- **[V]** `v1.2.2`
+- **[Feat]** **Keyboard Remapping**:
+    - **Remap Submenu**: Added a full **TASTIERA** remap screen in IMPOSTAZIONI.
+    - **Listening Flow**: Implemented a "PREMI..." listening flow for physical keypress rebinding.
+    - **Persistence**: Keyboard mappings are now saved to `localStorage` via a new `KeyboardMapping` singleton.
+- **[Refactor]** **Input Simplicity**:
+    - **Split Keyboard Removal**: Removed the P2 arrow-key split mode. Keyboard now always joins as a single player using 'all' mappings (WASD + Arrows both work for movement).
+    - **Routing**: Streamlined `InputManager` to use dynamic key lookups instead of hardcoded keycodes.
+- **[UI]** **Legend Polish**:
+    - **Controls Overlay**: Updated the `F1` legend to a cleaner 2-column layout (Tastiera/Gamepad).
+    - **Pause Menu**: Updated the commands page with dynamic labels and removed P2 keyboard references.
+- **[Fix]** **Build Integrity**:
+    - **Type Safety**: Fixed a `keyboardMapping` type mismatch in `Player.ts`.
+- **[S]** **STATUS**: Keyboard input is now as flexible as gamepad input. Split-keyboard mode removed in favor of clean routing.

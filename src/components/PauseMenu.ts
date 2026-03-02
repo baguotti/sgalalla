@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavY } from '../input/JoyConMapper';
+import { KeyboardMapping, keyCodeToLabel } from '../input/KeyboardMapping';
 
 const MenuOption = {
     RESUME: 0,
@@ -150,24 +151,31 @@ export class PauseMenu {
         }).setOrigin(0.5, 0);
         col1Header.setShadow(2, 2, '#000000', 0, false, true);
 
+        const km = KeyboardMapping.getInstance();
+        const lightKey = keyCodeToLabel(km.getKeyForAction('lightAttack'));
+        const heavyKey = keyCodeToLabel(km.getKeyForAction('heavyAttack'));
+        const jumpKey = keyCodeToLabel(km.getKeyForAction('jump'));
+        const dodgeKey = keyCodeToLabel(km.getKeyForAction('dodge'));
+        const tauntKey = keyCodeToLabel(km.getKeyForAction('taunt'));
+
         const inputLines = [
             'AZIONE          TASTI        GAMEPAD',
             '──────────────────────────────────────',
-            'Muovi           WASD/Frec.   Stick L / D-Pad',
-            'Salta           Spazio/Su    A',
-            'Att. Leggero    J / C        X',
-            'Att. Pesante    K / X        B / Y',
-            'Schivata        L / Z        LT / RT',
-            'Provoca         P            R3 (Click)',
+            `Muovi           WASD/Frec.   Stick L / D-Pad`,
+            `Salta           ${jumpKey}          A`,
+            `Att. Leggero    ${lightKey}            X`,
+            `Att. Pesante    ${heavyKey}            B / Y`,
+            `Schivata        ${dodgeKey}            LT / RT`,
+            `Provoca         ${tauntKey}            R3 (Click)`,
             'Pausa           ESC          Start',
             '',
             'INTERAZIONI',
             '──────────────────────────────────────',
-            'Apri Cassa      J / C        X',
+            `Apri Cassa      ${lightKey}            X`,
             '  (vicino alla cassa)',
-            'Raccogli        J / C        X',
+            `Raccogli        ${lightKey}            X`,
             '  (vicino a oggetto)',
-            'Lancia          J / C        X / RB',
+            `Lancia          ${lightKey}            X / RB`,
             '  (con oggetto in mano)',
         ].join('\n');
 

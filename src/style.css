@@ -23,55 +23,11 @@ canvas {
   display: block;
 }
 
-/* ═══════════════════════════════════════════════
-   CRT — Layer 1: Scanlines + Vignette (normal blend)
-   ═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   CRT Overlay — single layer, zero animations
+   GPU-promoted + layout-isolated for zero perf cost
+   ═══════════════════════════════════════ */
 .crt-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 9998;
-  pointer-events: none;
-  display: none;
-}
-
-.crt-overlay.active.crt-basso {
-  display: block;
-  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.07) 50%);
-  background-size: 100% 4px;
-  box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.18);
-  animation: crt-flicker 0.15s infinite;
-}
-
-.crt-overlay.active.crt-medio {
-  display: block;
-  background:
-    linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%),
-    linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-  background-size: 100% 3px, 3px 100%;
-  box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.38);
-  animation: crt-flicker 0.15s infinite;
-}
-
-.crt-overlay.active.crt-alto {
-  display: block;
-  background:
-    linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.26) 50%),
-    linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.05));
-  background-size: 100% 2px, 2px 100%;
-  box-shadow:
-    inset 0 0 180px rgba(0, 0, 0, 0.80),
-    inset 0 0 60px rgba(0, 0, 0, 0.50);
-  animation: crt-flicker 0.12s infinite;
-}
-
-/* ═══════════════════════════════════════════════
-   CRT — Layer 2: Highlight Glow (screen blend)
-   Only brightens existing bright pixels, leaves dark areas untouched
-   ═══════════════════════════════════════════════ */
-.crt-glow {
   position: absolute;
   top: 0;
   left: 0;
@@ -80,78 +36,41 @@ canvas {
   z-index: 9999;
   pointer-events: none;
   display: none;
-  mix-blend-mode: screen;
+  will-change: contents;
+  contain: strict;
 }
 
-.crt-glow.active.crt-basso {
+/* BASSO — faint scanlines, light vignette */
+.crt-overlay.active.crt-basso {
   display: block;
-  background: radial-gradient(ellipse 70% 60% at 50% 50%,
-      rgba(255, 245, 220, 0.05) 0%,
-      rgba(255, 245, 220, 0.02) 45%,
-      transparent 70%);
+  background: repeating-linear-gradient(to bottom,
+      transparent 0px,
+      transparent 3px,
+      rgba(0, 0, 0, 0.06) 3px,
+      rgba(0, 0, 0, 0.06) 4px);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.15);
 }
 
-.crt-glow.active.crt-medio {
+/* MEDIO — visible scanlines, moderate vignette */
+.crt-overlay.active.crt-medio {
   display: block;
-  background: radial-gradient(ellipse 70% 60% at 50% 50%,
-      rgba(255, 245, 220, 0.06) 0%,
-      rgba(255, 245, 220, 0.03) 45%,
-      transparent 70%);
+  background: repeating-linear-gradient(to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.12) 2px,
+      rgba(0, 0, 0, 0.12) 3px);
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.35);
 }
 
-.crt-glow.active.crt-alto {
+/* ALTO — dense scanlines, heavy vignette */
+.crt-overlay.active.crt-alto {
   display: block;
-  background: radial-gradient(ellipse 65% 55% at 50% 50%,
-      rgba(255, 245, 220, 0.10) 0%,
-      rgba(255, 245, 220, 0.05) 40%,
-      transparent 65%);
-}
-
-/* ═══════════════════════════════════════════════
-   ALTO — Jitter animation on the game container
-   ═══════════════════════════════════════════════ */
-body.crt-alto #game-container {
-  animation: crt-jitter 0.5s steps(1) infinite;
-}
-
-/* Barrel/fisheye distortion applied by VideoManager as filter: url(#crt-barrel) via inline style */
-
-@keyframes crt-jitter {
-  0% {
-    transform: translate(0px, 0px);
-  }
-
-  80% {
-    transform: translate(0px, 0px);
-  }
-
-  85% {
-    transform: translate(-0.5px, 0px);
-  }
-
-  90% {
-    transform: translate(0px, 0.5px);
-  }
-
-  95% {
-    transform: translate(0.5px, 0px);
-  }
-
-  100% {
-    transform: translate(0px, 0px);
-  }
-}
-
-@keyframes crt-flicker {
-  0% {
-    opacity: 0.98;
-  }
-
-  50% {
-    opacity: 1;
-  }
-
-  100% {
-    opacity: 0.99;
-  }
+  background: repeating-linear-gradient(to bottom,
+      transparent 0px,
+      transparent 1px,
+      rgba(0, 0, 0, 0.22) 1px,
+      rgba(0, 0, 0, 0.22) 2px);
+  box-shadow:
+    inset 0 0 120px rgba(0, 0, 0, 0.60),
+    inset 0 0 40px rgba(0, 0, 0, 0.40);
 }

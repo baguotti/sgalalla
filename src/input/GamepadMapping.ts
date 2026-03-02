@@ -20,24 +20,24 @@ export const BUTTON_NAMES: Record<number, string> = {
     5: 'RB',
     6: 'LT',
     7: 'RT',
-    8: 'BACK',
+    8: 'INDIETRO',
     9: 'START',
     10: 'L3',
     11: 'R3',
-    12: 'D-UP',
-    13: 'D-DOWN',
-    14: 'D-LEFT',
-    15: 'D-RIGHT',
+    12: 'D-SU',
+    13: 'D-GIÙ',
+    14: 'D-SINISTRA',
+    15: 'D-DESTRA',
 };
 
 /** Label shown in the settings UI for each action. */
 export const ACTION_LABELS: Record<GameAction, string> = {
-    jump: 'JUMP',
-    lightAttack: 'LIGHT ATTACK',
-    heavyAttack: 'HEAVY ATTACK',
-    heavyAttack2: 'HEAVY ATK 2',
-    dodge: 'DODGE',
-    taunt: 'TAUNT',
+    jump: 'SALTO',
+    lightAttack: 'ATT. LEGGERO',
+    heavyAttack: 'ATT. PESANTE',
+    heavyAttack2: 'ATT. PESANTE 2',
+    dodge: 'SCHIVATA',
+    taunt: 'PROVOCA',
 };
 
 export interface GamepadMappingData {

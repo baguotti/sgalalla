@@ -288,7 +288,7 @@ export class Player extends Fighter {
             useKeyboard: useKeyboard,
             gamepadIndex: gamepadIdx,
             enableGamepad: enableGamepad,
-            keyboardMapping: keyboardMapping
+            keyboardMapping: keyboardMapping as 'all' | undefined
         }, touchController);
 
         // Store input config for debug overlay

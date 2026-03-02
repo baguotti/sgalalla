@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GamepadInput } from './GamepadInput';
+import { KeyboardMapping } from './KeyboardMapping';
 import type { GamepadState } from './GamepadInput';
 import type { TouchController } from '../components/TouchController';
 
@@ -41,9 +42,9 @@ export interface InputState {
 export interface PlayerInputConfig {
     playerId: number;
     useKeyboard: boolean;
-    gamepadIndex: number | null; // null = no gamepad, or auto-detect if P1? For specific P2, usually 1.
-    enableGamepad?: boolean; // Explicitly enable/disable gamepad support
-    keyboardMapping?: 'wasd' | 'arrows' | 'all'; // For split keyboard local multiplayer
+    gamepadIndex: number | null;
+    enableGamepad?: boolean;
+    keyboardMapping?: 'all'; // Kept for API compat, always 'all' now (no more split)
 }
 
 export class InputManager {
@@ -52,41 +53,11 @@ export class InputManager {
     private touchController?: TouchController;
     private config: PlayerInputConfig;
 
-    // Keyboard keys
-    private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-    private wasd!: {
-        up: Phaser.Input.Keyboard.Key;
-        left: Phaser.Input.Keyboard.Key;
-        down: Phaser.Input.Keyboard.Key;
-        right: Phaser.Input.Keyboard.Key;
-    };
-    private spaceKey!: Phaser.Input.Keyboard.Key;
-    private shiftKey!: Phaser.Input.Keyboard.Key;
-    private jKey!: Phaser.Input.Keyboard.Key;
-    private kKey!: Phaser.Input.Keyboard.Key;
-    private lKey!: Phaser.Input.Keyboard.Key;
-    private pKey!: Phaser.Input.Keyboard.Key;
-
-    // Arrow keys actions (P2)
-    private cKey!: Phaser.Input.Keyboard.Key; // Light attack
-    private vKey!: Phaser.Input.Keyboard.Key; // Heavy attack
-    private bKey!: Phaser.Input.Keyboard.Key; // Dodge
-    private gKey!: Phaser.Input.Keyboard.Key; // Jump
-    private mKey!: Phaser.Input.Keyboard.Key; // Taunt
+    // Raw key objects – set up dynamically from KeyboardMapping
+    private keyMap: Map<string, Phaser.Input.Keyboard.Key> = new Map();
 
     // Track key states for single-press detection
-    private jKeyWasPressed: boolean = false;
-    private kKeyWasPressed: boolean = false;
-    private lKeyWasPressed: boolean = false;
-    private spaceWasPressed: boolean = false;
-
-    private pKeyWasPressed: boolean = false;
-    private mKeyWasPressed: boolean = false;
-
-    private gKeyWasPressed: boolean = false;
-    private cKeyWasPressed: boolean = false;
-    private vKeyWasPressed: boolean = false;
-    private bKeyWasPressed: boolean = false;
+    private prevStates: Map<string, boolean> = new Map();
 
     constructor(scene: Phaser.Scene, config: PlayerInputConfig = { playerId: 0, useKeyboard: true, gamepadIndex: null, enableGamepad: true, keyboardMapping: 'all' }, touchController?: TouchController) {
         this.scene = scene;
@@ -103,41 +74,103 @@ export class InputManager {
         const keyboard = this.scene.input.keyboard;
         if (!keyboard) return;
 
-        this.cursors = keyboard.createCursorKeys();
-        this.wasd = {
-            up: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-            left: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-            down: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-            right: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-        };
-        this.spaceKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-        this.shiftKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
-        this.jKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
-        this.kKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
-        this.lKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L);
-        this.pKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P); // Taunt P1
+        // Also register arrow keys for movement (always available alongside WASD remappable keys)
+        const cursors = keyboard.createCursorKeys();
+        this.keyMap.set('ArrowUp', cursors.up);
+        this.keyMap.set('ArrowDown', cursors.down);
+        this.keyMap.set('ArrowLeft', cursors.left);
+        this.keyMap.set('ArrowRight', cursors.right);
 
-        // Arrow actions (P2)
-        this.cKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
-        this.vKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V);
-        this.bKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.B);
-        this.gKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G); // Jump P2
-        this.mKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M); // Taunt P2
+        // Register all keys from the mapping
+        this.rebuildKeyMap();
+    }
+
+    /** Rebuild Phaser key objects from current KeyboardMapping. Call after remap. */
+    public rebuildKeyMap(): void {
+        const keyboard = this.scene.input.keyboard;
+        if (!keyboard) return;
+
+        const mapping = KeyboardMapping.getInstance().getMapping();
+
+        // Register each mapped key
+        for (const [_action, code] of Object.entries(mapping)) {
+            if (!this.keyMap.has(code)) {
+                const phaserCode = this.codeToPhaserKey(code);
+                if (phaserCode !== undefined) {
+                    this.keyMap.set(code, keyboard.addKey(phaserCode, false));
+                }
+            }
+        }
+    }
+
+    /** Convert a KeyboardEvent.code string to a Phaser KeyCodes number. */
+    private codeToPhaserKey(code: string): number | undefined {
+        // Letters: KeyA → A
+        if (code.startsWith('Key')) {
+            const letter = code.slice(3).toUpperCase();
+            return (Phaser.Input.Keyboard.KeyCodes as any)[letter];
+        }
+        // Digits: Digit1 → ONE, etc.
+        if (code.startsWith('Digit')) {
+            const digitNames = ['ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'];
+            const d = parseInt(code.slice(5));
+            return (Phaser.Input.Keyboard.KeyCodes as any)[digitNames[d]];
+        }
+        // Common keys
+        const MAP: Record<string, string> = {
+            Space: 'SPACE',
+            ShiftLeft: 'SHIFT',
+            ShiftRight: 'SHIFT',
+            ControlLeft: 'CTRL',
+            ControlRight: 'CTRL',
+            AltLeft: 'ALT',
+            AltRight: 'ALT',
+            Enter: 'ENTER',
+            Backspace: 'BACKSPACE',
+            Tab: 'TAB',
+            CapsLock: 'CAPS_LOCK',
+            ArrowUp: 'UP',
+            ArrowDown: 'DOWN',
+            ArrowLeft: 'LEFT',
+            ArrowRight: 'RIGHT',
+            Comma: 'COMMA',
+            Period: 'PERIOD',
+            Slash: 'FORWARD_SLASH',
+            Semicolon: 'SEMICOLON',
+            Quote: 'QUOTES',
+            BracketLeft: 'OPEN_BRACKET',
+            BracketRight: 'CLOSED_BRACKET',
+            Backslash: 'BACK_SLASH',
+            Minus: 'MINUS',
+            Equal: 'PLUS',
+        };
+        const name = MAP[code];
+        if (name) return (Phaser.Input.Keyboard.KeyCodes as any)[name];
+        return undefined;
+    }
+
+    private isKeyDown(code: string): boolean {
+        const key = this.keyMap.get(code);
+        return key ? key.isDown : false;
+    }
+
+    private isJustPressed(code: string): boolean {
+        const down = this.isKeyDown(code);
+        const was = this.prevStates.get(code) || false;
+        return down && !was;
     }
 
     /**
      * Poll all inputs and return unified state
      * Call this once per frame
-     * 
+     *
      * STRICT ROUTING:
      * - If useKeyboard=true && enableGamepad=false: keyboard-only
      * - If useKeyboard=false && enableGamepad=true: gamepad-only
      * - If both enabled: merge (online mode - first connected device wins)
      */
     poll(): InputState {
-        // FOCUS CHECK: Only process inputs if the window has focus
-        // This prevents inactive tabs from controlling the character in local testing (multiple tabs)
-        // Note: Touch devices might not reliably report document.hasFocus(), but we'll leave it for desktop
+        // FOCUS CHECK
         if (typeof document !== 'undefined' && !document.hasFocus() && !this.scene.sys.game.device.input.touch) {
             return this.getEmptyInput();
         }
@@ -147,8 +180,6 @@ export class InputManager {
 
         let baseState = this.getEmptyInput();
 
-        // MERGED MODE (both enabled - online mode or active checking)
-        // Poll all available inputs
         const gamepadState = gamepadEnabled ? this.gamepadInput.poll() : null;
         const keyboardState = keyboardEnabled ? this.pollKeyboard() : this.getEmptyInput();
         const touchState = this.touchController ? this.touchController.getState() : null;
@@ -161,17 +192,11 @@ export class InputManager {
             baseState = keyboardState;
         }
 
-        // Merge touch state if active. Touch state overrides other inputs if it exists and has active input.
+        // Merge touch state if active
         if (touchState) {
-            // Because TouchController returns Partial<InputState>, we need to merge it carefully
-            // only for properties that are true or non-zero.
-            // A simple OR merge works for booleans and taking the touch value for axes if non-zero.
-
-            // Axes
             if (touchState.moveX !== 0) baseState.moveX = touchState.moveX as number;
             if (touchState.moveY !== 0) baseState.moveY = touchState.moveY as number;
 
-            // Booleans
             baseState.moveLeft = baseState.moveLeft || (touchState.moveLeft as boolean);
             baseState.moveRight = baseState.moveRight || (touchState.moveRight as boolean);
             baseState.moveUp = baseState.moveUp || (touchState.moveUp as boolean);
@@ -196,9 +221,6 @@ export class InputManager {
             baseState.aimDown = baseState.aimDown || (touchState.aimDown as boolean);
             baseState.aimLeft = baseState.aimLeft || (touchState.aimLeft as boolean);
             baseState.aimRight = baseState.aimRight || (touchState.aimRight as boolean);
-
-            // Assuming if we use touch, it's not a gamepad purely (or maybe we say it is to show controller prompts?)
-            // We'll leave usingGamepad as whatever it was, or false.
         }
 
         return baseState;
@@ -238,7 +260,7 @@ export class InputManager {
             state.jumpHeld ||
             state.lightAttack ||
             state.heavyAttack ||
-            state.heavyAttackHeld || // Important: Check held state to prevent fallback to keyboard while charging
+            state.heavyAttackHeld ||
             state.dodge ||
             state.dodgeHeld ||
             state.taunt
@@ -246,53 +268,44 @@ export class InputManager {
     }
 
     private pollKeyboard(): InputState {
-        // Safety check if setupKeyboard wasn't called or failed
-        if (!this.cursors) return this.getEmptyInput();
+        if (!this.keyMap.size) return this.getEmptyInput();
 
-        const mapping = this.config.keyboardMapping || 'all';
-        const useAll = mapping === 'all';
-        const useWasd = mapping === 'wasd' || useAll;
-        const useArrows = mapping === 'arrows' || useAll;
+        const km = KeyboardMapping.getInstance();
 
-        const left = (useArrows && this.cursors.left.isDown) || (useWasd && this.wasd.left.isDown);
-        const right = (useArrows && this.cursors.right.isDown) || (useWasd && this.wasd.right.isDown);
-        const up = (useArrows && this.cursors.up.isDown) || (useWasd && this.wasd.up.isDown);
-        const down = (useArrows && this.cursors.down.isDown) || (useWasd && this.wasd.down.isDown);
+        // Movement: mapped keys + always allow arrow keys
+        const left = this.isKeyDown(km.getKeyForAction('moveLeft')) || this.isKeyDown('ArrowLeft');
+        const right = this.isKeyDown(km.getKeyForAction('moveRight')) || this.isKeyDown('ArrowRight');
+        const up = this.isKeyDown(km.getKeyForAction('moveUp')) || this.isKeyDown('ArrowUp');
+        const down = this.isKeyDown(km.getKeyForAction('moveDown')) || this.isKeyDown('ArrowDown');
 
-        // WASD map (J/K/L/Space/P)
-        const spaceDown = useWasd && this.spaceKey.isDown;
-        const jDown = useWasd && this.jKey.isDown;
-        const kDown = useWasd && this.kKey.isDown;
-        const lDown = useWasd && this.lKey.isDown;
-        const pDown = useWasd && this.pKey.isDown;
-        const shiftDown = useWasd && this.shiftKey.isDown;
+        // Action keys
+        const jumpCode = km.getKeyForAction('jump');
+        const lightCode = km.getKeyForAction('lightAttack');
+        const heavyCode = km.getKeyForAction('heavyAttack');
+        const dodgeCode = km.getKeyForAction('dodge');
+        const tauntCode = km.getKeyForAction('taunt');
+        const recoveryCode = km.getKeyForAction('recovery');
 
-        // Arrows map (C / V / B / G / M)
-        const gDown = useArrows && this.gKey.isDown;
-        const cDown = useArrows && this.cKey.isDown;
-        const vDown = useArrows && this.vKey.isDown;
-        const bDown = useArrows && this.bKey.isDown;
-        const mDown = useArrows && this.mKey.isDown;
+        const jumpDown = this.isKeyDown(jumpCode);
+        const lightDown = this.isKeyDown(lightCode);
+        const heavyDown = this.isKeyDown(heavyCode);
+        const dodgeDown = this.isKeyDown(dodgeCode);
+        const tauntDown = this.isKeyDown(tauntCode);
+        const recoveryDown = this.isKeyDown(recoveryCode);
 
-        // Single press detection - support both control schemes
-        const jumpPressed = (spaceDown && !this.spaceWasPressed) || (gDown && !this.gKeyWasPressed);
-        const lightPressed = (jDown && !this.jKeyWasPressed) || (cDown && !this.cKeyWasPressed);
-        const heavyPressed = (kDown && !this.kKeyWasPressed) || (vDown && !this.vKeyWasPressed);
-        const dodgePressed = (lDown && !this.lKeyWasPressed) || (bDown && !this.bKeyWasPressed);
-        const tauntPressed = (pDown && !this.pKeyWasPressed) || (mDown && !this.mKeyWasPressed);
+        // Single press detection
+        const jumpPressed = this.isJustPressed(jumpCode);
+        const lightPressed = this.isJustPressed(lightCode);
+        const heavyPressed = this.isJustPressed(heavyCode);
+        const dodgePressed = this.isJustPressed(dodgeCode);
+        const tauntPressed = this.isJustPressed(tauntCode);
 
-        // Update previous states
-        this.spaceWasPressed = spaceDown;
-        this.jKeyWasPressed = jDown;
-        this.kKeyWasPressed = kDown;
-        this.lKeyWasPressed = lDown;
-        this.pKeyWasPressed = pDown;
-
-        this.gKeyWasPressed = gDown;
-        this.cKeyWasPressed = cDown;
-        this.vKeyWasPressed = vDown;
-        this.bKeyWasPressed = bDown;
-        this.mKeyWasPressed = mDown;
+        // Update previous states for all action keys
+        this.prevStates.set(jumpCode, jumpDown);
+        this.prevStates.set(lightCode, lightDown);
+        this.prevStates.set(heavyCode, heavyDown);
+        this.prevStates.set(dodgeCode, dodgeDown);
+        this.prevStates.set(tauntCode, tauntDown);
 
         return {
             moveLeft: left,
@@ -302,14 +315,14 @@ export class InputManager {
             moveX: left ? -1 : right ? 1 : 0,
             moveY: up ? -1 : down ? 1 : 0,
             jump: jumpPressed,
-            jumpHeld: spaceDown || gDown,
+            jumpHeld: jumpDown,
             lightAttack: lightPressed,
-            lightAttackHeld: jDown || cDown, // Track light attack held
+            lightAttackHeld: lightDown,
             heavyAttack: heavyPressed,
-            heavyAttackHeld: kDown || vDown, // Track held state for charging
+            heavyAttackHeld: heavyDown,
             dodge: dodgePressed,
-            dodgeHeld: lDown || bDown, // Track dodge held for running
-            recovery: shiftDown, // Focus on shift for recovery on P1
+            dodgeHeld: dodgeDown,
+            recovery: recoveryDown,
             taunt: tauntPressed,
             aimUp: up,
             aimDown: down,
@@ -330,13 +343,13 @@ export class InputManager {
             jump: state.jump,
             jumpHeld: state.jumpHeld,
             lightAttack: state.lightAttack,
-            lightAttackHeld: state.lightAttackHeld, // Sync light attack held
+            lightAttackHeld: state.lightAttackHeld,
             heavyAttack: state.heavyAttack,
-            heavyAttackHeld: state.heavyAttackHeld, // Track B held for charging
+            heavyAttackHeld: state.heavyAttackHeld,
             dodge: state.dodge,
-            dodgeHeld: state.dodgeHeld, // Track LT/RT held for running
+            dodgeHeld: state.dodgeHeld,
             taunt: state.taunt,
-            recovery: state.heavyAttack && state.aimUp, // Map Up+Heavy to recovery signal. Logic handled by Player.
+            recovery: state.heavyAttack && state.aimUp,
             aimUp: state.aimUp,
             aimDown: state.aimDown,
             aimLeft: state.aimLeft,
