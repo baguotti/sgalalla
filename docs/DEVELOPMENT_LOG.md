@@ -536,4 +536,13 @@ Part 2
     - **Pause Menu**: Updated the commands page with dynamic labels and removed P2 keyboard references.
 - **[Fix]** **Build Integrity**:
     - **Type Safety**: Fixed a `keyboardMapping` type mismatch in `Player.ts`.
-- **[S]** **STATUS**: Keyboard input is now as flexible as gamepad input. Split-keyboard mode removed in favor of clean routing.
+- **[S]** **STATUS**: Keyboard input fully rebindable and localized. Ready for production.
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-03-02] v1.2.3 - Keyboard Remap Fixes 🛠️
+- **[V]** `v1.2.3`
+- **[Fix]** **Keyboard Remap Stale State**: Properly reset `kbTexts`, `kbValueTexts`, and `kbOptions` in `create()` to prevent ghost menu items on scene restart.
+- **[Feat]** **UX Improvements**:
+    - **ESC to Cancel**: Added the ability to cancel rebinding by pressing Escape.
+    - **Enter/Space Support**: Allowed binding actions to Enter and Space by ignoring `event.repeat`.
+    - **Selection Reset**: Ensured selection indices are reset to 0 when entering sub-menus.
+- **[S]** **STATUS**: Keyboard remapping is now stable and fully functional. Release confirmed.

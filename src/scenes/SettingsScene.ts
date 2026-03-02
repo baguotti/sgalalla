@@ -93,11 +93,20 @@ export class SettingsScene extends Phaser.Scene {
         this.videoValueTexts = [];
         this.controllerTexts = [];
         this.controllerValueTexts = [];
+        this.controllerOptions = [];
+        this.controllerSelectedIndex = 0;
+        this.kbTexts = [];
+        this.kbValueTexts = [];
+        this.kbOptions = [];
+        this.kbSelectedIndex = 0;
         this.screenMode = 'MAIN';
+        this.selectedIndex = 0;
         this.isListening = false;
         this.listeningAction = null;
         this.isKbListening = false;
         this.kbListeningAction = null;
+        this.kbListeningText = null;
+        this.listeningText = null;
 
         // Background
         const bgAlpha = this.returnScene !== 'MainMenuScene' ? 0.9 : 1.0;
