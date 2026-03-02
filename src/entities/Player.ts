@@ -4,6 +4,7 @@ import { PhysicsConfig } from '../config/PhysicsConfig';
 import { InputManager } from '../input/InputManager';
 import type { InputState } from '../input/InputManager';
 import { InputBuffer } from '../input/InputBuffer';
+import { TouchController } from '../components/TouchController';
 import { Fighter } from './Fighter';
 import { PlayerPhysics } from './player/PlayerPhysics';
 import { PlayerCombat } from './player/PlayerCombat';
@@ -198,7 +199,7 @@ export class Player extends Fighter {
         }
     }
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, keyboardMapping?: 'wasd' | 'arrows' | 'all', character?: string } = {}) {
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, keyboardMapping?: 'wasd' | 'arrows' | 'all', character?: string } = {}, touchController?: TouchController) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
@@ -288,7 +289,7 @@ export class Player extends Fighter {
             gamepadIndex: gamepadIdx,
             enableGamepad: enableGamepad,
             keyboardMapping: keyboardMapping
-        });
+        }, touchController);
 
         // Store input config for debug overlay
         if (this.isAI) {

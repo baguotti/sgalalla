@@ -4,6 +4,7 @@ import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { getConfirmButtonIndex } from '../input/JoyConMapper';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { InputDebugOverlay } from '../components/InputDebugOverlay';
+import { TouchController } from '../components/TouchController';
 import { PauseMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
 import { Chest } from '../entities/Chest';
@@ -19,6 +20,7 @@ import type { GameSceneInterface } from './GameSceneInterface';
 
 export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private debugOverlay!: DebugOverlay;
+    private touchController!: TouchController;
     private platforms: Phaser.GameObjects.Rectangle[] = [];
     private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
     private sidePlatforms: Phaser.GameObjects.Rectangle[] = []; // Track side platforms
@@ -196,6 +198,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // Setup cameras (Must be before createStage so UI camera exists for ignore logic)
             this.setupCameras();
 
+            // Touch Controller Overlay
+            this.touchController = new TouchController(this);
+            if (this.uiCamera) {
+                this.touchController.setCameraIgnore(this.cameras.main, this.uiCamera);
+            }
+
             // Create stage platforms
             this.createStage();
 
@@ -305,7 +313,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     useKeyboard: pData.input.type === 'KEYBOARD',
                     keyboardMapping: pData.input.keyboardMapping,
                     character: pData.character
-                });
+                }, pData.playerId === 0 ? this.touchController : undefined); // P1 gets touch control if active
 
                 // Set Color (all players use their assigned color)
                 const color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
@@ -432,7 +440,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.time.addEvent({
                 delay: 30000,
                 callback: () => {
-                    if (Phaser.Math.FloatBetween(0, 1) < 0.35) {
+                    if (Phaser.Math.FloatBetween(0, 1) < 0.01) {
                         this.spawnChest();
                     }
                 },

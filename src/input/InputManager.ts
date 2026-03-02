@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GamepadInput } from './GamepadInput';
 import type { GamepadState } from './GamepadInput';
+import type { TouchController } from '../components/TouchController';
 
 /**
  * Unified Input State
@@ -48,6 +49,7 @@ export interface PlayerInputConfig {
 export class InputManager {
     private scene: Phaser.Scene;
     private gamepadInput: GamepadInput;
+    private touchController?: TouchController;
     private config: PlayerInputConfig;
 
     // Keyboard keys
@@ -86,10 +88,11 @@ export class InputManager {
     private vKeyWasPressed: boolean = false;
     private bKeyWasPressed: boolean = false;
 
-    constructor(scene: Phaser.Scene, config: PlayerInputConfig = { playerId: 0, useKeyboard: true, gamepadIndex: null, enableGamepad: true, keyboardMapping: 'all' }) {
+    constructor(scene: Phaser.Scene, config: PlayerInputConfig = { playerId: 0, useKeyboard: true, gamepadIndex: null, enableGamepad: true, keyboardMapping: 'all' }, touchController?: TouchController) {
         this.scene = scene;
         this.config = { ...config, enableGamepad: config.enableGamepad !== undefined ? config.enableGamepad : true };
         this.gamepadInput = new GamepadInput(config.gamepadIndex);
+        this.touchController = touchController;
 
         if (this.config.useKeyboard) {
             this.setupKeyboard();
@@ -134,39 +137,71 @@ export class InputManager {
     poll(): InputState {
         // FOCUS CHECK: Only process inputs if the window has focus
         // This prevents inactive tabs from controlling the character in local testing (multiple tabs)
-        if (typeof document !== 'undefined' && !document.hasFocus()) {
+        // Note: Touch devices might not reliably report document.hasFocus(), but we'll leave it for desktop
+        if (typeof document !== 'undefined' && !document.hasFocus() && !this.scene.sys.game.device.input.touch) {
             return this.getEmptyInput();
         }
 
         const keyboardEnabled = this.config.useKeyboard;
         const gamepadEnabled = this.config.enableGamepad;
 
-        // STRICT ROUTING: Keyboard-only mode
-        if (keyboardEnabled && !gamepadEnabled) {
-            return this.pollKeyboard();
-        }
+        let baseState = this.getEmptyInput();
 
-        // STRICT ROUTING: Gamepad-only mode
-        if (!keyboardEnabled && gamepadEnabled) {
-            const gamepadState = this.gamepadInput.poll();
-            if (gamepadState.connected) {
-                return this.gamepadToInputState(gamepadState);
-            }
-            return this.getEmptyInput();
-        }
+        // MERGED MODE (both enabled - online mode or active checking)
+        // Poll all available inputs
+        const gamepadState = gamepadEnabled ? this.gamepadInput.poll() : null;
+        const keyboardState = keyboardEnabled ? this.pollKeyboard() : this.getEmptyInput();
+        const touchState = this.touchController ? this.touchController.getState() : null;
 
-        // MERGED MODE (both enabled - online mode)
-        // Poll both and prefer gamepad if it has input
-        const gamepadState = this.gamepadInput.poll();
-        const keyboardState = this.pollKeyboard();
-
-        const usingGamepad = gamepadState.connected && this.hasGamepadInput(gamepadState);
+        const usingGamepad = gamepadState && gamepadState.connected && this.hasGamepadInput(gamepadState);
 
         if (usingGamepad) {
-            return this.gamepadToInputState(gamepadState);
+            baseState = this.gamepadToInputState(gamepadState);
         } else {
-            return keyboardState;
+            baseState = keyboardState;
         }
+
+        // Merge touch state if active. Touch state overrides other inputs if it exists and has active input.
+        if (touchState) {
+            // Because TouchController returns Partial<InputState>, we need to merge it carefully
+            // only for properties that are true or non-zero.
+            // A simple OR merge works for booleans and taking the touch value for axes if non-zero.
+
+            // Axes
+            if (touchState.moveX !== 0) baseState.moveX = touchState.moveX as number;
+            if (touchState.moveY !== 0) baseState.moveY = touchState.moveY as number;
+
+            // Booleans
+            baseState.moveLeft = baseState.moveLeft || (touchState.moveLeft as boolean);
+            baseState.moveRight = baseState.moveRight || (touchState.moveRight as boolean);
+            baseState.moveUp = baseState.moveUp || (touchState.moveUp as boolean);
+            baseState.moveDown = baseState.moveDown || (touchState.moveDown as boolean);
+
+            baseState.jump = baseState.jump || (touchState.jump as boolean);
+            baseState.jumpHeld = baseState.jumpHeld || (touchState.jumpHeld as boolean);
+
+            baseState.lightAttack = baseState.lightAttack || (touchState.lightAttack as boolean);
+            baseState.lightAttackHeld = baseState.lightAttackHeld || (touchState.lightAttackHeld as boolean);
+
+            baseState.heavyAttack = baseState.heavyAttack || (touchState.heavyAttack as boolean);
+            baseState.heavyAttackHeld = baseState.heavyAttackHeld || (touchState.heavyAttackHeld as boolean);
+
+            baseState.dodge = baseState.dodge || (touchState.dodge as boolean);
+            baseState.dodgeHeld = baseState.dodgeHeld || (touchState.dodgeHeld as boolean);
+
+            baseState.recovery = baseState.recovery || (touchState.recovery as boolean);
+            baseState.taunt = baseState.taunt || (touchState.taunt as boolean);
+
+            baseState.aimUp = baseState.aimUp || (touchState.aimUp as boolean);
+            baseState.aimDown = baseState.aimDown || (touchState.aimDown as boolean);
+            baseState.aimLeft = baseState.aimLeft || (touchState.aimLeft as boolean);
+            baseState.aimRight = baseState.aimRight || (touchState.aimRight as boolean);
+
+            // Assuming if we use touch, it's not a gamepad purely (or maybe we say it is to show controller prompts?)
+            // We'll leave usingGamepad as whatever it was, or false.
+        }
+
+        return baseState;
     }
 
     public getEmptyInput(): InputState {

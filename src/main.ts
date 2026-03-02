@@ -37,5 +37,9 @@ const config: Phaser.Types.Core.GameConfig = {
     gamepad: true
   }
 };
+import { VideoManager } from './managers/VideoManager';
 
 new Phaser.Game(config);
+
+// Initialize CRT overlay from saved preferences
+VideoManager.getInstance().applySettings();

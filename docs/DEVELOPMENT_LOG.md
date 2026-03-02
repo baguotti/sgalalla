@@ -504,3 +504,21 @@ Part 2
     - **Aggregated Gamepad Input**: Refactored `PauseMenu.ts` to read from **all connected gamepads** simultaneously. Any player can now navigate and control the pause menu from any controller.
     - **UI**: Adjusted Menu Background Video scale (1.505) for pixel-perfect framing.
 - **[S]** **STATUS**: Combat mechanics and UI input robustness significantly enhanced. Ready for next phase.
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-03-02] v1.2.1 - CRT Filter & Input Remapping Polish 📺🎮
+- **[V]** `v1.2.1`
+- **[Feat]** **CRT Advanced Visuals**:
+    - **Intensity Levels**: Implemented 3 togglable intensity levels: **BASSO**, **MEDIO**, **ALTO**.
+    - **Highlight Glow**: Rearchitected the glow to use `mix-blend-mode: screen`, ensuring the warm phosphor glow only affects bright pixels/highlights.
+    - **ALTO Effects**: Added cinematic "Retro" extras: Heavy double-vignette, programmatic barrel/fisheye distortion (via SVG filter), and subtle 0.5px screen jitter.
+- **[Feat]** **Settings UI Restructure**:
+    - **Submenus**: Moved SFX and MUSIC controls into a dedicated **SONORO** submenu for better organization.
+    - **Video**: Created a **VIDEO** submenu for the CRT effect toggle and intensity selection.
+- **[Feat]** **Input Remapping**:
+    - **Gamepad Polish**: Enabled remapping to the 'B' button (previously reserved for back).
+    - **Safety**: Implemented a mandatory "Press START to Remap" flow to prevent accidental key overrides.
+    - **UI**: Added "PREMI START PER REMAPPARE" instructional text.
+- **[Tuning]** **Combat & Balance**:
+    - **Neutral Light**: Refactored from a 3-hit combo to a single, snappier hit. Increased spamability for a faster combat feel.
+    - **Chests**: Drastically reduced spawn rate (10 -> 1) to make item discovery more rewarding and tactical.
+- **[S]** **STATUS**: Visual fidelity reached "Premium" standards; UI and Input flows refined for production.

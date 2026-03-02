@@ -12,6 +12,7 @@
  */
 
 import { isSingleJoyCon, getMovementAxes, getNormalizedButtons } from './JoyConMapper';
+import { GamepadMapping } from './GamepadMapping';
 
 export interface GamepadState {
     // Movement (-1 to 1)
@@ -256,12 +257,20 @@ export class GamepadInput {
 
         const isGenericUSB = !isOfficialCtrl;
 
+        // ─── User-configurable mapping (buttons + invertY) ───
+        const mapping = GamepadMapping.getInstance().getMapping();
+
         // Left Stick (axes 0 and 1)
         const leftStickX = this.applyDeadzone(gamepad.axes[0] || 0);
         let leftStickY = this.applyDeadzone(gamepad.axes[1] || 0);
 
         if (isGenericUSB) {
             leftStickY = -leftStickY; // Invert Y axis for generic USB dongles
+        }
+
+        // User-configurable Y-axis inversion (manual override)
+        if (mapping.invertY) {
+            leftStickY = -leftStickY;
         }
 
         // D-pad (buttons 12-15)
@@ -277,6 +286,13 @@ export class GamepadInput {
             dpadDown = temp;
         }
 
+        // User-configurable D-pad Y inversion
+        if (mapping.invertY) {
+            const temp = dpadUp;
+            dpadUp = dpadDown;
+            dpadDown = temp;
+        }
+
         // Combine stick and D-pad for movement
         state.moveX = leftStickX || (dpadLeft ? -1 : dpadRight ? 1 : 0);
         state.moveY = leftStickY || (dpadUp ? -1 : dpadDown ? 1 : 0);
@@ -287,57 +303,67 @@ export class GamepadInput {
         state.aimLeft = state.moveX < -0.5;
         state.aimRight = state.moveX > 0.5;
 
-        // Buttons - detect press (not held) for actions
-        let aPressed = gamepad.buttons[XBOX_BUTTONS.A]?.pressed || false;
-        let xPressed = gamepad.buttons[XBOX_BUTTONS.X]?.pressed || false;
-        let bPressed = gamepad.buttons[XBOX_BUTTONS.B]?.pressed || false;
-        let yPressed = gamepad.buttons[XBOX_BUTTONS.Y]?.pressed || false;
+        // Read raw pressed states at mapped indices
+        // Nintendo Switch A/B X/Y physical swap: we apply it to the RAW indices
+        // so the user's mapping (which references logical Xbox layout) works correctly.
+        const readButton = (idx: number): boolean => {
+            if (isSwitchCtrl) {
+                // Swap 0<->1 (A<->B) and 2<->3 (X<->Y) only for face buttons
+                if (idx === 0) idx = 1;
+                else if (idx === 1) idx = 0;
+                else if (idx === 2) idx = 3;
+                else if (idx === 3) idx = 2;
+            }
+            return gamepad.buttons[idx]?.pressed || false;
+        };
 
-        // Remap for Nintendo Switch (Swap A/B and X/Y)
-        if (isSwitchCtrl) {
-            const tempA = aPressed;
-            aPressed = bPressed;
-            bPressed = tempA;
+        const jumpBtn = readButton(mapping.jump);
+        const lightBtn = readButton(mapping.lightAttack);
+        const heavyBtn1 = readButton(mapping.heavyAttack);
+        const heavyBtn2 = readButton(mapping.heavyAttack2);
 
-            const tempX = xPressed;
-            xPressed = yPressed;
-            yPressed = tempX;
+        // Dodge: user picks a trigger (LT=6/RT=7) or any button.
+        // If they picked a trigger, we mirror both LT and RT automatically.
+        const dodgeIdx = mapping.dodge;
+        let dodgePressed: boolean;
+        if (dodgeIdx === XBOX_BUTTONS.LT || dodgeIdx === XBOX_BUTTONS.RT) {
+            // Mirror both triggers
+            const ltValue = gamepad.buttons[XBOX_BUTTONS.LT]?.value || 0;
+            const rtValue = gamepad.buttons[XBOX_BUTTONS.RT]?.value || 0;
+            dodgePressed = ltValue > TRIGGER_THRESHOLD || rtValue > TRIGGER_THRESHOLD;
+        } else {
+            dodgePressed = readButton(dodgeIdx);
         }
 
-        // Triggers (value 0-1)
-        const ltValue = gamepad.buttons[XBOX_BUTTONS.LT]?.value || 0;
-        const rtValue = gamepad.buttons[XBOX_BUTTONS.RT]?.value || 0;
-        const triggerPressed = ltValue > TRIGGER_THRESHOLD || rtValue > TRIGGER_THRESHOLD;
+        const tauntBtn = readButton(mapping.taunt);
 
-        // Jump - detect new press AND held state
-        state.jump = aPressed && !this.previousState.jumpHeld;
-        state.jumpHeld = aPressed;
+        // Jump
+        state.jump = jumpBtn && !this.previousState.jumpHeld;
+        state.jumpHeld = jumpBtn;
 
-        // Light Attack (X) - detect new press AND held state
-        state.lightAttack = xPressed && !this.wasButtonPressed(XBOX_BUTTONS.X);
-        state.lightAttackHeld = xPressed;
+        // Light Attack
+        state.lightAttack = lightBtn && !this.previousState.lightAttackHeld;
+        state.lightAttackHeld = lightBtn;
 
-        // Heavy Attack (B or Y) - detect new press only
-        const heavyNewPress = (bPressed && !this.wasButtonPressed(XBOX_BUTTONS.B)) ||
-            (yPressed && !this.wasButtonPressed(XBOX_BUTTONS.Y));
-        state.heavyAttack = heavyNewPress;
-        state.heavyAttackHeld = bPressed || yPressed;
+        // Heavy Attack (two buttons)
+        const heavyHeld = heavyBtn1 || heavyBtn2;
+        state.heavyAttack = heavyHeld && !this.previousState.heavyAttackHeld;
+        state.heavyAttackHeld = heavyHeld;
 
-        // Dodge (LT or RT) - detect new press only
-        state.dodge = triggerPressed && !this.wasTriggerPressed();
-        state.dodgeHeld = triggerPressed;
+        // Dodge
+        state.dodge = dodgePressed && !this.previousState.dodgeHeld;
+        state.dodgeHeld = dodgePressed;
 
-        // Throw (Right Bumper/RB) - detect new press only
+        // Throw (Right Bumper/RB) — always RB, not rebindable
         const rbPressed = gamepad.buttons[XBOX_BUTTONS.RB]?.pressed || false;
         state.throw = rbPressed && !this.wasButtonPressed(XBOX_BUTTONS.RB);
 
-        // Pause (START button) - detect new press only
+        // Pause (START button) — always START, not rebindable
         const startPressed = gamepad.buttons[XBOX_BUTTONS.START]?.pressed || false;
         state.pause = startPressed && !this.wasButtonPressed(XBOX_BUTTONS.START);
 
-        // Taunt (Right Stick Click / R3) - detect new press only
-        const r3Pressed = gamepad.buttons[XBOX_BUTTONS.R3]?.pressed || false;
-        state.taunt = r3Pressed && !this.wasButtonPressed(XBOX_BUTTONS.R3);
+        // Taunt
+        state.taunt = tauntBtn && !this.previousState.taunt;
 
         this.previousState = { ...state };
         this.cacheButtonStates(gamepad);
@@ -357,21 +383,12 @@ export class GamepadInput {
 
     // Cache for detecting button releases
     private buttonCache: boolean[] = [];
-    private triggerCache: boolean = false;
-
     private cacheButtonStates(gamepad: Gamepad): void {
         this.buttonCache = gamepad.buttons.map(b => b.pressed);
-        const ltValue = gamepad.buttons[XBOX_BUTTONS.LT]?.value || 0;
-        const rtValue = gamepad.buttons[XBOX_BUTTONS.RT]?.value || 0;
-        this.triggerCache = ltValue > TRIGGER_THRESHOLD || rtValue > TRIGGER_THRESHOLD;
     }
 
     private wasButtonPressed(buttonIndex: number): boolean {
         return this.buttonCache[buttonIndex] || false;
-    }
-
-    private wasTriggerPressed(): boolean {
-        return this.triggerCache;
     }
 
     isConnected(): boolean {

@@ -1,55 +1,65 @@
-# Sgalalla - LLM Context & Protocol
+# Sgalalla - LLM Context & Protocol (v1.2.0)
 
 > [!IMPORTANT]
-> **MANDATORY**: Read this file first in every new session.
+> **MANDATORY**: Read this file first in every new session. It defines the core architecture and development protocols for the Sgalalla platform fighter.
 
 ## Project Vision
-Brawlhalla-style platform fighter. High snappiness, deterministic physics, 4-player online (Geckos.io).
+A snappy, high-fidelity platform fighter (Brawlhalla-style). Features deterministic physics, local and online multiplayer (Geckos.io), and a 6-character roster.
 
 ## Sources of Truth
-1. [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md): High-density technical trace.
-2. [LLM_CONTEXT.md](LLM_CONTEXT.md): (This file) Protocol and persistent state.
+1. [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md): Full technical history and feature trace.
+2. [shared/PhysicsSimulation.ts](../shared/PhysicsSimulation.ts): The "Source of Truth" for all movement and collision logic.
 
-## Update Protocol (MANDATORY per Commit)
-For every commit or major task completion, update `DEVELOPMENT_LOG.md` using the following token-saving prefixes:
+## Technical Architecture
 
-- `[V]` **Version**: e.g., `[V] v0.5.1`
-- `[R]` **Rationale**: Why the change was made (e.g., `[R] Silent crash on Node 22.4`).
-- `[M]` **Modify**: Files changed.
-- `[A]` **Add**: New files/features.
-- `[D]` **Delete**: Removed files/features.
-- `[T]` **Technical**: Low-level details (e.g., `[T] Switched to port 5175`).
-- `[S]` **Status**: Current state of the app (e.g., `[S] Playable, manual start req`).
+### 1. Character Logic (FSM)
+Character behavior is driven by a **Finite State Machine (FSM)**.
+- **Core**: `Player.ts` delegates logic to `fsm: StateMachine`.
+- **States**: 15+ discrete classes in `src/state/states/` (e.g., `Idle`, `Run`, `Attack`, `HitStun`, `GroundPound`).
+- **Logic**: Each state handles its own `enter`, `update`, and `exit` hooks, managing animations and transitions.
 
-## Development Environment
+### 2. Physics Simulation
+- **Shared Logic**: All physics math resides in `shared/PhysicsSimulation.ts`. This module is platform-agnostic and used by both Client and Server.
+- **Thin Wrapper**: `PlayerPhysics.ts` acts as a thin wrapper that:
+    1. Syncs current state to a `SimBody` interface.
+    2. Calls `stepPhysics(body, input, dt)`.
+    3. Syncs the resulting body back to Phaser properties.
+    4. Processes `PhysicsEvent` results (SFX, landings, FSM triggers).
+
+### 3. Multiplayer & Networking
+- **Authority**: Client-authoritative for player movement to ensure "perfect" local feel.
+- **Protocol**: Uses Geckos.io (UDP/WebRTC).
+- **Redundancy**: Every input packet contains a ring buffer of the last 10 frames of input to mitigate UDP packet loss.
+- **Sync**: Remote players are interpolated from snapshots with a tunable `RENDER_DELAY_MS` (currently 60ms).
+
+### 4. Assets & UI
+- **Atlases**: Characters (fok, sgu, sga, pe, nock, greg) use texture atlases.
+- **UI Tracking**: `GameScene` uses a dedicated `uiCamera`. Always call `uiCamera.ignore(newGameObject)` for game-world entities.
+- **Controls**: Hold-to-show behavior for [F1] / Gamepad [LB].
+
+---
+
+## Update Protocol (MANDATORY)
+
+### Logging Prefix System
+When updating `DEVELOPMENT_LOG.md`, use these tags:
+- `[V]` **Version** (e.g., `v1.2.0`)
+- `[Feat]` **Feature**: New functionality.
+- `[Fix]` **Fix**: Bug resolutions.
+- `[Refactor]` **Refactor**: Architectural changes/cleanup.
+- `[Polish]` **Polish**: Visual/Audio/UX improvements.
+- `[S]` **Status**: Current project health/readiness.
+
+### PROCEDURE Protocol
+When the user says "**PROCEDURE**", perform these EXACT steps:
+1.  **Bump Version**: Update `package.json` (e.g., `1.2.1`).
+2.  **Update UI**: Sync version string in `MainMenuScene.ts`.
+3.  **Log**: Add latest changes to `docs/DEVELOPMENT_LOG.md` (chronological).
+4.  **Commit**: Message format: `v[VERSION]: [Short Summary]`.
+5.  **Push**: Execute `git push` to deploy online.
+
+## Development Commands & URLs
+- **Client**: `npm run dev` (Vite on port `5175`). URL: `http://localhost:5175`
+- **Server**: `npm run server` (Kills port `9208` then starts Geckos). URL: `http://localhost:9208`
+- **Deployment**: `./deploy_client.sh` and `./deploy_server.sh` (Pass: 3003)
 - **Node**: v25.6.0+
-- **Commands**: `(npm run dev --prefix server-geckos & npx vite --port 5175 --host 0.0.0.0)`
-- **URLs**: Client: `localhost:5175`, Server: `9208`
-
-## ABSOLUTE RULES
-0. **Do NOT commit or push** unless explicitly instructed.
-1. **PROCEDURE Protocol**: When the user says "PROCEDURE", perform the following EXACT steps:
-    - **Bump Version**: Update `package.json` (e.g., `v0.13.2`).
-    - **Update UI**: Ensure the new version is displayed under the Main Title in `MainMenuScene.ts`.
-    - **Log**: Update `docs/DEVELOPMENT_LOG.md` with latest changes chronologically (add new updates at the end of the doc)
-    - **Commit**: Message MUST match the version + a brief description (e.g., `v0.13.2: Fixed physics bug`).
-    - **Push**: Execute `git push` to deploy online.
-
-## Project Architecture
-- **Client**: Phaser 3 + TypeScript (`src/`).
-- **Server**: Geckos.io + Node.js (`server-geckos/`).
-- **Assets**: Located in `public/assets/`. Load via `assets/...` (do NOT use `public/` prefix in code).
-- **UI Cameras**: UI overlays (HUD, Pause, Controls) are rendered on a dedicated `uiCamera` to prevent ghosting/scaling issues. Ensure game objects like Players/Chests are added to `uiCamera.ignore()`.
-- **Items**: Standalone bombs were deprecated. Chests now act as the primary interactable item, which can transition into a `isBombMode` state and be thrown.
-
-## Deployment Workflow
-- **Client**: `./deploy_client.sh` (Builds locally -> SCP -> Nginx). Pass: 3003
-- **Server**: `./deploy_server.sh` (SSH -> Git Pull -> PM2 Reload). Pass: 3003
-- **Manual**: SSH into `164.90.235.15` (root).
-
-
-## Critical Implementation Details
-- **Physics**: Hybrid. Player movement is **custom** (deterministic), environment uses Matter.js for static bodies.
-- **Stage**: `StageFactory.ts` generates shared stage data. `walls` are `Phaser.Geom.Rectangle[]`.
-- **Networking**: Client-predicted, Server-authoritative (sort of). Inputs are buffered natively on the client using a unified `InputState` interface supporting simultaneous Gamepad and Keyboard usage.
-- **Version**: displayed in `MainMenuScene` under title.

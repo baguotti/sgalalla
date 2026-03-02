@@ -595,7 +595,7 @@ setInterval(() => {
         // === CHEST SPAWNING ===
         room.chestSpawnTimer -= TICK_MS;
         if (room.chestSpawnTimer <= 0) {
-            if (Math.random() < 0.35) {
+            if (Math.random() < 0.01) {
                 const chestX = 600 + Math.random() * 720;
                 emitToRoom(NetMessageType.CHEST_SPAWN, { x: Math.round(chestX) });
                 console.log(`[Server] Chest spawned at x=${Math.round(chestX)}`);

@@ -31,6 +31,7 @@ import type { GameSnapshot, PlayerSnapshot } from '../network/StateSnapshot';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { ControlsOverlay } from '../components/ControlsOverlay';
+import { TouchController } from '../components/TouchController';
 
 import type { GameSceneInterface } from './GameSceneInterface';
 
@@ -51,6 +52,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
     // Input
     private inputManager!: InputManager;
+    private touchController!: TouchController;
 
     // Stage
     private platforms: Phaser.GameObjects.Rectangle[] = [];
@@ -264,6 +266,12 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.matchHUD = new MatchHUD(this);
         this.matchHUD.addToCameraIgnore(this.cameras.main);
 
+        // Touch Controller Overlay
+        this.touchController = new TouchController(this);
+        if (this.uiCamera) {
+            this.touchController.setCameraIgnore(this.cameras.main, this.uiCamera);
+        }
+
         // Debug Overlay (minimal: FPS + Ping only for online)
         this.debugOverlay = new DebugOverlay(this);
         this.debugOverlay.setCameraIgnore(this.cameras.main);
@@ -390,7 +398,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             useKeyboard: true,
             gamepadIndex: 0,
             enableGamepad: true
-        });
+        }, this.touchController);
 
         // Setup selection UI (hidden initially)
         this.createSelectionUI();
