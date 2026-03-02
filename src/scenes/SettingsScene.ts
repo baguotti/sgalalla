@@ -985,15 +985,31 @@ export class SettingsScene extends Phaser.Scene {
 
         // Listen for the next physical keypress (one-shot)
         const handler = (event: KeyboardEvent) => {
+            // Prevent auto-repeat events from the original Enter/Space press from instantly binding
+            if (event.repeat) return;
+
             event.preventDefault();
             event.stopPropagation();
-            // Ignore Escape (used for back) and Enter/Space (used for confirm)
-            if (event.code === 'Escape' || event.code === 'Enter' || event.code === 'Space') return;
+
+            if (event.code === 'Escape') {
+                window.removeEventListener('keydown', handler, true);
+                this.cancelKbListening();
+                return;
+            }
 
             window.removeEventListener('keydown', handler, true);
             this.applyKbRebind(event.code);
         };
         window.addEventListener('keydown', handler, true);
+    }
+
+    private cancelKbListening(): void {
+        this.audioManager.playSFX('ui_back', { volume: 0.5 });
+        this.isKbListening = false;
+        this.kbListeningAction = null;
+        this.kbListeningText = null;
+        this.refreshKbValues();
+        this.updateKbHighlight();
     }
 
     private applyKbRebind(code: string): void {
