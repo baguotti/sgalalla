@@ -38,6 +38,9 @@ export class AnimationHelpers {
 
         // Single Standalone Images
         scene.load.image('greg_win_000', 'assets/greg/greg_win_000.png');
+
+        // Taunt Atlas (all characters)
+        scene.load.atlas('taunts', 'assets/taunts/taunts.png', 'assets/taunts/taunts.json');
     }
 
     /**
@@ -242,6 +245,34 @@ export class AnimationHelpers {
                 frameRate: 10,
                 repeat: 0
             });
+        }
+
+        // ─── Taunt Animations (from taunt atlas) ───
+        const tauntDefs: { char: string; prefix: string; count: number; frameRate?: number }[] = [
+            { char: 'fok', prefix: 'fok_taunt_1_', count: 8, frameRate: 12 },
+            { char: 'sgu', prefix: 'sgu_taunt_uwu_', count: 2, frameRate: 4 },
+            { char: 'sga', prefix: 'sga_taunt_yoga_', count: 2, frameRate: 2 }, // Slowed down from 4 to 2
+            { char: 'pe', prefix: 'pe_taunt_sailor_', count: 2, frameRate: 4 },
+            { char: 'nock', prefix: 'nock_taunt_horse_', count: 2, frameRate: 4 },
+            { char: 'greg', prefix: 'greg_taunt_marx_', count: 2, frameRate: 4 },
+        ];
+
+        for (const def of tauntDefs) {
+            const animKey = `${def.char}_taunt`;
+            if (!scene.anims.exists(animKey)) {
+                const frames = scene.anims.generateFrameNames('taunts', {
+                    prefix: def.prefix,
+                    start: 0,
+                    end: def.count - 1,
+                    zeroPad: 3
+                });
+                scene.anims.create({
+                    key: animKey,
+                    frames: frames,
+                    frameRate: def.frameRate || 4,
+                    repeat: -1
+                });
+            }
         }
     }
 }

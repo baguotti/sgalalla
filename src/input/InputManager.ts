@@ -45,6 +45,7 @@ export interface PlayerInputConfig {
     gamepadIndex: number | null;
     enableGamepad?: boolean;
     keyboardMapping?: 'all'; // Kept for API compat, always 'all' now (no more split)
+    mappingSlot?: number; // Which gamepad mapping slot to use (0 or 1)
 }
 
 export class InputManager {
@@ -62,7 +63,7 @@ export class InputManager {
     constructor(scene: Phaser.Scene, config: PlayerInputConfig = { playerId: 0, useKeyboard: true, gamepadIndex: null, enableGamepad: true, keyboardMapping: 'all' }, touchController?: TouchController) {
         this.scene = scene;
         this.config = { ...config, enableGamepad: config.enableGamepad !== undefined ? config.enableGamepad : true };
-        this.gamepadInput = new GamepadInput(config.gamepadIndex);
+        this.gamepadInput = new GamepadInput(config.gamepadIndex, config.mappingSlot ?? 0);
         this.touchController = touchController;
 
         if (this.config.useKeyboard) {

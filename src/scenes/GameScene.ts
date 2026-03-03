@@ -59,14 +59,20 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     // Game Over State
     private isGameOver: boolean = false;
+    private isGameOverMenuReady: boolean = false;
+    private gameOverSelectedIndex: number = 0;
+    private gameOverMenuTexts: Phaser.GameObjects.Text[] = [];
+    private gameOverMenuOptions: string[] = ['RIVINCITA', 'TORNA ALLA LOBBY'];
     private previousAButtonPressed: boolean = false;
     private previousSelectPressed: boolean = false;
     private previousStartPressed: boolean = false;
+    private gameOverUpKey!: Phaser.Input.Keyboard.Key;
+    private gameOverDownKey!: Phaser.Input.Keyboard.Key;
+    private gameOverEnterKey!: Phaser.Input.Keyboard.Key;
 
     // Pre-allocated for update() — avoids per-frame GC
     private readonly hudPlayerMap: Map<number, Player> = new Map();
     private gameOverSpaceKey!: Phaser.Input.Keyboard.Key;
-    private gameOverEscKey!: Phaser.Input.Keyboard.Key;
 
     constructor() {
         super({ key: 'GameScene' });
@@ -159,6 +165,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 maxSize: 10
             });
             this.isGameOver = false;
+            this.isGameOverMenuReady = false;
+            this.gameOverSelectedIndex = 0;
+            if (this.gameOverMenuTexts) {
+                this.gameOverMenuTexts.forEach(t => t.destroy());
+                this.gameOverMenuTexts = [];
+            }
             this.isPaused = false;
 
             // --- Physics Setup ---
@@ -312,7 +324,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     gamepadIndex: pData.input.gamepadIndex,
                     useKeyboard: pData.input.type === 'KEYBOARD',
                     keyboardMapping: pData.input.keyboardMapping,
-                    character: pData.character
+                    character: pData.character,
+                    mappingSlot: pData.input.mappingSlot ?? 0
                 }, pData.playerId === 0 ? this.touchController : undefined); // P1 gets touch control if active
 
                 // Set Color (all players use their assigned color)
@@ -375,7 +388,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.trainingToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
             this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
             this.gameOverSpaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-            this.gameOverEscKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+            this.gameOverUpKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
+            this.gameOverDownKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
+            this.gameOverEnterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
 
             // Input Debug Overlay (F2)
             this.inputDebugOverlay = new InputDebugOverlay(this);
@@ -633,15 +648,56 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         // Stop updates if game over
         if (this.isGameOver) {
-            // Allow restarting via SPACE, ESC, or Gamepad A Button (0)
-            const spacePressed = Phaser.Input.Keyboard.JustDown(this.gameOverSpaceKey);
-            const escPressed = Phaser.Input.Keyboard.JustDown(this.gameOverEscKey);
-            const aButtonPressed = this.checkGamepadA();
-
-            if (spacePressed || escPressed || aButtonPressed) {
-                window.location.reload();
-            }
             this.players.forEach(p => p.updateVisuals(delta));
+
+            // Wait until 5 seconds passes and menu appears
+            if (!this.isGameOverMenuReady) return;
+
+            // Handle Menu Navigation
+            let moveUp = Phaser.Input.Keyboard.JustDown(this.gameOverUpKey);
+            let moveDown = Phaser.Input.Keyboard.JustDown(this.gameOverDownKey);
+            let confirm = Phaser.Input.Keyboard.JustDown(this.gameOverEnterKey) || Phaser.Input.Keyboard.JustDown(this.gameOverSpaceKey);
+
+            // Also check gamepads for navigation
+            const gamepads = navigator.getGamepads();
+            for (const gp of gamepads) {
+                if (!gp) continue;
+                // Basic D-Pad checking
+                if (gp.buttons[12]?.pressed) moveUp = true;
+                if (gp.buttons[13]?.pressed) moveDown = true;
+                const confirmIdx = getConfirmButtonIndex(gp);
+                if (gp.buttons[confirmIdx]?.pressed) {
+                    if (!this.previousAButtonPressed) {
+                        this.previousAButtonPressed = true;
+                        confirm = true;
+                    }
+                }
+            }
+
+            // A Button Edge Detection Release
+            const isAnyAPressed = Array.from(gamepads).some(gp => {
+                if (!gp) return false;
+                return gp.buttons[getConfirmButtonIndex(gp)]?.pressed;
+            });
+            if (!isAnyAPressed) this.previousAButtonPressed = false;
+
+            if (moveUp) {
+                this.gameOverSelectedIndex = (this.gameOverSelectedIndex - 1 + this.gameOverMenuOptions.length) % this.gameOverMenuOptions.length;
+                this.updateGameOverMenuHighlight();
+                // AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.5 }); // Optional
+            } else if (moveDown) {
+                this.gameOverSelectedIndex = (this.gameOverSelectedIndex + 1) % this.gameOverMenuOptions.length;
+                this.updateGameOverMenuHighlight();
+                // AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.5 }); // Optional
+            } else if (confirm) {
+                AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
+                if (this.gameOverSelectedIndex === 0) {
+                    this.restartMatch();
+                } else if (this.gameOverSelectedIndex === 1) {
+                    this.returnToLobby();
+                }
+            }
+
             return;
         }
 
@@ -977,6 +1033,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.players.forEach(p => p.lives = 3);
 
 
+        // Clear game over state
+        this.isGameOver = false;
+        this.isGameOverMenuReady = false;
+        this.gameOverSelectedIndex = 0;
+        if (this.gameOverMenuTexts) {
+            this.gameOverMenuTexts.forEach(t => t.destroy());
+            this.gameOverMenuTexts = [];
+        }
+
         // Close pause menu
         this.isPaused = false;
         this.pauseMenu.hide();
@@ -1179,7 +1244,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             winnerText += "\nDRAW GAME!";
         }
 
-        const text = this.add.text(width / 2, height / 2, winnerText, {
+        const text = this.add.text(width / 2, height / 2 - 50, winnerText, {
             fontSize: '64px',
             fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
@@ -1192,14 +1257,57 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         text.setDepth(1001);
         this.cameras.main.ignore(text); // Only UI camera sees it
 
-        const subText = this.add.text(width / 2, height / 2 + 100, "Press SPACE or (A) to Restart", {
-            fontSize: '32px',
-            fontFamily: '"Pixeloid Sans"',
-            color: '#cccccc'
+        // 5-second unskippable delay
+        this.time.delayedCall(5000, () => {
+            this.showGameOverMenu();
         });
-        subText.setOrigin(0.5);
-        subText.setDepth(1001);
-        this.cameras.main.ignore(subText);
+    }
+
+    private showGameOverMenu(): void {
+        this.isGameOverMenuReady = true;
+        this.gameOverSelectedIndex = 0;
+        const { width, height } = this.scale;
+
+        const startY = height / 2 + 50;
+        const gap = 60;
+
+        this.gameOverMenuOptions.forEach((option, index) => {
+            const text = this.add.text(width / 2, startY + (index * gap), option, {
+                fontSize: '36px',
+                fontFamily: '"Pixeloid Sans"',
+                color: index === 0 ? '#ffffff' : '#888888',
+                align: 'center',
+                stroke: '#000000',
+                strokeThickness: 4
+            }).setOrigin(0.5).setDepth(1001);
+
+            if (index === 0) text.setShadow(0, 0, '#ffffff', 10, false, true);
+
+            if (this.uiCamera) this.cameras.main.ignore(text);
+            this.gameOverMenuTexts.push(text);
+        });
+    }
+
+    private updateGameOverMenuHighlight(): void {
+        this.gameOverMenuTexts.forEach((text, index) => {
+            if (index === this.gameOverSelectedIndex) {
+                text.setColor('#ffffff');
+                text.setShadow(0, 0, '#ffffff', 10, false, true);
+            } else {
+                text.setColor('#888888');
+                text.setShadow(0, 0, '#000000', 0, false, true);
+            }
+        });
+    }
+
+    private returnToLobby(): void {
+        const isTraining = this.playerData.some((p: any) => p.isTrainingDummy);
+        const p1Data = this.playerData.find((p: any) => p.playerId === 0);
+        this.scene.start('LobbyScene', {
+            mode: isTraining ? 'training' : 'versus',
+            inputType: p1Data?.input?.type || 'KEYBOARD',
+            gamepadIndex: p1Data?.input?.gamepadIndex ?? null,
+        });
     }
     private toggleDebugVisuals(visible: boolean): void {
         // Safety check for debugGraphics existence
@@ -1324,32 +1432,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const isAnySelectPressed = Array.from(gamepads).some(gp => gp && gp.buttons[8]?.pressed);
         if (!isAnySelectPressed) {
             this.previousSelectPressed = false;
-        }
-
-        return false;
-    }
-
-    private checkGamepadA(): boolean {
-        // Restart/Confirm - uses JoyConMapper for correct button on all controllers
-        const gamepads = navigator.getGamepads();
-        for (const gp of gamepads) {
-            if (!gp) continue;
-            const confirmIdx = getConfirmButtonIndex(gp);
-            if (gp.buttons[confirmIdx]?.pressed) {
-                if (!this.previousAButtonPressed) {
-                    this.previousAButtonPressed = true;
-                    return true;
-                }
-            }
-        }
-
-        const isAnyAPressed = Array.from(gamepads).some(gp => {
-            if (!gp) return false;
-            const idx = getConfirmButtonIndex(gp);
-            return gp.buttons[idx]?.pressed;
-        });
-        if (!isAnyAPressed) {
-            this.previousAButtonPressed = false;
         }
 
         return false;

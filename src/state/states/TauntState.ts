@@ -33,7 +33,7 @@ export class TauntState implements IState {
     }
 
     getAnimationKey(_player: Player): string {
-        return 'win'; // Taunt reuses win animation
+        return 'taunt'; // All characters now have dedicated taunt animations
     }
 
     canBeInterrupted(): boolean {

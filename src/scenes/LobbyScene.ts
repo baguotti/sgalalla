@@ -14,6 +14,7 @@ export interface PlayerSelection {
         type: 'KEYBOARD' | 'GAMEPAD';
         gamepadIndex: number | null;
         keyboardMapping?: 'all';
+        mappingSlot?: number; // Which gamepad mapping slot to use (0 or 1)
     };
     character: CharacterType;
     isAI?: boolean;
@@ -465,6 +466,12 @@ export class LobbyScene extends Phaser.Scene {
             slot.input.gamepadIndex = index;
             slot.input.keyboardMapping = keyboardMapping;
             slot.character = 'fok';
+
+            // Assign mapping slot for gamepads based on join order
+            if (type === 'GAMEPAD') {
+                const gamepadCount = this.slots.filter(s => s.joined && s.input.type === 'GAMEPAD' && s !== slot).length;
+                slot.input.mappingSlot = Math.min(gamepadCount, 1); // 0 for first, 1 for second
+            }
 
             AudioManager.getInstance().playSFX('ui_player_found', { volume: 0.5 });
 

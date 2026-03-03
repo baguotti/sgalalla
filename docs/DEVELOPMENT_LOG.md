@@ -544,5 +544,18 @@ Part 2
 - **[Feat]** **UX Improvements**:
     - **ESC to Cancel**: Added the ability to cancel rebinding by pressing Escape.
     - **Enter/Space Support**: Allowed binding actions to Enter and Space by ignoring `event.repeat`.
-    - **Selection Reset**: Ensured selection indices are reset to 0 when entering sub-menus.
-- **[S]** **STATUS**: Keyboard remapping is now stable and fully functional. Release confirmed.
+- [S] **STATUS**: Keyboard remapping is now stable and fully functional. Release confirmed.
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-03-03] v1.2.4 - Gamepad Profiles, Taunts & Match Flow 🎮🎭
+- **[V]** `v1.2.4`
+- **[Feat]** **Gamepad Profiles**:
+    - **Per-Slot Customization**: Added independent button remapping for two gamepads in local play. Settings UI now features **GAMEPAD 1** and **GAMEPAD 2** tabs, mapping slot 0 and 1 automatically in the Lobby based on join order.
+- **[Feat]** **Taunt Overhaul**:
+    - **Unified Atlas**: Replaced standalone character taunts with a unified 18-frame taunt atlas.
+    - **Dedicated Animations**: All characters now have dedicated taunt animations (Fok: 8 frames, Sgu/Sga/Pe/Nock/Greg: 2 frames). Slowed down Sga's loop to 2fps for better pacing.
+- **[Feat]** **End of Match Flow**:
+    - **Unskippable Taunt Window**: Eliminated the hard page reload on match end. Added a 5-second unskippable delay to watch the winning player's taunt.
+    - **In-Game Menu**: After the delay, a seamless UI menu offers **RIVINCITA** (instant rematch) or **TORNA ALLA LOBBY** (maintain controller assignments), fully navigable via D-Pad or Keyboard.
+- **[Fix]** **Nintendo Switch Controller**:
+    - **Button Mapping**: Removed manual A/B X/Y swaps in `GamepadInput`. The standard API already maps buttons by physical position on macOS, fixing reversed inputs for Switch Pro controllers.
+- **[S]** **STATUS**: Competitive UX significantly improved. Match flow is seamless and celebratory.

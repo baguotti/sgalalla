@@ -38,6 +38,8 @@ export class SettingsScene extends Phaser.Scene {
     private controllerTexts: Phaser.GameObjects.Text[] = [];
     private controllerValueTexts: Phaser.GameObjects.Text[] = [];
     private controllerContainer!: Phaser.GameObjects.Container;
+    private controllerSlot: number = 0; // 0 = Gamepad 1, 1 = Gamepad 2
+    private slotTabs: Phaser.GameObjects.Text[] = [];
 
     private audioManager: AudioManager;
     private screenMode: ScreenMode = 'MAIN';
@@ -95,6 +97,8 @@ export class SettingsScene extends Phaser.Scene {
         this.controllerValueTexts = [];
         this.controllerOptions = [];
         this.controllerSelectedIndex = 0;
+        this.controllerSlot = 0;
+        this.slotTabs = [];
         this.kbTexts = [];
         this.kbValueTexts = [];
         this.kbOptions = [];
@@ -328,22 +332,37 @@ export class SettingsScene extends Phaser.Scene {
         this.controllerOptions.push('RIPRISTINA PREDEFINITI');
         this.controllerOptions.push('INDIETRO');
 
-        const subtitle = this.add.text(width / 2, 180, 'MAPPATURA CONTROLLER', {
+        const subtitle = this.add.text(width / 2, 170, 'MAPPATURA CONTROLLER', {
             fontSize: '36px',
             fontFamily: '"Pixeloid Sans"',
             color: '#FF9F1C'
         }).setOrigin(0.5);
         this.controllerContainer.add(subtitle);
 
-        const hint = this.add.text(width / 2, 220, 'PREMI START PER REMAPPARE', {
+        // ─── Gamepad Slot Tabs ───
+        const tabY = 215;
+        const tabLabels = ['◀  GAMEPAD 1', 'GAMEPAD 2  ▶'];
+        this.slotTabs = [];
+        tabLabels.forEach((label, i) => {
+            const tabX = width / 2 + (i === 0 ? -120 : 120);
+            const tab = this.add.text(tabX, tabY, label, {
+                fontSize: '22px',
+                fontFamily: '"Pixeloid Sans"',
+                color: i === this.controllerSlot ? '#ffffff' : '#555555'
+            }).setOrigin(0.5);
+            this.slotTabs.push(tab);
+            this.controllerContainer.add(tab);
+        });
+
+        const hint = this.add.text(width / 2, 248, 'PREMI START PER REMAPPARE', {
             fontSize: '18px',
             fontFamily: '"Pixeloid Sans"',
             color: '#666666'
         }).setOrigin(0.5);
         this.controllerContainer.add(hint);
 
-        const startY = height / 2 - 120;
-        const gap = 55;
+        const startY = height / 2 - 100;
+        const gap = 50;
         const mapping = GamepadMapping.getInstance();
 
         this.controllerOptions.forEach((label, index) => {
@@ -359,7 +378,7 @@ export class SettingsScene extends Phaser.Scene {
 
             if (index < this.controllerActions.length) {
                 const action = this.controllerActions[index];
-                const btnIdx = mapping.getButtonForAction(action);
+                const btnIdx = mapping.getButtonForAction(action, this.controllerSlot);
                 const btnName = BUTTON_NAMES[btnIdx] || `BTN ${btnIdx}`;
 
                 const valText = this.add.text(width / 2 + 20, y, btnName, {
@@ -370,11 +389,11 @@ export class SettingsScene extends Phaser.Scene {
                 this.controllerValueTexts.push(valText);
                 this.controllerContainer.add(valText);
             } else if (label === 'INVERTI ASSE Y') {
-                const invertVal = mapping.getInvertY() ? 'ON' : 'OFF';
+                const invertVal = mapping.getInvertY(this.controllerSlot) ? 'ON' : 'OFF';
                 const valText = this.add.text(width / 2 + 20, y, invertVal, {
                     fontSize: '32px',
                     fontFamily: '"Pixeloid Sans"',
-                    color: mapping.getInvertY() ? '#2EC4B6' : '#666666'
+                    color: mapping.getInvertY(this.controllerSlot) ? '#2EC4B6' : '#666666'
                 }).setOrigin(0, 0.5);
                 this.controllerValueTexts.push(valText);
                 this.controllerContainer.add(valText);
@@ -401,7 +420,7 @@ export class SettingsScene extends Phaser.Scene {
         this.controllerActions.forEach((action, index) => {
             const valText = this.controllerValueTexts[index];
             if (valText) {
-                const btnIdx = mapping.getButtonForAction(action);
+                const btnIdx = mapping.getButtonForAction(action, this.controllerSlot);
                 const btnName = BUTTON_NAMES[btnIdx] || `BTN ${btnIdx}`;
                 valText.setText(btnName);
                 valText.setColor(this.getBtnColor(btnName));
@@ -412,11 +431,17 @@ export class SettingsScene extends Phaser.Scene {
         if (invertIndex >= 0) {
             const valText = this.controllerValueTexts[invertIndex];
             if (valText) {
-                const isInverted = mapping.getInvertY();
+                const isInverted = mapping.getInvertY(this.controllerSlot);
                 valText.setText(isInverted ? 'ON' : 'OFF');
                 valText.setColor(isInverted ? '#2EC4B6' : '#666666');
             }
         }
+
+        // Update tab highlights
+        this.slotTabs.forEach((tab, i) => {
+            tab.setColor(i === this.controllerSlot ? '#ffffff' : '#555555');
+            tab.setAlpha(i === this.controllerSlot ? 1 : 0.4);
+        });
     }
 
     // ─── Update Loop ───
@@ -500,6 +525,10 @@ export class SettingsScene extends Phaser.Scene {
             this.changeControllerSelection(-1);
         } else if (Phaser.Input.Keyboard.JustDown(this.keyDown)) {
             this.changeControllerSelection(1);
+        } else if (Phaser.Input.Keyboard.JustDown(this.keyLeft)) {
+            this.switchControllerSlot(-1);
+        } else if (Phaser.Input.Keyboard.JustDown(this.keyRight)) {
+            this.switchControllerSlot(1);
         } else if (Phaser.Input.Keyboard.JustDown(this.keyEnter) || Phaser.Input.Keyboard.JustDown(this.keySpace)) {
             this.confirmControllerSelection();
         } else if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
@@ -559,10 +588,13 @@ export class SettingsScene extends Phaser.Scene {
                 else if (this.screenMode === 'CONTROLLER') this.changeControllerSelection(1);
             }
 
-            // NAV X (volume sliders in AUDIO screen)
+            // NAV X (volume sliders in AUDIO, slot tabs in CONTROLLER)
             if (this.screenMode === 'AUDIO') {
                 if (navX < 0 && prevAxis.x >= 0) this.modifyAudioValue(-1);
                 else if (navX > 0 && prevAxis.x <= 0) this.modifyAudioValue(1);
+            } else if (this.screenMode === 'CONTROLLER') {
+                if (navX < 0 && prevAxis.x >= 0) this.switchControllerSlot(-1);
+                else if (navX > 0 && prevAxis.x <= 0) this.switchControllerSlot(1);
             }
 
             // A (Confirm)
@@ -652,13 +684,23 @@ export class SettingsScene extends Phaser.Scene {
         if (!this.listeningAction) return;
 
         const mapping = GamepadMapping.getInstance();
-        mapping.setButtonForAction(this.listeningAction, buttonIndex);
+        mapping.setButtonForAction(this.listeningAction, buttonIndex, this.controllerSlot);
         this.audioManager.playSFX('ui_confirm', { volume: 0.5 });
 
         this.isListening = false;
         this.listeningAction = null;
         this.listeningText = null;
 
+        this.refreshControllerValues();
+        this.updateControllerHighlight();
+    }
+
+    private switchControllerSlot(dir: number): void {
+        if (this.isListening) return; // Don't switch while rebinding
+        const newSlot = this.controllerSlot + dir;
+        if (newSlot < 0 || newSlot > 1) return;
+        this.controllerSlot = newSlot;
+        this.audioManager.playSFX('ui_menu_hover', { volume: 0.5 });
         this.refreshControllerValues();
         this.updateControllerHighlight();
     }
@@ -751,11 +793,11 @@ export class SettingsScene extends Phaser.Scene {
             }
         } else if (this.controllerOptions[idx] === 'INVERTI ASSE Y') {
             const mapping = GamepadMapping.getInstance();
-            mapping.setInvertY(!mapping.getInvertY());
+            mapping.setInvertY(!mapping.getInvertY(this.controllerSlot), this.controllerSlot);
             this.refreshControllerValues();
             this.audioManager.playSFX('ui_confirm', { volume: 0.5 });
         } else if (this.controllerOptions[idx] === 'RIPRISTINA PREDEFINITI') {
-            GamepadMapping.getInstance().resetDefaults();
+            GamepadMapping.getInstance().resetDefaults(this.controllerSlot);
             this.refreshControllerValues();
             this.audioManager.playSFX('ui_confirm', { volume: 0.5 });
         } else if (this.controllerOptions[idx] === 'INDIETRO') {
@@ -872,11 +914,17 @@ export class SettingsScene extends Phaser.Scene {
                     const btnName = valText.text;
                     valText.setColor(isSelected ? this.getBtnColor(btnName) : '#333333');
                 } else {
-                    const isInverted = GamepadMapping.getInstance().getInvertY();
+                    const isInverted = GamepadMapping.getInstance().getInvertY(this.controllerSlot);
                     valText.setColor(isSelected ? (isInverted ? '#2EC4B6' : '#888888') : '#666666');
                 }
                 valText.setAlpha(isSelected ? 1 : 0.5);
             }
+        });
+
+        // Update tab highlights
+        this.slotTabs.forEach((tab, i) => {
+            tab.setColor(i === this.controllerSlot ? '#ffffff' : '#555555');
+            tab.setAlpha(i === this.controllerSlot ? 1 : 0.4);
         });
     }
 

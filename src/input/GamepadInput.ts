@@ -69,12 +69,14 @@ const TRIGGER_THRESHOLD = 0.5;
 export class GamepadInput {
     private previousState: GamepadState;
     private gamepadIndex: number | null = null;
+    private mappingSlot: number;
 
     private gamepadConnectedListener: (e: GamepadEvent) => void;
     private gamepadDisconnectedListener: (e: GamepadEvent) => void;
 
-    constructor(targetIndex: number | null = null) {
+    constructor(targetIndex: number | null = null, mappingSlot: number = 0) {
         this.previousState = this.createEmptyState();
+        this.mappingSlot = mappingSlot;
 
         // If a specific index is requested, set it immediately
         if (targetIndex !== null) {
@@ -258,7 +260,7 @@ export class GamepadInput {
         const isGenericUSB = !isOfficialCtrl;
 
         // ─── User-configurable mapping (buttons + invertY) ───
-        const mapping = GamepadMapping.getInstance().getMapping();
+        const mapping = GamepadMapping.getInstance().getMapping(this.mappingSlot);
 
         // Left Stick (axes 0 and 1)
         const leftStickX = this.applyDeadzone(gamepad.axes[0] || 0);
@@ -304,16 +306,9 @@ export class GamepadInput {
         state.aimRight = state.moveX > 0.5;
 
         // Read raw pressed states at mapped indices
-        // Nintendo Switch A/B X/Y physical swap: we apply it to the RAW indices
-        // so the user's mapping (which references logical Xbox layout) works correctly.
+        // Note: Standard Gamepad API maps buttons by PHYSICAL POSITION (bottom=0, right=1, left=2, top=3),
+        // so no manual swap is needed for Nintendo Switch Pro Controllers.
         const readButton = (idx: number): boolean => {
-            if (isSwitchCtrl) {
-                // Swap 0<->1 (A<->B) and 2<->3 (X<->Y) only for face buttons
-                if (idx === 0) idx = 1;
-                else if (idx === 1) idx = 0;
-                else if (idx === 2) idx = 3;
-                else if (idx === 3) idx = 2;
-            }
             return gamepad.buttons[idx]?.pressed || false;
         };
 

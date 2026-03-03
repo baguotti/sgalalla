@@ -199,7 +199,7 @@ export class Player extends Fighter {
         }
     }
 
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, keyboardMapping?: 'wasd' | 'arrows' | 'all', character?: string } = {}, touchController?: TouchController) {
+    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, keyboardMapping?: 'wasd' | 'arrows' | 'all', character?: string, mappingSlot?: number } = {}, touchController?: TouchController) {
         super(scene, x, y);
 
         this.isAI = config.isAI || false;
@@ -288,7 +288,8 @@ export class Player extends Fighter {
             useKeyboard: useKeyboard,
             gamepadIndex: gamepadIdx,
             enableGamepad: enableGamepad,
-            keyboardMapping: keyboardMapping as 'all' | undefined
+            keyboardMapping: keyboardMapping as 'all' | undefined,
+            mappingSlot: config.mappingSlot ?? 0
         }, touchController);
 
         // Store input config for debug overlay

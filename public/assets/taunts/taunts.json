@@ -1,0 +1,397 @@
+{
+	"textures": [
+		{
+			"image": "taunts",
+			"format": "RGBA8888",
+			"size": {
+				"w": 458,
+				"h": 1928
+			},
+			"scale": 1,
+			"frames": [
+				{
+					"filename": "nock_taunt_horse_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 66,
+						"y": 21,
+						"w": 132,
+						"h": 203
+					},
+					"frame": {
+						"x": 3,
+						"y": 3,
+						"w": 132,
+						"h": 203
+					}
+				},
+				{
+					"filename": "nock_taunt_horse_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 75,
+						"y": 21,
+						"w": 124,
+						"h": 203
+					},
+					"frame": {
+						"x": 3,
+						"y": 212,
+						"w": 124,
+						"h": 203
+					}
+				},
+				{
+					"filename": "sga_taunt_yoga_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 70,
+						"y": 24,
+						"w": 126,
+						"h": 202
+					},
+					"frame": {
+						"x": 3,
+						"y": 421,
+						"w": 126,
+						"h": 202
+					}
+				},
+				{
+					"filename": "sgu_taunt_uwu_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 44,
+						"y": 22,
+						"w": 134,
+						"h": 201
+					},
+					"frame": {
+						"x": 133,
+						"y": 212,
+						"w": 134,
+						"h": 201
+					}
+				},
+				{
+					"filename": "pe_taunt_sailor_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 30,
+						"y": 24,
+						"w": 176,
+						"h": 200
+					},
+					"frame": {
+						"x": 141,
+						"y": 3,
+						"w": 176,
+						"h": 200
+					}
+				},
+				{
+					"filename": "greg_taunt_marx_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 27,
+						"w": 175,
+						"h": 199
+					},
+					"frame": {
+						"x": 3,
+						"y": 629,
+						"w": 175,
+						"h": 199
+					}
+				},
+				{
+					"filename": "pe_taunt_sailor_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 31,
+						"y": 24,
+						"w": 174,
+						"h": 199
+					},
+					"frame": {
+						"x": 135,
+						"y": 419,
+						"w": 174,
+						"h": 199
+					}
+				},
+				{
+					"filename": "greg_taunt_marx_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 18,
+						"y": 27,
+						"w": 157,
+						"h": 199
+					},
+					"frame": {
+						"x": 273,
+						"y": 209,
+						"w": 157,
+						"h": 199
+					}
+				},
+				{
+					"filename": "sgu_taunt_uwu_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 44,
+						"y": 24,
+						"w": 132,
+						"h": 199
+					},
+					"frame": {
+						"x": 323,
+						"y": 3,
+						"w": 132,
+						"h": 199
+					}
+				},
+				{
+					"filename": "sga_taunt_yoga_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 53,
+						"y": 39,
+						"w": 179,
+						"h": 186
+					},
+					"frame": {
+						"x": 3,
+						"y": 834,
+						"w": 179,
+						"h": 186
+					}
+				},
+				{
+					"filename": "fok_taunt_1_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 84,
+						"y": 49,
+						"w": 85,
+						"h": 175
+					},
+					"frame": {
+						"x": 184,
+						"y": 624,
+						"w": 85,
+						"h": 175
+					}
+				},
+				{
+					"filename": "fok_taunt_1_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 84,
+						"y": 49,
+						"w": 85,
+						"h": 175
+					},
+					"frame": {
+						"x": 3,
+						"y": 1026,
+						"w": 85,
+						"h": 175
+					}
+				},
+				{
+					"filename": "fok_taunt_1_002",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 84,
+						"y": 49,
+						"w": 85,
+						"h": 175
+					},
+					"frame": {
+						"x": 3,
+						"y": 1207,
+						"w": 85,
+						"h": 175
+					}
+				},
+				{
+					"filename": "fok_taunt_1_003",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 84,
+						"y": 49,
+						"w": 85,
+						"h": 175
+					},
+					"frame": {
+						"x": 3,
+						"y": 1388,
+						"w": 85,
+						"h": 175
+					}
+				},
+				{
+					"filename": "fok_taunt_1_004",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 84,
+						"y": 49,
+						"w": 85,
+						"h": 175
+					},
+					"frame": {
+						"x": 3,
+						"y": 1569,
+						"w": 85,
+						"h": 175
+					}
+				},
+				{
+					"filename": "fok_taunt_1_005",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 84,
+						"y": 49,
+						"w": 85,
+						"h": 175
+					},
+					"frame": {
+						"x": 3,
+						"y": 1750,
+						"w": 85,
+						"h": 175
+					}
+				},
+				{
+					"filename": "fok_taunt_1_006",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 84,
+						"y": 49,
+						"w": 85,
+						"h": 175
+					},
+					"frame": {
+						"x": 94,
+						"y": 1026,
+						"w": 85,
+						"h": 175
+					}
+				},
+				{
+					"filename": "fok_taunt_1_007",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 84,
+						"y": 49,
+						"w": 85,
+						"h": 175
+					},
+					"frame": {
+						"x": 94,
+						"y": 1207,
+						"w": 85,
+						"h": 175
+					}
+				}
+			]
+		}
+	],
+	"meta": {
+		"app": "http://free-tex-packer.com",
+		"version": "0.6.7"
+	}
+}
