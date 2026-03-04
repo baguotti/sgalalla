@@ -123,6 +123,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     private mode: 'versus' | 'training' | 'campaign' = 'versus';
 
+    // ColorMatrix FX for campaign visual progression (desaturation effect)
+    private campaignColorMatrices: Phaser.FX.ColorMatrix[] = [];
+    private campaignTintProgress: number = 0; // 0 = fully desaturated, 1 = fully restored
+
+    // Campaign multi-phase fight flow
+    private campaignMidFightPlayed: boolean = false;
+
     init(data: any): void {
         this.mode = data.mode || 'versus';
 
@@ -153,7 +160,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                         ready: true,
                         input: { type: 'KEYBOARD', gamepadIndex: null },
                         character: opponent.character,
-                        isAI: true
+                        isAI: true,
+                        isTrainingDummy: true // Added for testing purposes so AI stands still
                     }
                 ];
             }
@@ -382,7 +390,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
                 // Add to HUD
                 this.addPlayerToHUD(player);
-                this.addPlayerToHUD(player);
+
+                // If campaign, apply visual suppression to opponent (playerId 1)
+                // Campaign mode: opponent sprite is NOT tinted (only background/platforms are desaturated)
             });
 
             // If campaign, trigger transition to cutscene immediately
@@ -391,8 +401,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 if (opponent) {
                     // Start cutscene, moving P1 slightly left and P2 slightly right of center
                     this.transitionToCutscene([
-                        { playerId: 0, x: 860, y: 300 },
-                        { playerId: 1, x: 1060, y: 300 }
+                        { playerId: 0, x: 860, y: 750 },
+                        { playerId: 1, x: 1060, y: 750 }
                     ], opponent.dialogueBefore, this.playerData[0].character, opponent.character).catch((e: Error | unknown) => console.error(e));
                 }
             }
@@ -624,6 +634,28 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (stage.sidePlatforms.length > 0) this.uiCamera.ignore(stage.sidePlatforms);
         }
 
+        // Apply campaign visual suppression (desaturation effect)
+        if (this.mode === 'campaign') {
+            this.campaignColorMatrices = [];
+            this.campaignTintProgress = 0;
+
+            // Background (use postFX to avoid cropping on scaled sprites)
+            if (stage.background.postFX) {
+                const bgFx = stage.background.postFX.addColorMatrix();
+                bgFx.saturate(-0.66);
+                this.campaignColorMatrices.push(bgFx);
+            }
+
+            // Platform Textures
+            stage.platformTextures.forEach(tex => {
+                if ((tex as any).postFX) {
+                    const fx = (tex as any).postFX.addColorMatrix();
+                    fx.saturate(-0.66);
+                    this.campaignColorMatrices.push(fx);
+                }
+            });
+        }
+
         // Re-run full exclusion pass (catches anything missed above)
         this.configureCameraExclusions();
     }
@@ -752,7 +784,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const isChestOverlayOpen = (this.chests.getChildren() as Chest[]).some(chest => chest.isOverlayOpen);
 
         if ((pauseKeyPressed || gamepadPausePressed) && !isChestOverlayOpen) {
-            this.togglePause();
+            if (!this.scene.isActive('DialogueScene')) {
+                this.togglePause();
+            }
         }
 
         // If paused, only update pause menu
@@ -921,6 +955,32 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 // Score update (lives)
                 player.lives = Math.max(0, player.lives - 1);
 
+                // Campaign Visual Progression: Smoothly restore saturation when opponent loses a life
+                if (this.mode === 'campaign' && player.playerId === 1 && this.campaignColorMatrices.length > 0) {
+                    const maxLives = 3;
+                    // Calculate what fraction of color to restore (0 = desaturated, 1 = full color)
+                    const livesLost = maxLives - player.lives;
+                    const targetProgress = livesLost / maxLives;
+                    const startProgress = this.campaignTintProgress;
+
+                    this.tweens.addCounter({
+                        from: startProgress * 100,
+                        to: targetProgress * 100,
+                        duration: 3000,
+                        ease: 'Linear',
+                        onUpdate: (_tween: Phaser.Tweens.Tween) => {
+                            const progress = (_tween.getValue() ?? 0) / 100;
+                            this.campaignTintProgress = progress;
+                            // Lerp saturation from -0.66 (66% desaturated) to 0 (full color)
+                            const saturation = -0.66 + (0.66 * progress); // goes from -0.66 → 0
+                            this.campaignColorMatrices.forEach(fx => {
+                                fx.reset();
+                                fx.saturate(saturation);
+                            });
+                        }
+                    });
+                }
+
                 // Deactivate player immediately so camera ignores them
                 player.setActive(false);
                 player.setVisible(false);
@@ -928,10 +988,32 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 if (player.body) this.matter.world.remove(player.body); // Remove body to prevent physics interactions while respawning
 
                 if (player.lives > 0) {
-                    // 2 Second Respawn Delay
-                    this.time.delayedCall(2000, () => {
-                        this.respawnPlayer(player, playerId);
-                    });
+                    // Campaign mid-fight cutscene: trigger when opponent reaches 1 life
+                    if (this.mode === 'campaign' && player.playerId === 1 && player.lives === 1 && !this.campaignMidFightPlayed) {
+                        this.campaignMidFightPlayed = true;
+                        const opponent = CampaignManager.getInstance().getCurrentOpponent();
+                        if (opponent && opponent.dialogueMidFight.length > 0) {
+                            // Fade to black, then show cutscene
+                            this.cameras.main.fadeOut(1000, 0, 0, 0);
+                            this.cameras.main.once('camerafadeoutcomplete', () => {
+                                // Respawn opponent and set up cutscene while screen is black
+                                this.respawnPlayer(player, playerId);
+                                this.campaignMidFightCutscene(opponent);
+                                // Fade back in to reveal the cutscene
+                                this.cameras.main.fadeIn(1000, 0, 0, 0);
+                            });
+                        } else {
+                            // No mid-fight dialogue, just respawn normally
+                            this.time.delayedCall(2000, () => {
+                                this.respawnPlayer(player, playerId);
+                            });
+                        }
+                    } else {
+                        // Normal respawn
+                        this.time.delayedCall(2000, () => {
+                            this.respawnPlayer(player, playerId);
+                        });
+                    }
                 } else {
                     // Elimination
                     this.killPlayer(player);
@@ -1245,6 +1327,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.matter.world.remove(player.body);
         }
 
+        // Campaign tint restoration is now handled in checkBlastZones on each life lost
+
         // Show "ELIMINATED" text briefly? (Optional)
     }
 
@@ -1254,11 +1338,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         if (survivors.length <= 1) {
             // Game Over!
-            const winner = survivors.length > 0 ? survivors[0] : null; // If 0 (everyone died same frame), draw or no winner
+            const winner = survivors.length > 0 ? survivors[0] : null;
 
-            // Advance ladder if P1 won in campaign
+            // Campaign mode: skip win animation and rematch entirely
             if (this.mode === 'campaign' && winner && winner.playerId === 0) {
                 CampaignManager.getInstance().advanceLadder();
+                this.campaignDefeatCutscene();
+                return; // Skip normal handleGameOver
             }
 
             this.handleGameOver(winner ? winner.playerId : -1);
@@ -1462,7 +1548,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         return new Promise<void>((resolve) => {
             // 1. Force players into Cinematic state
             const playersInvolved = this.players.filter(p => positions.some(pos => pos.playerId === p.playerId));
-            playersInvolved.forEach(p => p.fsm.changeState('Cinematic', p));
+            playersInvolved.forEach(p => {
+                p.velocity.set(0, 0);
+                p.isGrounded = true;
+                p.animationKey = 'idle';
+                p.fsm.changeState('Cinematic', p);
+                p.playAnim('idle', false);
+            });
 
             // 2. Snap to positions instantly
             positions.forEach(pos => {
@@ -1525,6 +1617,166 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         if (this.mode === 'campaign' && this.matchHUD) {
             this.matchHUD.setVisible(true);
         }
+    }
+
+    /**
+     * Campaign mid-fight cutscene: freeze both players, play dialogue, then resume fight.
+     */
+    private campaignMidFightCutscene(opponent: import('../managers/CampaignManager').OpponentConfig): void {
+        // Freeze both players and force them grounded with idle animation
+        const p1 = this.players.find(p => p.playerId === 0);
+        const p2 = this.players.find(p => p.playerId === 1);
+
+        this.players.forEach(p => {
+            p.velocity.set(0, 0);
+            p.isGrounded = true;
+            p.animationKey = 'idle';
+            p.fsm.changeState('Cinematic', p);
+            p.playAnim('idle', false);
+        });
+
+        // Position players on the ground, facing each other
+        if (p1) { p1.setPosition(860, 750); p1.setFacingDirection(1); }
+        if (p2) { p2.setPosition(1060, 750); p2.setFacingDirection(-1); }
+
+        // Hide HUD during cutscene
+        if (this.matchHUD) this.matchHUD.setVisible(false);
+
+        // Launch mid-fight dialogue
+        const playerChar = this.playerData[0]?.character || 'fok';
+        this.launchDialogueWithCallback(
+            opponent.dialogueMidFight,
+            playerChar,
+            opponent.character,
+            () => {
+                // Resume fight after mid-fight cutscene
+                this.endCutscene();
+            }
+        );
+    }
+
+    /**
+     * Campaign defeat cutscene: plays after opponent is eliminated.
+     * Skips win animation and rematch prompt entirely.
+     */
+    private campaignDefeatCutscene(): void {
+        this.isGameOver = true; // Prevent normal game over flow
+
+        const opponent = CampaignManager.getInstance().ladder[
+            (CampaignManager.getInstance() as any).currentData.currentLevel - 1
+        ];
+
+        // Fade to black immediately after death
+        this.cameras.main.fadeOut(1000, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+            // Reset camera to default state (stop any pan/zoom/shake from death)
+            this.cameras.main.stopFollow();
+            this.cameras.main.resetFX();
+            this.cameras.main.setZoom(1);
+            this.cameras.main.centerOn(960, 540);
+
+            // Position both players face-to-face like the intro cutscene
+            const p1 = this.players.find(p => p.playerId === 0);
+            const p2 = this.players.find(p => p.playerId === 1);
+
+            if (p1) {
+                p1.velocity.set(0, 0);
+                p1.isGrounded = true;
+                p1.setActive(true);
+                p1.setVisible(true);
+                p1.animationKey = 'idle';
+                p1.fsm.changeState('Cinematic', p1);
+                p1.setPosition(860, 750);
+                p1.setFacingDirection(1);
+                p1.playAnim('idle', false);
+            }
+
+            if (p2) {
+                p2.velocity.set(0, 0);
+                p2.isGrounded = true;
+                p2.setActive(true);
+                p2.setVisible(true);
+                p2.animationKey = 'idle';
+                p2.fsm.changeState('Cinematic', p2);
+                p2.setPosition(1060, 750);
+                p2.setFacingDirection(-1);
+                p2.playAnim('idle', false);
+            }
+
+            // Hide HUD
+            if (this.matchHUD) this.matchHUD.setVisible(false);
+
+            // Fade back in to reveal the cutscene
+            this.cameras.main.fadeIn(1000, 0, 0, 0);
+
+            if (opponent && opponent.dialogueAfterWin.length > 0) {
+                const playerChar = this.playerData[0]?.character || 'fok';
+                this.launchDialogueWithCallback(
+                    opponent.dialogueAfterWin,
+                    playerChar,
+                    opponent.character,
+                    () => {
+                        // After defeat cutscene → transition to next opponent
+                        this.campaignTransitionToNextOpponent();
+                    }
+                );
+            } else {
+                // No defeat dialogue, go straight to transition
+                this.campaignTransitionToNextOpponent();
+            }
+        });
+    }
+
+    /**
+     * Transition to next campaign opponent with a fade effect.
+     */
+    private campaignTransitionToNextOpponent(): void {
+        // Fade camera to black (longer transition for dramatic effect)
+        this.cameras.main.fadeOut(2000, 0, 0, 0);
+
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+            const nextOpponent = CampaignManager.getInstance().getCurrentOpponent();
+
+            if (nextOpponent) {
+                // Next opponent exists — restart GameScene in campaign mode
+                this.scene.restart({ playerData: [this.playerData[0]], mode: 'campaign' });
+            } else {
+                // Campaign complete!
+                CampaignManager.getInstance().resetCampaign();
+                this.scene.start('MainMenuScene');
+            }
+        });
+    }
+
+    /**
+     * Launch dialogue with a custom completion callback (used by mid-fight and defeat cutscenes).
+     */
+    private launchDialogueWithCallback(
+        dialogue: { speaker: string; text: string; side: 'left' | 'right' }[],
+        leftChar: string,
+        rightChar: string,
+        onComplete: () => void
+    ): void {
+        const diagData = {
+            dialogueData: dialogue,
+            leftCharacter: leftChar,
+            rightCharacter: rightChar
+        };
+
+        // Stop any stale DialogueScene first
+        if (this.scene.isActive('DialogueScene')) {
+            this.scene.stop('DialogueScene');
+        }
+
+        const diagScene = this.scene.get('DialogueScene');
+
+        diagScene.events.once('create', () => {
+            diagScene.events.once('dialogue_complete', () => {
+                onComplete();
+            });
+        });
+
+        this.scene.launch('DialogueScene', diagData);
     }
 
     // --- Gamepad Helper Methods (Raw Input for reliability) ---

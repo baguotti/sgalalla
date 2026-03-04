@@ -47,7 +47,7 @@ export class AttackState implements IState {
 
     getAnimationKey(player: Player): string {
         const currentAttack = player.getCurrentAttack();
-        if (!currentAttack) return 'attack_light_neutral';
+        if (!currentAttack) return 'idle'; // Attack ended — show idle until state transitions
 
         if (currentAttack.data.type === AttackType.HEAVY) {
             switch (currentAttack.data.direction) {

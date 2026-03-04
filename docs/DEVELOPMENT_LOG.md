@@ -4,6 +4,22 @@ Part 2
 
 
 
+
+### [2026-03-04] v2.0.3 - Campaign Multi-Phase Flow & Cutscene Polish ⚔️🎭
+- **[V]** `v2.0.3`
+- **[Feat]** **Campaign Multi-Phase Flow**:
+    - **Mid-Fight Cutscene**: Implemented a cinematic pause when the opponent reaches 1 life. Includes a 2s delay after respawn to let the atmosphere settle.
+    - **Custom Defeat Flow**: Integrated a dedicated cutscene for defeating an opponent. Skips the standard victory screen and rematch prompt to flow directly into the story.
+    - **Transitions**: Added a smooth 2000ms black fade transition between opponents in the campaign.
+- **[Fix]** **Cutscene Stability & Visuals**:
+    - **Animation Reset**: Fixed a bug where characters remained in "Death/Fall" sprites during cutscenes by resetting `animationKey` and forcing an `idle` pose.
+    - **Cinematic Physics**: Rearchitected the physics loop for `CinematicState`. Now skips the complex authoritative simulation to prevent position overwriting while maintaining manual gravity for the intro.
+    - **Glitch Fix**: Eliminated the 1-frame light punch flash at the end of heavy attacks by adjusting the fallback animation in `AttackState`.
+- **[Tuning]** **Pacing**: Optimized dialogue triggers to feel snappier and more intentional across all campaign phases.
+- **[S]** **STATUS**: Campaign story flow is now robust and immersive.
+
+---
+
 ### [2026-02-16] v0.12.0 - Refactoring & Technical Debt Cleanup
 - **[V]** `v0.12.0`
 - **[Refactor]** **Core Optimization**:

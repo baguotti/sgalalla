@@ -146,11 +146,9 @@ export class DialogueScene extends Phaser.Scene {
 
         if (this.leftPortrait) {
             this.leftPortrait.setTint(isLeftSpeaking ? 0xffffff : 0x555555);
-            this.leftPortrait.setAlpha(isLeftSpeaking ? 1 : 0.6);
         }
         if (this.rightPortrait) {
             this.rightPortrait.setTint(isLeftSpeaking ? 0x555555 : 0xffffff);
-            this.rightPortrait.setAlpha(isLeftSpeaking ? 0.6 : 1);
         }
     }
 

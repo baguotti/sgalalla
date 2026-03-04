@@ -48,6 +48,10 @@ export class Player extends Fighter {
 
     public combat: PlayerCombat;
 
+    public getSprite(): Phaser.GameObjects.Sprite {
+        return this.sprite;
+    }
+
     // FSM — State Machine (Phase 2 forward declaration, wired in Phase 3)
     public fsm: StateMachine = new StateMachine();
 
@@ -227,9 +231,6 @@ export class Player extends Fighter {
         // and so that relative child effects (like ghosts at player.depth - 1) still render above platforms.
         this.setDepth(10);
 
-
-
-
         // Create Name Tag (Player Indicator)
         let displayName = '';
         if (this.isAI) {
@@ -343,11 +344,18 @@ export class Player extends Fighter {
     }
 
     public updatePhysics(delta: number): void {
-        // If in Cinematic state, force empty input (no AI, no player input) but still run physics (gravity)
+        // If in Cinematic state, skip physics entirely — manual positioning only
         const isCinematic = this.fsm.getCurrentStateName() === 'Cinematic';
 
         if (isCinematic) {
             this.currentInput = this.inputManager.getEmptyInput();
+            this.inputBuffer.update(this.currentInput);
+            // Apply velocity to position manually (for gravity during intro cutscene)
+            // but skip stepPhysics/syncFromBody to prevent overwriting external positioning
+            const dt = delta / 1000;
+            this.x += this.velocity.x * dt;
+            this.y += this.velocity.y * dt;
+            return;
         } else if (this.isAI) {
             if (this.isTrainingDummy) {
                 this.currentInput = this.inputManager.getEmptyInput();
