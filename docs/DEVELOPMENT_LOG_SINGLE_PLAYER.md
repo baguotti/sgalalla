@@ -16,15 +16,12 @@
     - Tweaked `LobbyScene.ts` to automatically assign Player 1 and start the campaign ladder sequence upon character selection.
 - **[S]** **STATUS**: The foundational framework for the single-player campaign is live.
 ----------------------------------------------------------------------------------------------------------------------------
-### [2026-03-04] v2.0.1 - Campaign Cutscene Visual Overhaul 🎬
-- **[V]** `v2.0.1`
-- **[Feat]** **JRPG-Style Dialogue**:
-    - Characters snap to center stage positions facing each other (no tween, instant placement).
-    - AI opponent is fully frozen during cutscene — `CinematicState` now suppresses AI input while still applying gravity.
-    - `DialogueScene` auto-plays dialogue lines passed via `init()` data with large 4x character icon portraits on left/right.
-    - Active speaker portrait is bright, listener portrait is dimmed for visual clarity.
-- **[Fix]** **DialogueScene Registration**: Scene was missing from `main.ts` Phaser config — now properly registered.
-- **[Fix]** **Opponent Facing**: Uses `Player.setFacingDirection()` API to correctly face P2 towards P1.
-- **[Fix]** **Combat Blocking**: Added `'Cinematic'` to combat blocked states preventing attacks during cutscenes.
-- **[UI]** **MatchHUD**: Hidden during cutscene dialogue, restored when fight begins.
-- **[S]** **STATUS**: Pre-fight dialogue flow is working end-to-end.
+### [2026-03-04] v2.0.2 - Campaign Cutscene Polishing 🎬
+- **[V]** `v2.0.2`
+- **[Feat]** **Dialogue UI Polishing**:
+    - Portraits scaled to 2x (512px) for more impact.
+    - Icons aligned with dialogue box corners (Left Icon at 10%, Right Icon at 90%).
+    - Portraits rendered behind the dialogue box (Depth layering).
+    - Expanded dialogue for Nock (4 pages).
+- **[Fix]** **Hovering & Gravity**: Players now land naturally during cutscenes while remaining input-frozen.
+- **[S]** **STATUS**: Campaign intro is polished and versioned as v2.0.2.

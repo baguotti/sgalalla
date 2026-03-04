@@ -44,7 +44,8 @@ export class DialogueScene extends Phaser.Scene {
 
         // Dialogue Box (Bottom)
         this.dialogueBox = this.add.rectangle(width / 2, height - 100, width * 0.8, 150, 0x222222, 0.9)
-            .setStrokeStyle(4, 0xffffff);
+            .setStrokeStyle(4, 0xffffff)
+            .setDepth(15);
 
         // This makes sure it's not marked as unused by the linter
         this.dialogueBox.setVisible(true);
@@ -65,7 +66,7 @@ export class DialogueScene extends Phaser.Scene {
             fontSize: '24px',
             color: '#ffffff',
             wordWrap: { width: width * 0.8 - 40 }
-        });
+        }).setDepth(20);
 
         // Setup input to advance dialogue
         this.input.keyboard?.on('keydown-SPACE', () => this.advanceDialogue(), this);
@@ -99,16 +100,25 @@ export class DialogueScene extends Phaser.Scene {
     }
 
     private createPortraits(width: number, height: number) {
-        // Left Portrait
-        this.leftPortrait = this.add.sprite(width * 0.15, height - 250, this.leftCharacterKey, this.getIconFrame(this.leftCharacterKey))
-            .setScale(4)
-            .setDepth(10);
+        // Dialogue box top edge = height - 100 (center) - 75 (half height) = height - 175
+        // Icons at scale 2 = 256*2 = 512px display. Half = 256px.
+        // Portrait Y so bottom aligns with dialogue top: (height - 175) - 256 = height - 431
+        const portraitY = height - 175 - 256;
 
-        // Right Portrait
-        this.rightPortrait = this.add.sprite(width * 0.85, height - 250, this.rightCharacterKey, this.getIconFrame(this.rightCharacterKey))
-            .setScale(4)
+        // Box edges at 80% width: 0.1 * width and 0.9 * width
+        const boxLeft = width * 0.1;
+        const boxRight = width * 0.9;
+
+        // Left Portrait: align left edge with boxLeft
+        this.leftPortrait = this.add.sprite(boxLeft + 256, portraitY, this.leftCharacterKey, this.getIconFrame(this.leftCharacterKey))
+            .setScale(2)
+            .setDepth(10); // Behind dialogueBox (15)
+
+        // Right Portrait: align right edge with boxRight
+        this.rightPortrait = this.add.sprite(boxRight - 256, portraitY, this.rightCharacterKey, this.getIconFrame(this.rightCharacterKey))
+            .setScale(2)
             .setFlipX(true) // Enemy faces left
-            .setDepth(10);
+            .setDepth(10); // Behind dialogueBox (15)
     }
 
     public playDialogue(lines: DialogueLine[]): Promise<void> {

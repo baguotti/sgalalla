@@ -18,7 +18,10 @@ export class CampaignManager {
             character: 'nock',
             stage: 'stage_1',
             dialogueBefore: [
-                { speaker: 'Nock', text: 'You think you can pass me? Think again!', side: 'right' }
+                { speaker: 'Nock', text: 'You think you can pass me? Think again!', side: 'right' },
+                { speaker: 'Player', text: 'I am not just passing through. I am here to win.', side: 'left' },
+                { speaker: 'Nock', text: 'Win? Against ME? Your confidence is misplaced...', side: 'right' },
+                { speaker: 'Nock', text: 'Let see if your skills match your mouth!', side: 'right' }
             ],
             difficulty: 3
         },

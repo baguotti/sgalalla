@@ -389,9 +389,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (this.mode === 'campaign') {
                 const opponent = CampaignManager.getInstance().getCurrentOpponent();
                 if (opponent) {
-                    // Hide match HUD during cutscene
-                    if (this.matchHUD) this.matchHUD.setVisible(false);
-
                     // Start cutscene, moving P1 slightly left and P2 slightly right of center
                     this.transitionToCutscene([
                         { playerId: 0, x: 860, y: 300 },
@@ -1483,6 +1480,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
             // Wait 600ms for the black LOADING overlay to fade out, then launch dialogue
             this.time.delayedCall(600, () => {
+                // Hide match HUD now that it's fully constructed
+                if (this.matchHUD) this.matchHUD.setVisible(false);
                 this.launchDialogue(dialogue, resolve, leftChar, rightChar);
             });
         });
