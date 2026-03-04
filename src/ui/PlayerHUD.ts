@@ -49,17 +49,31 @@ export class PlayerHudSlot {
         _playerName: string,
         playerIndex: number,
         character: string,
-        isRightSide: boolean = false
+        isRightSide: boolean = false,
+        flipPortrait: boolean = false,
+        isCampaign: boolean = false
     ) {
         this.scene = scene;
         this.container = scene.add.container(x, y);
         this.container.setScrollFactor(0);
         this.container.setDepth(101);
 
-        const colorObj = Phaser.Display.Color.ValueToColor(SMASH_COLORS[playerIndex % SMASH_COLORS.length]);
+        let colorObj = Phaser.Display.Color.ValueToColor(SMASH_COLORS[playerIndex % SMASH_COLORS.length]);
+        let nameColorHex = '#' + colorObj.color.toString(16).padStart(6, '0');
+
+        // Campaign color overrides
+        if (isCampaign) {
+            if (playerIndex === 0) {
+                colorObj = Phaser.Display.Color.ValueToColor(0xF0F0F0); // Off-white for player
+                nameColorHex = '#F0F0F0';
+            } else {
+                colorObj = Phaser.Display.Color.ValueToColor(0x333333); // Dark grey diamond for opponent
+                nameColorHex = '#FFFFFF'; // White name for opponent
+            }
+        }
+
         const color = colorObj.color;
-        const colorHex = '#' + color.toString(16).padStart(6, '0');
-        this.colorHex = colorHex;
+        this.colorHex = '#' + color.toString(16).padStart(6, '0');
 
         // Darker color for top of gradient
         const darkerColorObj = new Phaser.Display.Color(colorObj.red, colorObj.green, colorObj.blue);
@@ -92,11 +106,14 @@ export class PlayerHudSlot {
         // Name Text
         let charName = character.split('_')[0].toUpperCase();
         if (charName === 'FOK') charName = 'FOK';
-        this.nameText = scene.add.text(nameX + 10, nameY, `P${playerIndex + 1} • ${charName}`, {
+
+        const displayText = isCampaign ? charName : `P${playerIndex + 1} • ${charName}`;
+
+        this.nameText = scene.add.text(nameX + 10, nameY, displayText, {
             fontSize: '16px',
             fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
-            color: colorHex,
+            color: nameColorHex,
             stroke: '#000000',
             strokeThickness: 2
         }).setOrigin(0, 0.5);
@@ -151,7 +168,12 @@ export class PlayerHudSlot {
         // User requested -5% smaller (1.35 -> 1.28)
         const targetSize = diamondSize * 1.15;
         const scale = targetSize / (portrait.width || 64);
-        portrait.setScale(scale);
+
+        if (flipPortrait) {
+            portrait.setScale(-scale, scale);
+        } else {
+            portrait.setScale(scale);
+        }
 
         portrait.y = 10; // Push down
 
@@ -359,17 +381,34 @@ export class MatchHUD {
         }
 
         const isRightSide = x > width / 2; // Kept for logic if needed, but mirroring disabled
+        let finalX = x;
+        let flipPortrait = false;
+
+        // --- Custom Campaign Mode Layout ---
+        // Player 1 on far left, Opponent on far right, Opponent portrait flipped
+        const currentScene = this.scene as any;
+        const isCampaign = currentScene.mode === 'campaign';
+        if (isCampaign) {
+            if (playerId === 0) {
+                finalX = 250; // Anchor left
+            } else if (playerId === 1) {
+                finalX = width - 250; // Anchor right (leaves room for the 180px nameplate)
+                flipPortrait = true;  // Make the portrait face the player
+            }
+        }
 
         const slot = new PlayerHudSlot(
             this.scene,
-            x,
+            finalX,
             y,
             240, // Base width
             80,  // Base height
             display,
             playerId,
             character,
-            isRightSide
+            isRightSide,
+            flipPortrait,
+            isCampaign
         );
 
         this.ignoredCameras.forEach(cam => slot.addToCameraIgnore(cam));

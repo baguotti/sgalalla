@@ -6,13 +6,16 @@ export class CinematicState implements IState {
     readonly name = 'Cinematic';
 
     enter(player: Player): void {
-        // Stop movement and reset animations
+        // Stop movement
         player.velocity.x = 0;
         player.velocity.y = 0;
-        player.playAnim('idle', true);
+
+        // Start cinematic in idle, but allow events to change player.animationKey later
+        if (!player.animationKey) {
+            player.animationKey = 'idle';
+        }
 
         // Ensure hitboxes are cleared
-        // Since disableAllHitboxes wasn't available, deactivateHitbox serves the identical purpose locally.
         (player.combat as any).deactivateHitbox();
     }
 
@@ -32,7 +35,9 @@ export class CinematicState implements IState {
     }
 
     getAnimationKey(player: Player): string {
-        // External dialogue manager can override player.animationKey if doing a custom animation
+        // Allow DialogueScene or tweens to set custom animationKeys (like 'taunt')
+        // We do NOT append character prefixes here. The player's updateAnimation logic 
+        // expects base keys ('idle', 'taunt') so we just return the currently requested key.
         return player.animationKey || 'idle';
     }
 

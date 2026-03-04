@@ -1,6 +1,13 @@
 import { SaveService } from './SaveService';
 import type { CampaignSaveData } from './SaveService';
 
+import * as nockDialogue from '../data/dialogue/nock';
+import * as peDialogue from '../data/dialogue/pe';
+import * as sguDialogue from '../data/dialogue/sgu';
+import * as sgaDialogue from '../data/dialogue/sga';
+import * as fokDialogue from '../data/dialogue/fok';
+import * as gregDialogue from '../data/dialogue/greg';
+
 export interface OpponentConfig {
     character: string;
     stage: string;
@@ -10,100 +17,51 @@ export interface OpponentConfig {
     difficulty: number; // 1-10 mapped to AI aggressiveness
 }
 
+/** Maps character keys to their dialogue modules */
+const dialogueMap: Record<string, typeof fokDialogue> = {
+    nock: nockDialogue,
+    pe: peDialogue,
+    sgu: sguDialogue,
+    sga: sgaDialogue,
+    fok: fokDialogue,
+    greg: gregDialogue,
+};
+
+/** Characters that have full dialogue scripts and can appear as opponents */
+const AVAILABLE_OPPONENTS = ['nock', 'pe', 'sgu', 'sga', 'fok', 'greg'];
+
+/** Difficulty tiers assigned in order (easiest → hardest, final boss is always 10) */
+const DIFFICULTY_TIERS = [2, 4, 5, 7, 8, 10];
+
+/** Fisher-Yates shuffle */
+function shuffle<T>(array: T[]): T[] {
+    const a = [...array];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
 export class CampaignManager {
     private static instance: CampaignManager;
     private currentData: CampaignSaveData | null = null;
 
-    // Hardcoded Ladder logic
-    public readonly ladder: OpponentConfig[] = [
-        {
-            character: 'nock',
-            stage: 'stage_1',
-            dialogueBefore: [
-                { speaker: 'Nock', text: 'You think you can pass me? Think again!', side: 'right' },
-                { speaker: 'Player', text: 'I am not just passing through. I am here to win.', side: 'left' },
-                { speaker: 'Nock', text: 'Win? Against ME? Your confidence is misplaced...', side: 'right' },
-                { speaker: 'Nock', text: 'Let see if your skills match your mouth!', side: 'right' }
-            ],
-            dialogueMidFight: [
-                { speaker: 'Nock', text: 'Tch... you are stronger than I expected.', side: 'right' },
-                { speaker: 'Player', text: 'Give up now while you still can.', side: 'left' },
-                { speaker: 'Nock', text: 'Never! I will show you my true power!', side: 'right' }
-            ],
-            dialogueAfterWin: [
-                { speaker: 'Nock', text: 'Impossible... I lost...', side: 'right' },
-                { speaker: 'Player', text: 'That was just the beginning. Who is next?', side: 'left' }
-            ],
-            difficulty: 3
-        },
-        {
-            character: 'pe',
-            stage: 'stage_1',
-            dialogueBefore: [
-                { speaker: 'Pe', text: 'Squawk! Intruders will be pecked.', side: 'right' }
-            ],
-            dialogueMidFight: [
-                { speaker: 'Pe', text: 'SQUAWK!! You dare hurt me?!', side: 'right' },
-                { speaker: 'Player', text: 'Stand down, bird.', side: 'left' }
-            ],
-            dialogueAfterWin: [
-                { speaker: 'Pe', text: 'Squawk... defeated...', side: 'right' },
-                { speaker: 'Player', text: 'Onward.', side: 'left' }
-            ],
-            difficulty: 5
-        },
-        {
-            character: 'sgu',
-            stage: 'stage_1',
-            dialogueBefore: [
-                { speaker: 'Sgu', text: '...', side: 'right' }
-            ],
-            dialogueMidFight: [
-                { speaker: 'Sgu', text: '......!', side: 'right' },
-                { speaker: 'Player', text: 'You fight well, even in silence.', side: 'left' }
-            ],
-            dialogueAfterWin: [
-                { speaker: 'Sgu', text: '...', side: 'right' },
-                { speaker: 'Player', text: 'I understand. Until next time.', side: 'left' }
-            ],
-            difficulty: 7
-        },
-        {
-            character: 'sga',
-            stage: 'stage_1',
-            dialogueBefore: [
-                { speaker: 'Sga', text: 'Let me show you my blade.', side: 'right' }
-            ],
-            dialogueMidFight: [
-                { speaker: 'Sga', text: 'You scratch my armor... impressive.', side: 'right' },
-                { speaker: 'Player', text: 'Your armor will not save you.', side: 'left' }
-            ],
-            dialogueAfterWin: [
-                { speaker: 'Sga', text: 'My blade... bested. You have earned my respect.', side: 'right' },
-                { speaker: 'Player', text: 'Respect earned in battle. Now step aside.', side: 'left' }
-            ],
-            difficulty: 8
-        },
-        {
-            character: 'fok',
-            stage: 'stage_1',
-            dialogueBefore: [
-                { speaker: 'Fok', text: 'You made it to the end. Now face your doom.', side: 'right' }
-            ],
-            dialogueMidFight: [
-                { speaker: 'Fok', text: 'Heh... not bad. But this is where it ends!', side: 'right' },
-                { speaker: 'Player', text: 'I have come too far to lose now!', side: 'left' }
-            ],
-            dialogueAfterWin: [
-                { speaker: 'Fok', text: 'You... actually did it. The champion falls.', side: 'right' },
-                { speaker: 'Player', text: 'It is over. I am the champion now.', side: 'left' }
-            ],
-            difficulty: 10
-        }
-    ];
+    /** The generated ladder for this run — built dynamically in startNewCampaign */
+    public ladder: OpponentConfig[] = [];
 
     private constructor() {
         this.currentData = SaveService.loadCampaign();
+        // Rebuild ladder from save if resuming
+        if (this.currentData && !this.currentData.completed) {
+            if (this.currentData.ladderOrder && this.currentData.ladderOrder.length > 0) {
+                this.ladder = this.buildLadderFromOrder(this.currentData.ladderOrder);
+            } else {
+                // Stale save from old format — clear it so a fresh campaign starts
+                this.currentData = null;
+                SaveService.clearCampaign();
+            }
+        }
     }
 
     public static getInstance(): CampaignManager {
@@ -113,13 +71,46 @@ export class CampaignManager {
         return CampaignManager.instance;
     }
 
+    /**
+     * Start a new campaign run.
+     * - Excludes the player's own character from the first N-1 opponents.
+     * - Shuffles them randomly.
+     * - Places the player's own character as the final boss (mirror match).
+     */
     public startNewCampaign(playerCharacter: string): void {
+        // Build opponent pool: everyone except the player, then shuffle
+        const pool = AVAILABLE_OPPONENTS.filter(c => c !== playerCharacter);
+        const shuffled = shuffle(pool);
+
+        // Final boss is always a mirror match (player's own character)
+        const ladderOrder = [...shuffled, playerCharacter];
+
+        this.ladder = this.buildLadderFromOrder(ladderOrder);
+
         this.currentData = {
             currentLevel: 0,
             playerCharacter,
-            completed: false
+            completed: false,
+            ladderOrder, // Persist so we can rebuild on reload
         };
         SaveService.saveCampaign(this.currentData);
+    }
+
+    /** Converts a list of character keys into a full OpponentConfig[] ladder */
+    private buildLadderFromOrder(order: string[]): OpponentConfig[] {
+        return order.map((char, index) => {
+            const dialogue = dialogueMap[char];
+            const difficulty = DIFFICULTY_TIERS[index] ?? 10;
+
+            return {
+                character: char,
+                stage: 'stage_1',
+                dialogueBefore: dialogue ? dialogue.dialogueBefore : [],
+                dialogueMidFight: dialogue ? dialogue.dialogueMidFight : [],
+                dialogueAfterWin: dialogue ? dialogue.dialogueAfterWin : [],
+                difficulty,
+            };
+        });
     }
 
     public hasActiveCampaign(): boolean {
@@ -149,6 +140,7 @@ export class CampaignManager {
 
     public resetCampaign(): void {
         this.currentData = null;
+        this.ladder = [];
         SaveService.clearCampaign();
     }
 }

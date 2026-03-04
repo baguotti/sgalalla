@@ -2,6 +2,7 @@ export interface CampaignSaveData {
     currentLevel: number;
     playerCharacter: string;
     completed: boolean;
+    ladderOrder?: string[]; // Persisted randomized opponent order
 }
 
 const SAVE_KEY = 'sgalalla_campaign_save';

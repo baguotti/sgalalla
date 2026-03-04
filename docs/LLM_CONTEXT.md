@@ -54,7 +54,7 @@ When updating `DEVELOPMENT_LOG.md`, use these tags:
 When the user says "**PROCEDURE**", perform these EXACT steps:
 1.  **Bump Version**: Update `package.json` (e.g., `1.2.1`).
 2.  **Update UI**: Sync version string in `MainMenuScene.ts`.
-3.  **Log**: Add latest changes to `docs/DEVELOPMENT_LOG.md` (chronological).
+3.  **Log**: Add every change since previous version to the devlog (chronological).
 4.  **Commit**: Message format: `v[VERSION]: [Short Summary]`.
 5.  **Push**: Execute `git push` to deploy online.
 

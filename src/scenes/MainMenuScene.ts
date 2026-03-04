@@ -70,13 +70,13 @@ export class MainMenuScene extends Phaser.Scene {
         }
 
         // Version Text
-        this.add.text(this.cameras.main.width - 20, this.cameras.main.height - 20, 'v2.0.4', {
+        this.add.text(this.cameras.main.width - 20, this.cameras.main.height - 20, 'v2.0.5', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(1, 1);        // Menu Items
-        const startY = height - 280; // Moved lower
+        const startY = height - 260; // Slightly lower
         this.menuOptions.forEach((opt, index) => {
-            const text = this.add.text(width / 2, startY + (index * 70), opt.label, {
-                fontSize: '48px', fontFamily: '"Pixeloid Sans"', color: '#888888'
+            const text = this.add.text(width / 2, startY + (index * 55), opt.label, {
+                fontSize: '40px', fontFamily: '"Pixeloid Sans"', color: '#888888'
             }).setOrigin(0.5);
 
 
@@ -209,7 +209,7 @@ export class MainMenuScene extends Phaser.Scene {
             } else {
                 text.setColor('#888888');
                 text.setAlpha(0.5);
-                text.setFontSize(48);
+                text.setFontSize(40);
                 text.setShadow(0, 0, 'transparent', 0, false, false); // remove glow
             }
         });

@@ -4,10 +4,11 @@ export interface DialogueLine {
     speaker: string;
     text: string;
     side: 'left' | 'right';
+    animation?: string; // Optional: sprite/animation to show (e.g. "idle", "taunt", "hurt")
 }
 
 export class DialogueScene extends Phaser.Scene {
-    private dialogueBox!: Phaser.GameObjects.Rectangle;
+    private dialogueBox!: Phaser.GameObjects.Graphics;
     private textElement!: Phaser.GameObjects.Text;
     private nameElement!: Phaser.GameObjects.Text;
     private lines: DialogueLine[] = [];
@@ -19,6 +20,10 @@ export class DialogueScene extends Phaser.Scene {
 
     private leftPortrait!: Phaser.GameObjects.Sprite;
     private rightPortrait!: Phaser.GameObjects.Sprite;
+
+    private isTyping: boolean = false;
+    private typewriterTimer?: Phaser.Time.TimerEvent;
+    private textMask!: Phaser.GameObjects.Graphics;
 
     constructor() {
         super('DialogueScene');
@@ -42,31 +47,46 @@ export class DialogueScene extends Phaser.Scene {
         // Dark semi-transparent background for focus
         this.add.rectangle(0, 0, width, height, 0x000000, 0.4).setOrigin(0);
 
+        // Dialogue Box Dimensions
+        const boxWidth = width * 0.8;
+        const boxHeight = 240; // Increased height
+        const boxX = (width - boxWidth) / 2;
+        const boxY = height - boxHeight - 50; // 50px from bottom
+
         // Dialogue Box (Bottom)
-        this.dialogueBox = this.add.rectangle(width / 2, height - 100, width * 0.8, 150, 0x222222, 0.9)
-            .setStrokeStyle(4, 0xffffff)
-            .setDepth(15);
+        this.dialogueBox = this.add.graphics();
+        this.dialogueBox.fillStyle(0x1a1a1a, 0.95);
+        this.dialogueBox.fillRoundedRect(boxX, boxY, boxWidth, boxHeight, 16);
+        this.dialogueBox.lineStyle(4, 0x444444);
+        this.dialogueBox.strokeRoundedRect(boxX, boxY, boxWidth, boxHeight, 16);
+        this.dialogueBox.setDepth(15);
 
-        // This makes sure it's not marked as unused by the linter
-        this.dialogueBox.setVisible(true);
+        // Anchor coordinates inside the box
+        const textRightAnchor = boxX + boxWidth - 40;
 
-        // Speaker Name text
-        this.nameElement = this.add.text(width / 2 - (width * 0.4) + 20, height - 170, '', {
+        // Speaker Name text (Keep on right)
+        this.nameElement = this.add.text(textRightAnchor, boxY + 20, '', {
             fontFamily: '"Pixeloid Sans"',
-            fontSize: '20px',
-            color: '#ffff00',
+            fontSize: '36px',
+            fontStyle: 'bold',
+            color: '#ffffff', // Changed to white
             stroke: '#000000',
-            strokeThickness: 3
-        });
-        this.nameElement.setDepth(20);
+            strokeThickness: 4,
+            align: 'right'
+        }).setOrigin(1, 0).setDepth(20);
 
-        // Text Element
-        this.textElement = this.add.text(width / 2 - (width * 0.4) + 20, height - 140, '', {
+        // Text Element (Right aligned)
+        this.textElement = this.add.text(textRightAnchor, boxY + 80, '', {
             fontFamily: '"Pixeloid Sans"',
-            fontSize: '24px',
+            fontSize: '48px',
             color: '#ffffff',
-            wordWrap: { width: width * 0.8 - 40 }
-        }).setDepth(20);
+            wordWrap: { width: boxWidth - 80 },
+            align: 'right'
+        }).setOrigin(1, 0).setDepth(20);
+
+        // Create an invisible mask for the typewriter reveal
+        this.textMask = this.make.graphics();
+        this.textElement.setMask(this.textMask.createGeometryMask());
 
         // Setup input to advance dialogue
         this.input.keyboard?.on('keydown-SPACE', () => this.advanceDialogue(), this);
@@ -100,10 +120,10 @@ export class DialogueScene extends Phaser.Scene {
     }
 
     private createPortraits(width: number, height: number) {
-        // Dialogue box top edge = height - 100 (center) - 75 (half height) = height - 175
+        // Dialogue box top edge = height - 240 (box height) - 50 (margin) = height - 290
         // Icons at scale 2 = 256*2 = 512px display. Half = 256px.
-        // Portrait Y so bottom aligns with dialogue top: (height - 175) - 256 = height - 431
-        const portraitY = height - 175 - 256;
+        // Portrait Y so bottom aligns with dialogue top: (height - 290) - 256
+        const portraitY = height - 290 - 256;
 
         // Box edges at 80% width: 0.1 * width and 0.9 * width
         const boxLeft = width * 0.1;
@@ -139,22 +159,83 @@ export class DialogueScene extends Phaser.Scene {
 
         const line = this.lines[this.currentLineIndex];
         this.nameElement.setText(line.speaker);
+
+        // --- Typewriter Effect via Masking ---
+        if (this.typewriterTimer) this.typewriterTimer.remove();
+
+        // Show FULL text immediately so it takes its final right-aligned position
         this.textElement.setText(line.text);
 
-        // Highlight active speaker, dim the other
-        const isLeftSpeaking = line.side === 'left';
+        // Reset mask to empty (hide everything)
+        this.textMask.clear();
+        this.isTyping = true;
+
+        const boxWidth = this.scale.width * 0.8;
+        const boxHeight = 240;
+        const boxX = (this.scale.width - boxWidth) / 2;
+        const boxY = this.scale.height - boxHeight - 50;
+
+        let charIndex = 0;
+        this.typewriterTimer = this.time.addEvent({
+            delay: 15, // Fast typewriter
+            callback: () => {
+                charIndex++;
+
+                // Redraw mask to reveal more of the area
+                // We reveal the entire box width but grow the mask height or X
+                // For a simpler "appears letter by letter" without sliding:
+                // We keep the mask covering the full height but grow from left to right
+                this.textMask.clear();
+                this.textMask.fillStyle(0xffffff);
+
+                // Because it is right-aligned, the text block might be shorter than the box.
+                // We just reveal the whole box width proportionally to char count.
+                const revealPercent = charIndex / line.text.length;
+                this.textMask.fillRect(boxX, boxY, boxWidth * revealPercent, boxHeight);
+
+                if (charIndex >= line.text.length) {
+                    this.isTyping = false;
+                    this.textMask.clear();
+                    this.textMask.fillRect(boxX, boxY, boxWidth, boxHeight); // Fully reveal
+                    if (this.typewriterTimer) this.typewriterTimer.remove();
+                }
+            },
+            repeat: line.text.length - 1
+        });
+
+        // Always emit animation — default to 'idle' when no animation is specified
+        this.events.emit('dialogue_animation', line.side, line.animation || 'idle');
 
         if (this.leftPortrait) {
-            this.leftPortrait.setTint(isLeftSpeaking ? 0xffffff : 0x555555);
+            this.leftPortrait.setTint(0xffffff);
+            this.leftPortrait.stop();
+            this.leftPortrait.setFrame(this.getIconFrame(this.leftCharacterKey));
         }
+
         if (this.rightPortrait) {
-            this.rightPortrait.setTint(isLeftSpeaking ? 0x555555 : 0xffffff);
+            this.rightPortrait.setTint(0xffffff);
+            this.rightPortrait.stop();
+            this.rightPortrait.setFrame(this.getIconFrame(this.rightCharacterKey));
         }
     }
 
     private advanceDialogue() {
-        this.currentLineIndex++;
-        this.showCurrentLine();
+        if (this.isTyping) {
+            // Skip typing - show full text immediately
+            if (this.typewriterTimer) this.typewriterTimer.remove();
+            this.isTyping = false;
+
+            // Clear mask to show everything
+            const boxWidth = this.scale.width * 0.8;
+            const boxX = (this.scale.width - boxWidth) / 2;
+            const boxY = this.scale.height - 240 - 50;
+            this.textMask.clear();
+            this.textMask.fillStyle(0xffffff);
+            this.textMask.fillRect(boxX, boxY, boxWidth, 240);
+        } else {
+            this.currentLineIndex++;
+            this.showCurrentLine();
+        }
     }
 
     private finishDialogue() {

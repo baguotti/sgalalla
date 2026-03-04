@@ -132,6 +132,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     init(data: any): void {
         this.mode = data.mode || 'versus';
+        this.campaignMidFightPlayed = false; // Reset for each new match
 
         if (data.playerData) {
             this.playerData = data.playerData;
@@ -145,8 +146,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         if (this.mode === 'campaign') {
             const campaign = CampaignManager.getInstance();
+            const selectedChar = this.playerData[0]?.character || 'fok';
+
+            // If the player changed character mid-run, reset and start fresh
+            if (campaign.hasActiveCampaign() && campaign.getPlayerCharacter() !== selectedChar) {
+                campaign.resetCampaign();
+            }
+
             if (!campaign.hasActiveCampaign()) {
-                campaign.startNewCampaign(this.playerData[0]?.character || 'fok');
+                campaign.startNewCampaign(selectedChar);
             }
 
             const opponent = campaign.getCurrentOpponent();
@@ -365,7 +373,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 }, pData.playerId === 0 ? this.touchController : undefined); // P1 gets touch control if active
 
                 // Set Color (all players use their assigned color)
-                const color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
+                let color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
+
+                // Campaign color overrides for indicators (HUD and name tags)
+                if (this.mode === 'campaign') {
+                    if (pData.playerId === 0) color = 0xF0F0F0; // Off-white for player
+                    else color = 0xFFFFFF; // White for opponent
+                }
+
                 player.visualColor = color;
                 player.resetVisuals();
 
@@ -1594,13 +1609,22 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Get scene reference BEFORE launch so we can listen for lifecycle events
         const diagScene = this.scene.get('DialogueScene');
 
-        // Listen for when DialogueScene finishes its create() — that's when dialogue starts auto-playing
-        diagScene.events.once('create', () => {
-            // Now listen for dialogue completion
-            diagScene.events.once('dialogue_complete', () => {
-                this.endCutscene();
-                resolve();
-            });
+        // Bind animation listener BEFORE launch — DialogueScene.create() synchronously
+        // calls showCurrentLine() which emits dialogue_animation during create().
+        diagScene.events.on('dialogue_animation', (side: 'left' | 'right', animation: string) => {
+            const targetPlayerId = side === 'left' ? 0 : 1;
+            const player = this.players.find(p => p.playerId === targetPlayerId);
+
+            if (player) {
+                player.animationKey = animation;
+                player.playAnim(animation, true);
+            }
+        });
+
+        diagScene.events.once('dialogue_complete', () => {
+            diagScene.events.off('dialogue_animation');
+            this.endCutscene();
+            resolve();
         });
 
         this.scene.launch('DialogueScene', diagData);
@@ -1770,10 +1794,20 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         const diagScene = this.scene.get('DialogueScene');
 
-        diagScene.events.once('create', () => {
-            diagScene.events.once('dialogue_complete', () => {
-                onComplete();
-            });
+        // Bind BEFORE launch to catch events emitted during create()
+        diagScene.events.on('dialogue_animation', (side: 'left' | 'right', animation: string) => {
+            const targetPlayerId = side === 'left' ? 0 : 1;
+            const player = this.players.find(p => p.playerId === targetPlayerId);
+
+            if (player) {
+                player.animationKey = animation;
+                player.playAnim(animation, true);
+            }
+        });
+
+        diagScene.events.once('dialogue_complete', () => {
+            diagScene.events.off('dialogue_animation');
+            onComplete();
         });
 
         this.scene.launch('DialogueScene', diagData);

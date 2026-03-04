@@ -54,3 +54,18 @@
 - **[Fix]** **Grounded Enforcement**: All three cutscene types (intro, mid-fight, defeat) now force both players to Y=750 with `isGrounded=true`, `velocity.set(0,0)`, and `playAnim('idle', false)`.
 - **[Fix]** **Tint Location**: Moved saturation restoration from `killPlayer()` (only fired at 0 lives) to `checkBlastZones` (fires on every death) so visual progression is gradual.
 - **[S]** **STATUS**: Campaign visuals and flow are polished and immersive.
+### [2026-03-04] v2.0.5 - Randomized Ladder & UI Polish 🎲✨
+- **[V]** `v2.0.5`
+- **[Feat]** **Dynamic Campaign Ladder**:
+    - Implemented randomized opponent order (shuffled excluding player's character).
+    - **Mirror Match**: Final boss is now always a mirror match of the player's character.
+    - **Persistence**: Ladder order is now saved in `localStorage`, persisting through reloads.
+    - **Reset Logic**: Campaign now automatically resets if the player selects a different character mid-run.
+- **[Feat]** **Character Expansion**:
+    - Added **Greg** as a playable and campaign opponent with unique dialogue and animations.
+- **[UI]** **HUD & Aesthetic Polish**:
+    - Opponent name color changed to white in HUD while keeping the diamond indicator dark grey.
+    - Dialogue speaker names increased to `36px` font size for better clarity.
+    - **Main Menu Optimization**: Reduced font size (`48px` -> `40px`) and vertical spacing (`70px` -> `55px`) to ensure all 5 options fit on screen without cropping.
+- **[Fix]** **Stale Save Protection**: Constructor now auto-clears invalid legacy save data missing the `ladderOrder` field.
+- **[S]** **STATUS**: Campaign logic is now dynamic and fully scalable. UI optimized for readability.
