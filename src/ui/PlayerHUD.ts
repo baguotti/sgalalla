@@ -288,6 +288,10 @@ export class PlayerHudSlot {
         });
     }
 
+    public setVisible(visible: boolean): void {
+        this.container.setVisible(visible);
+    }
+
     destroy(): void {
         this.container.destroy();
     }
@@ -396,6 +400,10 @@ export class MatchHUD {
             slot.destroy();
             this.slots.delete(playerId);
         }
+    }
+
+    public setVisible(visible: boolean): void {
+        this.slots.forEach(slot => slot.setVisible(visible));
     }
 
     destroy(): void {

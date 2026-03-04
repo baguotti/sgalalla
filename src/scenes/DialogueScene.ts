@@ -14,8 +14,26 @@ export class DialogueScene extends Phaser.Scene {
     private currentLineIndex: number = 0;
     private onDialogueComplete: (() => void) | null = null;
 
+    private leftCharacterKey: string = 'fok';
+    private rightCharacterKey: string = 'sgu';
+
+    private leftPortrait!: Phaser.GameObjects.Sprite;
+    private rightPortrait!: Phaser.GameObjects.Sprite;
+
     constructor() {
         super('DialogueScene');
+    }
+
+    init(data: any) {
+        if (data.leftCharacter) this.leftCharacterKey = data.leftCharacter.toLowerCase();
+        if (data.rightCharacter) this.rightCharacterKey = data.rightCharacter.toLowerCase();
+        // Store dialogue data to auto-play in create()
+        if (data.dialogueData && Array.isArray(data.dialogueData)) {
+            this.lines = data.dialogueData;
+        } else {
+            this.lines = [];
+        }
+        this.currentLineIndex = 0;
     }
 
     create() {
@@ -62,6 +80,35 @@ export class DialogueScene extends Phaser.Scene {
                 }
             });
         }
+
+        // Add Portraits
+        this.createPortraits(width, height);
+
+        // Auto-start dialogue if lines were passed via init
+        if (this.lines.length > 0) {
+            this.showCurrentLine();
+        }
+    }
+
+    private getIconFrame(characterKey: string): string {
+        const key = characterKey.toLowerCase();
+        if (['fok', 'sgu', 'sga', 'nock', 'greg', 'pe'].includes(key)) {
+            return `00_${key}_icon`;
+        }
+        return `${characterKey}_Idle_000.png`;
+    }
+
+    private createPortraits(width: number, height: number) {
+        // Left Portrait
+        this.leftPortrait = this.add.sprite(width * 0.15, height - 250, this.leftCharacterKey, this.getIconFrame(this.leftCharacterKey))
+            .setScale(4)
+            .setDepth(10);
+
+        // Right Portrait
+        this.rightPortrait = this.add.sprite(width * 0.85, height - 250, this.rightCharacterKey, this.getIconFrame(this.rightCharacterKey))
+            .setScale(4)
+            .setFlipX(true) // Enemy faces left
+            .setDepth(10);
     }
 
     public playDialogue(lines: DialogueLine[]): Promise<void> {
@@ -84,7 +131,17 @@ export class DialogueScene extends Phaser.Scene {
         this.nameElement.setText(line.speaker);
         this.textElement.setText(line.text);
 
-        // TODO: Handle portraits if added later
+        // Highlight active speaker, dim the other
+        const isLeftSpeaking = line.side === 'left';
+
+        if (this.leftPortrait) {
+            this.leftPortrait.setTint(isLeftSpeaking ? 0xffffff : 0x555555);
+            this.leftPortrait.setAlpha(isLeftSpeaking ? 1 : 0.6);
+        }
+        if (this.rightPortrait) {
+            this.rightPortrait.setTint(isLeftSpeaking ? 0x555555 : 0xffffff);
+            this.rightPortrait.setAlpha(isLeftSpeaking ? 0.6 : 1);
+        }
     }
 
     private advanceDialogue() {
@@ -97,6 +154,9 @@ export class DialogueScene extends Phaser.Scene {
             this.onDialogueComplete();
             this.onDialogueComplete = null;
         }
+
+        // Emit event so GameScene can listen for dialogue completion
+        this.events.emit('dialogue_complete');
 
         // Stop the scene completely and restore focus to GameScene underneath
         this.scene.stop();

@@ -343,8 +343,12 @@ export class Player extends Fighter {
     }
 
     public updatePhysics(delta: number): void {
-        // Get input
-        if (this.isAI) {
+        // If in Cinematic state, force empty input (no AI, no player input) but still run physics (gravity)
+        const isCinematic = this.fsm.getCurrentStateName() === 'Cinematic';
+
+        if (isCinematic) {
+            this.currentInput = this.inputManager.getEmptyInput();
+        } else if (this.isAI) {
             if (this.isTrainingDummy) {
                 this.currentInput = this.inputManager.getEmptyInput();
             } else {
@@ -378,7 +382,7 @@ export class Player extends Fighter {
             // Handle input for combat (attacks, charge, throw)
             // Only if the current state allows it (not taunting, hitstun, etc.)
             const currentStateName = this.fsm.getCurrentStateName();
-            const combatBlockedStates = ['HitStun', 'Taunt', 'Win', 'Respawning'];
+            const combatBlockedStates = ['HitStun', 'Taunt', 'Win', 'Respawning', 'Cinematic'];
             if (!combatBlockedStates.includes(currentStateName)) {
                 this.combat.handleInput(this.currentInput);
             }

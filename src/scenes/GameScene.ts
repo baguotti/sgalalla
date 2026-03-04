@@ -389,11 +389,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (this.mode === 'campaign') {
                 const opponent = CampaignManager.getInstance().getCurrentOpponent();
                 if (opponent) {
+                    // Hide match HUD during cutscene
+                    if (this.matchHUD) this.matchHUD.setVisible(false);
+
                     // Start cutscene, moving P1 slightly left and P2 slightly right of center
                     this.transitionToCutscene([
                         { playerId: 0, x: 860, y: 300 },
                         { playerId: 1, x: 1060, y: 300 }
-                    ], opponent.dialogueBefore).catch((e: Error | unknown) => console.error(e));
+                    ], opponent.dialogueBefore, this.playerData[0].character, opponent.character).catch((e: Error | unknown) => console.error(e));
                 }
             }
 
@@ -1458,58 +1461,58 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
 
     // --- Cinematic Methods ---
-    public async transitionToCutscene(positions: { playerId: number, x: number, y: number }[], dialogue: any[]): Promise<void> {
+    public async transitionToCutscene(positions: { playerId: number, x: number, y: number }[], dialogue: any[], leftChar?: string, rightChar?: string): Promise<void> {
         return new Promise<void>((resolve) => {
             // 1. Force players into Cinematic state
             const playersInvolved = this.players.filter(p => positions.some(pos => pos.playerId === p.playerId));
             playersInvolved.forEach(p => p.fsm.changeState('Cinematic', p));
 
-            // 2. Tween to positions
-            let tweensComplete = 0;
-            const requiredTweens = positions.length;
-
-            if (requiredTweens === 0) {
-                this.launchDialogue(dialogue, resolve);
-                return;
-            }
-
+            // 2. Snap to positions instantly
             positions.forEach(pos => {
                 const player = this.players.find(p => p.playerId === pos.playerId);
-                if (!player) {
-                    tweensComplete++;
-                    if (tweensComplete >= requiredTweens) this.launchDialogue(dialogue, resolve);
-                    return;
-                }
-
-                this.tweens.add({
-                    targets: player,
-                    x: pos.x,
-                    // If grounded, preserve Y so they don't float. If aerial, tween Y.
-                    y: pos.y,
-                    duration: 1500,
-                    ease: 'Sine.easeInOut',
-                    onComplete: () => {
-                        tweensComplete++;
-                        if (tweensComplete >= requiredTweens) {
-                            this.launchDialogue(dialogue, resolve);
-                        }
+                if (player) {
+                    player.setPosition(pos.x, pos.y);
+                    // Ensure they face each other
+                    if (player.playerId === 0) {
+                        player.setFacingDirection(1); // Face right
+                    } else if (player.playerId === 1) {
+                        player.setFacingDirection(-1); // Face left
                     }
-                });
+                }
+            });
+
+            // Wait 600ms for the black LOADING overlay to fade out, then launch dialogue
+            this.time.delayedCall(600, () => {
+                this.launchDialogue(dialogue, resolve, leftChar, rightChar);
             });
         });
     }
 
-    private launchDialogue(dialogue: any[], resolve: () => void): void {
-        this.scene.launch('DialogueScene');
-        // Typecast needed because we only have a loose reference to DialogueScene here
-        const diagScene = this.scene.get('DialogueScene') as any;
+    private launchDialogue(dialogue: any[], resolve: () => void, leftChar?: string, rightChar?: string): void {
+        const diagData = {
+            dialogueData: dialogue,
+            leftCharacter: leftChar,
+            rightCharacter: rightChar
+        };
 
+        // Stop any stale DialogueScene first, then launch fresh
+        if (this.scene.isActive('DialogueScene')) {
+            this.scene.stop('DialogueScene');
+        }
+
+        // Get scene reference BEFORE launch so we can listen for lifecycle events
+        const diagScene = this.scene.get('DialogueScene');
+
+        // Listen for when DialogueScene finishes its create() — that's when dialogue starts auto-playing
         diagScene.events.once('create', () => {
-            diagScene.playDialogue(dialogue).then(() => {
+            // Now listen for dialogue completion
+            diagScene.events.once('dialogue_complete', () => {
                 this.endCutscene();
                 resolve();
             });
         });
+
+        this.scene.launch('DialogueScene', diagData);
     }
 
     private endCutscene(): void {
@@ -1518,6 +1521,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 p.fsm.changeState('Idle', p);
             }
         });
+
+        // Restore HUD visibility
+        if (this.mode === 'campaign' && this.matchHUD) {
+            this.matchHUD.setVisible(true);
+        }
     }
 
     // --- Gamepad Helper Methods (Raw Input for reliability) ---
