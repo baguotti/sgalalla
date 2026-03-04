@@ -537,6 +537,11 @@ export class Player extends Fighter {
     }
 
     public flashDamageColor(damage: number): void {
+        const gameScene = this.scene as any;
+        if (gameScene.mode === 'campaign' && this.playerId === 1) {
+            return;
+        }
+
         let colorObj: Phaser.Types.Display.ColorObject;
 
         if (damage < 50) {

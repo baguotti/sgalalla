@@ -200,7 +200,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.walls = [];
             this.stageTextures = [];
 
-
             if (Array.isArray(this.chests)) {
                 this.chests.forEach(c => c.destroy());
             }
@@ -408,7 +407,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 this.addPlayerToHUD(player);
 
                 // If campaign, apply visual suppression to opponent (playerId 1)
-                // Campaign mode: opponent sprite is NOT tinted (only background/platforms are desaturated)
+                if (this.mode === 'campaign' && pData.playerId === 1) {
+                    if (player.spriteObject.postFX) {
+                        const fx = player.spriteObject.postFX.addColorMatrix();
+                        fx.saturate(-0.5);
+                        this.campaignColorMatrices.push(fx);
+                    }
+                }
             });
 
             // If campaign, trigger transition to cutscene immediately
@@ -655,10 +660,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.campaignColorMatrices = [];
             this.campaignTintProgress = 0;
 
-            // Background (use postFX to avoid cropping on scaled sprites)
+            // Background
             if (stage.background.postFX) {
                 const bgFx = stage.background.postFX.addColorMatrix();
-                bgFx.saturate(-0.66);
+                bgFx.saturate(-0.5);
                 this.campaignColorMatrices.push(bgFx);
             }
 
@@ -666,7 +671,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             stage.platformTextures.forEach(tex => {
                 if ((tex as any).postFX) {
                     const fx = (tex as any).postFX.addColorMatrix();
-                    fx.saturate(-0.66);
+                    fx.saturate(-0.5);
                     this.campaignColorMatrices.push(fx);
                 }
             });
@@ -987,8 +992,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                         onUpdate: (_tween: Phaser.Tweens.Tween) => {
                             const progress = (_tween.getValue() ?? 0) / 100;
                             this.campaignTintProgress = progress;
-                            // Lerp saturation from -0.66 (66% desaturated) to 0 (full color)
-                            const saturation = -0.66 + (0.66 * progress); // goes from -0.66 → 0
+                            // Lerp saturation from -0.5 (50% desaturated) to 0 (full color)
+                            const saturation = -0.5 + (0.5 * progress); // goes from -0.5 → 0
                             this.campaignColorMatrices.forEach(fx => {
                                 fx.reset();
                                 fx.saturate(saturation);

@@ -86,3 +86,20 @@
     - Created `deploy_campaign.sh` to host the campaign branch on port `8080` concurrently with the main site.
 - **[Fix]** **TypeScript Scope Errors**: Resolved scoping issues with Phaser event listeners in title/credits scenes.
 - **[S]** **STATUS**: Campaign experience is now feature-complete with persistent multi-save support.
+----------------------------------------------------------------------------------------------------------------------------
+### [2026-03-04] v2.1.1 - Campaign Opponent Visuals 🎨
+- **[V]** `v2.1.1`
+- **[Feat]** **Opponent Desaturation**:
+    - Campaign opponents now start with the same -0.5 desaturation effect as the background and platforms.
+    - Saturation restoration is perfectly synced with the background/platforms on opponent death.
+- **[Fix]** **Damage Tinting**:
+    - Removed the red/orange flashing damage tint applied to campaign opponents to preserve the aesthetic desaturation effect.
+- **[S]** **STATUS**: Opponent visuals in campaign mode are aligned with the environment.
+----------------------------------------------------------------------------------------------------------------------------
+### [2026-03-04] v2.1.2 - Campaign Fog Overlay 🌫️
+- **[V]** `v2.1.2`
+- **[Feat]** **Atmospheric Fog**:
+    - Added a 1:1 scale scrolling fog overlay (`fog_full_compressed.png`) to campaign matches.
+    - Fog scrolls smoothly left-to-right across the foreground at depth 20 (`alpha: 0.6`).
+    - Uses `TileSprite` attached to the camera (`scrollFactor: 0`) and `uiCamera` exclusions so it sits perfectly behind UI.
+- **[S]** **STATUS**: Campaign atmosphere increased.
