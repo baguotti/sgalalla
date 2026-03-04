@@ -23,7 +23,7 @@ export interface PlayerSelection {
 
 export class LobbyScene extends Phaser.Scene {
     private slots: PlayerSelection[] = [];
-    private mode: 'versus' | 'training' = 'versus';
+    private mode: 'versus' | 'training' | 'campaign' = 'versus';
     private initialInputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD';
     private initialGamepadIndex: number | null = null;
 
@@ -125,7 +125,10 @@ export class LobbyScene extends Phaser.Scene {
         // Title
         const centerY = height / 2 + 20;
         const titleY = centerY - 150 - 50;
-        const titleText = this.mode === 'training' ? 'MODALITÀ ALLENAMENTO' : 'SCEGLI IL TUO MANICO';
+        let titleText = 'SCEGLI IL TUO MANICO';
+        if (this.mode === 'training') titleText = 'MODALITÀ ALLENAMENTO';
+        if (this.mode === 'campaign') titleText = 'CAMPAGNA SINGOLO GIOCATORE';
+
         this.add.text(width / 2, titleY, titleText, {
             fontSize: '48px',
             color: '#ffffff',
@@ -150,7 +153,9 @@ export class LobbyScene extends Phaser.Scene {
         });
 
         // Initialize Slots
-        const slotCount = this.mode === 'versus' ? 6 : 2; // Support 6 players in versus
+        let slotCount = 6; // Support 6 players in versus
+        if (this.mode === 'training' || this.mode === 'campaign') slotCount = 2; // Campaign only needs 1 (or 2 for rendering simplicity)
+
         this.slots = [];
         for (let i = 0; i < slotCount; i++) {
             this.slots.push({
@@ -173,11 +178,14 @@ export class LobbyScene extends Phaser.Scene {
             if (this.initialInputType === 'GAMEPAD' && this.initialGamepadIndex !== null) {
                 this.joinPlayer('GAMEPAD', this.initialGamepadIndex);
             } else if (this.initialInputType === 'KEYBOARD') {
-                // Optional: Auto-join Keyboard P1? Usually yes for single player convience
-                // But "Botte in Locale" implies multiplayer setup. 
-                // Let's auto-join P1 if keyboard was used to select it, for consistency.
                 this.joinPlayer('KEYBOARD', null);
             }
+        } else if (this.mode === 'campaign') {
+            // Auto-join P1 for campaign selection
+            const p1 = this.slots[0];
+            p1.joined = true;
+            p1.input.type = this.initialInputType;
+            p1.input.gamepadIndex = this.initialGamepadIndex;
         }
 
         // CRITICAL: Reset keyboard state before adding keys
@@ -481,8 +489,8 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private handlePlayerInput(time: number): void {
-        // Special Training Mode Handling
-        if (this.mode === 'training') {
+        // Special Training/Campaign Mode Handling
+        if (this.mode === 'training' || this.mode === 'campaign') {
             this.handleTrainingInput(time);
             return;
         }
@@ -616,8 +624,14 @@ export class LobbyScene extends Phaser.Scene {
             if (this.selectionPhase === 'P1') {
                 AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 });
                 p1.ready = true;
-                this.selectionPhase = 'CPU';
-                inputRegistered = true;
+
+                if (this.mode === 'campaign') {
+                    inputRegistered = true;
+                    this.startCampaignGame();
+                } else {
+                    this.selectionPhase = 'CPU';
+                    inputRegistered = true;
+                }
             } else {
                 AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 }); // Or ui_player_ready
                 cpu.ready = true;
@@ -634,7 +648,15 @@ export class LobbyScene extends Phaser.Scene {
     private startTrainingGame(): void {
         AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
         this.time.delayedCall(500, () => {
-            this.scene.start('GameScene', { playerData: [this.slots[0], this.slots[1]] });
+            this.scene.start('GameScene', { playerData: [this.slots[0], this.slots[1]], mode: 'training' });
+        });
+    }
+
+    private startCampaignGame(): void {
+        AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
+        // Assuming campaign manager exists globally or in a generic singleton
+        this.time.delayedCall(500, () => {
+            this.scene.start('GameScene', { playerData: [this.slots[0]], mode: 'campaign' });
         });
     }
 

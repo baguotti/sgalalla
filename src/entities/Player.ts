@@ -17,7 +17,8 @@ import {
     AttackState, ChargingState, HitStunState,
     DodgeState, AirDodgeState,
     RecoveryState, GroundPoundState,
-    TauntState, WinState, RespawningState
+    TauntState, WinState, RespawningState,
+    CinematicState
 } from '../state/states';
 import type { Throwable } from './Throwable';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
@@ -321,6 +322,8 @@ export class Player extends Fighter {
         this.fsm.register(new TauntState());
         this.fsm.register(new WinState());
         this.fsm.register(new RespawningState());
+        this.fsm.register(new CinematicState());
+
         this.fsm.changeState('Idle', this);
     }
 

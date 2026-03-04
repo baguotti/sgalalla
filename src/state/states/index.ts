@@ -14,3 +14,4 @@ export { GroundPoundState } from './GroundPoundState';
 export { TauntState } from './TauntState';
 export { WinState } from './WinState';
 export { RespawningState } from './RespawningState';
+export { CinematicState } from './CinematicState';

@@ -14,6 +14,7 @@ import { createStage as createSharedStage } from '../stages/StageFactory';
 import { EffectManager } from '../effects/EffectManager';
 import { AnimationHelpers } from '../managers/AnimationHelpers';
 import { AudioManager } from '../managers/AudioManager';
+import { CampaignManager } from '../managers/CampaignManager';
 
 import type { GameSceneInterface } from './GameSceneInterface';
 
@@ -120,7 +121,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     public effectManager!: EffectManager;
 
+    private mode: 'versus' | 'training' | 'campaign' = 'versus';
+
     init(data: any): void {
+        this.mode = data.mode || 'versus';
+
         if (data.playerData) {
             this.playerData = data.playerData;
         } else {
@@ -129,6 +134,29 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 { playerId: 0, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null, keyboardMapping: 'all' }, character: 'fok' },
                 { playerId: 1, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null, keyboardMapping: 'all' }, character: 'fok', isAI: true, isTrainingDummy: true }
             ];
+        }
+
+        if (this.mode === 'campaign') {
+            const campaign = CampaignManager.getInstance();
+            if (!campaign.hasActiveCampaign()) {
+                campaign.startNewCampaign(this.playerData[0]?.character || 'fok');
+            }
+
+            const opponent = campaign.getCurrentOpponent();
+            if (opponent) {
+                // Force P1 and Opponent
+                this.playerData = [
+                    this.playerData[0], // P1
+                    {
+                        playerId: 1,
+                        joined: true,
+                        ready: true,
+                        input: { type: 'KEYBOARD', gamepadIndex: null },
+                        character: opponent.character,
+                        isAI: true
+                    }
+                ];
+            }
         }
 
         // Register shutdown handler
@@ -354,8 +382,20 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
                 // Add to HUD
                 this.addPlayerToHUD(player);
+                this.addPlayerToHUD(player);
             });
 
+            // If campaign, trigger transition to cutscene immediately
+            if (this.mode === 'campaign') {
+                const opponent = CampaignManager.getInstance().getCurrentOpponent();
+                if (opponent) {
+                    // Start cutscene, moving P1 slightly left and P2 slightly right of center
+                    this.transitionToCutscene([
+                        { playerId: 0, x: 860, y: 300 },
+                        { playerId: 1, x: 1060, y: 300 }
+                    ], opponent.dialogueBefore).catch((e: Error | unknown) => console.error(e));
+                }
+            }
 
             // Re-run camera exclusions now that players exist
             // (setupCameras was moved up before createStage, but players are created after)
@@ -1215,6 +1255,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         if (survivors.length <= 1) {
             // Game Over!
             const winner = survivors.length > 0 ? survivors[0] : null; // If 0 (everyone died same frame), draw or no winner
+
+            // Advance ladder if P1 won in campaign
+            if (this.mode === 'campaign' && winner && winner.playerId === 0) {
+                CampaignManager.getInstance().advanceLadder();
+            }
+
             this.handleGameOver(winner ? winner.playerId : -1);
         }
     }
@@ -1303,8 +1349,30 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private returnToLobby(): void {
         const isTraining = this.playerData.some((p: any) => p.isTrainingDummy);
         const p1Data = this.playerData.find((p: any) => p.playerId === 0);
+
+        let targetMode = 'versus';
+        if (this.mode === 'training' || isTraining) targetMode = 'training';
+        if (this.mode === 'campaign') targetMode = 'campaign';
+
+        // Check if campaign is completed!
+        if (this.mode === 'campaign' && CampaignManager.getInstance().getCurrentOpponent() === null) {
+            // For now, return to main menu or show credits?
+            // "You won the game!" -> we just reset and go to lobby for now
+            CampaignManager.getInstance().resetCampaign();
+            this.scene.start('MainMenuScene');
+            return;
+        }
+
+        // Just start GameScene directly if we are in campaign?
+        // Actually, if campaign, we may want to skip lobby. Let Lobby check and auto-start maybe?
+        // Let's just go back to Lobby in 'campaign' mode, and Lobby auto-assigns and starts? 
+        // No, lobby doesn't auto-start. 
+        // Let's go to Lobby but pass the 'campaign' mode so player can select character again?
+        // Or we can just restart GameScene if campaign continues.
+        // Let's go to Lobby so they can pick character for next round.
+
         this.scene.start('LobbyScene', {
-            mode: isTraining ? 'training' : 'versus',
+            mode: targetMode,
             inputType: p1Data?.input?.type || 'KEYBOARD',
             gamepadIndex: p1Data?.input?.gamepadIndex ?? null,
         });
@@ -1387,6 +1455,70 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.debugLabels.push(t);
     }
 
+
+
+    // --- Cinematic Methods ---
+    public async transitionToCutscene(positions: { playerId: number, x: number, y: number }[], dialogue: any[]): Promise<void> {
+        return new Promise<void>((resolve) => {
+            // 1. Force players into Cinematic state
+            const playersInvolved = this.players.filter(p => positions.some(pos => pos.playerId === p.playerId));
+            playersInvolved.forEach(p => p.fsm.changeState('Cinematic', p));
+
+            // 2. Tween to positions
+            let tweensComplete = 0;
+            const requiredTweens = positions.length;
+
+            if (requiredTweens === 0) {
+                this.launchDialogue(dialogue, resolve);
+                return;
+            }
+
+            positions.forEach(pos => {
+                const player = this.players.find(p => p.playerId === pos.playerId);
+                if (!player) {
+                    tweensComplete++;
+                    if (tweensComplete >= requiredTweens) this.launchDialogue(dialogue, resolve);
+                    return;
+                }
+
+                this.tweens.add({
+                    targets: player,
+                    x: pos.x,
+                    // If grounded, preserve Y so they don't float. If aerial, tween Y.
+                    y: pos.y,
+                    duration: 1500,
+                    ease: 'Sine.easeInOut',
+                    onComplete: () => {
+                        tweensComplete++;
+                        if (tweensComplete >= requiredTweens) {
+                            this.launchDialogue(dialogue, resolve);
+                        }
+                    }
+                });
+            });
+        });
+    }
+
+    private launchDialogue(dialogue: any[], resolve: () => void): void {
+        this.scene.launch('DialogueScene');
+        // Typecast needed because we only have a loose reference to DialogueScene here
+        const diagScene = this.scene.get('DialogueScene') as any;
+
+        diagScene.events.once('create', () => {
+            diagScene.playDialogue(dialogue).then(() => {
+                this.endCutscene();
+                resolve();
+            });
+        });
+    }
+
+    private endCutscene(): void {
+        this.players.forEach(p => {
+            if (p.fsm.getCurrentStateName() === 'Cinematic') {
+                p.fsm.changeState('Idle', p);
+            }
+        });
+    }
 
     // --- Gamepad Helper Methods (Raw Input for reliability) ---
     private checkGamepadPause(): boolean {

@@ -12,6 +12,7 @@ export class MainMenuScene extends Phaser.Scene {
     private selectedIndex: number = 0;
     private prevGamepadA: Map<number, boolean> = new Map(); // Edge detection for A/Start
     private menuOptions = [
+        { label: 'CAMPAGNA', mode: 'campaign' },
         { label: 'ALLENAMENTO', mode: 'training' },
         { label: 'BOTTE IN LOCALE', mode: 'versus' },
         { label: 'BOTTE IN REMOTO', mode: 'online' },
@@ -221,6 +222,12 @@ export class MainMenuScene extends Phaser.Scene {
         // Handle Online Quick Join
         if (mode === 'online') {
             this.scene.start('OnlineGameScene');
+            return;
+        }
+
+        if (mode === 'campaign') {
+            // For now, load LobbyScene in campaign mode to let them choose character
+            this.scene.start('LobbyScene', { mode: 'campaign', inputType: inputType, gamepadIndex: gamepadIndex });
             return;
         }
 
