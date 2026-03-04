@@ -154,7 +154,8 @@ export class LobbyScene extends Phaser.Scene {
 
         // Initialize Slots
         let slotCount = 6; // Support 6 players in versus
-        if (this.mode === 'training' || this.mode === 'campaign') slotCount = 2; // Campaign only needs 1 (or 2 for rendering simplicity)
+        if (this.mode === 'training') slotCount = 2;
+        if (this.mode === 'campaign') slotCount = 1; // Campaign only needs 1 central slot
 
         this.slots = [];
         for (let i = 0; i < slotCount; i++) {
@@ -277,7 +278,8 @@ export class LobbyScene extends Phaser.Scene {
             const container = this.add.container(cx, centerY);
 
             // Player color for this slot
-            const playerColor = SMASH_COLORS[i % SMASH_COLORS.length];
+            let playerColor = SMASH_COLORS[i % SMASH_COLORS.length];
+            if (this.mode === 'campaign') playerColor = 0xFFFFFF; // Campaign uses white for P1
             const colorHex = '#' + playerColor.toString(16).padStart(6, '0');
 
             // Gradient Background with Mask
@@ -674,7 +676,11 @@ export class LobbyScene extends Phaser.Scene {
             // Start Game
             AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
             this.time.delayedCall(1000, () => {
-                this.scene.start('GameScene', { playerData: joinedSlots });
+                this.scene.start('GameScene', {
+                    playerData: joinedSlots,
+                    mode: this.mode,
+                    slotIndex: (this._initData as any)?.slotIndex ?? 0
+                });
             });
         } else {
             if (joinedSlots.length < minPlayers) {

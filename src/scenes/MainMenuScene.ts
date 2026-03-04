@@ -70,7 +70,7 @@ export class MainMenuScene extends Phaser.Scene {
         }
 
         // Version Text
-        this.add.text(this.cameras.main.width - 20, this.cameras.main.height - 20, 'v2.0.5', {
+        this.add.text(this.cameras.main.width - 20, this.cameras.main.height - 20, 'v2.1.0', {
             fontSize: '24px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(1, 1);        // Menu Items
         const startY = height - 260; // Slightly lower
@@ -227,7 +227,7 @@ export class MainMenuScene extends Phaser.Scene {
 
         if (mode === 'campaign') {
             // For now, load LobbyScene in campaign mode to let them choose character
-            this.scene.start('LobbyScene', { mode: 'campaign', inputType: inputType, gamepadIndex: gamepadIndex });
+            this.scene.start('CampaignTitleScene', { mode: 'campaign', inputType: inputType, gamepadIndex: gamepadIndex });
             return;
         }
 

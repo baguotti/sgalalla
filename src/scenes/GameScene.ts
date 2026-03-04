@@ -147,6 +147,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         if (this.mode === 'campaign') {
             const campaign = CampaignManager.getInstance();
             const selectedChar = this.playerData[0]?.character || 'fok';
+            const slotIndex = data.slotIndex ?? campaign.getActiveSlotIndex();
 
             // If the player changed character mid-run, reset and start fresh
             if (campaign.hasActiveCampaign() && campaign.getPlayerCharacter() !== selectedChar) {
@@ -154,7 +155,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             }
 
             if (!campaign.hasActiveCampaign()) {
-                campaign.startNewCampaign(selectedChar);
+                campaign.startNewCampaign(selectedChar, slotIndex);
             }
 
             const opponent = campaign.getCurrentOpponent();
@@ -1765,9 +1766,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 // Next opponent exists — restart GameScene in campaign mode
                 this.scene.restart({ playerData: [this.playerData[0]], mode: 'campaign' });
             } else {
-                // Campaign complete!
+                // Campaign complete! Show credits.
                 CampaignManager.getInstance().resetCampaign();
-                this.scene.start('MainMenuScene');
+                this.scene.start('CreditsScene');
             }
         });
     }

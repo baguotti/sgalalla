@@ -69,3 +69,20 @@
     - **Main Menu Optimization**: Reduced font size (`48px` -> `40px`) and vertical spacing (`70px` -> `55px`) to ensure all 5 options fit on screen without cropping.
 - **[Fix]** **Stale Save Protection**: Constructor now auto-clears invalid legacy save data missing the `ladderOrder` field.
 - **[S]** **STATUS**: Campaign logic is now dynamic and fully scalable. UI optimized for readability.
+### [2026-03-04] v2.1.0 - Save System & Campaign Interstitials 💾🎬
+- **[V]** `v2.1.0`
+- **[Feat]** **Save File System**:
+    - Implemented a Pokémon-style 3-slot save system (`SaveFileScene.ts`).
+    - **Persistence**: Slots track character, progress (e.g. "3/6"), and total play time in milliseconds.
+    - **Migration**: Legacy single-key saves are automatically imported into Slot 0 on first launch.
+- **[Feat]** **Campaign Screens**:
+    - Added `CampaignTitleScene` ("ROAD TO LAMICIZIA") as a pre-lobby interstitial.
+    - Added `CreditsScene` placeholder after final boss defeat.
+    - Both screens are skippable via keyboard/gamepad or auto-advance on timer.
+- **[UI]** **Campaign Lobby Refinement**:
+    - Campaign lobby now shows only one central character slot.
+    - Slot theme changed from red to **white** for a more premium "single player" aesthetic.
+- **[Dev]** **Secondary Deployment**:
+    - Created `deploy_campaign.sh` to host the campaign branch on port `8080` concurrently with the main site.
+- **[Fix]** **TypeScript Scope Errors**: Resolved scoping issues with Phaser event listeners in title/credits scenes.
+- **[S]** **STATUS**: Campaign experience is now feature-complete with persistent multi-save support.

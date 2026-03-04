@@ -6,6 +6,9 @@ import { LobbyScene } from './scenes/LobbyScene';
 import { GameScene } from './scenes/GameScene';
 import { OnlineGameScene } from './scenes/OnlineGameScene';
 import { DialogueScene } from './scenes/DialogueScene';
+import { CampaignTitleScene } from './scenes/CampaignTitleScene';
+import { CreditsScene } from './scenes/CreditsScene';
+import { SaveFileScene } from './scenes/SaveFileScene';
 import './style.css';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -22,7 +25,7 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true
   },
-  scene: [PreloadScene, MainMenuScene, LobbyScene, GameScene, OnlineGameScene, SettingsScene, DialogueScene],
+  scene: [PreloadScene, MainMenuScene, LobbyScene, GameScene, OnlineGameScene, SettingsScene, DialogueScene, CampaignTitleScene, CreditsScene, SaveFileScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

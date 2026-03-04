@@ -46,22 +46,14 @@ function shuffle<T>(array: T[]): T[] {
 export class CampaignManager {
     private static instance: CampaignManager;
     private currentData: CampaignSaveData | null = null;
+    private activeSlotIndex: number = 0;
+    private sessionStartTime: number = 0; // Tracks when the current play session began
 
-    /** The generated ladder for this run — built dynamically in startNewCampaign */
+    /** The generated ladder for this run — built dynamically */
     public ladder: OpponentConfig[] = [];
 
     private constructor() {
-        this.currentData = SaveService.loadCampaign();
-        // Rebuild ladder from save if resuming
-        if (this.currentData && !this.currentData.completed) {
-            if (this.currentData.ladderOrder && this.currentData.ladderOrder.length > 0) {
-                this.ladder = this.buildLadderFromOrder(this.currentData.ladderOrder);
-            } else {
-                // Stale save from old format — clear it so a fresh campaign starts
-                this.currentData = null;
-                SaveService.clearCampaign();
-            }
-        }
+        // No auto-load on construction anymore — we wait for explicit slot selection
     }
 
     public static getInstance(): CampaignManager {
@@ -72,12 +64,37 @@ export class CampaignManager {
     }
 
     /**
-     * Start a new campaign run.
-     * - Excludes the player's own character from the first N-1 opponents.
-     * - Shuffles them randomly.
-     * - Places the player's own character as the final boss (mirror match).
+     * Load an existing save slot and resume the campaign.
      */
-    public startNewCampaign(playerCharacter: string): void {
+    public loadCampaignFromSlot(slotIndex: number): boolean {
+        this.activeSlotIndex = slotIndex;
+        const data = SaveService.loadSlot(slotIndex);
+        if (!data || data.completed) {
+            this.currentData = null;
+            this.ladder = [];
+            return false;
+        }
+
+        this.currentData = data;
+        if (data.ladderOrder && data.ladderOrder.length > 0) {
+            this.ladder = this.buildLadderFromOrder(data.ladderOrder);
+        } else {
+            // Stale save — clear it
+            this.currentData = null;
+            SaveService.deleteSlot(slotIndex);
+            return false;
+        }
+
+        this.sessionStartTime = Date.now();
+        return true;
+    }
+
+    /**
+     * Start a new campaign run in a specific slot.
+     */
+    public startNewCampaign(playerCharacter: string, slotIndex: number = 0): void {
+        this.activeSlotIndex = slotIndex;
+
         // Build opponent pool: everyone except the player, then shuffle
         const pool = AVAILABLE_OPPONENTS.filter(c => c !== playerCharacter);
         const shuffled = shuffle(pool);
@@ -88,12 +105,16 @@ export class CampaignManager {
         this.ladder = this.buildLadderFromOrder(ladderOrder);
 
         this.currentData = {
+            slotIndex,
             currentLevel: 0,
             playerCharacter,
             completed: false,
-            ladderOrder, // Persist so we can rebuild on reload
+            ladderOrder,
+            startedAt: Date.now(),
+            playTimeMs: 0,
         };
-        SaveService.saveCampaign(this.currentData);
+        this.sessionStartTime = Date.now();
+        SaveService.saveSlot(slotIndex, this.currentData);
     }
 
     /** Converts a list of character keys into a full OpponentConfig[] ladder */
@@ -128,6 +149,10 @@ export class CampaignManager {
         return this.currentData ? this.currentData.playerCharacter : 'fok';
     }
 
+    public getActiveSlotIndex(): number {
+        return this.activeSlotIndex;
+    }
+
     public advanceLadder(): void {
         if (!this.currentData) return;
 
@@ -135,12 +160,30 @@ export class CampaignManager {
         if (this.currentData.currentLevel >= this.ladder.length) {
             this.currentData.completed = true;
         }
-        SaveService.saveCampaign(this.currentData);
+        this.updatePlayTime();
+        SaveService.saveSlot(this.activeSlotIndex, this.currentData);
+    }
+
+    /** Call this when leaving the campaign to persist accumulated play time. */
+    public savePlayTime(): void {
+        if (!this.currentData) return;
+        this.updatePlayTime();
+        SaveService.saveSlot(this.activeSlotIndex, this.currentData);
+    }
+
+    private updatePlayTime(): void {
+        if (!this.currentData || this.sessionStartTime === 0) return;
+        const elapsed = Date.now() - this.sessionStartTime;
+        this.currentData.playTimeMs += elapsed;
+        this.sessionStartTime = Date.now(); // Reset session timer
     }
 
     public resetCampaign(): void {
+        if (this.currentData) {
+            SaveService.deleteSlot(this.activeSlotIndex);
+        }
         this.currentData = null;
         this.ladder = [];
-        SaveService.clearCampaign();
+        this.sessionStartTime = 0;
     }
 }
