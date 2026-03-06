@@ -33,6 +33,8 @@ export class DialogueScene extends Phaser.Scene {
     private isShowingChoices: boolean = false;
     private sceneActive: boolean = false; // Guard against post-stop callbacks
 
+    private blackBackground: boolean = false; // Add black background support
+
     constructor() {
         super('DialogueScene');
     }
@@ -55,13 +57,20 @@ export class DialogueScene extends Phaser.Scene {
         this.selectedChoiceIndex = 0;
         this.choicesContainer = undefined;
         this.sceneActive = true;
+        
+        if (data.blackBackground) {
+            this.blackBackground = true;
+        } else {
+            this.blackBackground = false;
+        }
     }
 
     create() {
         const { width, height } = this.scale;
 
-        // Dark semi-transparent background for focus
-        this.add.rectangle(0, 0, width, height, 0x000000, 0.4).setOrigin(0);
+        // Dark semi-transparent (or fully opaque) background for focus
+        const bgOpacity = this.blackBackground ? 1.0 : 0.4;
+        this.add.rectangle(0, 0, width, height, 0x000000, bgOpacity).setOrigin(0);
 
         // Dialogue Box Dimensions
         const boxWidth = width * 0.8;
@@ -319,21 +328,22 @@ export class DialogueScene extends Phaser.Scene {
         const boxX = (this.scale.width - boxWidth) / 2;
         const boxY = this.scale.height - 240 - 50;
 
-        this.choicesContainer = this.add.container(boxX + boxWidth - 40, boxY + 160);
+        this.choicesContainer = this.add.container(boxX + boxWidth / 2, boxY + 160);
         this.choicesContainer.setDepth(20);
         this.choiceButtons = [];
 
-        let currentX = 0;
-        // Build right-to-left layout for right-aligned UI
-        for (let i = choices.length - 1; i >= 0; i--) {
+        const spacing = 150; // Space between buttons
+        const startX = -((choices.length - 1) * spacing) / 2;
+
+        for (let i = 0; i < choices.length; i++) {
             const choice = choices[i];
-            const btn = this.add.text(currentX, 0, choice.text, {
+            const btn = this.add.text(startX + i * spacing, 0, choice.text, {
                 fontFamily: '"Pixeloid Sans"',
-                fontSize: '36px',
-                color: '#888888', // Unselected
+                fontSize: '42px', // Slightly larger for better visibility
+                color: '#aaaaaa', // Unselected
                 stroke: '#000000',
-                strokeThickness: 4
-            }).setOrigin(1, 0.5);
+                strokeThickness: 6
+            }).setOrigin(0.5, 0.5);
 
             // Interactive bounds
             btn.setInteractive();
@@ -347,9 +357,8 @@ export class DialogueScene extends Phaser.Scene {
                 this.updateChoiceSelection();
             });
 
-            this.choiceButtons.unshift(btn); // Put at start to maintain matching index
+            this.choiceButtons.push(btn);
             this.choicesContainer.add(btn);
-            currentX -= btn.width + 60; // Space between buttons
         }
 
         this.updateChoiceSelection();
@@ -370,10 +379,10 @@ export class DialogueScene extends Phaser.Scene {
         this.choiceButtons.forEach((btn, idx) => {
             if (!btn || !btn.active) return; // Guard against destroyed objects
             if (idx === this.selectedChoiceIndex) {
-                btn.setColor('#ffff00'); // Highlight yellow
-                btn.setScale(1.1);
+                btn.setColor('#ffffff'); // Highlight white instead of yellow
+                btn.setScale(1.15); // Slightly more scaled up
             } else {
-                btn.setColor('#888888');
+                btn.setColor('#aaaaaa'); // Dimmer white/grey
                 btn.setScale(1.0);
             }
         });

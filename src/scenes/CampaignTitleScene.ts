@@ -32,9 +32,9 @@ export class CampaignTitleScene extends Phaser.Scene {
         });
 
         // Setup input to skip
-        this.input.keyboard?.once('keydown', () => this.advance());
+        this.input.keyboard?.on('keydown', () => this.advance());
         if (this.input.gamepad) {
-            this.input.gamepad.once('down', () => this.advance());
+            this.input.gamepad.on('down', () => this.advance());
         }
 
         // Auto-advance after 5 seconds if no input

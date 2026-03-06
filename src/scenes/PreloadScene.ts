@@ -19,6 +19,7 @@ export class PreloadScene extends Phaser.Scene {
         // Load Global Music
         this.load.audio('global_music_loop', 'assets/audio/music/manici_intro_002_loop.mp3');
         this.load.audio('ui_player_found', 'assets/audio/ui/ui_player_found.wav');
+        this.load.image('minimap_bg', 'assets/ui/minimap_bg.jpg');
     }
 
     create(): void {

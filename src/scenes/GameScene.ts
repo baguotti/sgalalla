@@ -1395,41 +1395,54 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         if (winnerId >= 0) {
             AudioManager.getInstance().playSFX('sfx_knockout', { volume: 0.8 });
-            winnerText += `\nPLAYER ${winnerId + 1} HA ARATO!`; // Custom Text
             winner = this.players.find(p => p.playerId === winnerId);
-
-            // DRAMATIC ZOOM
-            if (winner) {
-                winner.isWinner = true;
-                winner.fsm.changeState('Win', winner); // Auto-taunt on victory
-                this.cameras.main.pan(winner.x, winner.y, 1500, 'Power2');
-                this.cameras.main.zoomTo(3.5, 1500, 'Power2');
+            
+            if (this.mode !== 'campaign') {
+                winnerText += `\nPLAYER ${winnerId + 1} HA ARATO!`; // Custom Text
+                // DRAMATIC ZOOM
+                if (winner) {
+                    winner.isWinner = true;
+                    winner.fsm.changeState('Win', winner); // Auto-taunt on victory
+                    this.cameras.main.pan(winner.x, winner.y, 1500, 'Power2');
+                    this.cameras.main.zoomTo(3.5, 1500, 'Power2');
+                }
+            } else if (winner) {
+                winner.isWinner = true; // Still mark as winner to stop movement, but no auto-taunt
             }
         } else {
-            winnerText += "\nDRAW GAME!";
+            if (this.mode !== 'campaign') {
+                winnerText += "\nDRAW GAME!";
+            }
         }
 
-        const text = this.add.text(width / 2, height / 2 - 50, winnerText, {
-            fontSize: '64px',
-            fontFamily: '"Pixeloid Sans"',
-            fontStyle: 'bold',
-            color: '#ffffff',
-            align: 'center',
-            stroke: '#000000',
-            strokeThickness: 8
-        });
-        text.setOrigin(0.5);
-        text.setDepth(1001);
-        this.cameras.main.ignore(text); // Only UI camera sees it
+        if (this.mode !== 'campaign') {
+            const text = this.add.text(width / 2, height / 2 - 50, winnerText, {
+                fontSize: '64px',
+                fontFamily: '"Pixeloid Sans"',
+                fontStyle: 'bold',
+                color: '#ffffff',
+                align: 'center',
+                stroke: '#000000',
+                strokeThickness: 8
+            });
+            text.setOrigin(0.5);
+            text.setDepth(1001);
+            this.cameras.main.ignore(text); // Only UI camera sees it
+        }
 
-        // 5-second unskippable delay
-        this.time.delayedCall(5000, () => {
-            if (this.mode === 'campaign' && this.isTraining) {
-                this.handleTrainingGameOver(winnerId);
-            } else {
+        if (this.mode === 'campaign' && this.isTraining) {
+            // Instantly transition to black screen dialogue
+            this.cameras.main.fade(1500, 0, 0, 0, false, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+                if (progress === 1) {
+                    this.handleTrainingGameOver(winnerId);
+                }
+            });
+        } else {
+            // 5-second unskippable delay (normal versus matches)
+            this.time.delayedCall(5000, () => {
                 this.showGameOverMenu();
-            }
-        });
+            });
+        }
     }
 
     private handleTrainingGameOver(winnerId: number): void {
@@ -1444,9 +1457,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             ? (opponent?.dialogueTrainingWin ?? [])
             : (opponent?.dialogueTrainingLose ?? []);
 
-        const dialogueText = dialogueLines.length > 0
+        const dialogueText = (dialogueLines.length > 0
             ? dialogueLines[0].text
-            : (isWin ? 'Well done! Train more?' : 'You should train more. Try again?');
+            : (isWin ? 'Well done!' : 'You should train more.')) + ' Want to train more?';
         const speakerName = dialogueLines.length > 0
             ? dialogueLines[0].speaker
             : oppCharKey;
@@ -1486,7 +1499,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                         } }
                     ]
                 }
-            ]
+            ],
+            blackBackground: true
         });
     }
 

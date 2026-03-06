@@ -109,8 +109,8 @@ export class SaveFileScene extends Phaser.Scene {
                     frameKey = `${config.idle.prefix}000`;
                 }
 
-                const sprite = this.add.sprite(-cardWidth / 2 + 90, 10, charKey, frameKey);
-                sprite.setScale(0.8);
+                const sprite = this.add.sprite(-cardWidth / 2 + 117, 0, charKey, frameKey);
+                sprite.setScale(0.9);
                 if (this.anims.exists(animKey)) {
                     sprite.play(animKey);
                 }
@@ -118,37 +118,28 @@ export class SaveFileScene extends Phaser.Scene {
 
                 // Character name
                 const charName = this.charLabels[charKey] || charKey.toUpperCase();
-                const nameText = this.add.text(-cardWidth / 2 + 160, -20, charName, {
-                    fontSize: '32px',
+                const nameText = this.add.text(-cardWidth / 2 + 190, 0, charName, {
+                    fontSize: '36px',
                     fontFamily: '"Pixeloid Sans"',
                     color: '#FFFFFF',
                     fontStyle: 'bold'
-                });
+                }).setOrigin(0, 0.5);
                 container.add(nameText);
-
-                // Progress
-                const progress = `${slotData.currentLevel}/${slotData.ladderOrder?.length ?? 6}`;
-                const progressText = this.add.text(-cardWidth / 2 + 160, 20, `Avversari sconfitti: ${progress}`, {
-                    fontSize: '20px',
-                    fontFamily: '"Pixeloid Sans"',
-                    color: '#aaaaaa'
-                });
-                container.add(progressText);
 
                 // Time played
                 const timeStr = this.formatPlayTime(slotData.playTimeMs || 0);
-                const timeText = this.add.text(cardWidth / 2 - 20, 20, timeStr, {
-                    fontSize: '20px',
+                const timeText = this.add.text(cardWidth / 2 - 30, 0, `TEMPO ${timeStr}`, {
+                    fontSize: '24px',
                     fontFamily: '"Pixeloid Sans"',
-                    color: '#888888'
-                }).setOrigin(1, 0);
+                    color: '#FFFFFF'
+                }).setOrigin(1, 0.5);
                 container.add(timeText);
             } else {
                 // ─── Empty Slot ───
-                const emptyText = this.add.text(0, 5, 'NUOVA PARTITA', {
-                    fontSize: '28px',
+                const emptyText = this.add.text(0, 0, 'NUOVA PARTITA', {
+                    fontSize: '32px',
                     fontFamily: '"Pixeloid Sans"',
-                    color: '#666666'
+                    color: '#555555'
                 }).setOrigin(0.5);
                 container.add(emptyText);
             }
@@ -342,12 +333,9 @@ export class SaveFileScene extends Phaser.Scene {
 
     private formatPlayTime(ms: number): string {
         const totalSeconds = Math.floor(ms / 1000);
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        if (hours > 0) {
-            return `${hours}h ${String(minutes).padStart(2, '0')}m`;
-        }
-        return `${minutes}m`;
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
 
     private ensureIdleAnimations(): void {

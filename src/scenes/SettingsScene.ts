@@ -18,14 +18,14 @@ export class SettingsScene extends Phaser.Scene {
     private mainContainer!: Phaser.GameObjects.Container;
 
     // Audio menu
-    private audioOptions = ['MUSIC', 'SFX', 'BACK'];
+    private audioOptions = ['MUSICA', 'EFFETTI', 'INDIETRO'];
     private audioSelectedIndex = 0;
     private audioTexts: Phaser.GameObjects.Text[] = [];
     private audioValueTexts: Phaser.GameObjects.Text[] = [];
     private audioContainer!: Phaser.GameObjects.Container;
 
     // Video menu
-    private videoOptions = ['EFFETTO CRT', 'BACK'];
+    private videoOptions = ['EFFETTO CRT', 'INDIETRO'];
     private videoSelectedIndex = 0;
     private videoTexts: Phaser.GameObjects.Text[] = [];
     private videoValueTexts: Phaser.GameObjects.Text[] = [];
@@ -303,10 +303,7 @@ export class SettingsScene extends Phaser.Scene {
     }
 
     private getCrtLabel(intensity: number): string {
-        if (intensity === 0) return 'OFF';
-        if (intensity === 1) return 'BASSO';
-        if (intensity === 2) return 'MEDIO';
-        return 'ALTO';
+        return intensity > 0 ? 'ON' : 'OFF';
     }
 
     private refreshVideoValues(): void {

@@ -69,8 +69,33 @@ export class CampaignMapScene extends Phaser.Scene {
         const { width, height } = this.scale;
         const campaign = CampaignManager.getInstance();
 
-        // Dark grey background (so black silhouettes are visible)
-        this.add.rectangle(0, 0, width, height, 0x181818).setOrigin(0).setScrollFactor(0);
+        // Background image
+        const bg = this.add.image(width / 2, height / 2, 'minimap_bg').setScrollFactor(0);
+        bg.setTint(0x666666); // Subtle dark tint
+        const scaleX = width / bg.width;
+        const scaleY = height / bg.height;
+        const scale = Math.max(scaleX, scaleY);
+        bg.setScale(scale);
+
+        // Elegant 16-bit rounded rectangle frame
+        const framePadding = 20;
+        const frameGraphics = this.add.graphics().setScrollFactor(0).setDepth(100);
+        
+        // Outer border (dark)
+        frameGraphics.lineStyle(6, 0x111111, 1);
+        frameGraphics.strokeRoundedRect(framePadding, framePadding, width - framePadding * 2, height - framePadding * 2, 20);
+        
+        // Main frame (light highlight)
+        frameGraphics.lineStyle(3, 0xdddddd, 0.8);
+        frameGraphics.strokeRoundedRect(framePadding + 3, framePadding + 3, width - (framePadding + 3) * 2, height - (framePadding + 3) * 2, 17);
+        
+        // Bevel effect (inner shadow)
+        frameGraphics.lineStyle(2, 0x000000, 0.3);
+        frameGraphics.strokeRoundedRect(framePadding + 6, framePadding + 6, width - (framePadding + 6) * 2, height - (framePadding + 6) * 2, 14);
+
+        // Glassy overlay hint (very subtle)
+        frameGraphics.fillStyle(0xffffff, 0.02);
+        frameGraphics.fillRoundedRect(framePadding, framePadding, width - framePadding * 2, height - framePadding * 2, 20);
 
         // Determine player character from playerData
         const selectedChar = this.playerData[0]?.character || 'fok';
@@ -112,16 +137,28 @@ export class CampaignMapScene extends Phaser.Scene {
             const defeated = i < currentLevel;
             const revealed = defeated; // Previously defeated = revealed
 
-            // Draw path line to next island (on the BASE_Y line)
+            // Draw a subtle, professional path of stars to the next island
             if (i < ladder.length - 1) {
                 const nextX = startX + (i + 1) * CampaignMapScene.ISLAND_SPACING;
                 const nextY = CampaignMapScene.BASE_Y + Math.sin((i + 1) * 1.2) * 30;
-                this.pathGraphics.beginPath();
-                this.pathGraphics.moveTo(ix, iy);
-                this.pathGraphics.lineTo(nextX, nextY);
-                this.pathGraphics.strokePath();
+                
+                const dist = Phaser.Math.Distance.Between(ix, iy, nextX, nextY);
+                const starSpacing = 45; // Pixels between stars
+                const numStars = Math.floor(dist / starSpacing);
+                
+                for (let j = 1; j < numStars; j++) {
+                    const t = j / numStars;
+                    const starX = Phaser.Math.Interpolation.Linear([ix, nextX], t);
+                    const starY = Phaser.Math.Interpolation.Linear([iy, nextY], t);
+                    
+                    // Draw a subtle 16-bit star (a small cross with a bright center)
+                    this.pathGraphics.fillStyle(0xaaaaaa, 0.4);
+                    this.pathGraphics.fillRect(starX - 1, starY - 3, 2, 6);
+                    this.pathGraphics.fillRect(starX - 3, starY - 1, 6, 2);
+                    this.pathGraphics.fillStyle(0xffffff, 0.7);
+                    this.pathGraphics.fillRect(starX - 1, starY - 1, 2, 2);
+                }
             }
-
             // Island container — floats ABOVE the path line
             const islandY = iy - CampaignMapScene.ISLAND_FLOAT_OFFSET;
             const container = this.add.container(ix, islandY);
@@ -170,13 +207,11 @@ export class CampaignMapScene extends Phaser.Scene {
         }
 
         // Set player starting position
-        // If returning from a fight (currentLevel > 0), start on the last defeated island
-        // If fresh start, start on island 0
-        if (currentLevel > 0 && currentLevel <= this.islands.length) {
-            this.currentIslandIndex = currentLevel; // Position on the next target
-        } else {
-            this.currentIslandIndex = 0;
-        }
+        // Start player on the most recently defeated island, unless returning from defeat/training where currentLevel wasn't advanced
+        // Actually, just always start on Math.max(0, currentLevel - 1) so player has to manually move right to the new challenge.
+        // Wait, if they just started a new save, currentLevel is 0.
+        // If they just beat level 0, currentLevel is 1. We want to spawn on 0.
+        this.currentIslandIndex = Math.max(0, currentLevel - 1); // Position on the next target
 
         // Clamp to valid range
         this.currentIslandIndex = Math.min(this.currentIslandIndex, this.islands.length - 1);
@@ -200,7 +235,7 @@ export class CampaignMapScene extends Phaser.Scene {
         // Center camera on player and follow
         this.cameras.main.startFollow(this.playerSprite, true, 0.08, 0.08);
 
-        // Title text
+        // Title text always visible
         this.add.text(width / 2, 60, 'ROAD TO LAMICIZIA', {
             fontSize: '48px',
             fontFamily: '"Pixeloid Sans"',
@@ -210,20 +245,43 @@ export class CampaignMapScene extends Phaser.Scene {
             strokeThickness: 6
         }).setOrigin(0.5).setScrollFactor(0);
 
-        // Instructions
-        const instrText = this.add.text(width / 2, height - 50, '◀ ▶  Muoviti   |   [A] / [SPAZIO]  Entra', {
-            fontSize: '22px',
-            fontFamily: '"Pixeloid Sans"',
-            color: '#888888'
-        }).setOrigin(0.5).setScrollFactor(0);
+        // Player UI (Bottom Left)
+        const uiPaddingX = framePadding + 10;
+        const uiPaddingY = height - framePadding - 3; // Align flush with the bottom inner frame
+        
+        const playerIconFrame = `00_${this.playerCharKey}_icon`;
+        const playerIcon = this.add.sprite(uiPaddingX, uiPaddingY, this.playerCharKey, playerIconFrame)
+            .setOrigin(0, 1)
+            .setScale(0.7)
+            .setScrollFactor(0)
+            .setDepth(105);
 
-        this.tweens.add({
-            targets: instrText,
-            alpha: { from: 1, to: 0.4 },
-            duration: 1200,
-            yoyo: true,
-            repeat: -1
-        });
+        const playerName = this.playerCharKey === 'pe' ? 'PÈ' : this.playerCharKey.toUpperCase();
+        this.add.text(uiPaddingX + playerIcon.displayWidth * 0.75, uiPaddingY - 25, playerName, {
+            fontSize: '32px',
+            fontFamily: '"Pixeloid Sans"',
+            color: '#ffffff',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 6
+        }).setOrigin(0, 1).setScrollFactor(0).setDepth(105);
+
+        if (currentLevel === 0) {
+            // Instructions only on fresh campaign
+            const instrText = this.add.text(width / 2, height - 50, '◀ ▶  Muoviti   |   [A] / [SPAZIO]  Entra', {
+                fontSize: '22px',
+                fontFamily: '"Pixeloid Sans"',
+                color: '#888888'
+            }).setOrigin(0.5).setScrollFactor(0);
+
+            this.tweens.add({
+                targets: instrText,
+                alpha: { from: 1, to: 0.4 },
+                duration: 1200,
+                yoyo: true,
+                repeat: -1
+            });
+        }
 
         // Fade in
         this.cameras.main.fadeIn(800, 0, 0, 0);
@@ -232,6 +290,9 @@ export class CampaignMapScene extends Phaser.Scene {
         this.time.delayedCall(600, () => {
             this.canInput = true;
         });
+
+        // Initial visual update
+        this.updateIslandVisuals();
 
         // Cleanup
         this.events.once('shutdown', () => {
@@ -356,8 +417,29 @@ export class CampaignMapScene extends Phaser.Scene {
                     this.playerSprite.play(idleAnim);
                 }
                 this.playerSprite.setFlipX(false);
+                this.updateIslandVisuals();
             }
         });
+    }
+
+    private updateIslandVisuals(): void {
+        for (let i = 0; i < this.islands.length; i++) {
+            const island = this.islands[i];
+            
+            if (!island.revealed) continue; // Keep ??? style
+
+            if (i === this.currentIslandIndex) {
+                // Standing on this island — make text glow (subtle)
+                island.label.setColor('#ffffff');
+                island.label.setStroke('#ffffff', 1);
+                island.label.setShadow(0, 0, '#ffffff', 4, false, true);
+            } else {
+                // Dimmer, no glow
+                island.label.setColor('#dddddd');
+                island.label.setStroke('#000000', 0);
+                island.label.setShadow(0, 0, '#000000', 0, false, false);
+            }
+        }
     }
 
     private enterIsland(): void {

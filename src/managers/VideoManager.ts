@@ -70,8 +70,8 @@ export class VideoManager {
         this.applySettings();
     }
 
-    /** Cycle: 0 → 1 → 2 → 3 → 0 */
+    /** Cycle: 0 → 1 → 0 */
     public cycleCrt(): void {
-        this.setCrtIntensity(((this.crtIntensity + 1) % 4) as CrtIntensity);
+        this.setCrtIntensity(this.crtIntensity === 0 ? 1 : 0);
     }
 }
