@@ -131,3 +131,21 @@
     - Refactored `StageFactory.ts` to support dynamic background textures.
     - Updated `GameScene.ts` to load the appropriate stage background based on the campaign opponent.
 - **[S]** **STATUS**: Visual variety improved for campaign progression.
+
+### [2026-03-06] v2.2.2 - Settings & Minimap Visual Polish 🎨🗺️
+- **[V]** `v2.2.2`
+- **[Feat]** **Minimap Visual Overhaul**:
+    - Integrated `Minimappa_001.jpg` as a tinted background and added a decorative 16-bit rounded frame.
+    - Added a subtle path of glowing stars connecting the floating islands.
+    - Restored the "ROAD TO LAMICIZIA" title to the top of the map persistently.
+    - Added player portrait and name UI at the bottom-left of the minimap frame.
+    - Implemented a subtle white text glow for the actively selected island name.
+- **[UI]** **Save File Refinement**:
+    - Cleaned up save cards by removing the "Avversari sconfitti" line.
+    - Updated playtime format to `MM:SS` and switched text color to white.
+    - Adjusted idle sprite positioning (+17px) to resolve overlap issues in Slot 0.
+- **[Fix]** **Settings & Flow**:
+    - Resolved Audio/Video settings bugs (volume controls & BACK button) caused by Italian/English string mismatches.
+    - Simplified CRT intensity setting to a binary ON/OFF toggle.
+    - Fixed `CampaignTitleScene` skippability by switching to persistent input listeners.
+- **[S]** **STATUS**: Minimap and settings menus are now polished and fully functional for v2.2.2.
