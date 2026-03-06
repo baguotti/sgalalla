@@ -149,3 +149,15 @@
     - Simplified CRT intensity setting to a binary ON/OFF toggle.
     - Fixed `CampaignTitleScene` skippability by switching to persistent input listeners.
 - **[S]** **STATUS**: Minimap and settings menus are now polished and fully functional for v2.2.2.
+
+### [2026-03-06] v2.2.3 - Campaign Defeat Flow & Save Management 💀💾
+- **[V]** v2.2.3
+- **[Feat]** **Campaign Defeat Flow**:
+    - Implemented a "Retry" dialogue upon match loss in campaign mode.
+    - Added a cinematic fade-to-black transition before presenting the retry choices.
+    - Integrated character-specific defeat dialogue lines (dialogueCampaignLose) across all fighters.
+- **[Feat]** **Save File Management**:
+    - Added a "CONTINUA" / "ELIMINA" submenu when selecting an occupied save slot.
+    - Implemented a red-bordered confirmation dialog ("Sei sicuro di voler cancellare...?") for save deletion.
+    - Fixed navigation logic to fully support horizontal D-Pad and Keyboard Arrow inputs for YES/NO choices.
+- **[S]** **STATUS**: Campaign defeat flow is now respectful of the story, and save management is safer and more professional.
