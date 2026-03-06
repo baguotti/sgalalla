@@ -1,5 +1,5 @@
 /**
- *  FOK — Opponent 5 (Final Boss) Dialogue Script
+ *  FOK — Dialogue Script
  *  ───────────────────────────────────────────────
  *  Edit the lines below to change what Fok says during the campaign.
  *  See _template.ts for field descriptions.
@@ -32,4 +32,19 @@ export const dialogueAfterWin: DialogueLine[] = [
     { speaker: "Fok", text: "Take the crown. It's yours by right of combat.", side: "right" },
     { speaker: "Fok", text: "Be a better ruler than I was.", side: "right" },
     { speaker: "Fok", text: "It is over. I am the champion no more.", side: "right" },
+];
+
+// ── TRAINING PROMPT (Revisiting defeated island) ────────────
+export const dialogueTrainingPrompt: DialogueLine[] = [
+    { speaker: "Fok", text: "The dethroned king still has lessons to teach. Shall we spar?", side: "right" },
+];
+
+// ── TRAINING WIN (Player wins training match) ───────────────
+export const dialogueTrainingWin: DialogueLine[] = [
+    { speaker: "Fok", text: "You defeated me once more. Your reign is well deserved.", side: "right" },
+];
+
+// ── TRAINING LOSE (Player loses training match) ─────────────
+export const dialogueTrainingLose: DialogueLine[] = [
+    { speaker: "Fok", text: "Even a fallen king can still bite. Train harder!", side: "right" },
 ];

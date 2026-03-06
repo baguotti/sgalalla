@@ -656,9 +656,12 @@ export class LobbyScene extends Phaser.Scene {
 
     private startCampaignGame(): void {
         AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
-        // Assuming campaign manager exists globally or in a generic singleton
         this.time.delayedCall(500, () => {
-            this.scene.start('GameScene', { playerData: [this.slots[0]], mode: 'campaign' });
+            this.scene.start('CampaignMapScene', {
+                playerData: [this.slots[0]],
+                mode: 'campaign',
+                slotIndex: (this._initData as any)?.slotIndex ?? 0,
+            });
         });
     }
 

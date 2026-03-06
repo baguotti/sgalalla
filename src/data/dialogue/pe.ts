@@ -33,3 +33,18 @@ export const dialogueAfterWin: DialogueLine[] = [
     { speaker: "Pe", text: "Go... leave me to my nest.", side: "right" },
     { speaker: "Pe", text: "Next time... I won't be so easy to catch.", side: "right" },
 ];
+
+// ── TRAINING PROMPT (Revisiting defeated island) ────────────
+export const dialogueTrainingPrompt: DialogueLine[] = [
+    { speaker: "Pe", text: "Squawk! You want another round? I can sharpen your talons!", side: "right" },
+];
+
+// ── TRAINING WIN (Player wins training match) ───────────────
+export const dialogueTrainingWin: DialogueLine[] = [
+    { speaker: "Pe", text: "SQUAWK! You're flying higher every time!", side: "right" },
+];
+
+// ── TRAINING LOSE (Player loses training match) ─────────────
+export const dialogueTrainingLose: DialogueLine[] = [
+    { speaker: "Pe", text: "You need more practice, little human. Try again!", side: "right" },
+];

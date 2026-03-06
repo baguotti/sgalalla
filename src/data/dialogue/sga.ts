@@ -33,3 +33,18 @@ export const dialogueAfterWin: DialogueLine[] = [
     { speaker: "Sga", text: "The champion waits... do not falter now.", side: "right" },
     { speaker: "Sga", text: "Honor in victory, warrior.", side: "right" },
 ];
+
+// ── TRAINING PROMPT (Revisiting defeated island) ────────────
+export const dialogueTrainingPrompt: DialogueLine[] = [
+    { speaker: "Sga", text: "You return to test your blade? I shall be your whetstone.", side: "right" },
+];
+
+// ── TRAINING WIN (Player wins training match) ───────────────
+export const dialogueTrainingWin: DialogueLine[] = [
+    { speaker: "Sga", text: "Well struck! Your technique improves with each bout.", side: "right" },
+];
+
+// ── TRAINING LOSE (Player loses training match) ─────────────
+export const dialogueTrainingLose: DialogueLine[] = [
+    { speaker: "Sga", text: "Your guard faltered. Train more and return stronger.", side: "right" },
+];

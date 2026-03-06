@@ -33,3 +33,18 @@ export const dialogueAfterWin: DialogueLine[] = [
     { speaker: "Greg", text: "The manifesto didn't prepare me for this.", side: "right" },
     { speaker: "Greg", text: "Go forth, comrade. You have proven your worth.", side: "right" },
 ];
+
+// ── TRAINING PROMPT (Revisiting defeated island) ────────────
+export const dialogueTrainingPrompt: DialogueLine[] = [
+    { speaker: "Greg", text: "Comrade! The revolution needs more soldiers. Let me drill you.", side: "right" },
+];
+
+// ── TRAINING WIN (Player wins training match) ───────────────
+export const dialogueTrainingWin: DialogueLine[] = [
+    { speaker: "Greg", text: "The people's champion grows stronger! Well fought, comrade!", side: "right" },
+];
+
+// ── TRAINING LOSE (Player loses training match) ─────────────
+export const dialogueTrainingLose: DialogueLine[] = [
+    { speaker: "Greg", text: "The struggle continues! You must train harder for the cause!", side: "right" },
+];

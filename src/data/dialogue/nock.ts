@@ -33,3 +33,18 @@ export const dialogueAfterWin: DialogueLine[] = [
     { speaker: "Nock", text: "Take my respect, for what it's worth.", side: "right" },
     { speaker: "Nock", text: "The real challenge lies ahead.", side: "right" },
 ];
+
+// ── TRAINING PROMPT (Revisiting defeated island) ────────────
+export const dialogueTrainingPrompt: DialogueLine[] = [
+    { speaker: "Nock", text: "Back again? I can train you for the challenges ahead.", side: "right" },
+];
+
+// ── TRAINING WIN (Player wins training match) ───────────────
+export const dialogueTrainingWin: DialogueLine[] = [
+    { speaker: "Nock", text: "Well done! You're getting sharper every time.", side: "right" },
+];
+
+// ── TRAINING LOSE (Player loses training match) ─────────────
+export const dialogueTrainingLose: DialogueLine[] = [
+    { speaker: "Nock", text: "You should train more. Don't give up!", side: "right" },
+];

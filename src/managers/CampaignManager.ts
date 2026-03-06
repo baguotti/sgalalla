@@ -14,6 +14,9 @@ export interface OpponentConfig {
     dialogueBefore: { speaker: string; text: string; side: 'left' | 'right' }[];
     dialogueMidFight: { speaker: string; text: string; side: 'left' | 'right' }[];
     dialogueAfterWin: { speaker: string; text: string; side: 'left' | 'right' }[];
+    dialogueTrainingPrompt: { speaker: string; text: string; side: 'left' | 'right' }[];
+    dialogueTrainingWin: { speaker: string; text: string; side: 'left' | 'right' }[];
+    dialogueTrainingLose: { speaker: string; text: string; side: 'left' | 'right' }[];
     difficulty: number; // 1-10 mapped to AI aggressiveness
 }
 
@@ -129,6 +132,9 @@ export class CampaignManager {
                 dialogueBefore: dialogue ? dialogue.dialogueBefore : [],
                 dialogueMidFight: dialogue ? dialogue.dialogueMidFight : [],
                 dialogueAfterWin: dialogue ? dialogue.dialogueAfterWin : [],
+                dialogueTrainingPrompt: dialogue?.dialogueTrainingPrompt ?? [],
+                dialogueTrainingWin: dialogue?.dialogueTrainingWin ?? [],
+                dialogueTrainingLose: dialogue?.dialogueTrainingLose ?? [],
                 difficulty,
             };
         });

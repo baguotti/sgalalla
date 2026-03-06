@@ -130,9 +130,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     // Campaign multi-phase fight flow
     private campaignMidFightPlayed: boolean = false;
 
+    // Training mode state
+    private isTraining: boolean = false;
+    private trainingOpponentIndex: number = 0;
+
     init(data: any): void {
         this.mode = data.mode || 'versus';
         this.campaignMidFightPlayed = false; // Reset for each new match
+        this.isTraining = data.isTraining || false;
+        this.trainingOpponentIndex = data.trainingOpponentIndex || 0;
 
         if (data.playerData) {
             this.playerData = data.playerData;
@@ -158,7 +164,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 campaign.startNewCampaign(selectedChar, slotIndex);
             }
 
-            const opponent = campaign.getCurrentOpponent();
+            const opponent = this.isTraining 
+                ? campaign.ladder[this.trainingOpponentIndex] 
+                : campaign.getCurrentOpponent();
+                
             if (opponent) {
                 // Force P1 and Opponent
                 this.playerData = [
@@ -416,8 +425,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 }
             });
 
-            // If campaign, trigger transition to cutscene immediately
-            if (this.mode === 'campaign') {
+            // If campaign and NOT training, trigger transition to cutscene immediately
+            if (this.mode === 'campaign' && !this.isTraining) {
                 const opponent = CampaignManager.getInstance().getCurrentOpponent();
                 if (opponent) {
                     // Start cutscene, moving P1 slightly left and P2 slightly right of center
@@ -522,11 +531,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     this.input.keyboard?.resetKeys();
                 }
             });
-            // Chest spawn timer: every 30 seconds, 35% chance
+            // Chest spawn timer: every 30 seconds, 2% chance
             this.time.addEvent({
                 delay: 30000,
                 callback: () => {
-                    if (Phaser.Math.FloatBetween(0, 1) < 0.01) {
+                    if (Phaser.Math.FloatBetween(0, 1) < 0.02) {
                         this.spawnChest();
                     }
                 },
@@ -1010,7 +1019,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
                 if (player.lives > 0) {
                     // Campaign mid-fight cutscene: trigger when opponent reaches 1 life
-                    if (this.mode === 'campaign' && player.playerId === 1 && player.lives === 1 && !this.campaignMidFightPlayed) {
+                    if (this.mode === 'campaign' && !this.isTraining && player.playerId === 1 && player.lives === 1 && !this.campaignMidFightPlayed) {
                         this.campaignMidFightPlayed = true;
                         const opponent = CampaignManager.getInstance().getCurrentOpponent();
                         if (opponent && opponent.dialogueMidFight.length > 0) {
@@ -1362,7 +1371,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             const winner = survivors.length > 0 ? survivors[0] : null;
 
             // Campaign mode: skip win animation and rematch entirely
-            if (this.mode === 'campaign' && winner && winner.playerId === 0) {
+            if (this.mode === 'campaign' && !this.isTraining && winner && winner.playerId === 0) {
                 CampaignManager.getInstance().advanceLadder();
                 this.campaignDefeatCutscene();
                 return; // Skip normal handleGameOver
@@ -1412,7 +1421,69 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         // 5-second unskippable delay
         this.time.delayedCall(5000, () => {
-            this.showGameOverMenu();
+            if (this.mode === 'campaign' && this.isTraining) {
+                this.handleTrainingGameOver(winnerId);
+            } else {
+                this.showGameOverMenu();
+            }
+        });
+    }
+
+    private handleTrainingGameOver(winnerId: number): void {
+        const campaign = CampaignManager.getInstance();
+        const opponent = campaign.ladder[this.trainingOpponentIndex];
+        const oppCharKey = opponent?.character || 'sgu';
+
+        const isWin = winnerId === 0;
+
+        // Get dialogue text from the data files
+        const dialogueLines = isWin
+            ? (opponent?.dialogueTrainingWin ?? [])
+            : (opponent?.dialogueTrainingLose ?? []);
+
+        const dialogueText = dialogueLines.length > 0
+            ? dialogueLines[0].text
+            : (isWin ? 'Well done! Train more?' : 'You should train more. Try again?');
+        const speakerName = dialogueLines.length > 0
+            ? dialogueLines[0].speaker
+            : oppCharKey;
+
+        // Launch Dialogue Scene with YES/NO choices
+        if (this.scene.isActive('DialogueScene') || this.scene.isSleeping('DialogueScene')) {
+            this.scene.stop('DialogueScene');
+        }
+
+        this.scene.launch('DialogueScene', {
+            leftCharacter: this.playerData[0]?.character || 'fok',
+            rightCharacter: oppCharKey,
+            dialogueData: [
+                {
+                    speaker: speakerName,
+                    text: dialogueText,
+                    side: 'right',
+                    animation: 'idle',
+                    choices: [
+                        { text: 'YES', action: () => {
+                            // Restart match
+                            this.scene.restart({
+                                playerData: this.playerData,
+                                mode: 'campaign',
+                                slotIndex: campaign.getActiveSlotIndex(),
+                                isTraining: true,
+                                trainingOpponentIndex: this.trainingOpponentIndex
+                            });
+                        } },
+                        { text: 'NO', action: () => {
+                            // Return to minimap
+                            this.scene.start('CampaignMapScene', {
+                                playerData: [this.playerData[0]],
+                                mode: 'campaign',
+                                slotIndex: campaign.getActiveSlotIndex(),
+                            });
+                        } }
+                    ]
+                }
+            ]
         });
     }
 
@@ -1768,8 +1839,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             const nextOpponent = CampaignManager.getInstance().getCurrentOpponent();
 
             if (nextOpponent) {
-                // Next opponent exists — restart GameScene in campaign mode
-                this.scene.restart({ playerData: [this.playerData[0]], mode: 'campaign' });
+                // Next opponent exists — go to map scene to pick next island
+                this.scene.start('CampaignMapScene', {
+                    playerData: [this.playerData[0]],
+                    mode: 'campaign',
+                    slotIndex: CampaignManager.getInstance().getActiveSlotIndex(),
+                });
             } else {
                 // Campaign complete! Show credits.
                 CampaignManager.getInstance().resetCampaign();

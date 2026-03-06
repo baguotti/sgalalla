@@ -1,5 +1,24 @@
 # Sgalalla - Development Log
 
+### [2026-03-06] v2.2.0 - Training Mode & Dialogue Overhaul 🥋🗣️
+- **[V]** `v2.2.0`
+- **[Feat]** **Training Mode on Defeated Islands**:
+    - Reaching a defeated island now prompts a training match with the opponent.
+    - Added YES/NO choice system with keyboard/gamepad/mouse support.
+    - Integrated character-specific training dialogues.
+- **[Refactor]** **Dialogue Data Centralization**:
+    - Moved all hardcoded scene dialogue into character-specific files (`nock.ts`, `pe.ts`, `sgu.ts`, `sga.ts`, `fok.ts`, `greg.ts`).
+    - Added new exports for `dialogueTrainingPrompt`, `dialogueTrainingWin`, and `dialogueTrainingLose`.
+- **[Fix]** **Dialogue Stability**:
+    - Replaced the standalone `DialogueScene` overlay on the map with a native inline prompt in `CampaignMapScene` to fix texture loading issues and silent crashes.
+    - Implemented input debounce (300ms) on prompt confirmation to prevent "key bleed through" when entering an island.
+- **[UI]** **Visual Polish**:
+    - Matched training prompt name styling (32px bold, white, 8px stroke) and box positioning (50px from bottom) exactly to in-game standard.
+    - Dynamic opponent icons and names now display correctly above the prompt box.
+- **[S]** **STATUS**: Campaign map exploration feel is now complete with repeatable training bouts.
+
+---
+
 Part 2
 
 

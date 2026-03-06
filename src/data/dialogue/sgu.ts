@@ -33,3 +33,18 @@ export const dialogueAfterWin: DialogueLine[] = [
     { speaker: "Sgu", text: "Keep... going.", side: "right" },
     { speaker: "Sgu", text: "Farewell.", side: "right" },
 ];
+
+// ── TRAINING PROMPT (Revisiting defeated island) ────────────
+export const dialogueTrainingPrompt: DialogueLine[] = [
+    { speaker: "Sgu", text: "...Again? ...Train.", side: "right" },
+];
+
+// ── TRAINING WIN (Player wins training match) ───────────────
+export const dialogueTrainingWin: DialogueLine[] = [
+    { speaker: "Sgu", text: "...Good.", side: "right" },
+];
+
+// ── TRAINING LOSE (Player loses training match) ─────────────
+export const dialogueTrainingLose: DialogueLine[] = [
+    { speaker: "Sgu", text: "...More.", side: "right" },
+];

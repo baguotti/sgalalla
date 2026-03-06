@@ -307,7 +307,7 @@ export class SaveFileScene extends Phaser.Scene {
             const campaign = CampaignManager.getInstance();
             campaign.loadCampaignFromSlot(this.selectedIndex);
 
-            // Build player data and go straight to GameScene
+            // Build player data and go to CampaignMapScene
             const playerData = [{
                 playerId: 0,
                 joined: true,
@@ -320,7 +320,7 @@ export class SaveFileScene extends Phaser.Scene {
                 character: slotData.playerCharacter,
             }];
 
-            this.scene.start('GameScene', {
+            this.scene.start('CampaignMapScene', {
                 playerData,
                 mode: 'campaign',
                 slotIndex: this.selectedIndex,
