@@ -23,10 +23,9 @@ export interface StageResult {
  * Creates the standard Sgalalla stage layout.
  * Shared between GameScene and OnlineGameScene to eliminate duplication.
  */
-export function createStage(scene: Phaser.Scene): StageResult {
+export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'adria_bg'): StageResult {
     // --- Background ---
-    // --- Background ---
-    const background = scene.add.image(scene.scale.width / 2, scene.scale.height / 2 + 150, 'adria_bg'); // New BG
+    const background = scene.add.image(scene.scale.width / 2, scene.scale.height / 2 + 150, backgroundTexture); // Dynamic BG
     const scaleX = scene.scale.width / background.width;
     const scaleY = scene.scale.height / background.height;
     const scale = Math.max(scaleX, scaleY) * 2.0;

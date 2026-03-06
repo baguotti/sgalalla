@@ -134,6 +134,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private isTraining: boolean = false;
     private trainingOpponentIndex: number = 0;
 
+    private currentStageBackground: string = 'adria_bg';
+
     init(data: any): void {
         this.mode = data.mode || 'versus';
         this.campaignMidFightPlayed = false; // Reset for each new match
@@ -182,6 +184,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                         isTrainingDummy: true // Added for testing purposes so AI stands still
                     }
                 ];
+                this.currentStageBackground = opponent.stage;
             }
         }
 
@@ -643,7 +646,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
 
     private createStage(): void {
-        const stage = createSharedStage(this);
+        const stage = createSharedStage(this, this.currentStageBackground);
 
         // Populate ALL tracking arrays so configureCameraExclusions always works
         this.backgroundImage = stage.background;
