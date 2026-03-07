@@ -45,7 +45,7 @@ export class CampaignTitleScene extends Phaser.Scene {
         if (!this.inputUnlocked) return;
         this.inputUnlocked = false; // Prevent multiple triggers
 
-        // Transition to SaveFileScene
-        this.scene.start('SaveFileScene', { ...this.initData, mode: 'campaign' });
+        // Transition to LobbyScene
+        this.scene.start('LobbyScene', { ...this.initData, mode: 'campaign' });
     }
 }

@@ -73,7 +73,7 @@ export class CampaignManager {
     public loadCampaignFromSlot(slotIndex: number): boolean {
         this.activeSlotIndex = slotIndex;
         const data = SaveService.loadSlot(slotIndex);
-        if (!data || data.completed) {
+        if (!data) {
             this.currentData = null;
             this.ladder = [];
             return false;
@@ -83,9 +83,8 @@ export class CampaignManager {
         if (data.ladderOrder && data.ladderOrder.length > 0) {
             this.ladder = this.buildLadderFromOrder(data.ladderOrder);
         } else {
-            // Stale save — clear it
+            // Stale save — clear in-memory state only, never auto-delete the slot
             this.currentData = null;
-            SaveService.deleteSlot(slotIndex);
             return false;
         }
 
@@ -143,11 +142,11 @@ export class CampaignManager {
     }
 
     public hasActiveCampaign(): boolean {
-        return this.currentData !== null && !this.currentData.completed;
+        return this.currentData !== null;
     }
 
     public getCurrentOpponent(): OpponentConfig | null {
-        if (!this.currentData || this.currentData.completed) return null;
+        if (!this.currentData) return null;
         if (this.currentData.currentLevel >= this.ladder.length) return null;
 
         return this.ladder[this.currentData.currentLevel];
@@ -165,8 +164,8 @@ export class CampaignManager {
         if (!this.currentData) return;
 
         this.currentData.currentLevel++;
-        if (this.currentData.currentLevel >= this.ladder.length) {
-            this.currentData.completed = true;
+        if (this.currentData.currentLevel > this.ladder.length) {
+            this.currentData.currentLevel = this.ladder.length;
         }
         this.updatePlayTime();
         SaveService.saveSlot(this.activeSlotIndex, this.currentData);
@@ -187,9 +186,8 @@ export class CampaignManager {
     }
 
     public resetCampaign(): void {
-        if (this.currentData) {
-            SaveService.deleteSlot(this.activeSlotIndex);
-        }
+        // Only clears in-memory state — NEVER auto-deletes the save file.
+        // The user must explicitly choose "ELIMINA" in the menu to delete.
         this.currentData = null;
         this.ladder = [];
         this.sessionStartTime = 0;

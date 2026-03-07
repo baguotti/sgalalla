@@ -27,8 +27,8 @@ export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'ad
     // --- Background ---
     const background = scene.add.image(scene.scale.width / 2, scene.scale.height / 2 + 150, backgroundTexture); // Dynamic BG
     const scaleX = scene.scale.width / background.width;
-    const scaleY = scene.scale.height / background.height;
-    const scale = Math.max(scaleX, scaleY) * 2.0;
+    // Use width-based scaling to ensure consistent zoom for ultra-wide backgrounds like Adria/Sala Prove
+    const scale = scaleX * 2.0;
 
     background.setScale(scale).setScrollFactor(0.9);
     background.setDepth(-100);

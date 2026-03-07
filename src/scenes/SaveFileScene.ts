@@ -119,7 +119,7 @@ export class SaveFileScene extends Phaser.Scene {
 
             const slotData = this.slots[i];
 
-            if (slotData && !slotData.completed) {
+            if (slotData) {
                 // ─── Occupied Slot ───
                 // Character sprite
                 const charKey = slotData.playerCharacter || 'fok';
@@ -130,7 +130,7 @@ export class SaveFileScene extends Phaser.Scene {
                     frameKey = `${config.idle.prefix}000`;
                 }
 
-                const sprite = this.add.sprite(-cardWidth / 2 + 117, 0, charKey, frameKey);
+                const sprite = this.add.sprite(-cardWidth / 2 + 127, 0, charKey, frameKey);
                 sprite.setScale(0.9);
                 if (this.anims.exists(animKey)) {
                     sprite.play(animKey);
@@ -209,7 +209,7 @@ export class SaveFileScene extends Phaser.Scene {
 
         // --- Create Confirm Delete Sub-Menu ---
         this.confirmMenuContainer = this.add.container(width / 2, height / 2).setVisible(false).setDepth(102);
-        
+
         const confirmCard = this.add.graphics();
         confirmCard.lineStyle(2, 0xff0000); // Red border for delete
         confirmCard.fillStyle(0x222222, 1);
@@ -333,7 +333,7 @@ export class SaveFileScene extends Phaser.Scene {
 
             const navY = getMenuNavY(pad);
             const navX = getMenuNavX(pad); // Support horizontal selection specifically for YES/NO
-            
+
             // Prioritize horizontal input if the confirm menu is open, otherwise use vertical
             if (this.isConfirmMenuOpen) {
                 if (navX < 0 || navY < 0) {
@@ -417,13 +417,13 @@ export class SaveFileScene extends Phaser.Scene {
         AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
         const slotData = this.slots[this.selectedIndex];
 
-        if (slotData && !slotData.completed) {
+        if (slotData) {
             // ─── Occupied save: Ask Continue or Delete ───
             this.openSubMenu();
         } else {
-            // ─── New game: go to lobby to pick character ───
+            // ─── New game: show title screen first, then go to lobby to pick character ───
             this.canInput = false;
-            this.scene.start('LobbyScene', {
+            this.scene.start('CampaignTitleScene', {
                 ...this.initData,
                 mode: 'campaign',
                 slotIndex: this.selectedIndex,
@@ -497,7 +497,7 @@ export class SaveFileScene extends Phaser.Scene {
 
     private handleSubMenuConfirm(): void {
         AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
-        
+
         if (this.subSelectedIndex === 0) {
             // Continua
             this.canInput = false;
@@ -544,7 +544,7 @@ export class SaveFileScene extends Phaser.Scene {
 
     private handleConfirmMenuSubmit(): void {
         AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
-        
+
         if (this.confirmSelectedIndex === 1) { // YES, Delete
             this.canInput = false;
             SaveService.deleteSlot(this.selectedIndex);

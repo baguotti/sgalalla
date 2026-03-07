@@ -169,3 +169,17 @@
     - Sprites float in sync with the islands and are scaled/flipped to face the island.
     - Implemented dynamic animation generation for all opponent characters on the map.
 - **[S]** **STATUS**: The minimap now feels alive and shows visual progress of the player's conquests.
+---
+### [2026-03-07] v2.2.5 - Campaign Persistence & Asset Optimization 💾🎨
+- **[V]** `v2.2.5`
+- **[Feat]** **Campaign Persistence**:
+  - Removed all auto-deletion logic triggered by campaign completion.
+  - Completed save files are now permanently stored and selectable from the Save Menu.
+  - Players can revisit a "conquered" campaign to engage in training matches with any opponent on the map.
+- **[Feat]** **La Sala Prove Optimization**:
+  - Converted the high-res "La Sala Prove" background asset to WebP (840KB), significantly improving load times.
+- **[Fix]** **Background Scaling Fix**:
+  - Standardized `StageFactory.ts` to use width-based scaling. All backgrounds (specifically Adria and Sala Prove) now use a consistent `scaleX * 2.0` zoom factor.
+- **[Dev]** **Campaign Architecture Audit**:
+  - Performed a deep technical audit of the single-player systems, identifying paths for future state-machine based refactors and input handling optimizations.
+- **[S]** **STATUS**: Campaign longevity is secured with persistent saves and optimized high-res assets.

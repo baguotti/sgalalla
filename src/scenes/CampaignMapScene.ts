@@ -80,15 +80,15 @@ export class CampaignMapScene extends Phaser.Scene {
         // Elegant 16-bit rounded rectangle frame
         const framePadding = 20;
         const frameGraphics = this.add.graphics().setScrollFactor(0).setDepth(100);
-        
+
         // Outer border (dark)
         frameGraphics.lineStyle(6, 0x111111, 1);
         frameGraphics.strokeRoundedRect(framePadding, framePadding, width - framePadding * 2, height - framePadding * 2, 20);
-        
+
         // Main frame (light highlight)
         frameGraphics.lineStyle(3, 0xdddddd, 0.8);
         frameGraphics.strokeRoundedRect(framePadding + 3, framePadding + 3, width - (framePadding + 3) * 2, height - (framePadding + 3) * 2, 17);
-        
+
         // Bevel effect (inner shadow)
         frameGraphics.lineStyle(2, 0x000000, 0.3);
         frameGraphics.strokeRoundedRect(framePadding + 6, framePadding + 6, width - (framePadding + 6) * 2, height - (framePadding + 6) * 2, 14);
@@ -141,16 +141,16 @@ export class CampaignMapScene extends Phaser.Scene {
             if (i < ladder.length - 1) {
                 const nextX = startX + (i + 1) * CampaignMapScene.ISLAND_SPACING;
                 const nextY = CampaignMapScene.BASE_Y + Math.sin((i + 1) * 1.2) * 30;
-                
+
                 const dist = Phaser.Math.Distance.Between(ix, iy, nextX, nextY);
                 const starSpacing = 45; // Pixels between stars
                 const numStars = Math.floor(dist / starSpacing);
-                
+
                 for (let j = 1; j < numStars; j++) {
                     const t = j / numStars;
                     const starX = Phaser.Math.Interpolation.Linear([ix, nextX], t);
                     const starY = Phaser.Math.Interpolation.Linear([iy, nextY], t);
-                    
+
                     // Draw a subtle 16-bit star (a small cross with a bright center)
                     this.pathGraphics.fillStyle(0xaaaaaa, 0.4);
                     this.pathGraphics.fillRect(starX - 1, starY - 3, 2, 6);
@@ -165,7 +165,7 @@ export class CampaignMapScene extends Phaser.Scene {
 
             // Island icon (placeholder Adria icon)
             const icon = this.add.sprite(0, 0, 'island_adria').setDisplaySize(CampaignMapScene.ISLAND_SIZE, CampaignMapScene.ISLAND_SIZE);
-            
+
             // Silhouette effect: tint black if not revealed
             if (!revealed) {
                 icon.setTint(0x000000);
@@ -198,10 +198,10 @@ export class CampaignMapScene extends Phaser.Scene {
             if (defeated) {
                 // Ensure their animation exists
                 this.ensureAnimations(opponent.character);
-                
+
                 const opponentIdleAnim = `${opponent.character}_idle`;
                 const opponentIdleFrame = `${opponent.character}_idle_000`;
-                
+
                 // Position them floating to the right of the island
                 const oppSprite = this.add.sprite(
                     CampaignMapScene.ISLAND_SIZE / 2, // X offset from center
@@ -274,7 +274,7 @@ export class CampaignMapScene extends Phaser.Scene {
         // Player UI (Bottom Left)
         const uiPaddingX = framePadding + 10;
         const uiPaddingY = height - framePadding - 3; // Align flush with the bottom inner frame
-        
+
         const playerIconFrame = `00_${this.playerCharKey}_icon`;
         const playerIcon = this.add.sprite(uiPaddingX, uiPaddingY, this.playerCharKey, playerIconFrame)
             .setOrigin(0, 1)
@@ -451,7 +451,7 @@ export class CampaignMapScene extends Phaser.Scene {
     private updateIslandVisuals(): void {
         for (let i = 0; i < this.islands.length; i++) {
             const island = this.islands[i];
-            
+
             if (!island.revealed) continue; // Keep ??? style
 
             if (i === this.currentIslandIndex) {
@@ -586,7 +586,7 @@ export class CampaignMapScene extends Phaser.Scene {
             }
         };
 
-        const cleanup = () => {
+        let cleanup = () => {
             allUI.forEach(obj => obj.destroy());
             this.input.keyboard?.off('keydown-LEFT', onLeft);
             this.input.keyboard?.off('keydown-RIGHT', onRight);
@@ -623,6 +623,66 @@ export class CampaignMapScene extends Phaser.Scene {
             this.input.keyboard?.on('keydown-SPACE', onConfirm, this);
             this.input.keyboard?.on('keydown-ENTER', onConfirm, this);
         });
+
+        // --- Gamepad Support ---
+        // Create an update listener just for this prompt
+        let lastPadTime = Date.now();
+        const padPrevA = new Map<number, boolean>();
+        const gamepadUpdate = () => {
+            const gamepads = navigator.getGamepads();
+            const now = Date.now();
+            if (now - lastPadTime < 200) return;
+
+            for (let i = 0; i < gamepads.length; i++) {
+                const pad = gamepads[i];
+                if (!pad) continue;
+
+                // Move
+                const navX = getMenuNavX(pad);
+                if (navX < 0) {
+                    onLeft();
+                    lastPadTime = now;
+                } else if (navX > 0) {
+                    onRight();
+                    lastPadTime = now;
+                }
+
+                // Confirm - Edge detection
+                const confirmIdx = getConfirmButtonIndex(pad);
+                const aPressed = pad.buttons[confirmIdx]?.pressed || false;
+                const wasA = padPrevA.get(pad.index) ?? false;
+                padPrevA.set(pad.index, aPressed);
+
+                // Need extra delay check on confirm so A button from opening the menu
+                // doesn't instantly click YES
+                if (aPressed && !wasA) {
+                    // Similar to the keyboard 200ms delay logic
+                    if (now - lastPadTime > 300) {
+                        onConfirm();
+                        lastPadTime = now;
+                    }
+                }
+            }
+        };
+
+        // Clear pad states initially to consume holding presses
+        const setupGamepads = navigator.getGamepads();
+        for (let i = 0; i < setupGamepads.length; i++) {
+            const pad = setupGamepads[i];
+            if (pad) {
+                const confIdx = getConfirmButtonIndex(pad);
+                padPrevA.set(pad.index, pad.buttons[confIdx]?.pressed || false);
+            }
+        }
+
+        this.events.on('update', gamepadUpdate);
+
+        // Append to cleanup
+        const oldCleanup = cleanup;
+        cleanup = () => {
+            oldCleanup();
+            this.events.off('update', gamepadUpdate);
+        };
 
         // Mouse/touch support
         yesBtn.setInteractive();

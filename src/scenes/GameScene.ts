@@ -166,10 +166,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 campaign.startNewCampaign(selectedChar, slotIndex);
             }
 
-            const opponent = this.isTraining 
-                ? campaign.ladder[this.trainingOpponentIndex] 
+            const opponent = this.isTraining
+                ? campaign.ladder[this.trainingOpponentIndex]
                 : campaign.getCurrentOpponent();
-                
+
             if (opponent) {
                 // Force P1 and Opponent
                 this.playerData = [
@@ -1396,7 +1396,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         if (winnerId >= 0) {
             AudioManager.getInstance().playSFX('sfx_knockout', { volume: 0.8 });
             winner = this.players.find(p => p.playerId === winnerId);
-            
+
             if (this.mode !== 'campaign') {
                 winnerText += `\nPLAYER ${winnerId + 1} HA ARATO!`; // Custom Text
                 // DRAMATIC ZOOM
@@ -1486,24 +1486,28 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     side: 'right',
                     animation: 'idle',
                     choices: [
-                        { text: 'YES', action: () => {
-                            // Restart match
-                            this.scene.restart({
-                                playerData: this.playerData,
-                                mode: 'campaign',
-                                slotIndex: campaign.getActiveSlotIndex(),
-                                isTraining: true,
-                                trainingOpponentIndex: this.trainingOpponentIndex
-                            });
-                        } },
-                        { text: 'NO', action: () => {
-                            // Return to minimap
-                            this.scene.start('CampaignMapScene', {
-                                playerData: [this.playerData[0]],
-                                mode: 'campaign',
-                                slotIndex: campaign.getActiveSlotIndex(),
-                            });
-                        } }
+                        {
+                            text: 'YES', action: () => {
+                                // Restart match
+                                this.scene.restart({
+                                    playerData: this.playerData,
+                                    mode: 'campaign',
+                                    slotIndex: campaign.getActiveSlotIndex(),
+                                    isTraining: true,
+                                    trainingOpponentIndex: this.trainingOpponentIndex
+                                });
+                            }
+                        },
+                        {
+                            text: 'NO', action: () => {
+                                // Return to minimap
+                                this.scene.start('CampaignMapScene', {
+                                    playerData: [this.playerData[0]],
+                                    mode: 'campaign',
+                                    slotIndex: campaign.getActiveSlotIndex(),
+                                });
+                            }
+                        }
                     ]
                 }
             ],
@@ -1517,10 +1521,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const oppCharKey = opponent?.character || 'sgu';
 
         const dialogueLines = opponent?.dialogueCampaignLose ?? [];
-        
+
         // Grab the dialogue data (use the first line)
-        const dialogueData = dialogueLines.length > 0 
-            ? dialogueLines[0] 
+        const dialogueData = dialogueLines.length > 0
+            ? dialogueLines[0]
             : { speaker: oppCharKey, text: "You lost. Want to try again?", side: 'right', animation: "idle" };
 
         // Ensure choices are appended
@@ -1530,23 +1534,27 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             side: dialogueData.side as 'left' | 'right',
             animation: (dialogueData as any).animation || 'idle',
             choices: [
-                { text: 'YES', action: () => {
-                    // Restart match (same level)
-                    this.scene.restart({
-                        playerData: this.playerData,
-                        mode: 'campaign',
-                        slotIndex: campaign.getActiveSlotIndex(),
-                        isTraining: false
-                    });
-                } },
-                { text: 'NO', action: () => {
-                    // Return to minimap
-                    this.scene.start('CampaignMapScene', {
-                        playerData: [this.playerData[0]],
-                        mode: 'campaign',
-                        slotIndex: campaign.getActiveSlotIndex(),
-                    });
-                } }
+                {
+                    text: 'YES', action: () => {
+                        // Restart match (same level)
+                        this.scene.restart({
+                            playerData: this.playerData,
+                            mode: 'campaign',
+                            slotIndex: campaign.getActiveSlotIndex(),
+                            isTraining: false
+                        });
+                    }
+                },
+                {
+                    text: 'NO', action: () => {
+                        // Return to minimap
+                        this.scene.start('CampaignMapScene', {
+                            playerData: [this.playerData[0]],
+                            mode: 'campaign',
+                            slotIndex: campaign.getActiveSlotIndex(),
+                        });
+                    }
+                }
             ]
         };
 
@@ -1607,12 +1615,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         if (this.mode === 'training' || isTraining) targetMode = 'training';
         if (this.mode === 'campaign') targetMode = 'campaign';
 
-        // Check if campaign is completed!
+        // Check if campaign is completed (no next opponent)
         if (this.mode === 'campaign' && CampaignManager.getInstance().getCurrentOpponent() === null) {
-            // For now, return to main menu or show credits?
-            // "You won the game!" -> we just reset and go to lobby for now
-            CampaignManager.getInstance().resetCampaign();
-            this.scene.start('MainMenuScene');
+            // Campaign is complete — go back to map so player can do training rematch.
+            // Save is kept intact.
+            this.scene.start('CampaignMapScene', {
+                playerData: [this.playerData[0]],
+                mode: 'campaign',
+                slotIndex: CampaignManager.getInstance().getActiveSlotIndex(),
+            });
             return;
         }
 
@@ -1921,8 +1932,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     slotIndex: CampaignManager.getInstance().getActiveSlotIndex(),
                 });
             } else {
-                // Campaign complete! Show credits.
-                CampaignManager.getInstance().resetCampaign();
+                // Campaign complete! Show credits — save file is kept.
                 this.scene.start('CreditsScene');
             }
         });
