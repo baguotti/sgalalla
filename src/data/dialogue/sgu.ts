@@ -48,3 +48,8 @@ export const dialogueTrainingWin: DialogueLine[] = [
 export const dialogueTrainingLose: DialogueLine[] = [
     { speaker: "Sgu", text: "...More.", side: "right" },
 ];
+
+// ── CAMPAIGN LOSE (Player loses campaign match) ─────────────
+export const dialogueCampaignLose: DialogueLine[] = [
+    { speaker: "Sgu", text: "Not fast enough! But you're getting there. Ready for round two?", side: "right", animation: "taunt" },
+];

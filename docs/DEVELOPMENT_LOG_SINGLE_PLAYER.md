@@ -161,3 +161,11 @@
     - Implemented a red-bordered confirmation dialog ("Sei sicuro di voler cancellare...?") for save deletion.
     - Fixed navigation logic to fully support horizontal D-Pad and Keyboard Arrow inputs for YES/NO choices.
 - **[S]** **STATUS**: Campaign defeat flow is now respectful of the story, and save management is safer and more professional.
+
+### [2026-03-07] v2.2.4 - Minimap Opponent Sprites 🗺️👤
+- **[V]** v2.2.4
+- **[Feat]** **Defeated Opponent Sprites**:
+    - Defeated opponents now appear as idle sprites next to their respective islands on the campaign minimap.
+    - Sprites float in sync with the islands and are scaled/flipped to face the island.
+    - Implemented dynamic animation generation for all opponent characters on the map.
+- **[S]** **STATUS**: The minimap now feels alive and shows visual progress of the player's conquests.

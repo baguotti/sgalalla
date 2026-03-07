@@ -1437,6 +1437,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     this.handleTrainingGameOver(winnerId);
                 }
             });
+        } else if (this.mode === 'campaign' && !this.isTraining) {
+            // Player lost campaign match! Instantly transition to black screen retry dialogue
+            this.cameras.main.fade(1500, 0, 0, 0, false, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+                if (progress === 1) {
+                    this.handleCampaignLoseGameOver();
+                }
+            });
         } else {
             // 5-second unskippable delay (normal versus matches)
             this.time.delayedCall(5000, () => {
@@ -1500,6 +1507,57 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     ]
                 }
             ],
+            blackBackground: true
+        });
+    }
+
+    private handleCampaignLoseGameOver(): void {
+        const campaign = CampaignManager.getInstance();
+        const opponent = campaign.getCurrentOpponent();
+        const oppCharKey = opponent?.character || 'sgu';
+
+        const dialogueLines = opponent?.dialogueCampaignLose ?? [];
+        
+        // Grab the dialogue data (use the first line)
+        const dialogueData = dialogueLines.length > 0 
+            ? dialogueLines[0] 
+            : { speaker: oppCharKey, text: "You lost. Want to try again?", side: 'right', animation: "idle" };
+
+        // Ensure choices are appended
+        const choiceData = {
+            speaker: dialogueData.speaker,
+            text: dialogueData.text,
+            side: dialogueData.side as 'left' | 'right',
+            animation: (dialogueData as any).animation || 'idle',
+            choices: [
+                { text: 'YES', action: () => {
+                    // Restart match (same level)
+                    this.scene.restart({
+                        playerData: this.playerData,
+                        mode: 'campaign',
+                        slotIndex: campaign.getActiveSlotIndex(),
+                        isTraining: false
+                    });
+                } },
+                { text: 'NO', action: () => {
+                    // Return to minimap
+                    this.scene.start('CampaignMapScene', {
+                        playerData: [this.playerData[0]],
+                        mode: 'campaign',
+                        slotIndex: campaign.getActiveSlotIndex(),
+                    });
+                } }
+            ]
+        };
+
+        if (this.scene.isActive('DialogueScene') || this.scene.isSleeping('DialogueScene')) {
+            this.scene.stop('DialogueScene');
+        }
+
+        this.scene.launch('DialogueScene', {
+            leftCharacter: this.playerData[0]?.character || 'fok',
+            rightCharacter: oppCharKey,
+            dialogueData: [choiceData],
             blackBackground: true
         });
     }

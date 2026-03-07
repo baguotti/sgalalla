@@ -17,6 +17,7 @@ export interface OpponentConfig {
     dialogueTrainingPrompt: { speaker: string; text: string; side: 'left' | 'right' }[];
     dialogueTrainingWin: { speaker: string; text: string; side: 'left' | 'right' }[];
     dialogueTrainingLose: { speaker: string; text: string; side: 'left' | 'right' }[];
+    dialogueCampaignLose: { speaker: string; text: string; side: 'left' | 'right' }[];
     difficulty: number; // 1-10 mapped to AI aggressiveness
 }
 
@@ -135,6 +136,7 @@ export class CampaignManager {
                 dialogueTrainingPrompt: dialogue?.dialogueTrainingPrompt ?? [],
                 dialogueTrainingWin: dialogue?.dialogueTrainingWin ?? [],
                 dialogueTrainingLose: dialogue?.dialogueTrainingLose ?? [],
+                dialogueCampaignLose: dialogue?.dialogueCampaignLose ?? [],
                 difficulty,
             };
         });

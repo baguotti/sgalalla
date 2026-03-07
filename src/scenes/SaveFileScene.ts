@@ -3,7 +3,7 @@ import { SaveService } from '../managers/SaveService';
 import type { CampaignSaveData } from '../managers/SaveService';
 import { CampaignManager } from '../managers/CampaignManager';
 import { AudioManager } from '../managers/AudioManager';
-import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavY } from '../input/JoyConMapper';
+import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavY, getMenuNavX } from '../input/JoyConMapper';
 import { charConfigs } from '../config/CharacterConfig';
 
 /**
@@ -23,9 +23,26 @@ export class SaveFileScene extends Phaser.Scene {
     private prevGamepadB: Map<number, boolean> = new Map();
     private lastGamepadInputTime: number = 0;
 
+    // SubMenu
+    private isSubMenuOpen: boolean = false;
+    private subSelectedIndex: number = 0;
+    private subMenuContainer!: Phaser.GameObjects.Container;
+    private subMenuTexts: Phaser.GameObjects.Text[] = [];
+    private subMenuArrow!: Phaser.GameObjects.Text;
+    private subMenuOverlay!: Phaser.GameObjects.Rectangle;
+
+    // Delete Confirmation SubMenu
+    private isConfirmMenuOpen: boolean = false;
+    private confirmSelectedIndex: number = 0; // 0 = NO, 1 = YES
+    private confirmMenuContainer!: Phaser.GameObjects.Container;
+    private confirmMenuTexts: Phaser.GameObjects.Text[] = [];
+    private confirmMenuArrow!: Phaser.GameObjects.Text;
+
     // Keyboard
     private upKey!: Phaser.Input.Keyboard.Key;
     private downKey!: Phaser.Input.Keyboard.Key;
+    private leftKey!: Phaser.Input.Keyboard.Key;
+    private rightKey!: Phaser.Input.Keyboard.Key;
     private confirmKey!: Phaser.Input.Keyboard.Key;
     private enterKey!: Phaser.Input.Keyboard.Key;
     private backKey!: Phaser.Input.Keyboard.Key;
@@ -47,6 +64,10 @@ export class SaveFileScene extends Phaser.Scene {
         this.slotContainers = [];
         this.prevGamepadA.clear();
         this.prevGamepadB.clear();
+        this.isSubMenuOpen = false;
+        this.subSelectedIndex = 0;
+        this.isConfirmMenuOpen = false;
+        this.confirmSelectedIndex = 0;
     }
 
     create() {
@@ -159,11 +180,71 @@ export class SaveFileScene extends Phaser.Scene {
 
         this.updateSelection();
 
+        // --- Create Sub-Menu ---
+        this.subMenuOverlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.7).setOrigin(0).setVisible(false).setDepth(100);
+        this.subMenuContainer = this.add.container(width / 2, height / 2).setVisible(false).setDepth(101);
+
+        const subCard = this.add.graphics();
+        subCard.lineStyle(2, 0xffffff);
+        subCard.fillStyle(0x222222, 1);
+        subCard.fillRoundedRect(-150, -100, 300, 200, 12);
+        subCard.strokeRoundedRect(-150, -100, 300, 200, 12);
+        this.subMenuContainer.add(subCard);
+
+        const contText = this.add.text(0, -30, 'CONTINUA', {
+            fontSize: '32px', fontFamily: '"Pixeloid Sans"', color: '#FFFFFF'
+        }).setOrigin(0.5);
+        const delText = this.add.text(0, 30, 'ELIMINA', {
+            fontSize: '32px', fontFamily: '"Pixeloid Sans"', color: '#FFFFFF'
+        }).setOrigin(0.5);
+
+        this.subMenuTexts = [contText, delText];
+        this.subMenuContainer.add(contText);
+        this.subMenuContainer.add(delText);
+
+        this.subMenuArrow = this.add.text(-120, -30, '▶', {
+            fontSize: '28px', fontFamily: '"Pixeloid Sans"', color: '#FFFFFF'
+        }).setOrigin(0.5);
+        this.subMenuContainer.add(this.subMenuArrow);
+
+        // --- Create Confirm Delete Sub-Menu ---
+        this.confirmMenuContainer = this.add.container(width / 2, height / 2).setVisible(false).setDepth(102);
+        
+        const confirmCard = this.add.graphics();
+        confirmCard.lineStyle(2, 0xff0000); // Red border for delete
+        confirmCard.fillStyle(0x222222, 1);
+        confirmCard.fillRoundedRect(-350, -120, 700, 240, 12);
+        confirmCard.strokeRoundedRect(-350, -120, 700, 240, 12);
+        this.confirmMenuContainer.add(confirmCard);
+
+        const promptText = this.add.text(0, -50, 'Sei sicuro di voler cancellare\nil salvataggio?', {
+            fontSize: '28px', fontFamily: '"Pixeloid Sans"', color: '#ff5555', align: 'center'
+        }).setOrigin(0.5);
+        this.confirmMenuContainer.add(promptText);
+
+        const noText = this.add.text(-120, 50, 'NO', {
+            fontSize: '32px', fontFamily: '"Pixeloid Sans"', color: '#FFFFFF'
+        }).setOrigin(0.5);
+        const yesText = this.add.text(120, 50, 'SI', {
+            fontSize: '32px', fontFamily: '"Pixeloid Sans"', color: '#888888'
+        }).setOrigin(0.5);
+
+        this.confirmMenuTexts = [noText, yesText];
+        this.confirmMenuContainer.add(noText);
+        this.confirmMenuContainer.add(yesText);
+
+        this.confirmMenuArrow = this.add.text(-170, 50, '▶', {
+            fontSize: '28px', fontFamily: '"Pixeloid Sans"', color: '#FFFFFF'
+        }).setOrigin(0.5);
+        this.confirmMenuContainer.add(this.confirmMenuArrow);
+
         // Input safety delay
         this.time.delayedCall(400, () => {
             this.canInput = true;
             this.upKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
             this.downKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
+            this.leftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+            this.rightKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
             this.confirmKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
             this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
             this.backKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
@@ -185,14 +266,40 @@ export class SaveFileScene extends Phaser.Scene {
         if (!this.canInput) return;
 
         // Keyboard
-        if (Phaser.Input.Keyboard.JustDown(this.upKey)) {
-            this.changeSelection(-1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
-            this.changeSelection(1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.confirmKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-            this.selectSlot();
-        } else if (Phaser.Input.Keyboard.JustDown(this.backKey)) {
-            this.goBack();
+        if (this.isConfirmMenuOpen) {
+            if (Phaser.Input.Keyboard.JustDown(this.leftKey)) {
+                this.changeConfirmSelection(-1);
+            } else if (Phaser.Input.Keyboard.JustDown(this.rightKey)) {
+                this.changeConfirmSelection(1);
+            } else if (Phaser.Input.Keyboard.JustDown(this.upKey)) {
+                this.changeConfirmSelection(-1);
+            } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
+                this.changeConfirmSelection(1);
+            } else if (Phaser.Input.Keyboard.JustDown(this.confirmKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+                this.handleConfirmMenuSubmit();
+            } else if (Phaser.Input.Keyboard.JustDown(this.backKey)) {
+                this.closeConfirmMenu();
+            }
+        } else if (this.isSubMenuOpen) {
+            if (Phaser.Input.Keyboard.JustDown(this.upKey)) {
+                this.changeSubSelection(-1);
+            } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
+                this.changeSubSelection(1);
+            } else if (Phaser.Input.Keyboard.JustDown(this.confirmKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+                this.handleSubMenuConfirm();
+            } else if (Phaser.Input.Keyboard.JustDown(this.backKey)) {
+                this.closeSubMenu();
+            }
+        } else {
+            if (Phaser.Input.Keyboard.JustDown(this.upKey)) {
+                this.changeSelection(-1);
+            } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
+                this.changeSelection(1);
+            } else if (Phaser.Input.Keyboard.JustDown(this.confirmKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+                this.selectSlot();
+            } else if (Phaser.Input.Keyboard.JustDown(this.backKey)) {
+                this.goBack();
+            }
         }
 
         // Gamepad
@@ -225,12 +332,27 @@ export class SaveFileScene extends Phaser.Scene {
             if (!pad) continue;
 
             const navY = getMenuNavY(pad);
-            if (navY < 0) {
-                this.changeSelection(-1);
-                this.lastGamepadInputTime = now;
-            } else if (navY > 0) {
-                this.changeSelection(1);
-                this.lastGamepadInputTime = now;
+            const navX = getMenuNavX(pad); // Support horizontal selection specifically for YES/NO
+            
+            // Prioritize horizontal input if the confirm menu is open, otherwise use vertical
+            if (this.isConfirmMenuOpen) {
+                if (navX < 0 || navY < 0) {
+                    this.changeConfirmSelection(-1);
+                    this.lastGamepadInputTime = now;
+                } else if (navX > 0 || navY > 0) {
+                    this.changeConfirmSelection(1);
+                    this.lastGamepadInputTime = now;
+                }
+            } else {
+                if (navY < 0) {
+                    if (this.isSubMenuOpen) this.changeSubSelection(-1);
+                    else this.changeSelection(-1);
+                    this.lastGamepadInputTime = now;
+                } else if (navY > 0) {
+                    if (this.isSubMenuOpen) this.changeSubSelection(1);
+                    else this.changeSelection(1);
+                    this.lastGamepadInputTime = now;
+                }
             }
 
             const confirmIdx = getConfirmButtonIndex(pad);
@@ -241,7 +363,9 @@ export class SaveFileScene extends Phaser.Scene {
             const wasA = this.prevGamepadA.get(pad.index) ?? false;
             this.prevGamepadA.set(pad.index, aPressed);
             if (aPressed && !wasA) {
-                this.selectSlot();
+                if (this.isConfirmMenuOpen) this.handleConfirmMenuSubmit();
+                else if (this.isSubMenuOpen) this.handleSubMenuConfirm();
+                else this.selectSlot();
                 this.lastGamepadInputTime = now;
             }
 
@@ -250,7 +374,9 @@ export class SaveFileScene extends Phaser.Scene {
             const wasB = this.prevGamepadB.get(pad.index) ?? false;
             this.prevGamepadB.set(pad.index, bPressed);
             if (bPressed && !wasB) {
-                this.goBack();
+                if (this.isConfirmMenuOpen) this.closeConfirmMenu();
+                else if (this.isSubMenuOpen) this.closeSubMenu();
+                else this.goBack();
                 this.lastGamepadInputTime = now;
             }
         }
@@ -289,40 +415,146 @@ export class SaveFileScene extends Phaser.Scene {
 
     private selectSlot(): void {
         AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
-        this.canInput = false;
-
         const slotData = this.slots[this.selectedIndex];
 
         if (slotData && !slotData.completed) {
-            // ─── Continue existing save ───
-            const campaign = CampaignManager.getInstance();
-            campaign.loadCampaignFromSlot(this.selectedIndex);
-
-            // Build player data and go to CampaignMapScene
-            const playerData = [{
-                playerId: 0,
-                joined: true,
-                ready: true,
-                input: {
-                    type: this.initData.inputType || 'KEYBOARD',
-                    gamepadIndex: this.initData.gamepadIndex ?? null,
-                    keyboardMapping: 'all'
-                },
-                character: slotData.playerCharacter,
-            }];
-
-            this.scene.start('CampaignMapScene', {
-                playerData,
-                mode: 'campaign',
-                slotIndex: this.selectedIndex,
-            });
+            // ─── Occupied save: Ask Continue or Delete ───
+            this.openSubMenu();
         } else {
             // ─── New game: go to lobby to pick character ───
+            this.canInput = false;
             this.scene.start('LobbyScene', {
                 ...this.initData,
                 mode: 'campaign',
                 slotIndex: this.selectedIndex,
             });
+        }
+    }
+
+    private loadCampaign(): void {
+        const slotData = this.slots[this.selectedIndex];
+        if (!slotData) return;
+
+        const campaign = CampaignManager.getInstance();
+        campaign.loadCampaignFromSlot(this.selectedIndex);
+
+        // Build player data and go to CampaignMapScene
+        const playerData = [{
+            playerId: 0,
+            joined: true,
+            ready: true,
+            input: {
+                type: this.initData.inputType || 'KEYBOARD',
+                gamepadIndex: this.initData.gamepadIndex ?? null,
+                keyboardMapping: 'all'
+            },
+            character: slotData.playerCharacter,
+        }];
+
+        this.scene.start('CampaignMapScene', {
+            playerData,
+            mode: 'campaign',
+            slotIndex: this.selectedIndex,
+        });
+    }
+
+    private changeSubSelection(dir: number): void {
+        AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.5 });
+        this.subSelectedIndex = (this.subSelectedIndex + dir + 2) % 2;
+        this.updateSubSelection();
+    }
+
+    private updateSubSelection(): void {
+        this.subMenuArrow.setY(this.subSelectedIndex === 0 ? -30 : 30);
+        this.subMenuTexts.forEach((text, i) => {
+            if (i === this.subSelectedIndex) {
+                text.setColor('#ffffff');
+                text.setShadow(0, 0, '#ffffff', 10, false, true);
+            } else {
+                text.setColor('#888888');
+                text.setShadow(0, 0, '#000000', 0, false, true);
+            }
+        });
+    }
+
+    private openSubMenu(): void {
+        this.isSubMenuOpen = true;
+        this.subSelectedIndex = 0;
+        this.subMenuOverlay.setVisible(true);
+        this.subMenuContainer.setVisible(true);
+        this.updateSubSelection();
+    }
+
+    private closeSubMenu(): void {
+        AudioManager.getInstance().playSFX('ui_back', { volume: 0.5 });
+        this.isSubMenuOpen = false;
+        this.subMenuOverlay.setVisible(false);
+        this.subMenuContainer.setVisible(false);
+        this.time.delayedCall(100, () => {
+            this.canInput = true; // Wait slightly before accepting main menu input to avoid double-bounce
+        });
+    }
+
+    private handleSubMenuConfirm(): void {
+        AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
+        
+        if (this.subSelectedIndex === 0) {
+            // Continua
+            this.canInput = false;
+            this.loadCampaign();
+        } else {
+            // Elimina - Prompt for confirmation
+            this.openConfirmMenu();
+        }
+    }
+
+    private changeConfirmSelection(dir: number): void {
+        AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.5 });
+        this.confirmSelectedIndex = (this.confirmSelectedIndex + dir + 2) % 2;
+        this.updateConfirmSelection();
+    }
+
+    private updateConfirmSelection(): void {
+        this.confirmMenuArrow.setX(this.confirmSelectedIndex === 0 ? -170 : 70);
+        this.confirmMenuTexts.forEach((text, i) => {
+            if (i === this.confirmSelectedIndex) {
+                text.setColor('#ffffff');
+                text.setShadow(0, 0, '#ffffff', 10, false, true);
+            } else {
+                text.setColor('#888888');
+                text.setShadow(0, 0, '#000000', 0, false, true);
+            }
+        });
+    }
+
+    private openConfirmMenu(): void {
+        this.isConfirmMenuOpen = true;
+        this.confirmSelectedIndex = 0; // Default to NO
+        this.subMenuContainer.setVisible(false); // Hide the Continua/Elimina box behind it
+        this.confirmMenuContainer.setVisible(true);
+        this.updateConfirmSelection();
+    }
+
+    private closeConfirmMenu(): void {
+        AudioManager.getInstance().playSFX('ui_back', { volume: 0.5 });
+        this.isConfirmMenuOpen = false;
+        this.confirmMenuContainer.setVisible(false);
+        this.subMenuContainer.setVisible(true); // Return to sub-menu
+    }
+
+    private handleConfirmMenuSubmit(): void {
+        AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
+        
+        if (this.confirmSelectedIndex === 1) { // YES, Delete
+            this.canInput = false;
+            SaveService.deleteSlot(this.selectedIndex);
+            this.isConfirmMenuOpen = false;
+            this.isSubMenuOpen = false;
+            this.confirmMenuContainer.setVisible(false);
+            this.subMenuOverlay.setVisible(false);
+            this.scene.restart(this.initData);
+        } else { // NO, Cancel
+            this.closeConfirmMenu();
         }
     }
 

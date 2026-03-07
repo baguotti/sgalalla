@@ -194,6 +194,32 @@ export class CampaignMapScene extends Phaser.Scene {
                 delay: i * 150
             });
 
+            // If the opponent on this island has been defeated, render their idle sprite!
+            if (defeated) {
+                // Ensure their animation exists
+                this.ensureAnimations(opponent.character);
+                
+                const opponentIdleAnim = `${opponent.character}_idle`;
+                const opponentIdleFrame = `${opponent.character}_idle_000`;
+                
+                // Position them floating to the right of the island
+                const oppSprite = this.add.sprite(
+                    CampaignMapScene.ISLAND_SIZE / 2, // X offset from center
+                    0, // Y offset from center
+                    opponent.character,
+                    opponentIdleFrame
+                ).setScale(0.85); // slightly smaller than player
+
+                // Face generally towards the island/left
+                oppSprite.setFlipX(true);
+
+                if (this.anims.exists(opponentIdleAnim)) {
+                    oppSprite.play(opponentIdleAnim);
+                }
+
+                container.add(oppSprite);
+            }
+
             this.islands.push({
                 x: ix,
                 y: iy,
@@ -665,18 +691,18 @@ export class CampaignMapScene extends Phaser.Scene {
         this.scene.start('SaveFileScene', { mode: 'campaign' });
     }
 
-    private ensureAnimations(): void {
-        const charKey = this.playerCharKey;
-        const config = charConfigs[charKey];
+    private ensureAnimations(charKey?: string): void {
+        const keyToUse = charKey || this.playerCharKey;
+        const config = charConfigs[keyToUse];
         if (!config) return;
 
         // Idle
-        const idleKey = `${charKey}_idle`;
+        const idleKey = `${keyToUse}_idle`;
         if (!this.anims.exists(idleKey) && config.idle) {
             const cfg = config.idle;
             const frames: { key: string; frame: string }[] = [];
             for (let f = 0; f < cfg.count; f++) {
-                frames.push({ key: charKey, frame: `${cfg.prefix}${String(f).padStart(3, '0')}` });
+                frames.push({ key: keyToUse, frame: `${cfg.prefix}${String(f).padStart(3, '0')}` });
             }
             this.anims.create({
                 key: idleKey,
@@ -687,12 +713,12 @@ export class CampaignMapScene extends Phaser.Scene {
         }
 
         // Run
-        const runKey = `${charKey}_run`;
+        const runKey = `${keyToUse}_run`;
         if (!this.anims.exists(runKey) && config.run) {
             const cfg = config.run;
             const frames: { key: string; frame: string }[] = [];
             for (let f = 0; f < cfg.count; f++) {
-                frames.push({ key: charKey, frame: `${cfg.prefix}${String(f).padStart(3, '0')}` });
+                frames.push({ key: keyToUse, frame: `${cfg.prefix}${String(f).padStart(3, '0')}` });
             }
             this.anims.create({
                 key: runKey,

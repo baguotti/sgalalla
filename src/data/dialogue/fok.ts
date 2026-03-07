@@ -48,3 +48,8 @@ export const dialogueTrainingWin: DialogueLine[] = [
 export const dialogueTrainingLose: DialogueLine[] = [
     { speaker: "Fok", text: "Even a fallen king can still bite. Train harder!", side: "right" },
 ];
+
+// ── CAMPAIGN LOSE (Player loses campaign match) ─────────────
+export const dialogueCampaignLose: DialogueLine[] = [
+    { speaker: "Fok", text: "The throne remains mine! Will you dare challenge me again?", side: "right" },
+];

@@ -48,3 +48,8 @@ export const dialogueTrainingWin: DialogueLine[] = [
 export const dialogueTrainingLose: DialogueLine[] = [
     { speaker: "Greg", text: "The struggle continues! You must train harder for the cause!", side: "right" },
 ];
+
+// ── CAMPAIGN LOSE (Player loses campaign match) ─────────────
+export const dialogueCampaignLose: DialogueLine[] = [
+    { speaker: "Greg", text: "Another victory for the people! Will you rise and fight again?", side: "right", animation: "taunt" },
+];
