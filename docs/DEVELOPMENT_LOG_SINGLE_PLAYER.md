@@ -1,6 +1,20 @@
 # Sgalalla - Single-Player Campaign Development Log
 
 ---
+### [2026-03-07] v2.2.6 - Campaign Polish & New Stages 🌍🗺️
+- **[V]** `v2.2.6`
+- **[Feat]** **New Stage Backgrounds**:
+    - **Londra**: Added high-res WebP background for Fok's stage.
+    - **Sguzia**: Added high-res WebP background for Sga's stage.
+    - **La Sala Prove**: Added high-res WebP background for Nock's stage.
+- **[Feat]** **Campaign Pause Menu**:
+    - Tailored pause menu for Campaign mode: removed "Spawn CPU", "Riavvia", and "Lobby" options.
+    - Added "Ritorna alla mappa" to allow direct exit to the campaign map from any match.
+- **[Fix]** **Map Return Positioning**:
+    - Fixed player spawning at the correct island when returning to the map from a re-challenge or training fight (fixed being forced back to progression start).
+- **[Fix]** **Death Glitch**: Resolved a critical bug where falling off the stage caused looping sounds and camera shake (blast zone detection fix).
+- **[S]** **STATUS**: Campaign experience is streamlined and visually updated with new high-res backgrounds.
+----------------------------------------------------------------------------------------------------------------------------
 
 ### [2026-03-04] v2.0.0 - Single-Player Campaign Mode Launch 🎬🗺️
 - **[V]** `v2.0.0`

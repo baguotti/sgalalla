@@ -10,6 +10,7 @@ const MenuOption = {
     SPAWN_DUMMY: 6,
     RESTART: 4,
     LOBBY: 7,
+    MAP: 9,
     EXIT: 5
 } as const;
 type MenuOption = typeof MenuOption[keyof typeof MenuOption];
@@ -27,16 +28,7 @@ export class PauseMenu {
 
     private visible: boolean = false;
 
-    private menuOptions = [
-        { label: 'RIPRENDI', value: MenuOption.RESUME },
-        { label: 'COMANDI', value: MenuOption.CONTROLS },
-        { label: 'IMPOSTAZIONI', value: MenuOption.SETTINGS },
-        // Training Options removed
-        { label: 'SPAWN CPU', value: MenuOption.SPAWN_DUMMY },
-        { label: 'RIAVVIA PARTITA', value: MenuOption.RESTART },
-        { label: 'TORNA ALLA LOBBY', value: MenuOption.LOBBY },
-        { label: 'TORNA AL MENU', value: MenuOption.EXIT }
-    ];
+    private menuOptions: Array<{ label: string, value: MenuOption }> = [];
 
     private upKey!: Phaser.Input.Keyboard.Key;
     private downKey!: Phaser.Input.Keyboard.Key;
@@ -75,6 +67,25 @@ export class PauseMenu {
         this.overlay.setScrollFactor(0);
         this.overlay.setDepth(1000);
         this.overlay.setVisible(false);
+
+        // Build dynamic options based on mode
+        const mode = (this.scene as any).mode || 'versus';
+
+        this.menuOptions = [
+            { label: 'RIPRENDI', value: MenuOption.RESUME },
+            { label: 'COMANDI', value: MenuOption.CONTROLS },
+            { label: 'IMPOSTAZIONI', value: MenuOption.SETTINGS }
+        ];
+
+        if (mode === 'campaign') {
+            this.menuOptions.push({ label: 'RITORNA ALLA MAPPA', value: MenuOption.MAP });
+        } else {
+            this.menuOptions.push({ label: 'SPAWN CPU', value: MenuOption.SPAWN_DUMMY });
+            this.menuOptions.push({ label: 'RIAVVIA PARTITA', value: MenuOption.RESTART });
+            this.menuOptions.push({ label: 'TORNA ALLA LOBBY', value: MenuOption.LOBBY });
+        }
+
+        this.menuOptions.push({ label: 'TORNA AL MENU', value: MenuOption.EXIT });
 
         // Title
         this.titleText = this.scene.add.text(centerX, 120, 'PAUSED', {
@@ -420,6 +431,9 @@ export class PauseMenu {
                 break;
             case MenuOption.LOBBY:
                 this.scene.events.emit('pauseMenuLobby');
+                break;
+            case MenuOption.MAP:
+                this.scene.events.emit('pauseMenuMap');
                 break;
             case MenuOption.EXIT:
                 this.scene.events.emit('pauseMenuExit');

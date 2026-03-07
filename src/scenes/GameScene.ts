@@ -520,6 +520,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.events.on('pauseMenuExit', () => {
                 this.scene.start('MainMenuScene');
             });
+            this.events.on('pauseMenuMap', () => {
+                const campaign = CampaignManager.getInstance();
+                this.scene.start('CampaignMapScene', {
+                    playerData: [this.playerData[0]],
+                    mode: 'campaign',
+                    slotIndex: campaign.getActiveSlotIndex(),
+                    targetIslandIndex: this.trainingOpponentIndex
+                });
+            });
             this.events.on('spawnDummy', () => {
                 this.togglePause(); // Unpause
                 if (this.players.length < 4) {
@@ -1505,6 +1514,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                                     playerData: [this.playerData[0]],
                                     mode: 'campaign',
                                     slotIndex: campaign.getActiveSlotIndex(),
+                                    targetIslandIndex: this.trainingOpponentIndex // Add this!
                                 });
                             }
                         }
@@ -1552,6 +1562,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                             playerData: [this.playerData[0]],
                             mode: 'campaign',
                             slotIndex: campaign.getActiveSlotIndex(),
+                            targetIslandIndex: this.trainingOpponentIndex // Add this!
                         });
                     }
                 }
@@ -1623,6 +1634,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 playerData: [this.playerData[0]],
                 mode: 'campaign',
                 slotIndex: CampaignManager.getInstance().getActiveSlotIndex(),
+                targetIslandIndex: this.trainingOpponentIndex
             });
             return;
         }
@@ -1930,6 +1942,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     playerData: [this.playerData[0]],
                     mode: 'campaign',
                     slotIndex: CampaignManager.getInstance().getActiveSlotIndex(),
+                    targetIslandIndex: this.trainingOpponentIndex
                 });
             } else {
                 // Campaign complete! Show credits — save file is kept.

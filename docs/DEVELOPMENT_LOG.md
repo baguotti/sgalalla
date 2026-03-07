@@ -7,6 +7,14 @@ Part 2
 
 
 ---
+### [2026-03-07] v2.2.6 - Campaign Polish & Death Fix
+- **[V]** `v2.2.6`
+- **[Fix]** **Death Handling**: Fixed a critical regression where falling into blast zones caused infinite sound loops and camera shakes due to missing core deactivation logic.
+- **[Feat]** **Campaign UX**: Updated the pause menu to be mode-specific; added "Return to Map" and removed irrelevant multiplayer options.
+- **[Feat]** **New High-Res Maps**: Integrated WebP optimized backgrounds for Londra (Fok), Sguzia (Sga), and La Sala Prove (Nock).
+- **[S]** **STATUS**: Critical bugs fixed and campaign mode UX refined.
+
+---
 
 ### [2026-02-16] v0.12.0 - Refactoring & Technical Debt Cleanup
 - **[V]** `v0.12.0`

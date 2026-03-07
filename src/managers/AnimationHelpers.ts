@@ -71,6 +71,8 @@ export class AnimationHelpers {
         // Stage Assets
         scene.load.image('adria_bg', 'assets/stages/adria_v2.2_web.webp'); // Restored
         scene.load.image('bg_la_sala_prove', 'assets/images/bg_la_sala_prove.webp'); // High-res WebP Sala Prove background
+        scene.load.image('sguzia_bg', 'assets/stages/sguzia_bg.webp');
+        scene.load.image('londra_bg', 'assets/stages/londra_bg.webp');
         scene.load.image('platform_corner_left', 'assets/stages/Platform_BH4A_adria.png');
         scene.load.image('platform_corner_right', 'assets/stages/Platform_BH4A_adria.png'); // Same asset, flipped code-side
 

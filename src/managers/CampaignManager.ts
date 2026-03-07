@@ -128,7 +128,7 @@ export class CampaignManager {
 
             return {
                 character: char,
-                stage: char === 'nock' ? 'bg_la_sala_prove' : 'adria_bg',
+                stage: char === 'nock' ? 'bg_la_sala_prove' : (char === 'sga' ? 'sguzia_bg' : (char === 'fok' ? 'londra_bg' : 'adria_bg')),
                 dialogueBefore: dialogue ? dialogue.dialogueBefore : [],
                 dialogueMidFight: dialogue ? dialogue.dialogueMidFight : [],
                 dialogueAfterWin: dialogue ? dialogue.dialogueAfterWin : [],

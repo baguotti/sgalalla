@@ -55,14 +55,19 @@ export class CampaignMapScene extends Phaser.Scene {
         this.load.image('island_adria', 'assets/images/island_adria.png');
     }
 
-    init(data: Record<string, any>) {
+    private targetIslandIndex?: number;
+
+    init(data: any): void {
         this.playerData = data.playerData || [];
-        this.slotIndex = data.slotIndex ?? CampaignManager.getInstance().getActiveSlotIndex();
+        this.slotIndex = data.slotIndex ?? 0;
+        this.targetIslandIndex = data.targetIslandIndex;
         this.islands = [];
         this.currentIslandIndex = 0;
         this.isMoving = false;
         this.canInput = false;
         this.prevGamepadA.clear();
+        // Fade in
+        this.cameras.main.fadeIn(1000, 0, 0, 0);
     }
 
     create() {
@@ -237,7 +242,11 @@ export class CampaignMapScene extends Phaser.Scene {
         // Actually, just always start on Math.max(0, currentLevel - 1) so player has to manually move right to the new challenge.
         // Wait, if they just started a new save, currentLevel is 0.
         // If they just beat level 0, currentLevel is 1. We want to spawn on 0.
-        this.currentIslandIndex = Math.max(0, currentLevel - 1); // Position on the next target
+        if (this.targetIslandIndex !== undefined) {
+            this.currentIslandIndex = this.targetIslandIndex;
+        } else {
+            this.currentIslandIndex = Math.max(0, currentLevel - 1); // Position on the next target
+        }
 
         // Clamp to valid range
         this.currentIslandIndex = Math.min(this.currentIslandIndex, this.islands.length - 1);
