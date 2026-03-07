@@ -1,19 +1,22 @@
 # Sgalalla - Single-Player Campaign Development Log
 
 ---
-### [2026-03-07] v2.2.6 - Campaign Polish & New Stages 🌍🗺️
+### [2026-03-07] v2.2.6 - Map Selection & Campaign Polish 🌍🗺️
 - **[V]** `v2.2.6`
-- **[Feat]** **New Stage Backgrounds**:
-    - **Londra**: Added high-res WebP background for Fok's stage.
-    - **Sguzia**: Added high-res WebP background for Sga's stage.
-    - **La Sala Prove**: Added high-res WebP background for Nock's stage.
-- **[Feat]** **Campaign Pause Menu**:
-    - Tailored pause menu for Campaign mode: removed "Spawn CPU", "Riavvia", and "Lobby" options.
-    - Added "Ritorna alla mappa" to allow direct exit to the campaign map from any match.
-- **[Fix]** **Map Return Positioning**:
-    - Fixed player spawning at the correct island when returning to the map from a re-challenge or training fight (fixed being forced back to progression start).
-- **[Fix]** **Death Glitch**: Resolved a critical bug where falling off the stage caused looping sounds and camera shake (blast zone detection fix).
-- **[S]** **STATUS**: Campaign experience is streamlined and visually updated with new high-res backgrounds.
+- **[Feat]** **Map Selection Screen**:
+    - Added a dedicated map selection phase for Versus and Training modes.
+    - P1 can pick between Adria, La Sala Prove, Sguzia, and Londra with real-time preview thumbnails.
+- **[Feat]** **New High-Res Maps**:
+    - Integrated optimized WebP backgrounds for Londra (Fok), Sguzia (Sga), and La Sala Prove (Nock).
+- **[Feat]** **Campaign UX Polish**:
+    - **Re-challenge Saturation**: Removed visual desaturation for re-challenge/training matches; the cinematic color restoration now only applies on first encounters.
+    - **Pause Menu**: Cleaned up "versus" options in campaign mode; added "Ritorna alla mappa".
+- **[Fix]** **Stability & Logic**:
+    - Fixed a critical `TypeError` crash when restarting matches (stale FX reference cleanup).
+    - Fixed training mode input priority bug where character cycling blocked map selection.
+    - Fixed player spawning at the correct island when returning to the map.
+    - Resolved blast zone infinite sound loop glitch.
+- **[S]** **STATUS**: Campaign experience is polished and visually upgraded; new flexible map selection available in local modes.
 ----------------------------------------------------------------------------------------------------------------------------
 
 ### [2026-03-04] v2.0.0 - Single-Player Campaign Mode Launch 🎬🗺️

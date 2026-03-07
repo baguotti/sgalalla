@@ -6,6 +6,13 @@ import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavX } from '../input
 
 type CharacterType = 'fok' | 'dummy';
 
+const MAP_OPTIONS = [
+    { key: 'adria_bg', label: 'Adria' },
+    { key: 'bg_la_sala_prove', label: 'La Sala Prove' },
+    { key: 'sguzia_bg', label: 'Sguzia' },
+    { key: 'londra_bg', label: 'Londra' },
+];
+
 export interface PlayerSelection {
     playerId: number;
     joined: boolean;
@@ -73,6 +80,7 @@ export class LobbyScene extends Phaser.Scene {
 
     init(data: { mode?: 'versus' | 'training', inputType?: 'KEYBOARD' | 'GAMEPAD', gamepadIndex?: number | null, slots?: PlayerSelection[] } | null): void {
         this.selectionPhase = 'P1'; // Reset phase
+        this.selectedMapIndex = 0;
         const safeData = data || {};
         this._initData = safeData;
         void this._initData; // Silence linter
@@ -99,6 +107,11 @@ export class LobbyScene extends Phaser.Scene {
         this.load.audio('ui_back', 'assets/audio/ui/ui_back.wav');
         this.load.audio('ui_player_ready', 'assets/audio/ui/ui_player_ready.wav');
 
+        // Stage backgrounds (for map selection preview)
+        this.load.image('adria_bg', 'assets/stages/adria_v2.2_web.webp');
+        this.load.image('bg_la_sala_prove', 'assets/images/bg_la_sala_prove.webp');
+        this.load.image('sguzia_bg', 'assets/stages/sguzia_bg.webp');
+        this.load.image('londra_bg', 'assets/stages/londra_bg.webp');
     }
 
 
@@ -218,7 +231,11 @@ export class LobbyScene extends Phaser.Scene {
         });
     }
 
-    private selectionPhase: 'P1' | 'CPU' = 'P1';
+    private selectionPhase: 'P1' | 'CPU' | 'MAP' = 'P1';
+    private selectedMapIndex: number = 0;
+    private mapUIContainer?: Phaser.GameObjects.Container;
+    private mapNameText?: Phaser.GameObjects.Text;
+    private mapPreview?: Phaser.GameObjects.Image;
 
     private setupTrainingMode(): void {
         // Auto-join P1 (if keyboard)
@@ -545,7 +562,31 @@ export class LobbyScene extends Phaser.Scene {
             }
 
             let inputRegistered = false;
-            if (!slot.ready) {
+            // If in MAP phase, only P1 (slot 0) handles input
+            if (this.selectionPhase === 'MAP') {
+                if (slot.playerId === 0) {
+                    if (left) {
+                        this.changeMap(-1);
+                        inputRegistered = true;
+                    } else if (right) {
+                        this.changeMap(1);
+                        inputRegistered = true;
+                    } else if (select) {
+                        AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
+                        inputRegistered = true;
+                        this.hideMapSelection();
+                        const joinedSlots = this.slots.filter(s => s.joined);
+                        this.time.delayedCall(500, () => {
+                            this.scene.start('GameScene', {
+                                playerData: joinedSlots,
+                                mode: this.mode,
+                                slotIndex: (this._initData as any)?.slotIndex ?? 0,
+                                selectedMap: MAP_OPTIONS[this.selectedMapIndex].key
+                            });
+                        });
+                    }
+                }
+            } else if (!slot.ready) {
                 if (left) {
                     this.changeCharacter(slot, -1);
                     inputRegistered = true;
@@ -616,7 +657,21 @@ export class LobbyScene extends Phaser.Scene {
         }
 
         let inputRegistered = false;
-        if (left) {
+
+        // MAP phase must be checked FIRST (before character cycling)
+        if (this.selectionPhase === 'MAP') {
+            if (left) {
+                this.changeMap(-1);
+                inputRegistered = true;
+            } else if (right) {
+                this.changeMap(1);
+                inputRegistered = true;
+            } else if (select) {
+                AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
+                inputRegistered = true;
+                this.startTrainingGame();
+            }
+        } else if (left) {
             this.changeCharacter(targetSlot, -1);
             inputRegistered = true;
         } else if (right) {
@@ -635,10 +690,12 @@ export class LobbyScene extends Phaser.Scene {
                     inputRegistered = true;
                 }
             } else {
-                AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 }); // Or ui_player_ready
+                AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 });
                 cpu.ready = true;
                 inputRegistered = true;
-                this.startTrainingGame();
+                // Move to map selection instead of starting immediately
+                this.selectionPhase = 'MAP';
+                this.showMapSelection();
             }
         }
 
@@ -648,9 +705,14 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private startTrainingGame(): void {
+        this.hideMapSelection();
         AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
         this.time.delayedCall(500, () => {
-            this.scene.start('GameScene', { playerData: [this.slots[0], this.slots[1]], mode: 'training' });
+            this.scene.start('GameScene', {
+                playerData: [this.slots[0], this.slots[1]],
+                mode: 'training',
+                selectedMap: MAP_OPTIONS[this.selectedMapIndex].key
+            });
         });
     }
 
@@ -676,19 +738,105 @@ export class LobbyScene extends Phaser.Scene {
         const joinedSlots = this.slots.filter(s => s.joined);
         const minPlayers = this.mode === 'versus' ? 2 : 1;
         if (joinedSlots.length >= minPlayers && joinedSlots.every(s => s.ready)) {
-            // Start Game
-            AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
-            this.time.delayedCall(1000, () => {
-                this.scene.start('GameScene', {
-                    playerData: joinedSlots,
-                    mode: this.mode,
-                    slotIndex: (this._initData as any)?.slotIndex ?? 0
-                });
-            });
-        } else {
-            if (joinedSlots.length < minPlayers) {
-            } else {
-            }
+            // Transition to MAP selection phase
+            this.selectionPhase = 'MAP';
+            this.showMapSelection();
+        }
+    }
+
+    private showMapSelection(): void {
+        // Hide player cards
+        this.slotContainers.forEach(c => c.setVisible(false));
+
+        const { width, height } = this.scale;
+        const centerY = height / 2;
+
+        // Container for map selection UI
+        this.mapUIContainer = this.add.container(width / 2, centerY);
+        this.mapUIContainer.setDepth(100);
+
+        // Solid background to cover character cards
+        const bg = this.add.graphics();
+        bg.fillStyle(0x000000, 1);
+        bg.fillRect(-width / 2, -height / 2, width, height);
+        this.mapUIContainer.add(bg);
+
+        // Title
+        const title = this.add.text(0, -160, 'SCEGLI LA MAPPA', {
+            fontSize: '48px',
+            fontFamily: '"Pixeloid Sans"',
+            fontStyle: 'bold',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+
+        // Map preview (thumbnail of the background texture)
+        const mapKey = MAP_OPTIONS[this.selectedMapIndex].key;
+        this.mapPreview = this.add.image(0, 0, mapKey);
+        // Scale to fit a preview box (400x225 = 16:9)
+        const previewW = 500;
+        const previewH = 280;
+        const imgScale = Math.max(previewW / this.mapPreview.width, previewH / this.mapPreview.height);
+        this.mapPreview.setScale(imgScale);
+
+        // Frame around preview
+        const frame = this.add.graphics();
+        frame.lineStyle(3, 0xffffff, 0.8);
+        frame.strokeRoundedRect(-previewW / 2, -previewH / 2, previewW, previewH, 8);
+
+        // Map name
+        this.mapNameText = this.add.text(0, previewH / 2 + 30, MAP_OPTIONS[this.selectedMapIndex].label, {
+            fontSize: '36px',
+            fontFamily: '"Pixeloid Sans"',
+            fontStyle: 'bold',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+
+        // Arrows
+        const leftArrow = this.add.text(-previewW / 2 - 40, 0, '◀', {
+            fontSize: '48px',
+            fontFamily: '"Pixeloid Sans"',
+            color: '#8ab4f8'
+        }).setOrigin(0.5);
+
+        const rightArrow = this.add.text(previewW / 2 + 40, 0, '▶', {
+            fontSize: '48px',
+            fontFamily: '"Pixeloid Sans"',
+            color: '#8ab4f8'
+        }).setOrigin(0.5);
+
+        // Instruction
+        const instr = this.add.text(0, previewH / 2 + 80, 'P1: Conferma con [SPAZIO/INVIO] o [A]', {
+            fontSize: '18px',
+            fontFamily: '"Pixeloid Sans"',
+            color: '#888888'
+        }).setOrigin(0.5);
+
+        this.mapUIContainer.add([title, this.mapPreview, frame, this.mapNameText, leftArrow, rightArrow, instr]);
+    }
+
+    private hideMapSelection(): void {
+        if (this.mapUIContainer) {
+            this.mapUIContainer.destroy(true);
+            this.mapUIContainer = undefined;
+        }
+        // Restore player cards
+        this.slotContainers.forEach(c => c.setVisible(true));
+    }
+
+    private changeMap(dir: number): void {
+        AudioManager.getInstance().playSFX('ui_change_character', { volume: 0.4 });
+        this.selectedMapIndex = (this.selectedMapIndex + dir + MAP_OPTIONS.length) % MAP_OPTIONS.length;
+        // Update preview
+        if (this.mapPreview) {
+            const mapKey = MAP_OPTIONS[this.selectedMapIndex].key;
+            this.mapPreview.setTexture(mapKey);
+            const previewW = 500;
+            const previewH = 280;
+            const imgScale = Math.max(previewW / this.mapPreview.width, previewH / this.mapPreview.height);
+            this.mapPreview.setScale(imgScale);
+        }
+        if (this.mapNameText) {
+            this.mapNameText.setText(MAP_OPTIONS[this.selectedMapIndex].label);
         }
     }
 

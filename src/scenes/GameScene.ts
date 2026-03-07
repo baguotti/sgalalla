@@ -139,8 +139,17 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     init(data: any): void {
         this.mode = data.mode || 'versus';
         this.campaignMidFightPlayed = false; // Reset for each new match
+        this.campaignColorMatrices = []; // Reset stale FX references from previous rounds
+        this.campaignTintProgress = 0;
         this.isTraining = data.isTraining || false;
         this.trainingOpponentIndex = data.trainingOpponentIndex || 0;
+
+        // Apply selected map from lobby (non-campaign)
+        if (data.selectedMap) {
+            this.currentStageBackground = data.selectedMap;
+        } else {
+            this.currentStageBackground = 'adria_bg';
+        }
 
         if (data.playerData) {
             this.playerData = data.playerData;
@@ -418,8 +427,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 // Add to HUD
                 this.addPlayerToHUD(player);
 
-                // If campaign, apply visual suppression to opponent (playerId 1)
-                if (this.mode === 'campaign' && pData.playerId === 1) {
+                // If campaign first encounter, apply visual suppression to opponent (playerId 1)
+                if (this.mode === 'campaign' && !this.isTraining && pData.playerId === 1) {
                     if (player.spriteObject.postFX) {
                         const fx = player.spriteObject.postFX.addColorMatrix();
                         fx.saturate(-0.5);
@@ -676,8 +685,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (stage.sidePlatforms.length > 0) this.uiCamera.ignore(stage.sidePlatforms);
         }
 
-        // Apply campaign visual suppression (desaturation effect)
-        if (this.mode === 'campaign') {
+        // Apply campaign visual suppression (desaturation effect) — only on first encounters
+        if (this.mode === 'campaign' && !this.isTraining) {
             this.campaignColorMatrices = [];
             this.campaignTintProgress = 0;
 
