@@ -81,6 +81,16 @@ export class AnimationHelpers {
         scene.load.image('platform_side', 'assets/platform_side.png');
         scene.load.image('platform_top', 'assets/platform_top_left.png'); // Will flip for right side
 
+        // Londra Custom Platforms
+        scene.load.image('platform_londra_main', 'assets/stages/londra/platform_londra_main.webp');
+        scene.load.image('platform_londra_side', 'assets/stages/londra/platform_londra_side.webp');
+        scene.load.image('platform_londra_top', 'assets/stages/londra/platform_londra_top.webp');
+
+        // Sguzia Custom Platforms
+        scene.load.image('platform_sguzia_main', 'assets/stages/sguzia/platform_sguzia_main.webp');
+        scene.load.image('platform_sguzia_side', 'assets/stages/sguzia/platform_sguzia_side.webp');
+        scene.load.image('platform_sguzia_top', 'assets/stages/sguzia/platform_sguzia_top.webp');
+
         // Legacy/Unused? (Keeping just in case, or removing if confirmed unused)
     }
 

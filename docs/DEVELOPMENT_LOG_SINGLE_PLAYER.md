@@ -217,3 +217,17 @@
 - **[Cleanup]** **Save System**:
     - Removed unused deprecated legacy methods from `SaveService.ts`.
 - **[S]** **STATUS**: Campaign core architecture is now robust, type-safe, and leak-free.
+
+----------------------------------------------------------------------------------------------------------------------------
+### [2026-03-08] v2.2.8 - Stage Platform Upgrades & Asset Optimization 🏗️🎨
+- **[V]** `v2.2.8`
+- **[Feat]** **Londra Stage Upgrade**:
+    - Integrated custom-themed platforms (Main, Side, Top) with converted WebP assets for optimal performance.
+- **[Feat]** **Sguzia Stage Upgrade**:
+    - Integrated custom-themed platforms (Main, Side, Top) with converted WebP assets.
+- **[Perf]** **Asset Optimization**:
+    - Converted all new platform assets from PNG to WebP using `convert_to_webp.sh`, achieving significant file size reductions (e.g., Sguzia Main: 1.0MB -> 86KB).
+- **[Refactor]** **Stage Logic**:
+    - Updated `AnimationHelpers.ts` to support map-specific platform loading.
+    - Enhanced `StageFactory.ts` with dynamic platform texture selection based on the active background.
+- **[S]** **STATUS**: Stage visuals are becoming more distinct and performance-optimized.

@@ -33,6 +33,22 @@ export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'ad
     background.setScale(scale).setScrollFactor(0.9);
     background.setDepth(-100);
 
+    // --- Texture Selection ---
+    // Use map-specific platforms if available, otherwise default to Adria themes.
+    let mainTexKey = 'platform_main';
+    let sideTexKey = 'platform_side';
+    let topTexKey = 'platform_top';
+
+    if (backgroundTexture === 'londra_bg') {
+        mainTexKey = 'platform_londra_main';
+        sideTexKey = 'platform_londra_side';
+        topTexKey = 'platform_londra_top';
+    } else if (backgroundTexture === 'sguzia_bg') {
+        mainTexKey = 'platform_sguzia_main';
+        sideTexKey = 'platform_sguzia_side';
+        topTexKey = 'platform_sguzia_top';
+    }
+
 
 
 
@@ -59,13 +75,13 @@ export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'ad
 
     // Left Texture
     // User requested "Platform_BH4A_adria.png" (renamed to platform_main.png)
-    const leftTex = scene.add.image(pLeft, pTop, 'platform_main');
+    const leftTex = scene.add.image(pLeft, pTop, mainTexKey);
     leftTex.setOrigin(0, 0); // Top-Left
     leftTex.setScale(0.8, 0.8); // Reduce X scale to avoid too much overlap
 
     // Right Texture
     const pRight = 960 + 590 + 38; // 1588
-    const rightTex = scene.add.image(pRight, pTop, 'platform_main');
+    const rightTex = scene.add.image(pRight, pTop, mainTexKey);
     rightTex.setOrigin(1, 0); // Top-Right
     rightTex.setScale(0.8, 0.8);
     rightTex.setFlipX(true); // Flip for right side
@@ -91,7 +107,7 @@ export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'ad
 
     // --- Left Side Platform ---
     // Visual (User set to 40, 450):
-    const leftPlatVisual = scene.add.image(40, 480, 'platform_side');
+    const leftPlatVisual = scene.add.image(40, 480, sideTexKey);
     leftPlatVisual.setScale(0.8);
     leftPlatVisual.setDepth(-10)
     sidePlatVisuals.push(leftPlatVisual);
@@ -122,7 +138,7 @@ export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'ad
     // --- Single Top Platform (Centered) ---
     // User requested "just have one floating platform at the center".
     // Visual:
-    const topPlatVisual = scene.add.image(960, 510, 'platform_top');
+    const topPlatVisual = scene.add.image(960, 510, topTexKey);
     topPlatVisual.setScale(0.8);
     topPlatVisual.setDepth(-10);
     // Collision Rectangle (this is what the player walks on):
