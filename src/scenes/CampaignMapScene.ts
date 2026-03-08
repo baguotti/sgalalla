@@ -46,6 +46,15 @@ export class CampaignMapScene extends Phaser.Scene {
     private static readonly ISLAND_FLOAT_OFFSET = 220; // How far islands float above the path
     private static readonly START_X = 250;    // Left margin
 
+    // Cached keyboard keys (initialised in create)
+    private keyLeft!: Phaser.Input.Keyboard.Key;
+    private keyRight!: Phaser.Input.Keyboard.Key;
+    private keyA!: Phaser.Input.Keyboard.Key;
+    private keyD!: Phaser.Input.Keyboard.Key;
+    private keySpace!: Phaser.Input.Keyboard.Key;
+    private keyEnter!: Phaser.Input.Keyboard.Key;
+    private keyEsc!: Phaser.Input.Keyboard.Key;
+
     constructor() {
         super({ key: 'CampaignMapScene' });
     }
@@ -66,8 +75,6 @@ export class CampaignMapScene extends Phaser.Scene {
         this.isMoving = false;
         this.canInput = false;
         this.prevGamepadA.clear();
-        // Fade in
-        this.cameras.main.fadeIn(1000, 0, 0, 0);
     }
 
     create() {
@@ -105,13 +112,8 @@ export class CampaignMapScene extends Phaser.Scene {
         // Determine player character from playerData
         const selectedChar = this.playerData[0]?.character || 'fok';
 
-        // Initialize campaign if needed (was previously done in GameScene.create)
-        if (campaign.hasActiveCampaign() && campaign.getPlayerCharacter() !== selectedChar) {
-            campaign.resetCampaign();
-        }
-        if (!campaign.hasActiveCampaign()) {
-            campaign.startNewCampaign(selectedChar, this.slotIndex);
-        }
+        // Initialize campaign if needed (idempotent — resets only if character changed)
+        campaign.ensureActive(selectedChar, this.slotIndex);
 
         this.playerCharKey = campaign.getPlayerCharacter();
 
@@ -120,7 +122,7 @@ export class CampaignMapScene extends Phaser.Scene {
 
         // Build island nodes from the campaign ladder
         const ladder = campaign.ladder;
-        const currentLevel = (campaign as any).currentData?.currentLevel ?? 0;
+        const currentLevel = campaign.getCurrentLevel();
 
         // Calculate layout - center the islands horizontally
         const totalWidth = (ladder.length - 1) * CampaignMapScene.ISLAND_SPACING;
@@ -326,6 +328,16 @@ export class CampaignMapScene extends Phaser.Scene {
             this.canInput = true;
         });
 
+        // Cache keyboard keys once
+        const kb = this.input.keyboard!;
+        this.keyLeft = kb.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT, false);
+        this.keyRight = kb.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT, false);
+        this.keyA = kb.addKey(Phaser.Input.Keyboard.KeyCodes.A, false);
+        this.keyD = kb.addKey(Phaser.Input.Keyboard.KeyCodes.D, false);
+        this.keySpace = kb.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE, false);
+        this.keyEnter = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER, false);
+        this.keyEsc = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ESC, false);
+
         // Initial visual update
         this.updateIslandVisuals();
 
@@ -342,22 +354,14 @@ export class CampaignMapScene extends Phaser.Scene {
         this.pollGamepadEdge();
         if (!this.canInput || this.isMoving) return;
 
-        // --- Keyboard Input ---
-        const leftKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT, false);
-        const rightKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT, false);
-        const aKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.A, false);
-        const dKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D, false);
-        const spaceKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE, false);
-        const enterKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER, false);
-        const escKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC, false);
-
-        if ((leftKey && Phaser.Input.Keyboard.JustDown(leftKey)) || (aKey && Phaser.Input.Keyboard.JustDown(aKey))) {
+        // --- Keyboard Input (using cached keys from create()) ---
+        if (Phaser.Input.Keyboard.JustDown(this.keyLeft) || Phaser.Input.Keyboard.JustDown(this.keyA)) {
             this.movePlayer(-1);
-        } else if ((rightKey && Phaser.Input.Keyboard.JustDown(rightKey)) || (dKey && Phaser.Input.Keyboard.JustDown(dKey))) {
+        } else if (Phaser.Input.Keyboard.JustDown(this.keyRight) || Phaser.Input.Keyboard.JustDown(this.keyD)) {
             this.movePlayer(1);
-        } else if ((spaceKey && Phaser.Input.Keyboard.JustDown(spaceKey)) || (enterKey && Phaser.Input.Keyboard.JustDown(enterKey))) {
+        } else if (Phaser.Input.Keyboard.JustDown(this.keySpace) || Phaser.Input.Keyboard.JustDown(this.keyEnter)) {
             this.enterIsland();
-        } else if (escKey && Phaser.Input.Keyboard.JustDown(escKey)) {
+        } else if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
             this.goBack();
         }
 
@@ -416,7 +420,7 @@ export class CampaignMapScene extends Phaser.Scene {
 
         // Can't move past the current target (undefeated) island
         const campaign = CampaignManager.getInstance();
-        const currentLevel = (campaign as any).currentData?.currentLevel ?? 0;
+        const currentLevel = campaign.getCurrentLevel();
         if (targetIndex > currentLevel) return;
 
         // Can't move beyond last island
@@ -480,7 +484,7 @@ export class CampaignMapScene extends Phaser.Scene {
     private enterIsland(): void {
         const island = this.islands[this.currentIslandIndex];
         const campaign = CampaignManager.getInstance();
-        const currentLevel = (campaign as any).currentData?.currentLevel ?? 0;
+        const currentLevel = campaign.getCurrentLevel();
 
         AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
         this.canInput = false;
@@ -691,7 +695,11 @@ export class CampaignMapScene extends Phaser.Scene {
         cleanup = () => {
             oldCleanup();
             this.events.off('update', gamepadUpdate);
+            this.events.off('shutdown', cleanup); // Remove shutdown listener too
         };
+
+        // Ensure cleanup runs on scene shutdown (e.g. player presses ESC while prompt is open)
+        this.events.once('shutdown', cleanup);
 
         // Mouse/touch support
         yesBtn.setInteractive();

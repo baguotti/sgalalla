@@ -97,20 +97,4 @@ export class SaveService {
         return null;
     }
 
-    // ─── Legacy compat (used by CampaignManager until fully migrated) ───
-
-    /** @deprecated Use saveSlot instead */
-    public static saveCampaign(data: CampaignSaveData): void {
-        SaveService.saveSlot(data.slotIndex ?? 0, data);
-    }
-
-    /** @deprecated Use loadSlot instead */
-    public static loadCampaign(): CampaignSaveData | null {
-        return SaveService.loadSlot(0);
-    }
-
-    /** @deprecated Use deleteSlot instead */
-    public static clearCampaign(): void {
-        SaveService.deleteSlot(0);
-    }
 }

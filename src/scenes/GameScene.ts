@@ -166,14 +166,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             const selectedChar = this.playerData[0]?.character || 'fok';
             const slotIndex = data.slotIndex ?? campaign.getActiveSlotIndex();
 
-            // If the player changed character mid-run, reset and start fresh
-            if (campaign.hasActiveCampaign() && campaign.getPlayerCharacter() !== selectedChar) {
-                campaign.resetCampaign();
-            }
-
-            if (!campaign.hasActiveCampaign()) {
-                campaign.startNewCampaign(selectedChar, slotIndex);
-            }
+            campaign.ensureActive(selectedChar, slotIndex);
 
             const opponent = this.isTraining
                 ? campaign.ladder[this.trainingOpponentIndex]
@@ -1946,12 +1939,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             const nextOpponent = CampaignManager.getInstance().getCurrentOpponent();
 
             if (nextOpponent) {
-                // Next opponent exists — go to map scene to pick next island
+                // Next opponent exists — go to map scene positioned on the island just beaten
+                // getCurrentLevel() has already been incremented by advanceLadder(), so -1 gives
+                // the last defeated opponent's island (player then steps right to the new one).
+                const justBeatenIndex = CampaignManager.getInstance().getCurrentLevel() - 1;
                 this.scene.start('CampaignMapScene', {
                     playerData: [this.playerData[0]],
                     mode: 'campaign',
                     slotIndex: CampaignManager.getInstance().getActiveSlotIndex(),
-                    targetIslandIndex: this.trainingOpponentIndex
+                    targetIslandIndex: Math.max(0, justBeatenIndex)
                 });
             } else {
                 // Campaign complete! Show credits — save file is kept.

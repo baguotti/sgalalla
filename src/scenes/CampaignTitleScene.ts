@@ -45,7 +45,9 @@ export class CampaignTitleScene extends Phaser.Scene {
         if (!this.inputUnlocked) return;
         this.inputUnlocked = false; // Prevent multiple triggers
 
-        // Transition to LobbyScene
-        this.scene.start('LobbyScene', { ...this.initData, mode: 'campaign' });
+        this.cameras.main.fadeOut(500, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+            this.scene.start('LobbyScene', { ...this.initData, mode: 'campaign' });
+        });
     }
 }

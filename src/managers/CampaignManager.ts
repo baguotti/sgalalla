@@ -1,6 +1,8 @@
 import { SaveService } from './SaveService';
 import type { CampaignSaveData } from './SaveService';
 
+import { CHARACTER_STAGES } from '../data/CampaignIslandData';
+
 import * as nockDialogue from '../data/dialogue/nock';
 import * as peDialogue from '../data/dialogue/pe';
 import * as sguDialogue from '../data/dialogue/sgu';
@@ -120,6 +122,21 @@ export class CampaignManager {
         SaveService.saveSlot(slotIndex, this.currentData);
     }
 
+    /**
+     * Idempotent guard used by scenes before reading campaign state.
+     * - If a campaign is active for a different character, resets it and starts fresh.
+     * - If no campaign is active, starts a new one.
+     * - If a campaign is already active for the correct character, does nothing.
+     */
+    public ensureActive(playerCharacter: string, slotIndex: number): void {
+        if (this.hasActiveCampaign() && this.getPlayerCharacter() !== playerCharacter) {
+            this.resetCampaign();
+        }
+        if (!this.hasActiveCampaign()) {
+            this.startNewCampaign(playerCharacter, slotIndex);
+        }
+    }
+
     /** Converts a list of character keys into a full OpponentConfig[] ladder */
     private buildLadderFromOrder(order: string[]): OpponentConfig[] {
         return order.map((char, index) => {
@@ -128,7 +145,7 @@ export class CampaignManager {
 
             return {
                 character: char,
-                stage: char === 'nock' ? 'bg_la_sala_prove' : (char === 'sga' ? 'sguzia_bg' : (char === 'fok' ? 'londra_bg' : 'adria_bg')),
+                stage: CHARACTER_STAGES[char] ?? 'adria_bg',
                 dialogueBefore: dialogue ? dialogue.dialogueBefore : [],
                 dialogueMidFight: dialogue ? dialogue.dialogueMidFight : [],
                 dialogueAfterWin: dialogue ? dialogue.dialogueAfterWin : [],
@@ -143,6 +160,10 @@ export class CampaignManager {
 
     public hasActiveCampaign(): boolean {
         return this.currentData !== null;
+    }
+
+    public getCurrentLevel(): number {
+        return this.currentData?.currentLevel ?? 0;
     }
 
     public getCurrentOpponent(): OpponentConfig | null {
@@ -164,7 +185,7 @@ export class CampaignManager {
         if (!this.currentData) return;
 
         this.currentData.currentLevel++;
-        if (this.currentData.currentLevel > this.ladder.length) {
+        if (this.currentData.currentLevel >= this.ladder.length) {
             this.currentData.currentLevel = this.ladder.length;
         }
         this.updatePlayTime();

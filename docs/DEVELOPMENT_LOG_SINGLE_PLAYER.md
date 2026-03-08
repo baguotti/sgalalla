@@ -1,23 +1,7 @@
 # Sgalalla - Single-Player Campaign Development Log
 
 ---
-### [2026-03-07] v2.2.6 - Map Selection & Campaign Polish 🌍🗺️
-- **[V]** `v2.2.6`
-- **[Feat]** **Map Selection Screen**:
-    - Added a dedicated map selection phase for Versus and Training modes.
-    - P1 can pick between Adria, La Sala Prove, Sguzia, and Londra with real-time preview thumbnails.
-- **[Feat]** **New High-Res Maps**:
-    - Integrated optimized WebP backgrounds for Londra (Fok), Sguzia (Sga), and La Sala Prove (Nock).
-- **[Feat]** **Campaign UX Polish**:
-    - **Re-challenge Saturation**: Removed visual desaturation for re-challenge/training matches; the cinematic color restoration now only applies on first encounters.
-    - **Pause Menu**: Cleaned up "versus" options in campaign mode; added "Ritorna alla mappa".
-- **[Fix]** **Stability & Logic**:
-    - Fixed a critical `TypeError` crash when restarting matches (stale FX reference cleanup).
-    - Fixed training mode input priority bug where character cycling blocked map selection.
-    - Fixed player spawning at the correct island when returning to the map.
-    - Resolved blast zone infinite sound loop glitch.
-- **[S]** **STATUS**: Campaign experience is polished and visually upgraded; new flexible map selection available in local modes.
-----------------------------------------------------------------------------------------------------------------------------
+
 
 ### [2026-03-04] v2.0.0 - Single-Player Campaign Mode Launch 🎬🗺️
 - **[V]** `v2.0.0`
@@ -200,3 +184,36 @@
 - **[Dev]** **Campaign Architecture Audit**:
   - Performed a deep technical audit of the single-player systems, identifying paths for future state-machine based refactors and input handling optimizations.
 - **[S]** **STATUS**: Campaign longevity is secured with persistent saves and optimized high-res assets.
+
+### [2026-03-07] v2.2.6 - Map Selection & Campaign Polish 🌍🗺️
+- **[V]** `v2.2.6`
+- **[Feat]** **Map Selection Screen**:
+    - Added a dedicated map selection phase for Versus and Training modes.
+    - P1 can pick between Adria, La Sala Prove, Sguzia, and Londra with real-time preview thumbnails.
+- **[Feat]** **New High-Res Maps**:
+    - Integrated optimized WebP backgrounds for Londra (Fok), Sguzia (Sga), and La Sala Prove (Nock).
+- **[Feat]** **Campaign UX Polish**:
+    - **Re-challenge Saturation**: Removed visual desaturation for re-challenge/training matches; the cinematic color restoration now only applies on first encounters.
+    - **Pause Menu**: Cleaned up "versus" options in campaign mode; added "Ritorna alla mappa".
+- **[Fix]** **Stability & Logic**:
+    - Fixed a critical `TypeError` crash when restarting matches (stale FX reference cleanup).
+    - Fixed training mode input priority bug where character cycling blocked map selection.
+    - Fixed player spawning at the correct island when returning to the map.
+    - Resolved blast zone infinite sound loop glitch.
+- **[S]** **STATUS**: Campaign experience is polished and visually upgraded; new flexible map selection available in local modes.
+
+### [2026-03-08] v2.2.7 - Campaign Architecture & Stability Audit 🧩🔧
+- **[V]** `v2.2.7`
+- **[Refactor]** **Campaign Architecture**:
+    - Centralized campaign initialization logic into `CampaignManager.ensureActive()` to eliminate duplication between scenes.
+    - Added type-safe `getCurrentLevel()` getter, removing unsafe `as any` private field access across the codebase.
+    - Centralized character-to-stage mapping in `CampaignIslandData.ts` to replace nested ternaries and simplify expansion.
+- **[Fix]** **Campaign Flow & UX**:
+    - Fixed a bug where players were reset to the first island after a campaign win; now correctly positions on the just-defeated opponent.
+    - Added a smooth 500ms fade-out transition to `CampaignTitleScene` for visual consistency.
+    - Resolved a memory leak in `CampaignMapScene` by ensuring gamepad update listeners are cleaned up on scene shutdown.
+- **[Perf]** **Input Optimization**:
+    - Optimized `CampaignMapScene` by caching keyboard keys in `create()`, reducing per-frame overhead.
+- **[Cleanup]** **Save System**:
+    - Removed unused deprecated legacy methods from `SaveService.ts`.
+- **[S]** **STATUS**: Campaign core architecture is now robust, type-safe, and leak-free.

@@ -5,19 +5,6 @@
 
 Part 2
 
-
----
-### [2026-03-07] v2.2.6 - Map Selection & Campaign Quality 🌍🗺️
-- **[V]** `v2.2.6`
-- **[Feat]** **Map Selection Phase**: Implemented a new phase in the lobby allowing P1 to select the map for Versus and Training modes (Adria, La Sala Prove, Sguzia, Londra).
-- **[Feat]** **Campaign Polish**:
-    - **Visuals**: Added high-res WebP stage backgrounds for campaign characters.
-    - **Saturation Logic**: Defeated opponents and their stages now appear in full color when re-challenged.
-    - **UX**: Tailored the pause menu for campaign mode with a direct "Return to Map" option.
-- **[Fix]** **Critical Stability**: Fixed a crash occurring during match restarts in campaign mode due to destroyed FX references (`campaignColorMatrices`).
-- **[Fix]** **Death Handling**: Fixed a regression where falling into blast zones caused infinite sound loops.
-- **[S]** **STATUS**: Version 2.2.6 brings significant UX improvements to both local multiplayer and single-player campaign.
-
 ---
 
 ### [2026-02-16] v0.12.0 - Refactoring & Technical Debt Cleanup
