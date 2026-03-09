@@ -562,3 +562,10 @@ Part 2
 - **[Fix]** **Nintendo Switch Controller**:
     - **Button Mapping**: Removed manual A/B X/Y swaps in `GamepadInput`. The standard API already maps buttons by physical position on macOS, fixing reversed inputs for Switch Pro controllers.
 - **[S]** **STATUS**: Competitive UX significantly improved. Match flow is seamless and celebratory.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-03-09] v1.2.5 - Hotfix: Physics Stability
+- **[V]** `v1.2.5`
+- **[Fix]** **Ground Pound Clipping**:
+    - **Collision Pipeline**: Modified `PhysicsSimulation.ts` to calculate a dynamic `PLATFORM_SNAP_THRESHOLD` based on downward velocity (`body.vy`). This prevents characters from falling so fast during a ground pound that they completely bypass the 45px floor thickness check in a single frame.
+- **[S]** **STATUS**: Major clipping bug resolved. Stability restored.
