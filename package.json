@@ -32,6 +32,7 @@
   "build": {
     "appId": "com.sgalalla.game",
     "productName": "Sgalalla",
+    "icon": "build/icon.png",
     "directories": {
       "output": "release"
     },

@@ -243,6 +243,8 @@
 - **[Fix]** **Online Multiplayer Connectivity**:
     - Added fallback to production droplet IP (`164.90.235.15`) in `NetworkManager` for Electron environments.
     - Fixed black screen when entering "Botte in Remoto" on macOS.
+- **[UI]** **App Branding**:
+    - Configured custom application icon (512x512) for Mac and Windows builds.
 - **[Refactor]** **Build Organization & Cleanup**:
     - Implemented organized output folders: `release/mac` and `release/win`.
     - Added automatic cleanup logic in `package.json` to delete previous builds before a new one.
