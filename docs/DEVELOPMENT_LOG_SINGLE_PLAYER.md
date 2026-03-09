@@ -248,6 +248,8 @@
 - **[Refactor]** **Build Organization & Cleanup**:
     - Implemented organized output folders: `release/mac` and `release/win`.
     - Added automatic cleanup logic in `package.json` to delete previous builds before a new one.
+- [x] **Ground Pound Clipping Fix**:
+    - **Physics Stability**: Implemented a dynamic `PLATFORM_SNAP_THRESHOLD` in `PhysicsSimulation.ts` that scales with falling velocity. This prevents characters from phasing through floors during high-speed attacks like the Ground Pound.
 - **[Refactor]** **Agent Protocol & Rules**:
     - Integrated `LLM_CONTEXT.md` into `AGENTS.md` and established strict dual-devlog/versioning protocol (V1 for Main, V2 for Single Player).
 - **[S]** **STATUS**: Electron packaging issues resolved and versioning protocols formalized.
