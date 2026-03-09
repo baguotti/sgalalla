@@ -231,3 +231,21 @@
     - Updated `AnimationHelpers.ts` to support map-specific platform loading.
     - Enhanced `StageFactory.ts` with dynamic platform texture selection based on the active background.
 - **[S]** **STATUS**: Stage visuals are becoming more distinct and performance-optimized.
+---
+### [2026-03-09] v2.2.9 - Electron ESM Fixes & Build Organization 📦🔧
+- **[V]** `v2.2.9`
+- **[Fix]** **Electron ESM Compatibility**:
+    - Renamed `main.ts` and `preload.ts` to `.cts` to force CommonJS output as `.cjs`.
+    - Resolved `ReferenceError: exports is not defined` in ES module scope.
+- **[Fix]** **Packaged App Rendering**:
+    - Configured Vite `base: './'` to ensure relative asset paths when served via `file://`.
+    - Resolved black screen issue in the packaged Mac application.
+- **[Fix]** **Online Multiplayer Connectivity**:
+    - Added fallback to production droplet IP (`164.90.235.15`) in `NetworkManager` for Electron environments.
+    - Fixed black screen when entering "Botte in Remoto" on macOS.
+- **[Refactor]** **Build Organization & Cleanup**:
+    - Implemented organized output folders: `release/mac` and `release/win`.
+    - Added automatic cleanup logic in `package.json` to delete previous builds before a new one.
+- **[Refactor]** **Agent Protocol & Rules**:
+    - Integrated `LLM_CONTEXT.md` into `AGENTS.md` and established strict dual-devlog/versioning protocol (V1 for Main, V2 for Single Player).
+- **[S]** **STATUS**: Electron packaging issues resolved and versioning protocols formalized.

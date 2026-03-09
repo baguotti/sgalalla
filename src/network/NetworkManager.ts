@@ -186,7 +186,14 @@ class NetworkManager {
         return new Promise((resolve) => {
             // Geckos.io: Connect to the host where the page was served, on port 9208
             // Ensure local dev (localhost) and production (droplet IP) both work automatically.
-            const hostname = window.location.hostname || 'localhost';
+            // In packaged Electron apps, protocol is 'file:', so hostname is empty. Fallback to production IP.
+            let hostname = window.location.hostname;
+            if (!hostname || window.location.protocol === 'file:') {
+                hostname = '164.90.235.15'; // Production Droplet IP
+            } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                hostname = window.location.hostname; // Keep local for dev
+            }
+
             const port = 9208;
             const url = `http://${hostname}`;
 

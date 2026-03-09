@@ -25,7 +25,7 @@ export class SettingsScene extends Phaser.Scene {
     private audioContainer!: Phaser.GameObjects.Container;
 
     // Video menu
-    private videoOptions = ['EFFETTO CRT', 'INDIETRO'];
+    private videoOptions = ['SCHERMO INTERO', 'EFFETTO CRT', 'INDIETRO'];
     private videoSelectedIndex = 0;
     private videoTexts: Phaser.GameObjects.Text[] = [];
     private videoValueTexts: Phaser.GameObjects.Text[] = [];
@@ -261,7 +261,7 @@ export class SettingsScene extends Phaser.Scene {
 
     private createVideoUI(): void {
         const { width, height } = this.scale;
-        const startY = height / 2 - 50;
+        const startY = height / 2 - 80;
         const gap = 80;
 
         const subtitle = this.add.text(width / 2, 180, 'VIDEO', {
@@ -284,7 +284,16 @@ export class SettingsScene extends Phaser.Scene {
             this.videoTexts.push(text);
             this.videoContainer.add(text);
 
-            if (opt === 'EFFETTO CRT') {
+            if (opt === 'SCHERMO INTERO') {
+                const isFs = videoMgr.getFullscreen();
+                const valText = this.add.text(width / 2 + 50, y, isFs ? 'ON' : 'OFF', {
+                    fontSize: '40px',
+                    fontFamily: '"Pixeloid Sans"',
+                    color: isFs ? '#2EC4B6' : '#666666'
+                }).setOrigin(0, 0.5);
+                this.videoValueTexts.push(valText);
+                this.videoContainer.add(valText);
+            } else if (opt === 'EFFETTO CRT') {
                 const label = this.getCrtLabel(videoMgr.getCrtIntensity());
                 const color = videoMgr.isCrtEnabled() ? '#2EC4B6' : '#666666';
                 const valText = this.add.text(width / 2 + 50, y, label, {
@@ -308,6 +317,19 @@ export class SettingsScene extends Phaser.Scene {
 
     private refreshVideoValues(): void {
         const videoMgr = VideoManager.getInstance();
+
+        // Fullscreen
+        const fsIndex = this.videoOptions.indexOf('SCHERMO INTERO');
+        if (fsIndex >= 0) {
+            const valText = this.videoValueTexts[fsIndex];
+            if (valText) {
+                const isFs = videoMgr.getFullscreen();
+                valText.setText(isFs ? 'ON' : 'OFF');
+                valText.setColor(isFs ? '#2EC4B6' : '#666666');
+            }
+        }
+
+        // CRT
         const crtIndex = this.videoOptions.indexOf('EFFETTO CRT');
         if (crtIndex >= 0) {
             const valText = this.videoValueTexts[crtIndex];
@@ -773,6 +795,12 @@ export class SettingsScene extends Phaser.Scene {
         const opt = this.videoOptions[this.videoSelectedIndex];
         if (opt === 'INDIETRO') {
             this.goBack();
+        } else if (opt === 'SCHERMO INTERO') {
+            VideoManager.getInstance().toggleFullscreen(this).then(() => {
+                this.refreshVideoValues();
+                this.updateVideoHighlight();
+            });
+            this.audioManager.playSFX('ui_confirm', { volume: 0.5 });
         } else if (opt === 'EFFETTO CRT') {
             VideoManager.getInstance().cycleCrt();
             this.refreshVideoValues();
@@ -885,6 +913,7 @@ export class SettingsScene extends Phaser.Scene {
     }
 
     private updateVideoHighlight(): void {
+        const videoMgr = VideoManager.getInstance();
         this.videoTexts.forEach((text, index) => {
             const isSelected = index === this.videoSelectedIndex;
             text.setColor(isSelected ? '#ffffff' : '#888888');
@@ -892,7 +921,10 @@ export class SettingsScene extends Phaser.Scene {
 
             if (this.videoValueTexts[index]) {
                 const valText = this.videoValueTexts[index];
-                const enabled = VideoManager.getInstance().isCrtEnabled();
+                const opt = this.videoOptions[index];
+                let enabled = false;
+                if (opt === 'SCHERMO INTERO') enabled = videoMgr.getFullscreen();
+                else if (opt === 'EFFETTO CRT') enabled = videoMgr.isCrtEnabled();
                 valText.setColor(isSelected ? (enabled ? '#2EC4B6' : '#888888') : '#666666');
                 valText.setAlpha(isSelected ? 1 : 0.5);
             }

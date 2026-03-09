@@ -1,16 +1,24 @@
 {
   "name": "sgalalla",
   "private": true,
-  "version": "2.2.8",
+  "version": "2.2.9",
   "type": "module",
+  "main": "electron-dist/main.cjs",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "server": "lsof -ti:9208 | xargs kill -9 2>/dev/null; sleep 1; npm run dev --prefix server-geckos",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "deploy:campaign": "bash deploy_campaign.sh"
+    "deploy:campaign": "bash deploy_campaign.sh",
+    "electron:dev": "tsc -p tsconfig.electron.json && concurrently \"vite --host 0.0.0.0\" \"sleep 3 && electron electron-dist/main.cjs\"",
+    "electron:build": "tsc && vite build && tsc -p tsconfig.electron.json && electron-builder",
+    "electron:build:mac": "rm -rf release/mac && tsc && vite build && tsc -p tsconfig.electron.json && electron-builder --mac -c.directories.output=release/mac",
+    "electron:build:win": "rm -rf release/win && tsc && vite build && tsc -p tsconfig.electron.json && electron-builder --win -c.directories.output=release/win"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
+    "electron": "^35.7.5",
+    "electron-builder": "^26.8.1",
     "typescript": "~5.9.3",
     "vite": "^7.2.4"
   },
@@ -20,5 +28,30 @@
     "free-tex-packer-core": "^0.3.5",
     "phaser": "^3.90.0",
     "socket.io-client": "^4.8.3"
+  },
+  "build": {
+    "appId": "com.sgalalla.game",
+    "productName": "Sgalalla",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron-dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.games",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    }
   }
 }

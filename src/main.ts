@@ -48,3 +48,6 @@ new Phaser.Game(config);
 
 // Initialize CRT overlay from saved preferences
 VideoManager.getInstance().applySettings();
+
+// Restore fullscreen state on boot (Electron only, no-op on web)
+VideoManager.getInstance().syncFullscreenState();
