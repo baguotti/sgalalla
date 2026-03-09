@@ -649,6 +649,14 @@ export function checkSinglePlatformCollision(
         return events;
     }
 
+    // Calculate dynamic snap threshold to catch high-velocity falls (e.g. Ground Pound)
+    // Assumes up to a 30fps worst-case delta (0.033s) with a 1.5x safety margin
+    const fallDistMargin = Math.max(0, body.vy * 0.033 * 1.5);
+    const dynamicThreshold = Math.min(
+        Math.max(PhysicsConfig.PLATFORM_SNAP_THRESHOLD, fallDistMargin),
+        body.height * 0.8 // Never snap if 80%+ submerged
+    );
+
     // Soft platform logic
     if (isSoft) {
         if (body.dropGraceTimer > 0) {
@@ -656,10 +664,10 @@ export function checkSinglePlatformCollision(
             if (!isNaN(body.droppingThroughY) && Math.abs(platCy - body.droppingThroughY) < 5) return events;
         }
         if (body.vy < 0) return events;
-        if (bodyBottom > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) return events;
+        if (bodyBottom > platTop + dynamicThreshold) return events;
     } else {
         if (body.vy < 0) return events;
-        if (bodyBottom > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) return events;
+        if (bodyBottom > platTop + dynamicThreshold) return events;
     }
 
     // Landing
