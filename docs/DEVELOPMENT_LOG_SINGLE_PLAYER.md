@@ -253,3 +253,14 @@
 - **[Refactor]** **Agent Protocol & Rules**:
     - Integrated `LLM_CONTEXT.md` into `AGENTS.md` and established strict dual-devlog/versioning protocol (V1 for Main, V2 for Single Player).
 - **[S]** **STATUS**: Electron packaging issues resolved and versioning protocols formalized.
++
++### [2026-03-10] v2.2.10 - Rematch & Game Over Refinements 🔧🎮
++- **[V]** `v2.2.10`
++- **[Fix]** **Rematch State Persistence**:
++    - Fixed a bug where the "PLAYER X HA ARATO" text persisted after a rematch in offline modes.
++    - Resolved the "Crown" (Taunt animation) persisting until a dash by explicitly resetting the Player FSM to `Idle` on respawn.
++- **[UI]** **Game Over Menu Polish**:
++    - Reduced the unskippable delay before the game over menu appears from 5 seconds to 2 seconds.
++    - Updated Game Over menu options ("RIVINCITA", etc.) to use a larger font size (64px) and matching stroke, replacing the splash text for a cleaner transition.
++- **[Fix]** **Code Cleanup**: Removed duplicate `currentZoomLevel` and `PLAYER_COLORS` definitions in `GameScene.ts`.
++- **[S]** **STATUS**: Rematch flow is now clean and state-safe.

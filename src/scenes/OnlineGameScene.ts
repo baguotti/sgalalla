@@ -998,6 +998,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         player.physics.reset();
         player.setState(PlayerState.AIRBORNE);
         player.setDamage(0);
+        player.isWinner = false;
+        player.fsm.changeState('Idle', player);
         player.resetVisuals();
         player.setInvulnerable(1000); // 1 full second invulnerability
 
@@ -1264,6 +1266,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             player.setDamage(0);
             player.velocity.x = 0;
             player.velocity.y = 0;
+            player.isWinner = false;
+            player.fsm.changeState('Idle', player);
 
             // Respawn position
             const spawnPoints = [

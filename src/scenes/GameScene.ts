@@ -119,6 +119,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     public spawnPoints: { x: number, y: number }[] = [];
     private playerData: any[] = [];
 
+    private winnerTextVisual?: Phaser.GameObjects.Text;
+
     public effectManager!: EffectManager;
 
     private mode: 'versus' | 'training' | 'campaign' = 'versus';
@@ -1109,6 +1111,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         player.physics.reset();
         player.setState(PlayerState.AIRBORNE);
         player.setDamage(0);
+        player.isWinner = false;
+        player.fsm.changeState('Idle', player);
         player.resetVisuals();
         player.setInvulnerable(1000); // 1 full second of invulnerability
 
@@ -1126,7 +1130,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         });
     }
 
-    public setZoomLevel(level: 'CLOSE' | 'NORMAL' | 'WIDE'): void {
+    public setZoomLevel(level: ZoomLevel): void {
         this.currentZoomLevel = level;
     }
 
@@ -1202,6 +1206,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Clear game over state
         this.isGameOver = false;
         this.isGameOverMenuReady = false;
+        if (this.winnerTextVisual) {
+            this.winnerTextVisual.destroy();
+            this.winnerTextVisual = undefined;
+        }
         this.gameOverSelectedIndex = 0;
         if (this.gameOverMenuTexts) {
             this.gameOverMenuTexts.forEach(t => t.destroy());
@@ -1427,7 +1435,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
 
         if (this.mode !== 'campaign') {
-            const text = this.add.text(width / 2, height / 2 - 50, winnerText, {
+            this.winnerTextVisual = this.add.text(width / 2, height / 2 - 50, winnerText, {
                 fontSize: '64px',
                 fontFamily: '"Pixeloid Sans"',
                 fontStyle: 'bold',
@@ -1436,9 +1444,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 stroke: '#000000',
                 strokeThickness: 8
             });
-            text.setOrigin(0.5);
-            text.setDepth(1001);
-            this.cameras.main.ignore(text); // Only UI camera sees it
+            this.winnerTextVisual.setOrigin(0.5);
+            this.winnerTextVisual.setDepth(1001);
+            this.cameras.main.ignore(this.winnerTextVisual); // Only UI camera sees it
         }
 
         if (this.mode === 'campaign' && this.isTraining) {
@@ -1456,8 +1464,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 }
             });
         } else {
-            // 5-second unskippable delay (normal versus matches)
-            this.time.delayedCall(5000, () => {
+            // 2-second delay (normal versus matches)
+            this.time.delayedCall(2000, () => {
                 this.showGameOverMenu();
             });
         }
@@ -1588,17 +1596,23 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.gameOverSelectedIndex = 0;
         const { width, height } = this.scale;
 
-        const startY = height / 2 + 50;
-        const gap = 60;
+        // Destroy the "HA ARATO" text before showing the menu
+        if (this.winnerTextVisual) {
+            this.winnerTextVisual.destroy();
+            this.winnerTextVisual = undefined;
+        }
+
+        const startY = height / 2 - 50;
+        const gap = 80;
 
         this.gameOverMenuOptions.forEach((option, index) => {
             const text = this.add.text(width / 2, startY + (index * gap), option, {
-                fontSize: '36px',
+                fontSize: '64px',
                 fontFamily: '"Pixeloid Sans"',
                 color: index === 0 ? '#ffffff' : '#888888',
                 align: 'center',
                 stroke: '#000000',
-                strokeThickness: 4
+                strokeThickness: 8
             }).setOrigin(0.5).setDepth(1001);
 
             if (index === 0) text.setShadow(0, 0, '#ffffff', 10, false, true);
