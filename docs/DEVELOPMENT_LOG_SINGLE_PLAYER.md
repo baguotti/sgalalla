@@ -264,3 +264,16 @@
 +    - Updated Game Over menu options ("RIVINCITA", etc.) to use a larger font size (64px) and matching stroke, replacing the splash text for a cleaner transition.
 +- **[Fix]** **Code Cleanup**: Removed duplicate `currentZoomLevel` and `PLAYER_COLORS` definitions in `GameScene.ts`.
 +- **[S]** **STATUS**: Rematch flow is now clean and state-safe.
+
+
++### [2026-03-10] v2.2.11 - Movement & Audio Polish 🛠️🔊
++- **[V]** `v2.2.11`
++- **[Fix]** **Rematch Movement Freeze**:
++    - Implemented `Player.fullReset()` to explicitly purge combat flags (`isAttacking`, `isDodging`) during respawn, ensuring players are never "stuck" after a rematch.
++- **[Feat]** **Dynamic Audio Pitch**:
++    - Added ±300 cents randomized pitch variation to light attacks, signatures, and hits.
++    - Implemented consecutive duplicate prevention in `AudioManager` to ensure tonal variety.
++- **[UI]** **Menu Cleanup**:
++    - Hidden "MINI GIOCHI" from the Main Menu as requested.
++- **[S]** **STATUS**: Movement bug resolved and audio variety enhanced.
++

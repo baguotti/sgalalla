@@ -1108,12 +1108,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.matter.body.setAngle(player.body as MatterJS.BodyType, 0);
             this.matter.body.setAngularVelocity(player.body as MatterJS.BodyType, 0);
         }
-        player.physics.reset();
-        player.setState(PlayerState.AIRBORNE);
-        player.setDamage(0);
-        player.isWinner = false;
-        player.fsm.changeState('Idle', player);
-        player.resetVisuals();
+        
+        // Unified clean slate for all logic/combat/state
+        player.fullReset();
+        
+        player.setState(PlayerState.AIRBORNE); // Force them to fall from the spawn point
         player.setInvulnerable(1000); // 1 full second of invulnerability
 
         // Visual respawn effect (flash)

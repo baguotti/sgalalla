@@ -751,14 +751,44 @@ export class Player extends Fighter {
     }
 
 
-    public respawn(): void {
-        this.velocity.set(0, 0);
-        this.physics.acceleration.set(0, 0);
-        this.damagePercent = 0;
+    public fullReset(): void {
+        // Clear all combat and state flags
+        this.isAttacking = false;
+        this.isDodging = false;
         this.isHitStunned = false;
-        this.isInvincible = false;
+        this.isTaunting = false;
+        this.isWinner = false;
+        // Do not clear isRespawning here, as GameScene manages its duration
+        
+        // Terminate any active attacks/charge
+        if (this.combat) {
+            this.combat.endAttack();
+        }
+
+        // Reset physics engine state
+        if (this.physics) {
+            this.physics.reset();
+            this.physics.resetOnGround();
+        }
+
+        // Reset vitals
+        this.velocity.set(0, 0);
+        if (this.physics && this.physics.acceleration) {
+            this.physics.acceleration.set(0, 0);
+        }
+        this.damagePercent = 0;
+        this.invulnerabilityTimer = 0;
+        this.isInvulnerable = false;
+
+        // Reset visuals and FSM
         this.resetVisuals();
-        this.physics.resetOnGround();
+        if (this.fsm) {
+            this.fsm.changeState('Idle', this);
+        }
+    }
+
+    public respawn(): void {
+        this.fullReset();
     }
 
     public addToCameraIgnore(camera: Phaser.Cameras.Scene2D.Camera): void {

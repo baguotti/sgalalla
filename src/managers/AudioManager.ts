@@ -15,6 +15,8 @@ export class AudioManager {
         return AudioManager.instance;
     }
 
+    private lastPitches: Map<string, number> = new Map();
+
     public init(scene: Phaser.Scene): void {
         this.scene = scene;
         this.loadSettings();
@@ -60,14 +62,6 @@ export class AudioManager {
         // Update global music loop if it exists
         const music = this.scene.sound.get('global_music_loop');
         if (music && music.isPlaying) {
-            // If we are in GameScene, we might want lower volume, but AudioManager 
-            // generally sets the "Base" volume. 
-            // Logic update: The game currently manually tweaks volume for GameScene vs Menu.
-            // We should probably respect that ratio or let the Scene handle the specific ducking 
-            // relative to this base volume.
-            // For now, let's just update it directly, BUT we need to be careful about the GameScene ducking.
-            // If we change volume here, it overrides the tween.
-
             // Simple approach: Update playing instance. Interactions with GameScene ducking 
             // might need the GameScene to query this manager.
             if (music instanceof Phaser.Sound.WebAudioSound || music instanceof Phaser.Sound.HTML5AudioSound) {
@@ -76,11 +70,34 @@ export class AudioManager {
         }
     }
 
-    public playSFX(key: string, config: Phaser.Types.Sound.SoundConfig = {}): void {
+    public playSFX(key: string, config: Phaser.Types.Sound.SoundConfig & { randomPitchRange?: number } = {}): void {
         if (!this.scene) return;
 
-        const finalConfig = {
+        let detune = config.detune || 0;
+        
+        // Add random pitch (detune) if requested to avoid repetitive sounds
+        // e.g., randomPitchRange: 600 = ±300 detune cents (3 semitones)
+        if (config.randomPitchRange) {
+            const halfRange = config.randomPitchRange / 2;
+            const lastDetune = this.lastPitches.get(key);
+            
+            let newDetune: number;
+            let attempts = 0;
+            
+            // Loop until we find a different pitch than the one played previously for this key
+            // (Max 10 attempts to avoid infinite loop if range is tiny/zero)
+            do {
+                newDetune = Phaser.Math.Between(-halfRange, halfRange);
+                attempts++;
+            } while (newDetune === lastDetune && attempts < 10);
+            
+            detune += newDetune;
+            this.lastPitches.set(key, newDetune);
+        }
+
+        const finalConfig: Phaser.Types.Sound.SoundConfig = {
             ...config,
+            detune,
             volume: (config.volume || 1) * this.sfxVolume
         };
 

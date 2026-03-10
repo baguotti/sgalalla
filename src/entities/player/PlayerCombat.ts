@@ -299,13 +299,13 @@ export class PlayerCombat {
             // SFX: Attack Start (Whiff)
             if (this.currentAttack.data.type === AttackType.LIGHT) {
                 if (this.currentAttack.data.direction === AttackDirection.RUN) {
-                    AudioManager.getInstance().playSFX('sfx_run_light_miss', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('sfx_run_light_miss', { volume: 0.5, randomPitchRange: 600 });
                 } else {
-                    AudioManager.getInstance().playSFX('sfx_side_light_miss', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('sfx_side_light_miss', { volume: 0.5, randomPitchRange: 600 });
                 }
             } else if (this.currentAttack.data.type === AttackType.HEAVY) {
                 // All characters play sigs_hurt on startup
-                AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.5 });
+                AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.5, randomPitchRange: 600 });
             }
         } catch (e) {
             console.warn('Unknown attack:', attackKey);
@@ -341,20 +341,20 @@ export class PlayerCombat {
             if (this.currentAttack.data.type === AttackType.HEAVY) {
 
                 if (this.player.character === 'nock') {
-                    AudioManager.getInstance().playSFX('sfx_nock_sig', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('sfx_nock_sig', { volume: 0.5, randomPitchRange: 600 });
                 } else if (this.player.character === 'sga') {
-                    AudioManager.getInstance().playSFX('sfx_sga_sig', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('sfx_sga_sig', { volume: 0.5, randomPitchRange: 600 });
                 } else if (this.player.character === 'fok' || this.player.character === 'fok_v3') {
-                    AudioManager.getInstance().playSFX('sfx_fok_sig', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('sfx_fok_sig', { volume: 0.5, randomPitchRange: 600 });
                 } else if (this.player.character === 'greg') {
-                    AudioManager.getInstance().playSFX('sfx_greg_sig', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('sfx_greg_sig', { volume: 0.5, randomPitchRange: 600 });
                 } else if (this.player.character === 'sgu') {
-                    AudioManager.getInstance().playSFX('sfx_sgu_sig', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('sfx_sgu_sig', { volume: 0.5, randomPitchRange: 600 });
                 } else if (this.player.character === 'pe') {
-                    AudioManager.getInstance().playSFX('sfx_pe_sig', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('sfx_pe_sig', { volume: 0.5, randomPitchRange: 600 });
                 } else {
                     // Fallback generic sound
-                    AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.5, randomPitchRange: 600 });
                 }
             }
         } catch (e) {
@@ -983,12 +983,12 @@ export class PlayerCombat {
             // SFX: Attack Hit (Impact)
             if (this.currentAttack.data.type === AttackType.LIGHT) {
                 if (this.currentAttack.data.direction === AttackDirection.RUN) {
-                    AudioManager.getInstance().playSFX('sfx_run_light_hit', { volume: 0.6 });
+                    AudioManager.getInstance().playSFX('sfx_run_light_hit', { volume: 0.6, randomPitchRange: 600 });
                 } else {
-                    AudioManager.getInstance().playSFX('sfx_side_light_hit', { volume: 0.6 });
+                    AudioManager.getInstance().playSFX('sfx_side_light_hit', { volume: 0.6, randomPitchRange: 600 });
                 }
             } else if (this.currentAttack.data.type === AttackType.HEAVY) {
-                AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.6 });
+                AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.6, randomPitchRange: 600 });
             }
 
         } else if (this.player.physics.isRecovering) {
@@ -999,7 +999,7 @@ export class PlayerCombat {
             knockbackAngle = 80; // Upwards
             isHeavy = false;
 
-            AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.6 });
+            AudioManager.getInstance().playSFX('sfx_sigs_hurt', { volume: 0.6, randomPitchRange: 600 });
         } else {
             return;
         }

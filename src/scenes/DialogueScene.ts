@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { AudioManager } from '../managers/AudioManager';
 
 export interface DialogueLine {
     speaker: string;
@@ -248,12 +249,21 @@ export class DialogueScene extends Phaser.Scene {
                 // We just reveal the whole box width proportionally to char count.
                 const revealPercent = charIndex / line.text.length;
                 this.textMask.fillRect(boxX, boxY, boxWidth * revealPercent, boxHeight);
+                
+                if (charIndex <= line.text.length) {
+                    const char = line.text[charIndex - 1];
+                    if (char && char.trim() !== '') {
+                        AudioManager.getInstance().playSFX('text_skip', { volume: 0.5, rate: 1.3 });
+                    }
+                }
 
                 if (charIndex >= line.text.length) {
                     this.isTyping = false;
                     this.textMask.clear();
                     this.textMask.fillRect(boxX, boxY, boxWidth, boxHeight); // Fully reveal
                     if (this.typewriterTimer) this.typewriterTimer.remove();
+                    
+                    AudioManager.getInstance().playSFX('text_finish', { volume: 0.7 });
 
                     if (line.choices && line.choices.length > 0) {
                         this.showChoices(line.choices);
@@ -304,6 +314,8 @@ export class DialogueScene extends Phaser.Scene {
             this.textMask.clear();
             this.textMask.fillStyle(0xffffff);
             this.textMask.fillRect(boxX, boxY, boxWidth, 240);
+            
+            AudioManager.getInstance().playSFX('text_finish', { volume: 0.7 });
 
             const line = this.lines[this.currentLineIndex];
             if (line.choices && line.choices.length > 0) {
