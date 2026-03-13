@@ -10,7 +10,7 @@ import type { DialogueLine } from '../../scenes/DialogueScene';
 // ── INTRO (Before the fight) ────────────────────────────────
 export const dialogueBefore: DialogueLine[] = [
     { speaker: "Nock", text: "You think you can pass me? Think again!", side: "right" },
-    { speaker: "Nock", text: "Many have tried to cross this threshold, and all have failed.", side: "right", animation: "taunt" },
+    { speaker: "Nock", text: "Many have tried to cross this threshold, and all have failed. This is a test to see how the text reacts!!! And now let's see how three lines look!", side: "right", animation: "taunt" },
     { speaker: "Nock", text: "Win? Against ME? Your confidence is misplaced...", side: "right" },
     { speaker: "Nock", text: "I've been watching your progress. It ends here.", side: "right" },
     { speaker: "Nock", text: "Let see if your skills match your mouth!", side: "right" },

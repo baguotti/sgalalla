@@ -16,6 +16,15 @@ export class PreloadScene extends Phaser.Scene {
         this.load.atlas('pe', 'assets/pe/pe.png', 'assets/pe/pe.json');
         this.load.atlas('nock', 'assets/nock/nock.png', 'assets/nock/nock.json');
         this.load.atlas('greg', 'assets/greg/greg.png', 'assets/greg/greg.json');
+        
+        // Load custom dialogue portraits
+        this.load.image('dialogue_portrait_fok', 'assets/ui/portraits/fok.png');
+        this.load.image('dialogue_portrait_greg', 'assets/ui/portraits/greg.png');
+        this.load.image('dialogue_portrait_nock', 'assets/ui/portraits/nock.png');
+        this.load.image('dialogue_portrait_pe', 'assets/ui/portraits/pe.png');
+        this.load.image('dialogue_portrait_sga', 'assets/ui/portraits/sga.png');
+        this.load.image('dialogue_portrait_sgu', 'assets/ui/portraits/sgu.png');
+        
         // Load Global Music
         this.load.audio('global_music_loop', 'assets/audio/music/manici_intro_002_loop.mp3');
         this.load.audio('ui_player_found', 'assets/audio/ui/ui_player_found.wav');

@@ -542,11 +542,19 @@ export class CampaignMapScene extends Phaser.Scene {
         // Opponent icon — matches DialogueScene right portrait positioning
         const boxRight = boxX + boxWidth / 2;
         const portraitY = boxY - boxHeight / 2 - 256; // bottom of icon aligns with top of box
-        const iconFrame = `00_${charKey}_icon`;
-        const iconSprite = this.add.sprite(boxRight - 256, portraitY, charKey, iconFrame)
-            .setScale(2)
-            .setFlipX(true)
-            .setScrollFactor(0).setDepth(52);
+        
+        let iconSprite: Phaser.GameObjects.Sprite;
+        const customPortraitKey = `dialogue_portrait_${charKey}`;
+        if (this.textures.exists(customPortraitKey)) {
+            iconSprite = this.add.sprite(boxRight - 256, portraitY, customPortraitKey)
+                .setScrollFactor(0).setDepth(52);
+        } else {
+            const iconFrame = `00_${charKey}_icon`;
+            iconSprite = this.add.sprite(boxRight - 256, portraitY, charKey, iconFrame)
+                .setScale(2)
+                .setFlipX(true)
+                .setScrollFactor(0).setDepth(52);
+        }
 
         // Speaker name below the icon — matches DialogueScene exactly
         const nameText = this.add.text(boxRight - 256, portraitY + (iconSprite.displayHeight / 2) - 5, speakerName, {

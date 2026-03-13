@@ -276,4 +276,18 @@
 +- **[UI]** **Menu Cleanup**:
 +    - Hidden "MINI GIOCHI" from the Main Menu as requested.
 +- **[S]** **STATUS**: Movement bug resolved and audio variety enhanced.
-+
+
+### [2026-03-13] v2.2.12 - Dialogue UI Enhancements & Sound Sync 🗣️🔊
+- **[V]** `v2.2.12`
+- **[Feat]** **High-Res Dialogue Portraits**:
+    - Integrated new 512x512 custom portraits for Fok, Greg, Nock, Pe, Sga, and Sgu in `DialogueScene`.
+    - Implemented portrait flipping logic (Left faces right, Right faces left) for custom assets.
+    - Updated `CampaignMapScene` rematch prompt to utilize new high-res portraits.
+- **[Fix]** **Dialogue Typewriter & Sound Sync**:
+    - **Multiline Masking**: Fixed typewriter mask to reveal text line-by-line horizontally, resolving "ghosting" on second lines.
+    - **Performance**: Pre-calculated text wrapping (`getWrappedText()`) outside the typewriter loop to eliminate frame-rate spikes.
+    - **Rhythmic Audio**: Character "blips" now trigger every 2nd non-space character for a cleaner rhythmic feel at slower speeds.
+    - **Finish Sync**: Synchronized `text_finish` sound to trigger exactly when the final character appears.
+- **[UI]** **Typewriter Speed**:
+    - Slowed down text reveal speed from 15ms to 35ms for better readability.
+- **[S]** **STATUS**: Dialogue system is visually upgraded and audio-synchronized for a premium feel.

@@ -166,7 +166,12 @@ export class DialogueScene extends Phaser.Scene {
 
         // Left Portrait: only create if texture exists
         try {
-            if (this.textures.exists(this.leftCharacterKey)) {
+            const leftCustomKey = `dialogue_portrait_${this.leftCharacterKey}`;
+            if (this.textures.exists(leftCustomKey)) {
+                this.leftPortrait = this.add.sprite(boxLeft + 256, portraitY, leftCustomKey)
+                    .setFlipX(true)
+                    .setDepth(10);
+            } else if (this.textures.exists(this.leftCharacterKey)) {
                 this.leftPortrait = this.add.sprite(boxLeft + 256, portraitY, this.leftCharacterKey, this.getIconFrame(this.leftCharacterKey))
                     .setScale(2)
                     .setDepth(10);
@@ -177,7 +182,11 @@ export class DialogueScene extends Phaser.Scene {
 
         // Right Portrait: only create if texture exists
         try {
-            if (this.textures.exists(this.rightCharacterKey)) {
+            const rightCustomKey = `dialogue_portrait_${this.rightCharacterKey}`;
+            if (this.textures.exists(rightCustomKey)) {
+                this.rightPortrait = this.add.sprite(boxRight - 256, portraitY, rightCustomKey)
+                    .setDepth(10);
+            } else if (this.textures.exists(this.rightCharacterKey)) {
                 this.rightPortrait = this.add.sprite(boxRight - 256, portraitY, this.rightCharacterKey, this.getIconFrame(this.rightCharacterKey))
                     .setScale(2)
                     .setFlipX(true)
@@ -232,39 +241,58 @@ export class DialogueScene extends Phaser.Scene {
         const boxX = (this.scale.width - boxWidth) / 2;
         const boxY = this.scale.height - boxHeight - 50;
 
+        // PRE-CALCULATE wrapping once to avoid expensive calculations every frame
+        const wrappedLines = this.textElement.getWrappedText(line.text);
+        const numLines = Math.max(1, wrappedLines.length);
+        const lineHeight = this.textElement.height / numLines;
+
         let charIndex = 0;
         this.typewriterTimer = this.time.addEvent({
-            delay: 15, // Fast typewriter
+            delay: 35, // Slower typewriter (was 15)
             callback: () => {
                 charIndex++;
 
-                // Redraw mask to reveal more of the area
-                // We reveal the entire box width but grow the mask height or X
-                // For a simpler "appears letter by letter" without sliding:
-                // We keep the mask covering the full height but grow from left to right
-                this.textMask.clear();
-                this.textMask.fillStyle(0xffffff);
-
-                // Because it is right-aligned, the text block might be shorter than the box.
-                // We just reveal the whole box width proportionally to char count.
-                const revealPercent = charIndex / line.text.length;
-                this.textMask.fillRect(boxX, boxY, boxWidth * revealPercent, boxHeight);
+                // 1. SOUND TRIGGERS (At the very start for minimum latency)
+                const isLastChar = charIndex >= line.text.length;
                 
-                if (charIndex <= line.text.length) {
+                if (isLastChar) {
+                    // Play finish sound exactly when the last char starts appearing
+                    AudioManager.getInstance().playSFX('text_finish', { volume: 0.7 });
+                } else {
                     const char = line.text[charIndex - 1];
-                    if (char && char.trim() !== '') {
+                    // Play rhythmic blip every 2nd non-space character for better "typing" feel
+                    if (char && char.trim() !== '' && charIndex % 2 === 0) {
                         AudioManager.getInstance().playSFX('text_skip', { volume: 0.5, rate: 1.3 });
                     }
                 }
 
-                if (charIndex >= line.text.length) {
+                // 2. VISUAL RENDERING
+                this.textMask.clear();
+                this.textMask.fillStyle(0xffffff);
+
+                let charsSoFar = 0;
+                for (let i = 0; i < numLines; i++) {
+                    const lLen = wrappedLines[i].length;
+                    const lineStartChar = charsSoFar;
+                    
+                    if (charIndex > lineStartChar) {
+                        const charsInThisLine = Math.min(charIndex - lineStartChar, lLen);
+                        const revealPercent = lLen > 0 ? charsInThisLine / lLen : 1;
+                        
+                        const startY = (boxY + 40) + i * lineHeight;
+                        this.textMask.fillRect(boxX, startY, boxWidth * revealPercent, lineHeight);
+                    }
+                    
+                    charsSoFar += lLen + 1; // +1 for the space
+                }
+
+                // 3. COMPLETION LOGIC
+                if (isLastChar) {
                     this.isTyping = false;
                     this.textMask.clear();
                     this.textMask.fillRect(boxX, boxY, boxWidth, boxHeight); // Fully reveal
                     if (this.typewriterTimer) this.typewriterTimer.remove();
                     
-                    AudioManager.getInstance().playSFX('text_finish', { volume: 0.7 });
-
                     if (line.choices && line.choices.length > 0) {
                         this.showChoices(line.choices);
                     }
@@ -279,13 +307,17 @@ export class DialogueScene extends Phaser.Scene {
         if (this.leftPortrait) {
             this.leftPortrait.setTint(0xffffff);
             this.leftPortrait.stop();
-            this.leftPortrait.setFrame(this.getIconFrame(this.leftCharacterKey));
+            if (this.leftPortrait.texture.key !== `dialogue_portrait_${this.leftCharacterKey}`) {
+                this.leftPortrait.setFrame(this.getIconFrame(this.leftCharacterKey));
+            }
         }
 
         if (this.rightPortrait) {
             this.rightPortrait.setTint(0xffffff);
             this.rightPortrait.stop();
-            this.rightPortrait.setFrame(this.getIconFrame(this.rightCharacterKey));
+            if (this.rightPortrait.texture.key !== `dialogue_portrait_${this.rightCharacterKey}`) {
+                this.rightPortrait.setFrame(this.getIconFrame(this.rightCharacterKey));
+            }
         }
     }
 
