@@ -27,11 +27,11 @@ export const dialogueMidFight: DialogueLine[] = [
 
 // ── AFTER WIN (Opponent defeated) ───────────────────────────
 export const dialogueAfterWin: DialogueLine[] = [
-    { speaker: "Sgu", text: "...", side: "right" },
-    { speaker: "Sgu", text: "..Good fight.", side: "right" },
-    { speaker: "Sgu", text: "Victory... is yours.", side: "right" },
-    { speaker: "Sgu", text: "Keep... going.", side: "right" },
-    { speaker: "Sgu", text: "Farewell.", side: "right" },
+    { speaker: "Sgu", text: "...", side: "right", animation: "defeat" },
+    { speaker: "Sgu", text: "..Good fight.", side: "right", animation: "defeat" },
+    { speaker: "Sgu", text: "Victory... is yours.", side: "right", animation: "defeat" },
+    { speaker: "Sgu", text: "Keep... going.", side: "right", animation: "defeat" },
+    { speaker: "Sgu", text: "Farewell.", side: "right", animation: "defeat" },
 ];
 
 // ── TRAINING PROMPT (Revisiting defeated island) ────────────

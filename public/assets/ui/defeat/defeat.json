@@ -1,0 +1,271 @@
+{
+	"textures": [
+		{
+			"image": "defeat",
+			"format": "RGBA8888",
+			"size": {
+				"w": 190,
+				"h": 1315
+			},
+			"scale": 1,
+			"frames": [
+				{
+					"filename": "fok_defeat_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 80,
+						"y": 61,
+						"w": 90,
+						"h": 163
+					},
+					"frame": {
+						"x": 3,
+						"y": 3,
+						"w": 90,
+						"h": 163
+					}
+				},
+				{
+					"filename": "fok_defeat_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 80,
+						"y": 61,
+						"w": 90,
+						"h": 162
+					},
+					"frame": {
+						"x": 3,
+						"y": 172,
+						"w": 90,
+						"h": 162
+					}
+				},
+				{
+					"filename": "pe_defeat_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 74,
+						"y": 66,
+						"w": 90,
+						"h": 158
+					},
+					"frame": {
+						"x": 3,
+						"y": 340,
+						"w": 90,
+						"h": 158
+					}
+				},
+				{
+					"filename": "sga_defeat_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 77,
+						"y": 65,
+						"w": 89,
+						"h": 158
+					},
+					"frame": {
+						"x": 3,
+						"y": 504,
+						"w": 89,
+						"h": 158
+					}
+				},
+				{
+					"filename": "nock_defeat_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 78,
+						"y": 68,
+						"w": 89,
+						"h": 157
+					},
+					"frame": {
+						"x": 3,
+						"y": 668,
+						"w": 89,
+						"h": 157
+					}
+				},
+				{
+					"filename": "nock_defeat_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 78,
+						"y": 68,
+						"w": 89,
+						"h": 157
+					},
+					"frame": {
+						"x": 3,
+						"y": 831,
+						"w": 89,
+						"h": 157
+					}
+				},
+				{
+					"filename": "sga_defeat_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 77,
+						"y": 66,
+						"w": 89,
+						"h": 157
+					},
+					"frame": {
+						"x": 3,
+						"y": 994,
+						"w": 89,
+						"h": 157
+					}
+				},
+				{
+					"filename": "pe_defeat_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 74,
+						"y": 69,
+						"w": 90,
+						"h": 155
+					},
+					"frame": {
+						"x": 3,
+						"y": 1157,
+						"w": 90,
+						"h": 155
+					}
+				},
+				{
+					"filename": "greg_defeat_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 78,
+						"y": 67,
+						"w": 88,
+						"h": 154
+					},
+					"frame": {
+						"x": 98,
+						"y": 504,
+						"w": 88,
+						"h": 154
+					}
+				},
+				{
+					"filename": "greg_defeat_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 78,
+						"y": 68,
+						"w": 88,
+						"h": 153
+					},
+					"frame": {
+						"x": 98,
+						"y": 664,
+						"w": 88,
+						"h": 153
+					}
+				},
+				{
+					"filename": "sgu_defeat_000",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 83,
+						"y": 74,
+						"w": 89,
+						"h": 149
+					},
+					"frame": {
+						"x": 98,
+						"y": 823,
+						"w": 89,
+						"h": 149
+					}
+				},
+				{
+					"filename": "sgu_defeat_001",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 83,
+						"y": 74,
+						"w": 89,
+						"h": 149
+					},
+					"frame": {
+						"x": 98,
+						"y": 978,
+						"w": 89,
+						"h": 149
+					}
+				}
+			]
+		}
+	],
+	"meta": {
+		"app": "http://free-tex-packer.com",
+		"version": "0.6.7"
+	}
+}

@@ -8,9 +8,7 @@ export interface DialogueLine {
     animation?: string; // Optional: sprite/animation to show (e.g. "idle", "taunt", "hurt")
     choices?: { text: string; action: () => void }[]; // Optional YES/NO choices
 }
-
 export class DialogueScene extends Phaser.Scene {
-    private dialogueBox!: Phaser.GameObjects.Graphics;
     private textElement!: Phaser.GameObjects.Text;
     private nameElement!: Phaser.GameObjects.Text;
     private lines: DialogueLine[] = [];
@@ -58,7 +56,7 @@ export class DialogueScene extends Phaser.Scene {
         this.selectedChoiceIndex = 0;
         this.choicesContainer = undefined;
         this.sceneActive = true;
-        
+
         if (data.blackBackground) {
             this.blackBackground = true;
         } else {
@@ -73,41 +71,32 @@ export class DialogueScene extends Phaser.Scene {
         const bgOpacity = this.blackBackground ? 1.0 : 0.4;
         this.add.rectangle(0, 0, width, height, 0x000000, bgOpacity).setOrigin(0);
 
-        // Dialogue Box Dimensions
-        const boxWidth = width * 0.8;
-        const boxHeight = 240; // Increased height
-        const boxX = (width - boxWidth) / 2;
-        const boxY = height - boxHeight - 50; // 50px from bottom
-
         // Dialogue Box (Bottom)
-        this.dialogueBox = this.add.graphics();
-        this.dialogueBox.fillStyle(0x1a1a1a, 0.75); // Lowered by ~20% (was 0.95)
-        this.dialogueBox.fillRoundedRect(boxX, boxY, boxWidth, boxHeight, 16);
-        this.dialogueBox.lineStyle(4, 0x444444);
-        this.dialogueBox.strokeRoundedRect(boxX, boxY, boxWidth, boxHeight, 16);
-        this.dialogueBox.setDepth(15);
+        this.add.image(width / 2, height / 2, 'dialogue_box')
+            .setOrigin(0.5, 0.5)
+            .setDepth(15);
 
-        // Anchor coordinates inside the box
-        const textRightAnchor = boxX + boxWidth - 40;
+        // The image is 1920x1080 full screen, so we position relative to width/height
+        const textRightAnchor = 1530; // Move text left so the right edge aligns with "P" in "PE"
+        const textY = height - 225; // Move text up slightly
 
         // Speaker Name text (Positioned dynamically per speaker)
-        this.nameElement = this.add.text(0, 0, '', {
+        this.nameElement = this.add.text(1600, 850, '', {
             fontFamily: '"Pixeloid Sans"',
-            fontSize: '32px', // Larger for floating visibility
+            fontSize: '36px', // Matches mockup relative size
             fontStyle: 'bold',
             color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 8, // Thicker stroke for floating text
-            align: 'center'
-        }).setOrigin(0.5, 1).setDepth(20);
+            align: 'right'
+        }).setOrigin(1, 1).setDepth(20);
 
         // Text Element (Right aligned)
-        this.textElement = this.add.text(textRightAnchor, boxY + 40, '', {
+        this.textElement = this.add.text(textRightAnchor, textY, '', {
             fontFamily: '"Pixeloid Sans"',
-            fontSize: '48px',
+            fontSize: '32px', // Smaller than before, matches mockup
             color: '#ffffff',
-            wordWrap: { width: boxWidth - 80 },
-            align: 'right'
+            wordWrap: { width: 1050 }, // Increase width to allow longer lines (extend further left)
+            align: 'right',
+            lineSpacing: 10
         }).setOrigin(1, 0).setDepth(20);
 
         // Create an invisible mask for the typewriter reveal
@@ -138,7 +127,7 @@ export class DialogueScene extends Phaser.Scene {
         }
 
         // Add Portraits
-        this.createPortraits(width, height);
+        this.createPortraits();
 
         // Auto-start dialogue if lines were passed via init
         if (this.lines.length > 0) {
@@ -154,25 +143,18 @@ export class DialogueScene extends Phaser.Scene {
         return `${characterKey}_Idle_000.png`;
     }
 
-    private createPortraits(width: number, height: number) {
-        // Dialogue box top edge = height - 240 (box height) - 50 (margin) = height - 290
-        // Icons at scale 2 = 256*2 = 512px display. Half = 256px.
-        // Portrait Y so bottom aligns with dialogue top: (height - 290) - 256
-        const portraitY = height - 290 - 256;
-
-        // Box edges at 80% width: 0.1 * width and 0.9 * width
-        const boxLeft = width * 0.1;
-        const boxRight = width * 0.9;
-
-        // Left Portrait: only create if texture exists
+    private createPortraits() {
+        // Left Portrait: bottom left corner at X=208, Y=759
         try {
             const leftCustomKey = `dialogue_portrait_${this.leftCharacterKey}`;
             if (this.textures.exists(leftCustomKey)) {
-                this.leftPortrait = this.add.sprite(boxLeft + 256, portraitY, leftCustomKey)
+                this.leftPortrait = this.add.sprite(208, 759, leftCustomKey)
+                    .setOrigin(0, 1)
                     .setFlipX(true)
                     .setDepth(10);
             } else if (this.textures.exists(this.leftCharacterKey)) {
-                this.leftPortrait = this.add.sprite(boxLeft + 256, portraitY, this.leftCharacterKey, this.getIconFrame(this.leftCharacterKey))
+                this.leftPortrait = this.add.sprite(208, 759, this.leftCharacterKey, this.getIconFrame(this.leftCharacterKey))
+                    .setOrigin(0, 1)
                     .setScale(2)
                     .setDepth(10);
             }
@@ -180,14 +162,16 @@ export class DialogueScene extends Phaser.Scene {
             console.warn('DialogueScene: Could not create left portrait', e);
         }
 
-        // Right Portrait: only create if texture exists
+        // Right Portrait: bottom right corner at X=1710, Y=759
         try {
             const rightCustomKey = `dialogue_portrait_${this.rightCharacterKey}`;
             if (this.textures.exists(rightCustomKey)) {
-                this.rightPortrait = this.add.sprite(boxRight - 256, portraitY, rightCustomKey)
+                this.rightPortrait = this.add.sprite(1710, 759, rightCustomKey)
+                    .setOrigin(1, 1)
                     .setDepth(10);
             } else if (this.textures.exists(this.rightCharacterKey)) {
-                this.rightPortrait = this.add.sprite(boxRight - 256, portraitY, this.rightCharacterKey, this.getIconFrame(this.rightCharacterKey))
+                this.rightPortrait = this.add.sprite(1710, 759, this.rightCharacterKey, this.getIconFrame(this.rightCharacterKey))
+                    .setOrigin(1, 1)
                     .setScale(2)
                     .setFlipX(true)
                     .setDepth(10);
@@ -214,17 +198,11 @@ export class DialogueScene extends Phaser.Scene {
         }
 
         const line = this.lines[this.currentLineIndex];
-        this.nameElement.setText(line.speaker);
+        this.nameElement.setText(line.speaker.toUpperCase());
 
-        // Position name above the active portrait
-        const activePortrait = line.side === 'left' ? this.leftPortrait : this.rightPortrait;
-        if (activePortrait) {
-            // Align to bottom center of the sprite
-            // Since origin is (0.5, 1), the text bottom will sit exactly on this point
-            // We use the bottom of the portrait (portraitY + displayHeight/2)
-            // And maybe a tiny 5px lift to not touch the box edge
-            this.nameElement.setPosition(activePortrait.x, activePortrait.y + (activePortrait.displayHeight / 2) - 5);
-        }
+        // Name is statically right-aligned inside the dialogue bubble now.
+        // We only change the color or highlight based on active speaker if desired,
+        // but for now, we just ensure the text is updated.
 
         // --- Typewriter Effect via Masking ---
         if (this.typewriterTimer) this.typewriterTimer.remove();
@@ -236,10 +214,10 @@ export class DialogueScene extends Phaser.Scene {
         this.textMask.clear();
         this.isTyping = true;
 
-        const boxWidth = this.scale.width * 0.8;
-        const boxHeight = 240;
-        const boxX = (this.scale.width - boxWidth) / 2;
-        const boxY = this.scale.height - boxHeight - 50;
+        const boxWidth = this.scale.width;
+        const boxHeight = this.scale.height;
+        const boxX = 0;
+        const boxY = 0;
 
         // PRE-CALCULATE wrapping once to avoid expensive calculations every frame
         const wrappedLines = this.textElement.getWrappedText(line.text);
@@ -254,7 +232,7 @@ export class DialogueScene extends Phaser.Scene {
 
                 // 1. SOUND TRIGGERS (At the very start for minimum latency)
                 const isLastChar = charIndex >= line.text.length;
-                
+
                 if (isLastChar) {
                     // Play finish sound exactly when the last char starts appearing
                     AudioManager.getInstance().playSFX('text_finish', { volume: 0.7 });
@@ -274,15 +252,21 @@ export class DialogueScene extends Phaser.Scene {
                 for (let i = 0; i < numLines; i++) {
                     const lLen = wrappedLines[i].length;
                     const lineStartChar = charsSoFar;
-                    
+
                     if (charIndex > lineStartChar) {
                         const charsInThisLine = Math.min(charIndex - lineStartChar, lLen);
                         const revealPercent = lLen > 0 ? charsInThisLine / lLen : 1;
-                        
-                        const startY = (boxY + 40) + i * lineHeight;
-                        this.textMask.fillRect(boxX, startY, boxWidth * revealPercent, lineHeight);
+
+                        // X start is dynamic because text is right-aligned
+                        // Mask needs to grow from left to right covering the line
+                        const startY = this.textElement.y + i * lineHeight;
+
+                        // We use a simpler strategy for right-aligned text mask: 
+                        // Just reveal the entire text block width starting from X=0
+                        // Since text is right aligned, we just open the mask left-to-right relative to the screen
+                        this.textMask.fillRect(0, startY, this.scale.width * revealPercent, lineHeight);
                     }
-                    
+
                     charsSoFar += lLen + 1; // +1 for the space
                 }
 
@@ -292,7 +276,7 @@ export class DialogueScene extends Phaser.Scene {
                     this.textMask.clear();
                     this.textMask.fillRect(boxX, boxY, boxWidth, boxHeight); // Fully reveal
                     if (this.typewriterTimer) this.typewriterTimer.remove();
-                    
+
                     if (line.choices && line.choices.length > 0) {
                         this.showChoices(line.choices);
                     }
@@ -346,7 +330,7 @@ export class DialogueScene extends Phaser.Scene {
             this.textMask.clear();
             this.textMask.fillStyle(0xffffff);
             this.textMask.fillRect(boxX, boxY, boxWidth, 240);
-            
+
             AudioManager.getInstance().playSFX('text_finish', { volume: 0.7 });
 
             const line = this.lines[this.currentLineIndex];
@@ -411,10 +395,10 @@ export class DialogueScene extends Phaser.Scene {
     private navigateChoice(dir: number) {
         if (!this.sceneActive || !this.isShowingChoices || this.choiceButtons.length === 0) return;
         this.selectedChoiceIndex += dir;
-        
+
         if (this.selectedChoiceIndex < 0) this.selectedChoiceIndex = this.choiceButtons.length - 1;
         if (this.selectedChoiceIndex >= this.choiceButtons.length) this.selectedChoiceIndex = 0;
-        
+
         this.updateChoiceSelection();
     }
 
@@ -434,7 +418,7 @@ export class DialogueScene extends Phaser.Scene {
 
     private confirmChoice() {
         if (!this.sceneActive || !this.isShowingChoices) return;
-        
+
         const line = this.lines[this.currentLineIndex];
         if (line.choices && line.choices[this.selectedChoiceIndex]) {
             // Mark scene as inactive BEFORE executing action to prevent any further callbacks
@@ -481,7 +465,7 @@ export class DialogueScene extends Phaser.Scene {
                 // Simple stick deadzone check
                 const xAxis = pad.axes[0] ? pad.axes[0].getValue() : 0;
                 const moved = this.stickMovedX.get(pad.index) || false;
-                
+
                 // Track stick release to allow single steps
                 if (!moved) {
                     if (xAxis < -0.5) {

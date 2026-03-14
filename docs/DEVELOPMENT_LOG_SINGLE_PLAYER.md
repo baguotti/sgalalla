@@ -291,3 +291,15 @@
 - **[UI]** **Typewriter Speed**:
     - Slowed down text reveal speed from 15ms to 35ms for better readability.
 - **[S]** **STATUS**: Dialogue system is visually upgraded and audio-synchronized for a premium feel.
+
+### [2026-03-14] v2.2.13 - Dialogue UI Redesign & Global Defeat Mapping 🎬💀
+- **[V]** `v2.2.13`
+- **[Feat]** **Dialogue UI Overhaul**:
+    - Replaced procedurally drawn dialogue box with a custom `1920x1080` transparent image asset.
+    - Redesigned layout to match mockup: Right-aligned dialogue text and speaker names inside the speech bubble.
+    - Implemented pixel-perfect portrait positioning (Bottom-Left: 208, 759; Bottom-Right: 1710, 759).
+    - Fixed multiline text wrapping logic to prevent overlap on the left side of the screen.
+- **[Feat]** **Input & Animations**:
+    - Added global 'defeat' animation mapping to the `O` key (Keyboard only).
+    - Integrated second iteration of 512x512 dialogue portraits for all characters.
+- **[S]** **STATUS**: Dialogue UI is now fully aligned with high-fidelity mockups.

@@ -1,7 +1,7 @@
 {
   "name": "sgalalla",
   "private": true,
-  "version": "2.2.12",
+  "version": "2.2.13",
   "type": "module",
   "main": "electron-dist/main.cjs",
   "scripts": {

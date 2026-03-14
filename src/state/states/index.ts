@@ -13,5 +13,6 @@ export { RecoveryState } from './RecoveryState';
 export { GroundPoundState } from './GroundPoundState';
 export { TauntState } from './TauntState';
 export { WinState } from './WinState';
+export { DefeatState } from './DefeatState';
 export { RespawningState } from './RespawningState';
 export { CinematicState } from './CinematicState';

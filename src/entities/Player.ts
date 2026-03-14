@@ -17,7 +17,7 @@ import {
     AttackState, ChargingState, HitStunState,
     DodgeState, AirDodgeState,
     RecoveryState, GroundPoundState,
-    TauntState, WinState, RespawningState,
+    TauntState, WinState, DefeatState, RespawningState,
     CinematicState
 } from '../state/states';
 import type { Throwable } from './Throwable';
@@ -102,6 +102,7 @@ export class Player extends Fighter {
     public isDead: boolean = false;
     public isWinner: boolean = false;
     public isTaunting: boolean = false;
+    public isShowingDefeat: boolean = false;
     public isRespawning: boolean = false; // Prevents double-deaths and damage immediately after spawning
     private ai: PlayerAI | null = null;
     private aiInput: any = {}; // Store AI generated input
@@ -322,6 +323,7 @@ export class Player extends Fighter {
         this.fsm.register(new GroundPoundState());
         this.fsm.register(new TauntState());
         this.fsm.register(new WinState());
+        this.fsm.register(new DefeatState());
         this.fsm.register(new RespawningState());
         this.fsm.register(new CinematicState());
 
@@ -390,7 +392,7 @@ export class Player extends Fighter {
             // Handle input for combat (attacks, charge, throw)
             // Only if the current state allows it (not taunting, hitstun, etc.)
             const currentStateName = this.fsm.getCurrentStateName();
-            const combatBlockedStates = ['HitStun', 'Taunt', 'Win', 'Respawning', 'Cinematic'];
+            const combatBlockedStates = ['HitStun', 'Taunt', 'Win', 'Defeat', 'Respawning', 'Cinematic'];
             if (!combatBlockedStates.includes(currentStateName)) {
                 this.combat.handleInput(this.currentInput);
             }
@@ -708,7 +710,8 @@ export class Player extends Fighter {
             case 'Idle':
             case 'Run':
             case 'Taunt':
-            case 'Win': return PlayerState.GROUNDED;
+            case 'Win':
+            case 'Defeat': return PlayerState.GROUNDED;
             case 'Fall':
             case 'WallSlide':
                 if (this.physics.isFastFalling) return PlayerState.FAST_FALLING;
@@ -757,6 +760,7 @@ export class Player extends Fighter {
         this.isDodging = false;
         this.isHitStunned = false;
         this.isTaunting = false;
+        this.isShowingDefeat = false;
         this.isWinner = false;
         // Do not clear isRespawning here, as GameScene manages its duration
         

@@ -27,11 +27,11 @@ export const dialogueMidFight: DialogueLine[] = [
 
 // ── AFTER WIN (Opponent defeated) ───────────────────────────
 export const dialogueAfterWin: DialogueLine[] = [
-    { speaker: "Sga", text: "My blade... bested. You have earned my respect.", side: "right" },
-    { speaker: "Sga", text: "I have much to reflect on after this encounter.", side: "right" },
-    { speaker: "Sga", text: "Carry my strength with you to the final challenge.", side: "right" },
-    { speaker: "Sga", text: "The champion waits... do not falter now.", side: "right" },
-    { speaker: "Sga", text: "Honor in victory, warrior.", side: "right" },
+    { speaker: "Sga", text: "My blade... bested. You have earned my respect.", side: "right", animation: "defeat" },
+    { speaker: "Sga", text: "I have much to reflect on after this encounter.", side: "right", animation: "defeat" },
+    { speaker: "Sga", text: "Carry my strength with you to the final challenge.", side: "right", animation: "defeat" },
+    { speaker: "Sga", text: "The champion waits... do not falter now.", side: "right", animation: "defeat" },
+    { speaker: "Sga", text: "Honor in victory, warrior.", side: "right", animation: "defeat" },
 ];
 
 // ── TRAINING PROMPT (Revisiting defeated island) ────────────

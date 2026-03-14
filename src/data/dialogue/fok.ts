@@ -27,11 +27,11 @@ export const dialogueMidFight: DialogueLine[] = [
 
 // ── AFTER WIN (Opponent defeated) ───────────────────────────
 export const dialogueAfterWin: DialogueLine[] = [
-    { speaker: "Fok", text: "You... actually did it. The champion falls.", side: "right" },
-    { speaker: "Fok", text: "The weight... it's finally off my shoulders.", side: "right", animation: "taunt" },
-    { speaker: "Fok", text: "Take the crown. It's yours by right of combat.", side: "right" },
-    { speaker: "Fok", text: "Be a better ruler than I was.", side: "right" },
-    { speaker: "Fok", text: "It is over. I am the champion no more.", side: "right" },
+    { speaker: "Fok", text: "You... actually did it. The champion falls.", side: "right", animation: "defeat" },
+    { speaker: "Fok", text: "The weight... it's finally off my shoulders.", side: "right", animation: "defeat" },
+    { speaker: "Fok", text: "Take the crown. It's yours by right of combat.", side: "right", animation: "defeat" },
+    { speaker: "Fok", text: "Be a better ruler than I was.", side: "right", animation: "defeat" },
+    { speaker: "Fok", text: "It is over. I am the champion no more.", side: "right", animation: "defeat" },
 ];
 
 // ── TRAINING PROMPT (Revisiting defeated island) ────────────

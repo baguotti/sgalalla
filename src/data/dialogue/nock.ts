@@ -27,11 +27,11 @@ export const dialogueMidFight: DialogueLine[] = [
 
 // ── AFTER WIN (Opponent defeated) ───────────────────────────
 export const dialogueAfterWin: DialogueLine[] = [
-    { speaker: "Nock", text: "Impossible... I lost...", side: "right" },
-    { speaker: "Nock", text: "How could someone like you break my defense?", side: "right" },
-    { speaker: "Nock", text: "Go on then... the others won't be as lenient as I was.", side: "right" },
-    { speaker: "Nock", text: "Take my respect, for what it's worth.", side: "right" },
-    { speaker: "Nock", text: "The real challenge lies ahead.", side: "right" },
+    { speaker: "Nock", text: "Impossible... I lost...", side: "right", animation: "defeat" },
+    { speaker: "Nock", text: "How could someone like you break my defense?", side: "right", animation: "defeat" },
+    { speaker: "Nock", text: "Go on then... the others won't be as lenient as I was.", side: "right", animation: "defeat" },
+    { speaker: "Nock", text: "Take my respect, for what it's worth.", side: "right", animation: "defeat" },
+    { speaker: "Nock", text: "The real challenge lies ahead.", side: "right", animation: "defeat" },
 ];
 
 // ── TRAINING PROMPT (Revisiting defeated island) ────────────

@@ -36,6 +36,12 @@ export class IdleState implements IState {
             return;
         }
 
+        // Defeat
+        if (input.defeat) {
+            player.fsm.changeState('Defeat', player);
+            return;
+        }
+
         // Dodge (buffered)
         if (player.inputBuffer.has('dodge') && player.physics.dodgeCooldownTimer <= 0) {
             player.fsm.changeState('Dodge', player);

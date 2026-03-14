@@ -8,7 +8,7 @@
  */
 
 /** The keyboard actions that can be rebound. */
-export type KeyboardAction = 'moveUp' | 'moveDown' | 'moveLeft' | 'moveRight' | 'jump' | 'lightAttack' | 'heavyAttack' | 'dodge' | 'taunt' | 'recovery';
+export type KeyboardAction = 'moveUp' | 'moveDown' | 'moveLeft' | 'moveRight' | 'jump' | 'lightAttack' | 'heavyAttack' | 'dodge' | 'taunt' | 'recovery' | 'defeat';
 
 /** Human-readable labels for the settings UI. */
 export const KB_ACTION_LABELS: Record<KeyboardAction, string> = {
@@ -22,6 +22,7 @@ export const KB_ACTION_LABELS: Record<KeyboardAction, string> = {
     dodge: 'SCHIVATA',
     taunt: 'PROVOCA',
     recovery: 'RECOVERY',
+    defeat: 'SCONFITTA',
 };
 
 export interface KeyboardMappingData {
@@ -35,6 +36,7 @@ export interface KeyboardMappingData {
     dodge: string;
     taunt: string;
     recovery: string;
+    defeat: string;
 }
 
 const DEFAULT_MAPPING: KeyboardMappingData = {
@@ -48,6 +50,7 @@ const DEFAULT_MAPPING: KeyboardMappingData = {
     dodge: 'KeyL',
     taunt: 'KeyP',
     recovery: 'ShiftLeft',
+    defeat: 'KeyO',
 };
 
 /** Convert a KeyboardEvent.code to a short display name. */

@@ -27,11 +27,11 @@ export const dialogueMidFight: DialogueLine[] = [
 
 // ── AFTER WIN (Opponent defeated) ───────────────────────────
 export const dialogueAfterWin: DialogueLine[] = [
-    { speaker: "Greg", text: "The dialectic... it has spoken.", side: "right" },
-    { speaker: "Greg", text: "Perhaps I was the bourgeoisie all along.", side: "right" },
-    { speaker: "Greg", text: "You've earned this victory. Seize it.", side: "right" },
-    { speaker: "Greg", text: "The manifesto didn't prepare me for this.", side: "right" },
-    { speaker: "Greg", text: "Go forth, comrade. You have proven your worth.", side: "right" },
+    { speaker: "Greg", text: "The dialectic... it has spoken.", side: "right", animation: "defeat" },
+    { speaker: "Greg", text: "Perhaps I was the bourgeoisie all along.", side: "right", animation: "defeat" },
+    { speaker: "Greg", text: "You've earned this victory. Seize it.", side: "right", animation: "defeat" },
+    { speaker: "Greg", text: "The manifesto didn't prepare me for this.", side: "right", animation: "defeat" },
+    { speaker: "Greg", text: "Go forth, comrade. You have proven your worth.", side: "right", animation: "defeat" },
 ];
 
 // ── TRAINING PROMPT (Revisiting defeated island) ────────────

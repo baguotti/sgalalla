@@ -28,6 +28,7 @@ export interface InputState {
     dodgeHeld: boolean; // For running (dodge key held)
     recovery: boolean;
     taunt: boolean; // Taunt / Win Animation
+    defeat: boolean; // Manual defeat animation
 
     // Directional input for attacks
     aimUp: boolean;
@@ -217,6 +218,7 @@ export class InputManager {
 
             baseState.recovery = baseState.recovery || (touchState.recovery as boolean);
             baseState.taunt = baseState.taunt || (touchState.taunt as boolean);
+            baseState.defeat = baseState.defeat || (touchState.defeat as boolean);
 
             baseState.aimUp = baseState.aimUp || (touchState.aimUp as boolean);
             baseState.aimDown = baseState.aimDown || (touchState.aimDown as boolean);
@@ -245,6 +247,7 @@ export class InputManager {
             dodgeHeld: false,
             recovery: false,
             taunt: false,
+            defeat: false,
             aimUp: false,
             aimDown: false,
             aimLeft: false,
@@ -264,7 +267,8 @@ export class InputManager {
             state.heavyAttackHeld ||
             state.dodge ||
             state.dodgeHeld ||
-            state.taunt
+            state.taunt ||
+            state.defeat
         );
     }
 
@@ -286,6 +290,7 @@ export class InputManager {
         const dodgeCode = km.getKeyForAction('dodge');
         const tauntCode = km.getKeyForAction('taunt');
         const recoveryCode = km.getKeyForAction('recovery');
+        const defeatCode = km.getKeyForAction('defeat');
 
         const jumpDown = this.isKeyDown(jumpCode);
         const lightDown = this.isKeyDown(lightCode);
@@ -293,6 +298,7 @@ export class InputManager {
         const dodgeDown = this.isKeyDown(dodgeCode);
         const tauntDown = this.isKeyDown(tauntCode);
         const recoveryDown = this.isKeyDown(recoveryCode);
+        const defeatDown = this.isKeyDown(defeatCode);
 
         // Single press detection
         const jumpPressed = this.isJustPressed(jumpCode);
@@ -300,6 +306,7 @@ export class InputManager {
         const heavyPressed = this.isJustPressed(heavyCode);
         const dodgePressed = this.isJustPressed(dodgeCode);
         const tauntPressed = this.isJustPressed(tauntCode);
+        const defeatPressed = this.isJustPressed(defeatCode);
 
         // Update previous states for all action keys
         this.prevStates.set(jumpCode, jumpDown);
@@ -307,6 +314,7 @@ export class InputManager {
         this.prevStates.set(heavyCode, heavyDown);
         this.prevStates.set(dodgeCode, dodgeDown);
         this.prevStates.set(tauntCode, tauntDown);
+        this.prevStates.set(defeatCode, defeatDown);
 
         return {
             moveLeft: left,
@@ -325,6 +333,7 @@ export class InputManager {
             dodgeHeld: dodgeDown,
             recovery: recoveryDown,
             taunt: tauntPressed,
+            defeat: defeatPressed,
             aimUp: up,
             aimDown: down,
             aimLeft: left,
@@ -350,6 +359,7 @@ export class InputManager {
             dodge: state.dodge,
             dodgeHeld: state.dodgeHeld,
             taunt: state.taunt,
+            defeat: state.defeat,
             recovery: state.heavyAttack && state.aimUp,
             aimUp: state.aimUp,
             aimDown: state.aimDown,

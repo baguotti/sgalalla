@@ -24,6 +24,8 @@ export class PreloadScene extends Phaser.Scene {
         this.load.image('dialogue_portrait_pe', 'assets/ui/portraits/pe.png');
         this.load.image('dialogue_portrait_sga', 'assets/ui/portraits/sga.png');
         this.load.image('dialogue_portrait_sgu', 'assets/ui/portraits/sgu.png');
+
+        this.load.image('dialogue_box', 'assets/ui/dialogue/dialogue_box.png');
         
         // Load Global Music
         this.load.audio('global_music_loop', 'assets/audio/music/manici_intro_002_loop.mp3');

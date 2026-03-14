@@ -41,6 +41,9 @@ export class AnimationHelpers {
 
         // Taunt Atlas (all characters)
         scene.load.atlas('taunts', 'assets/taunts/taunts.png', 'assets/taunts/taunts.json');
+
+        // Defeat Atlas (all characters)
+        scene.load.atlas('defeat', 'assets/ui/defeat/defeat.png', 'assets/ui/defeat/defeat.json');
     }
 
     /**
@@ -283,6 +286,29 @@ export class AnimationHelpers {
                     key: animKey,
                     frames: frames,
                     frameRate: def.frameRate || 4,
+                    repeat: -1
+                });
+            }
+        }
+
+        // ─── Defeat Animations (from defeat atlas) ───
+        const defeatDefs: { char: string }[] = [
+            { char: 'fok' }, { char: 'sgu' }, { char: 'sga' }, { char: 'pe' }, { char: 'nock' }, { char: 'greg' }
+        ];
+
+        for (const def of defeatDefs) {
+            const animKey = `${def.char}_defeat`;
+            if (!scene.anims.exists(animKey)) {
+                const frames = scene.anims.generateFrameNames('defeat', {
+                    prefix: `${def.char}_defeat_`,
+                    start: 0,
+                    end: 1,
+                    zeroPad: 3
+                });
+                scene.anims.create({
+                    key: animKey,
+                    frames: frames,
+                    frameRate: 2, // Slow loop, hold each frame a touch
                     repeat: -1
                 });
             }
