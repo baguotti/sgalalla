@@ -34,8 +34,9 @@ export class PlayerHudSlot {
     private scene: Phaser.Scene;
     private colorHex: string; // Store for hearts
 
-    // Shake State
+    // Shake & Render State
     private lastDamage: number = 0;
+    private lastDisplayedDamage: number = -1;
     private lastStocks: number = -1; // Force initial render
     private portraitBaseX: number = 0;
     private portraitBaseY: number = 0;
@@ -231,25 +232,31 @@ export class PlayerHudSlot {
 
     update(damage: number, stocks: number): void {
         const d = Math.floor(damage);
-        this.bigDamageText.setText(`${d}`);
 
-        // Update Position of % symbol to follow number
-        const width = this.bigDamageText.width;
-        this.percentText.x = this.bigDamageText.x + width + 2;
+        // Only update text & colors when displayed integer damage changes
+        if (d !== this.lastDisplayedDamage) {
+            this.bigDamageText.setText(`${d}`);
+
+            // Update Position of % symbol to follow number
+            const width = this.bigDamageText.width;
+            this.percentText.x = this.bigDamageText.x + width + 2;
+
+            // Color Grading for Damage
+            if (damage < 50) {
+                this.bigDamageText.setColor('#ffffff');
+            } else if (damage < 100) {
+                this.bigDamageText.setColor('#ffdd44'); // Yellowish
+            } else {
+                this.bigDamageText.setColor('#ff4444'); // Red
+            }
+
+            this.lastDisplayedDamage = d;
+        }
 
         // Stocks Update (Only redraw if changed)
         if (stocks !== this.lastStocks) {
             this.updateHearts(stocks);
             this.lastStocks = stocks;
-        }
-
-        // Color Grading for Damage
-        if (damage < 50) {
-            this.bigDamageText.setColor('#ffffff');
-        } else if (damage < 100) {
-            this.bigDamageText.setColor('#ffdd44'); // Yellowish
-        } else {
-            this.bigDamageText.setColor('#ff4444'); // Red
         }
 
         // Shake detection

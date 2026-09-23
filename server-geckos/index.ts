@@ -14,6 +14,7 @@ import { ADRIA_STAGE } from '../shared/StageData.js';
 // Network message types (mirrored from client)
 const NetMessageType = {
     INPUT: 'input',
+    BINARY_INPUT: 'bi',
     STATE_UPDATE: 'state_update',
     POSITION_UPDATE: 'position_update',
     ATTACK_START: 'attack_start',
@@ -226,6 +227,7 @@ io.onConnection((channel: ServerChannel) => {
         });
     }
     const room = rooms.get(roomId)!;
+    channel.join(roomId);
 
     // Enforce 4-player limit
     if (room.players.size >= 4) {
@@ -361,6 +363,15 @@ io.onConnection((channel: ServerChannel) => {
             }));
             emitToRoom(NetMessageType.GAME_START, { players: startPayload });
         }
+    });
+
+    // ─── BINARY ROLLBACK INPUT RELAY (Direct peer forwarding) ───
+    channel.onRaw((rawMessage) => {
+        channel.raw.broadcast.emit(rawMessage);
+    });
+
+    channel.on(NetMessageType.BINARY_INPUT, (data: any) => {
+        channel.broadcast.emit(NetMessageType.BINARY_INPUT, data);
     });
 
     // ─── INPUT HANDLER (Most-Recent-Input + Edge-Trigger Scanning) ───

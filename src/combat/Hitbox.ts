@@ -10,6 +10,7 @@ export class Hitbox {
     active: boolean;
     debugGraphics?: Phaser.GameObjects.Rectangle;
     private debugVisible: boolean = false;
+    private readonly _boundsRect: Phaser.Geom.Rectangle = new Phaser.Geom.Rectangle(0, 0, 0, 0);
 
     constructor(
         scene: Phaser.Scene,
@@ -83,22 +84,17 @@ export class Hitbox {
 
         if (this.debugGraphics) {
             this.debugGraphics.setSize(width, height);
-            // Updating size of rectangle geometry might not center it correctly if origin isn't handled
-            // But rectangle primitive usually draws from x,y minus origin.
-            // setSize updates the display size.
-            // Let's ensure visuals align.
-            // Actually, simply destroying and recreating debug graphics might be safer if size changes often?
-            // Or setSize is fine.
         }
     }
 
     getBounds(): Phaser.Geom.Rectangle {
-        return new Phaser.Geom.Rectangle(
+        this._boundsRect.setTo(
             this.x - this.width / 2,
             this.y - this.height / 2,
             this.width,
             this.height
         );
+        return this._boundsRect;
     }
 
     checkCollision(targetBounds: Phaser.Geom.Rectangle): boolean {

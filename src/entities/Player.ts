@@ -365,6 +365,8 @@ export class Player extends Fighter {
                 this.updateAI(delta);
                 this.currentInput = this.aiInput;
             }
+        } else if (this.useExternalInput) {
+            // Keep this.currentInput assigned externally (e.g. via setInput)
         } else {
             this.currentInput = this.inputManager.poll();
         }
@@ -830,6 +832,10 @@ export class Player extends Fighter {
 
     public setVelocity(x: number, y: number): void {
         this.velocity.set(x, y);
+        if (this.physics && this.physics.body) {
+            this.physics.body.vx = x;
+            this.physics.body.vy = y;
+        }
     }
 
     public playHurtAnimation(): void {

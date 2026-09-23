@@ -104,27 +104,22 @@ export class DialogueScene extends Phaser.Scene {
         this.textElement.setMask(this.textMask.createGeometryMask());
 
         // Setup input to advance dialogue
-        this.input.keyboard?.on('keydown-SPACE', () => this.handleConfirm(), this);
-        this.input.keyboard?.on('keydown-ENTER', () => this.handleConfirm(), this);
+        this.input.keyboard?.on('keydown-SPACE', this.onConfirmInput, this);
+        this.input.keyboard?.on('keydown-ENTER', this.onConfirmInput, this);
 
         // Choice navigation
-        this.input.keyboard?.on('keydown-LEFT', () => this.navigateChoice(-1), this);
-        this.input.keyboard?.on('keydown-RIGHT', () => this.navigateChoice(1), this);
-        this.input.keyboard?.on('keydown-A', () => this.navigateChoice(-1), this);
-        this.input.keyboard?.on('keydown-D', () => this.navigateChoice(1), this);
+        this.input.keyboard?.on('keydown-LEFT', this.onNavLeft, this);
+        this.input.keyboard?.on('keydown-RIGHT', this.onNavRight, this);
+        this.input.keyboard?.on('keydown-A', this.onNavLeft, this);
+        this.input.keyboard?.on('keydown-D', this.onNavRight, this);
 
         // Map Gamepad
         if (this.input.gamepad) {
-            this.input.gamepad.on('down', (_pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button) => {
-                // Assuming button 0 (A) advances text/confirms
-                if (button.index === 0) {
-                    this.handleConfirm();
-                }
-                // D-pad navigation
-                if (button.index === 14) this.navigateChoice(-1); // Left
-                if (button.index === 15) this.navigateChoice(1);  // Right
-            });
+            this.input.gamepad.on('down', this.onGamepadDown, this);
         }
+
+        // Register shutdown event for clean lifecycle teardown
+        this.events.once('shutdown', this.shutdown, this);
 
         // Add Portraits
         this.createPortraits();
@@ -451,6 +446,26 @@ export class DialogueScene extends Phaser.Scene {
         this.scene.stop();
     }
 
+    private onConfirmInput(): void {
+        this.handleConfirm();
+    }
+
+    private onNavLeft(): void {
+        this.navigateChoice(-1);
+    }
+
+    private onNavRight(): void {
+        this.navigateChoice(1);
+    }
+
+    private onGamepadDown(_pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button): void {
+        if (button.index === 0) {
+            this.handleConfirm();
+        }
+        if (button.index === 14) this.navigateChoice(-1);
+        if (button.index === 15) this.navigateChoice(1);
+    }
+
     // Stick navigation state
     private stickMovedX: Map<number, boolean> = new Map();
 
@@ -480,5 +495,26 @@ export class DialogueScene extends Phaser.Scene {
                 }
             }
         }
+    }
+
+    shutdown(): void {
+        this.input.keyboard?.off('keydown-SPACE', this.onConfirmInput, this);
+        this.input.keyboard?.off('keydown-ENTER', this.onConfirmInput, this);
+        this.input.keyboard?.off('keydown-LEFT', this.onNavLeft, this);
+        this.input.keyboard?.off('keydown-RIGHT', this.onNavRight, this);
+        this.input.keyboard?.off('keydown-A', this.onNavLeft, this);
+        this.input.keyboard?.off('keydown-D', this.onNavRight, this);
+
+        if (this.input.gamepad) {
+            this.input.gamepad.off('down', this.onGamepadDown, this);
+        }
+
+        if (this.typewriterTimer) {
+            this.typewriterTimer.remove();
+            this.typewriterTimer = undefined;
+        }
+
+        this.stickMovedX.clear();
+        this.choiceButtons = [];
     }
 }

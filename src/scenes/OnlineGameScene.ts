@@ -24,10 +24,17 @@ import { ALL_CHARACTERS } from '../config/CharacterConfig';
 import { createStage as createSharedStage } from '../stages/StageFactory';
 import type { StageResult } from '../stages/StageFactory';
 
-// Define a snapshot type that includes reconstructed server timestamp for fixed-timeline interpolation
-type NetPlayerSnapshot = NetPlayerState & { frame: number; serverTime: number };
-import { InputManager } from '../input/InputManager';
-import type { GameSnapshot, PlayerSnapshot } from '../network/StateSnapshot';
+import { InputManager, type InputState } from '../input/InputManager';
+import { RollbackBuffer } from '../network/StateSnapshot';
+import {
+    encodeInputMask, decodeInputMask, toSimInput,
+    EMPTY_PLAYER_INPUT, type FullPlayerInput
+} from '../../shared/NetworkProtocol';
+import {
+    stepPhysics, checkPlatformCollisions, checkWallCollisions,
+    type SimInput
+} from '../../shared/PhysicsSimulation';
+import { ADRIA_STAGE } from '../../shared/StageData';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { ControlsOverlay } from '../components/ControlsOverlay';
@@ -35,20 +42,71 @@ import { TouchController } from '../components/TouchController';
 
 import type { GameSceneInterface } from './GameSceneInterface';
 
+function inputStateToFullPlayerInput(state: InputState, dst?: FullPlayerInput): FullPlayerInput {
+    const target = dst || { ...EMPTY_PLAYER_INPUT };
+    target.moveLeft = state.moveLeft;
+    target.moveRight = state.moveRight;
+    target.moveUp = state.moveUp;
+    target.moveDown = state.moveDown;
+    target.jumpBuffered = state.jump;
+    target.jumpHeld = state.jumpHeld;
+    target.lightAttack = state.lightAttack;
+    target.lightAttackHeld = state.lightAttackHeld;
+    target.heavyAttack = state.heavyAttack;
+    target.heavyAttackHeld = state.heavyAttackHeld;
+    target.dodgeBuffered = state.dodge;
+    target.dodgeHeld = state.dodgeHeld;
+    target.aimUp = state.aimUp;
+    target.aimDown = state.aimDown;
+    target.recoveryRequested = state.recovery;
+    target.taunt = state.taunt;
+    return target;
+}
+
+function fullPlayerInputToInputState(input: FullPlayerInput, dst?: InputState): InputState {
+    const target = dst || {
+        moveLeft: false, moveRight: false, moveUp: false, moveDown: false,
+        moveX: 0, moveY: 0,
+        jump: false, jumpHeld: false,
+        lightAttack: false, lightAttackHeld: false,
+        heavyAttack: false, heavyAttackHeld: false,
+        dodge: false, dodgeHeld: false,
+        recovery: false, taunt: false, defeat: false,
+        aimUp: false, aimDown: false, aimLeft: false, aimRight: false,
+        usingGamepad: false
+    };
+    target.moveLeft = input.moveLeft;
+    target.moveRight = input.moveRight;
+    target.moveUp = input.moveUp;
+    target.moveDown = input.moveDown;
+    target.moveX = input.moveLeft ? -1 : (input.moveRight ? 1 : 0);
+    target.moveY = input.moveUp ? -1 : (input.moveDown ? 1 : 0);
+    target.jump = input.jumpBuffered;
+    target.jumpHeld = input.jumpHeld;
+    target.lightAttack = input.lightAttack;
+    target.lightAttackHeld = input.lightAttackHeld;
+    target.heavyAttack = input.heavyAttack;
+    target.heavyAttackHeld = input.heavyAttackHeld;
+    target.dodge = input.dodgeBuffered;
+    target.dodgeHeld = input.dodgeHeld;
+    target.recovery = input.recoveryRequested;
+    target.taunt = input.taunt;
+    target.aimUp = input.aimUp;
+    target.aimDown = input.aimDown;
+    target.aimLeft = input.moveLeft;
+    target.aimRight = input.moveRight;
+    return target;
+}
+
 export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface {
     // Networking
     private networkManager: NetworkManager;
-    private snapshotBuffer: Map<number, NetPlayerSnapshot[]> = new Map();
-    private interpolationTime: number = 0; // Stable playback timeline (milliseconds)
-    private isBufferInitialized: boolean = false;
-    // Adaptive buffer: 60ms provides a tight, responsive feel while absorbing standard jitter.
-    private readonly RENDER_DELAY_MS = 60;
     private localPlayerId: number = -1;
     private isConnected: boolean = false;
 
-    // Players
     private players: Map<number, Player> = new Map();
     private localPlayer: Player | null = null;
+    private remotePlayer: Player | null = null;
 
     // Input
     private inputManager!: InputManager;
@@ -66,17 +124,38 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     private connectionStatusBg!: Phaser.GameObjects.Rectangle;
     private matchHUD!: MatchHUD;
 
-    // Rollback netcode
-    private localFrame: number = 0;
-    // Prediction history for server reconciliation (ring buffer)
-    private predictionHistory: Array<{ frame: number; x: number; y: number }> = [];
-    private readonly PREDICTION_BUFFER_SIZE = 128;
-
-    // Network throttling
+    // Rollback Netcode System
+    private rollbackBuffer: RollbackBuffer = new RollbackBuffer(128);
+    private currentSimFrame: number = 0;
+    private lastConfirmedRemoteFrame: number = 0;
+    private lastRemoteInputMask: number = 0;
+    private localInputHistory: number[] = [0, 0, 0]; // [maskN, maskN-1, maskN-2]
     private stateThrottleCounter: number = 0;
-    private readonly STATE_SEND_INTERVAL: number = 2; // sendState every 2nd frame (~30Hz, matches server broadcast)
-    private inputThrottleCounter: number = 0;
-    private readonly INPUT_SEND_INTERVAL: number = 1; // sendInput every frame (~60Hz)
+
+    // Zero-allocation pre-allocated scratch objects for simulation & conversion
+    private tempLocalSimInput: SimInput = {
+        moveLeft: false, moveRight: false, moveUp: false, moveDown: false,
+        jumpBuffered: false, jumpHeld: false, dodgeBuffered: false,
+        aimUp: false, aimDown: false, recoveryRequested: false
+    };
+    private tempRemoteSimInput: SimInput = {
+        moveLeft: false, moveRight: false, moveUp: false, moveDown: false,
+        jumpBuffered: false, jumpHeld: false, dodgeBuffered: false,
+        aimUp: false, aimDown: false, recoveryRequested: false
+    };
+    private tempFullInput1: FullPlayerInput = { ...EMPTY_PLAYER_INPUT };
+    private tempFullInput2: FullPlayerInput = { ...EMPTY_PLAYER_INPUT };
+    private tempRemoteInputState: InputState = {
+        moveLeft: false, moveRight: false, moveUp: false, moveDown: false,
+        moveX: 0, moveY: 0,
+        jump: false, jumpHeld: false,
+        lightAttack: false, lightAttackHeld: false,
+        heavyAttack: false, heavyAttackHeld: false,
+        dodge: false, dodgeHeld: false,
+        recovery: false, taunt: false, defeat: false,
+        aimUp: false, aimDown: false, aimLeft: false, aimRight: false,
+        usingGamepad: false
+    };
 
     // Selection UI Visuals
     private playerSelectionSprites: Map<number, Phaser.GameObjects.Sprite> = new Map();
@@ -204,6 +283,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
         // Setup network callbacks
         this.networkManager.onStateUpdate((state) => this.handleStateUpdate(state));
+        this.networkManager.onBinaryInput((packet) => this.handleRemoteBinaryInput(packet));
         this.networkManager.onDisconnect(() => this.handleDisconnect());
         this.networkManager.onChargeStart((playerId, _dir) => {
             const player = this.players.get(playerId);
@@ -437,9 +517,20 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         // Only run game loop in PLAYING phase
         if (this.phase !== 'PLAYING') return;
 
-        this.localFrame++;
+        // Ensure players are assigned
+        if (!this.localPlayer || !this.remotePlayer) {
+            if (!this.remotePlayer) {
+                this.remotePlayer = Array.from(this.players.values()).find(p => p !== this.localPlayer) || null;
+                if (this.remotePlayer) {
+                    this.remotePlayer.useExternalInput = true;
+                }
+            }
+            if (!this.localPlayer || !this.remotePlayer) return;
+        }
 
-        // Poll and send local input (throttled to ~30Hz)
+        const frame = this.currentSimFrame;
+
+        // 1. Poll and map local input (0ms delay!)
         const input = this.inputManager.poll();
 
         // If escape prompt is open, steal input for menu navigation
@@ -466,51 +557,70 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             }
             return; // Block game input while prompt is open
         }
-        this.inputThrottleCounter++;
-        if (this.inputThrottleCounter >= this.INPUT_SEND_INTERVAL) {
-            this.inputThrottleCounter = 0;
-            const fsmState = this.localPlayer?.fsm.getCurrentStateName() ?? '';
-            this.networkManager.sendInput(input, fsmState);
-        }
 
-        // Save snapshot every 3 frames (reduce GC pressure)
-        if (this.localPlayer && this.localFrame % 3 === 0) {
-            const snapshot: GameSnapshot = {
-                frame: this.localFrame,
-                timestamp: Date.now(),
-                players: this.captureAllPlayerSnapshots()
-            };
-            this.networkManager.saveSnapshot(snapshot);
-        }
+        // Convert local input to 16-bit bitmask
+        inputStateToFullPlayerInput(input, this.tempFullInput1);
+        const localMask = encodeInputMask(this.tempFullInput1);
 
-        // Update local player prediction (client-side)
-        if (this.localPlayer) {
-            this.localPlayer.setInput(input);
-            this.localPlayer.updatePhysics(delta);
+        // Update 3-frame redundancy
+        this.localInputHistory[2] = this.localInputHistory[1];
+        this.localInputHistory[1] = this.localInputHistory[0];
+        this.localInputHistory[0] = localMask;
 
-            // Resolve platform collisions
-            this.platforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, false));
-            this.sidePlatforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, false));
-            this.softPlatforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, true));
-            this.localPlayer.checkWallCollision(this.walls);
+        // 2. Transmit compact binary packet over Geckos
+        this.networkManager.sendBinaryInput(frame, this.localInputHistory[0], this.localInputHistory[1], this.localInputHistory[2]);
 
-            this.localPlayer.updateLogic(delta);
+        // 3. Predict remote input for frame (input repetition / zero-order hold)
+        const predictedRemoteMask = this.lastRemoteInputMask;
+        decodeInputMask(predictedRemoteMask, this.tempFullInput2);
+        toSimInput(this.tempFullInput2, this.tempRemoteSimInput);
+        fullPlayerInputToInputState(this.tempFullInput2, this.tempRemoteInputState);
 
-            // Store prediction for reconciliation
-            this.predictionHistory.push({
-                frame: this.networkManager.getLocalFrame(),
-                x: this.localPlayer.x,
-                y: this.localPlayer.y,
-            });
-            if (this.predictionHistory.length > this.PREDICTION_BUFFER_SIZE) {
-                this.predictionHistory.shift();
-            }
+        // 4. Save state snapshot at frame before advancing
+        this.rollbackBuffer.saveFrame(
+            frame,
+            this.localPlayer.physics.body,
+            this.remotePlayer.physics.body,
+            localMask,
+            predictedRemoteMask,
+            true
+        );
 
-            // Blast zone check - respawn if player falls off
-            this.checkBlastZone(this.localPlayer);
+        // 5. Apply inputs and step physics & logic forward
+        this.localPlayer.setInput(input);
+        this.remotePlayer.setInput(this.tempRemoteInputState);
 
-            // Send local player's actual position to server for relay to other clients
-            const stateToSend = {
+        this.localPlayer.updatePhysics(delta);
+        this.platforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, false));
+        this.sidePlatforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, false));
+        this.softPlatforms.forEach(platform => this.localPlayer!.checkPlatformCollision(platform, true));
+        this.localPlayer.checkWallCollision(this.walls);
+        this.localPlayer.updateLogic(delta);
+
+        this.remotePlayer.updatePhysics(delta);
+        this.platforms.forEach(platform => this.remotePlayer!.checkPlatformCollision(platform, false));
+        this.sidePlatforms.forEach(platform => this.remotePlayer!.checkPlatformCollision(platform, false));
+        this.softPlatforms.forEach(platform => this.remotePlayer!.checkPlatformCollision(platform, true));
+        this.remotePlayer.checkWallCollision(this.walls);
+        this.remotePlayer.updateLogic(delta);
+        this.remotePlayer.updateVisuals(delta);
+
+        // 6. Blast zone check
+        this.checkBlastZone(this.localPlayer);
+        this.checkBlastZone(this.remotePlayer);
+
+        // 7. Hit detection
+        this.localPlayer.checkHitAgainst(this.remotePlayer);
+        this.remotePlayer.checkHitAgainst(this.localPlayer);
+
+        // 8. Chest interactions
+        this.checkChestInteractions();
+
+        // 9. Low-frequency stats heartbeat to server (every 6th frame = ~10Hz)
+        this.stateThrottleCounter++;
+        if (this.stateThrottleCounter >= 6) {
+            this.stateThrottleCounter = 0;
+            this.networkManager.sendState({
                 playerId: this.localPlayerId,
                 x: this.localPlayer.x,
                 y: this.localPlayer.y,
@@ -522,123 +632,11 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 animationKey: this.localPlayer.animationKey,
                 damagePercent: this.localPlayer.damagePercent,
                 lives: this.localPlayer.lives
-            };
-            // Throttle state updates to reduce bandwidth (every 3rd frame = ~20Hz)
-            this.stateThrottleCounter++;
-            const shouldSendState = this.stateThrottleCounter >= this.STATE_SEND_INTERVAL ||
-                stateToSend.animationKey === 'hurt' || // Always send on damage
-                stateToSend.isAttacking; // Always send on attack
-
-            if (shouldSendState) {
-                this.stateThrottleCounter = 0;
-                this.networkManager.sendState(stateToSend);
-            }
-
-            // Check local player attacks against all remote players
-            this.players.forEach((target) => {
-                if (target !== this.localPlayer) {
-                    this.localPlayer!.checkHitAgainst(target);
-                }
             });
-
-            // Chest Interaction (attack near chest to open)
-            this.checkChestInteractions();
         }
 
-        // JITTER BUFFER (Fixed Timeline Interpolation)
-        // ----------------------------------------------------------------
-        // Interpolate from reconstructed server timeline, decoupled from network jitter.
-
-        // 1. Advance Stable Interpolation Clock (with drift correction)
-        if (this.isBufferInitialized) {
-            // Check if we're running too far ahead (buffer starvation)
-            let maxBufferTime = 0;
-            this.snapshotBuffer.forEach((buffer) => {
-                if (buffer.length > 0) {
-                    maxBufferTime = Math.max(maxBufferTime, buffer[buffer.length - 1].serverTime);
-                }
-            });
-
-            const targetLead = maxBufferTime - this.interpolationTime;
-
-            // Smooth continuous clock speed curve (eliminates discrete jumps)
-            const leadError = targetLead - this.RENDER_DELAY_MS;
-            const clockSpeed = Phaser.Math.Clamp(
-                1.0 + (leadError * 0.002), // Gentle adjustment factor
-                0.95,  // Lower bound (slow down when buffer is low)
-                1.05   // Upper bound (speed up when buffer is high)
-            );
-
-            this.interpolationTime += delta * clockSpeed;
-        }
-
-        // 2. Interpolate Remote Players
-        this.players.forEach((player, playerId) => {
-            if (playerId !== this.localPlayerId) {
-
-                const buffer = this.snapshotBuffer.get(playerId);
-
-                if (buffer && buffer.length >= 2) {
-                    // Find snapshots A and B such that A.serverTime <= interpolationTime < B.serverTime
-                    let fromSnap = buffer[0];
-                    let toSnap = buffer[1];
-
-                    // Shift buffer based on interpolationTime
-                    while (buffer.length >= 2 && this.interpolationTime > buffer[1].serverTime) {
-                        buffer.shift();
-                        if (buffer.length >= 2) {
-                            fromSnap = buffer[0];
-                            toSnap = buffer[1];
-                        }
-                    }
-
-                    // Perform Interpolation
-                    if (buffer.length >= 2 && this.interpolationTime >= fromSnap.serverTime && this.interpolationTime <= toSnap.serverTime) {
-                        const segmentDuration = toSnap.serverTime - fromSnap.serverTime;
-                        const t = segmentDuration > 0 ? (this.interpolationTime - fromSnap.serverTime) / segmentDuration : 0;
-
-                        // Linear Interpolation for Position
-                        player.x = Phaser.Math.Linear(fromSnap.x, toSnap.x, t);
-                        player.y = Phaser.Math.Linear(fromSnap.y, toSnap.y, t);
-
-                        // Discrete State Updates
-                        if (fromSnap.animationKey && fromSnap.animationKey !== player.animationKey) {
-                            player.playAnim(fromSnap.animationKey, true);
-                        }
-                        player.setFacingDirection(fromSnap.facingDirection);
-                    } else if (buffer.length > 0) {
-                        // Smooth extrapolation using last known velocity
-                        const latest = buffer[buffer.length - 1];
-                        const timeSinceLast = this.interpolationTime - latest.serverTime;
-
-                        const predictedX = latest.x + (latest.velocityX || 0) * (timeSinceLast / 1000);
-                        const predictedY = latest.y + (latest.velocityY || 0) * (timeSinceLast / 1000);
-
-                        player.x = Phaser.Math.Linear(player.x, predictedX, 0.15);
-                        player.y = Phaser.Math.Linear(player.y, predictedY, 0.15);
-
-                        if (latest.animationKey) player.playAnim(latest.animationKey, true);
-                        player.setFacingDirection(latest.facingDirection);
-                    }
-                } else if (buffer && buffer.length === 1) {
-                    // Single snapshot: snap to latest known position immediately
-                    const snap = buffer[0];
-                    player.x = snap.x;
-                    player.y = snap.y;
-                    if (snap.animationKey) player.playAnim(snap.animationKey, true);
-                    player.setFacingDirection(snap.facingDirection);
-                }
-
-                // Update Visuals (Timers, Blink, etc.) — ALWAYS run, even without buffer
-                player.updateVisuals(delta);
-
-                // Update combat visuals (charge ghost fade-in) for remote players
-                player.combat.update(delta);
-
-                // Check blast zone for remote players
-                this.checkBlastZone(player);
-            }
-        });
+        // Advance simulation frame
+        this.currentSimFrame++;
 
         // Update MatchHUD
         if (this.matchHUD) {
@@ -684,31 +682,116 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     }
 
     /**
-     * Capture snapshots of all players for rollback
+     * Inbound Binary Input: Process remote player's real inputs.
+     * If a misprediction occurred within the ring buffer window, trigger GGPO Rollback.
      */
-    private captureAllPlayerSnapshots(): PlayerSnapshot[] {
-        const snapshots: PlayerSnapshot[] = [];
-        this.players.forEach((player) => {
-            snapshots.push(player.captureSnapshot());
-        });
-        return snapshots;
+    private handleRemoteBinaryInput(packet: { frame: number; maskN: number; maskN1: number; maskN2: number }): void {
+        if (this.phase !== 'PLAYING' || !this.localPlayer || !this.remotePlayer) return;
+
+        const { frame, maskN, maskN1, maskN2 } = packet;
+
+        // Process redundant inputs in chronological order: frame-2, frame-1, frame
+        const frames = [frame - 2, frame - 1, frame];
+        const masks = [maskN2, maskN1, maskN];
+
+        let earliestMisprediction = -1;
+
+        for (let i = 0; i < 3; i++) {
+            const f = frames[i];
+            const mask = masks[i];
+            if (f < 0 || f > this.currentSimFrame) continue;
+
+            const slot = this.rollbackBuffer.getFrame(f);
+            if (slot) {
+                if (slot.remotePredicted && slot.remoteInputMask !== mask) {
+                    if (earliestMisprediction === -1 || f < earliestMisprediction) {
+                        earliestMisprediction = f;
+                    }
+                }
+                slot.remoteInputMask = mask;
+                slot.remotePredicted = false;
+            }
+
+            if (f >= this.lastConfirmedRemoteFrame) {
+                this.lastConfirmedRemoteFrame = f;
+                this.lastRemoteInputMask = mask;
+            }
+        }
+
+        if (earliestMisprediction !== -1) {
+            this.performRollback(earliestMisprediction);
+        }
+    }
+
+    /**
+     * GGPO Rollback Engine:
+     * Restores state from frame `fromFrame` and re-simulates forward to `currentSimFrame`.
+     * Zero allocations, deterministic pure-math execution (<0.05ms).
+     */
+    private performRollback(fromFrame: number): void {
+        if (!this.localPlayer || !this.remotePlayer) return;
+
+        const localBody = this.localPlayer.physics.body;
+        const remoteBody = this.remotePlayer.physics.body;
+
+        // 1. Restore simulation state at fromFrame
+        const restored = this.rollbackBuffer.restoreFrame(fromFrame, localBody, remoteBody);
+        if (!restored) {
+            return;
+        }
+
+        const DT = 1 / 60;
+
+        // 2. Resimulate all frames from fromFrame up to currentSimFrame - 1
+        for (let f = fromFrame; f < this.currentSimFrame; f++) {
+            const slot = this.rollbackBuffer.getFrame(f);
+            const localMask = slot ? slot.localInputMask : 0;
+            const remoteMask = slot ? slot.remoteInputMask : this.lastRemoteInputMask;
+            const isPredicted = slot ? slot.remotePredicted : true;
+
+            decodeInputMask(localMask, this.tempFullInput1);
+            toSimInput(this.tempFullInput1, this.tempLocalSimInput);
+
+            decodeInputMask(remoteMask, this.tempFullInput2);
+            toSimInput(this.tempFullInput2, this.tempRemoteSimInput);
+
+            // Step local body physics
+            stepPhysics(localBody, this.tempLocalSimInput, DT);
+            checkPlatformCollisions(localBody, ADRIA_STAGE);
+            checkWallCollisions(localBody, ADRIA_STAGE);
+
+            // Step remote body physics
+            stepPhysics(remoteBody, this.tempRemoteSimInput, DT);
+            checkPlatformCollisions(remoteBody, ADRIA_STAGE);
+            checkWallCollisions(remoteBody, ADRIA_STAGE);
+
+            // Save re-simulated frame
+            this.rollbackBuffer.saveFrame(
+                f + 1,
+                localBody,
+                remoteBody,
+                localMask,
+                remoteMask,
+                isPredicted
+            );
+        }
+
+        // 3. Resync Phaser player visual transforms from bodies
+        this.localPlayer.physics.syncFromBody();
+        this.remotePlayer.physics.syncFromBody();
     }
 
     private handleStateUpdate(state: NetGameState): void {
-        // Process state updates immediately (no jitter buffer)
         this.processStateUpdate(state);
     }
 
     private processStateUpdate(state: NetGameState): void {
-        // Only process player state during PLAYING phase
         if (this.phase !== 'PLAYING') return;
-
-        const serverFrame = state.frame;
 
         state.players.forEach((netPlayer: NetPlayerState) => {
             let player = this.players.get(netPlayer.playerId);
 
-            // Create player if new
+            // Create player if late-spawning
             if (!player) {
                 const char = this.playerCharacters.get(netPlayer.playerId) || 'fok';
                 player = this.createPlayer(netPlayer.playerId, netPlayer.x, netPlayer.y, char);
@@ -716,9 +799,11 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
                 if (netPlayer.playerId === this.localPlayerId) {
                     this.localPlayer = player;
+                } else {
+                    this.remotePlayer = player;
+                    player.useExternalInput = true;
                 }
 
-                // Add to HUD
                 if (this.matchHUD) {
                     const isLocal = netPlayer.playerId === this.localPlayerId;
                     const character = this.playerCharacters.get(netPlayer.playerId) || 'fok';
@@ -726,46 +811,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 }
             }
 
-            // For local player: check for deviation/reconciliation
-            if (netPlayer.playerId === this.localPlayerId && this.localPlayer) {
-                this.checkAndReconcile(netPlayer, serverFrame);
-                return;
-            }
-
-            // --- JITTER BUFFER: Store Snapshot ---
-            let buffer = this.snapshotBuffer.get(netPlayer.playerId);
-            if (!buffer) {
-                buffer = [];
-                this.snapshotBuffer.set(netPlayer.playerId, buffer);
-            }
-
-            // Create a snapshot with CLIENT ARRIVAL timestamp
-            const arrivalTime = performance.now();
-            const snapshot: NetPlayerSnapshot = {
-                ...netPlayer,
-                frame: serverFrame,
-                serverTime: arrivalTime
-            };
-
-            // Add to buffer in chronological order
-            if (buffer.length === 0 || snapshot.frame > buffer[buffer.length - 1].frame) {
-                buffer.push(snapshot);
-            }
-
-            // Cap buffer size (keeping 20 snapshots = ~333ms at 60Hz)
-            if (buffer.length > 20) {
-                buffer.shift();
-            }
-
-            // Initialize clock
-            if (!this.isBufferInitialized && buffer.length >= 2) {
-                this.interpolationTime = arrivalTime - this.RENDER_DELAY_MS;
-                this.isBufferInitialized = true;
-            }
-
-            // Sync stats (stateless)
+            // Sync match stats (stateless: score, lives, damage)
             if (typeof netPlayer.lives === 'number' && player.lives !== netPlayer.lives) {
-                // Trigger death effects if a remote player lost a life
                 if (netPlayer.lives < player.lives && netPlayer.playerId !== this.localPlayerId) {
                     AudioManager.getInstance().playSFX('sfx_death', { volume: 0.8 });
                     if (Math.random() > 0.5) {
@@ -781,15 +828,6 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 player.setDamage(netPlayer.damagePercent);
             }
         });
-    }
-
-    private checkAndReconcile(_serverState: NetPlayerState, _serverFrame: number): void {
-        // Phase 5: Reconciliation DISABLED.
-        // Without input replay (rewind + resimulate), the server is always behind
-        // on input processing. This causes the lerp to fight client prediction,
-        // pulling the player down during jumps. Both client and server run identical
-        // stepPhysics() code, so predictions are accurate locally.
-        // Reconciliation will be re-enabled in Phase 6 with full input replay.
     }
 
     /**
@@ -1030,7 +1068,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         if (this.isGameOver) return;
 
         // Wait for setup (ensure we have >1 player or it is a test)
-        if (this.players.size < 2 && this.localFrame < 600) return; // Allow 10s for connections? Or just check if we ever had >1.
+        if (this.players.size < 2 && this.currentSimFrame < 600) return; // Allow 10s for connections? Or just check if we ever had >1.
         // Actually, if we are playing 1v1, we need 2 players.
         // If opponent disconnects, player list size drops?
         // NetworkManager player_left event? We haven't handled it in OnlineGameScene yet.
@@ -1256,7 +1294,11 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         // Reset game state
         this.isGameOver = false;
         this.hasVotedRematch = false;
-        this.localFrame = 0;
+        this.rollbackBuffer.clear();
+        this.currentSimFrame = 0;
+        this.lastConfirmedRemoteFrame = 0;
+        this.lastRemoteInputMask = 0;
+        this.localInputHistory.fill(0);
 
         // Reset all players
         this.players.forEach((player, playerId) => {
@@ -1701,6 +1743,9 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 if (this.uiCamera) {
                     this.uiCamera.ignore(tri);
                 }
+            } else {
+                this.remotePlayer = player;
+                player.useExternalInput = true;
             }
 
             // Add to HUD
@@ -1709,8 +1754,12 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             this.matchHUD.addPlayer(p.playerId, `P${p.playerId + 1} ${charDisplay}`, isLocal, p.character);
         });
 
-        // Setup collision overlap for hit detection
-        // ... (existing collision code)
+        // Initialize Rollback system for the match
+        this.rollbackBuffer.clear();
+        this.currentSimFrame = 0;
+        this.lastConfirmedRemoteFrame = 0;
+        this.lastRemoteInputMask = 0;
+        this.localInputHistory.fill(0);
     }
     private cycleCharacter(direction: number): void {
         if (this.phase !== 'SELECTING') return;
@@ -1972,7 +2021,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         this.players.forEach(player => player.destroy());
         this.players.clear();
         this.remoteTargets.clear();
-        this.snapshotBuffer.clear();
+        this.rollbackBuffer.clear();
 
         // Clear HUD
         if (this.matchHUD) {

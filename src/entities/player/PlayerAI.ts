@@ -13,8 +13,18 @@ export class PlayerAI {
     private state: 'IDLE' | 'CHASE' | 'SPACING' | 'ATTACK' | 'DEFEND' | 'RECOVER' = 'IDLE';
     private stateTimer: number = 0;
 
-    // Input Store
-    private currentInput: any = {}; // Mutable input state
+    // Input Store (pre-allocated to avoid per-tick heap allocations)
+    private currentInput: InputState = {
+        moveLeft: false, moveRight: false, moveUp: false, moveDown: false,
+        moveX: 0, moveY: 0,
+        jump: false, jumpHeld: false,
+        lightAttack: false, lightAttackHeld: false,
+        heavyAttack: false, heavyAttackHeld: false,
+        dodge: false, dodgeHeld: false, recovery: false,
+        taunt: false, defeat: false,
+        aimUp: false, aimDown: false, aimLeft: false, aimRight: false,
+        usingGamepad: false
+    };
 
     // Reaction Control
     // private reactionDelay: number = 0; // Unused for now
@@ -46,20 +56,22 @@ export class PlayerAI {
     }
 
     private findTarget(): void {
-        // Find closest opponent (Human or other AI)
-        const players = this.scene.children.list.filter(c => c instanceof Player && c !== this.player) as Player[];
+        // Find closest active opponent using scene's cached player array
+        const gameScene = this.scene as { getPlayers?: () => Player[] };
+        const players = gameScene.getPlayers ? gameScene.getPlayers() : [];
 
         let closestDist = Infinity;
         let closestTarget: Player | null = null;
 
-        players.forEach(p => {
-            // Ignore dead players if we had that state
+        for (let i = 0; i < players.length; i++) {
+            const p = players[i];
+            if (p === this.player || !p.active || p.lives <= 0) continue;
             const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, p.x, p.y);
             if (dist < closestDist) {
                 closestDist = dist;
                 closestTarget = p;
             }
-        });
+        }
 
         this.target = closestTarget;
     }
@@ -290,20 +302,19 @@ export class PlayerAI {
     }
 
     private resetInput(): void {
-        this.currentInput = {
-            moveLeft: false, moveRight: false, moveUp: false, moveDown: false,
-            moveX: 0, moveY: 0,
-            jump: false, jumpHeld: false,
-            lightAttack: false, heavyAttack: false, heavyAttackHeld: false,
-            dodge: false, dodgeHeld: false, recovery: false,
-            aimUp: false, aimDown: false, aimLeft: false, aimRight: false,
-            usingGamepad: false
-        };
+        const inp = this.currentInput;
+        inp.moveLeft = false; inp.moveRight = false; inp.moveUp = false; inp.moveDown = false;
+        inp.moveX = 0; inp.moveY = 0;
+        inp.jump = false; inp.jumpHeld = false;
+        inp.lightAttack = false; inp.lightAttackHeld = false;
+        inp.heavyAttack = false; inp.heavyAttackHeld = false;
+        inp.dodge = false; inp.dodgeHeld = false; inp.recovery = false;
+        inp.taunt = false; inp.defeat = false;
+        inp.aimUp = false; inp.aimDown = false; inp.aimLeft = false; inp.aimRight = false;
+        inp.usingGamepad = false;
     }
 
     private formatInput(): InputState {
-        // Return a copy to avoid mutation downstream issues?
-        // InputState interface compliance
-        return { ...this.currentInput };
+        return this.currentInput;
     }
 }

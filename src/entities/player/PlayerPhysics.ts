@@ -231,7 +231,7 @@ export class PlayerPhysics {
     //  STATE SYNC (PlayerPhysics ↔ SimBody)
     // ═══════════════════════════════════════════════════════
 
-    private syncToBody(): void {
+    public syncToBody(): void {
         const b = this.body;
 
         // Position & velocity from Player
@@ -295,7 +295,7 @@ export class PlayerPhysics {
         }
     }
 
-    private syncFromBody(): void {
+    public syncFromBody(): void {
         const b = this.body;
 
         // Position & velocity → Player

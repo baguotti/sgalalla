@@ -192,6 +192,77 @@ export function createBody(x: number, y: number, facingDirection: number): SimBo
     };
 }
 
+/**
+ * Copy all properties from src SimBody to dst SimBody without heap allocation.
+ * Used for zero-allocation rollback state rewinding.
+ */
+export function copyBody(dst: SimBody, src: SimBody): void {
+    dst.x = src.x;
+    dst.y = src.y;
+    dst.vx = src.vx;
+    dst.vy = src.vy;
+    dst.width = src.width;
+    dst.height = src.height;
+    dst.ax = src.ax;
+    dst.ay = src.ay;
+
+    dst.isGrounded = src.isGrounded;
+    dst.wasGroundedLastFrame = src.wasGroundedLastFrame;
+
+    dst.jumpsRemaining = src.jumpsRemaining;
+    dst.airActionCounter = src.airActionCounter;
+    dst.jumpHoldTime = src.jumpHoldTime;
+    dst.wasJumpHeld = src.wasJumpHeld;
+    dst.isFastFalling = src.isFastFalling;
+
+    dst.isWallSliding = src.isWallSliding;
+    dst.wallDirection = src.wallDirection;
+    dst.isTouchingWall = src.isTouchingWall;
+    dst.wallTouchesExhausted = src.wallTouchesExhausted;
+    dst.lastWallTouchTimer = src.lastWallTouchTimer;
+    dst.lastWallDirection = src.lastWallDirection;
+
+    dst.isDodging = src.isDodging;
+    dst.isSpotDodging = src.isSpotDodging;
+    dst.dodgeTimer = src.dodgeTimer;
+    dst.dodgeCooldownTimer = src.dodgeCooldownTimer;
+    dst.dodgeDirection = src.dodgeDirection;
+    dst.isInvincible = src.isInvincible;
+
+    dst.droppingThroughPlatformIdx = src.droppingThroughPlatformIdx;
+    dst.droppingThroughY = src.droppingThroughY;
+    dst.dropGraceTimer = src.dropGraceTimer;
+    dst.currentPlatformIdx = src.currentPlatformIdx;
+
+    dst.isRecovering = src.isRecovering;
+    dst.recoveryAvailable = src.recoveryAvailable;
+    dst.recoveryTimer = src.recoveryTimer;
+
+    dst.isAttacking = src.isAttacking;
+    dst.isHitStunned = src.isHitStunned;
+    dst.isCharging = src.isCharging;
+    dst.isThrowCharging = src.isThrowCharging;
+    dst.attackPhase = src.attackPhase;
+    dst.attackType = src.attackType;
+    dst.shouldStallInAir = src.shouldStallInAir;
+
+    dst.isRunning = src.isRunning;
+    dst.facingDirection = src.facingDirection;
+    dst.damagePercent = src.damagePercent;
+    dst.lives = src.lives;
+}
+
+/**
+ * Clone a SimBody. If dst is provided, reuses dst to prevent GC allocation.
+ */
+export function cloneBody(src: SimBody, dst?: SimBody): SimBody {
+    if (!dst) {
+        dst = createBody(src.x, src.y, src.facingDirection);
+    }
+    copyBody(dst, src);
+    return dst;
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  MAIN STEP FUNCTION
 // ═══════════════════════════════════════════════════════════════

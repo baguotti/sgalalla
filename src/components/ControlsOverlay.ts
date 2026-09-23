@@ -240,4 +240,8 @@ export class ControlsOverlay {
     public getElements(): Phaser.GameObjects.GameObject[] {
         return [this.container];
     }
+
+    public destroy(): void {
+        this.container.destroy();
+    }
 }

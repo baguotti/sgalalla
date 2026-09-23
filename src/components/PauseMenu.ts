@@ -503,4 +503,8 @@ export class PauseMenu {
     getElements(): Phaser.GameObjects.GameObject[] {
         return [this.overlay, this.titleText, this.hintText, this.controlsContainer, ...this.mainMenuItems];
     }
+
+    destroy(): void {
+        this.getElements().forEach(e => e.destroy());
+    }
 }

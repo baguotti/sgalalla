@@ -1364,10 +1364,34 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         // Destroy players
         this.players.forEach(p => p.destroy());
+        this.players = [];
 
+        // Destroy HUD
+        if (this.matchHUD) {
+            this.matchHUD.destroy();
+        }
+
+        // Destroy overlays and menus
+        if (this.pauseMenu) {
+            this.pauseMenu.destroy();
+        }
+        if (this.controlsOverlay) {
+            this.controlsOverlay.destroy();
+        }
+        if (this.inputDebugOverlay) {
+            this.inputDebugOverlay.destroy();
+        }
         if (this.debugOverlay) {
             this.debugOverlay.destroy();
         }
+
+        // Clean up chests
+        if (this.chests) {
+            this.chests.destroy(true);
+        }
+
+        // Stop all active tweens
+        this.tweens.killAll();
     }
     private killPlayer(player: Player): void {
         player.setActive(false);

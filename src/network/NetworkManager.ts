@@ -14,10 +14,12 @@ import type { InputState } from '../input/InputManager';
 import { InputBuffer, SnapshotBuffer } from './StateSnapshot';
 import type { FrameInput, GameSnapshot } from './StateSnapshot';
 import { shouldSendState } from './BinaryCodec';
+import { encodeInputPacket, decodeInputPacket } from '../../shared/NetworkProtocol';
 
 // Network message types
 export const NetMessageType = {
     INPUT: 'input',
+    BINARY_INPUT: 'bi',
     STATE_UPDATE: 'state_update',
     POSITION_UPDATE: 'position_update', // Client sends its position to server
     ATTACK_START: 'attack_start',       // Client started an attack
@@ -121,6 +123,7 @@ export type ChestBombExplodeCallback = (x: number, y: number) => void;
 export type RecoveryStartCallback = (playerId: number) => void;
 export type ChargeStartCallback = (playerId: number, direction: number) => void;
 export type GroundPoundLandCallback = (playerId: number) => void;
+export type BinaryInputCallback = (packet: { frame: number; maskN: number; maskN1: number; maskN2: number }) => void;
 
 class NetworkManager {
     private static instance: NetworkManager    // Singleton pattern
@@ -128,6 +131,7 @@ class NetworkManager {
     private connected: boolean = false;
     private localPlayerId: number = -1;
     private currentFrame: number = 0;
+    private onBinaryInputCallback: BinaryInputCallback | null = null;
 
     // ============ ROLLBACK NETCODE SUPPORT ============
     // Input buffer for replay
@@ -372,6 +376,29 @@ class NetworkManager {
         this.channel.on(NetMessageType.GROUND_POUND_LAND, (playerId: any) => {
             this.onGroundPoundLandCallback?.(playerId as number);
         });
+
+        // Binary Rollback Input Handler
+        const handleBinaryPacket = (data: any) => {
+            let buffer: ArrayBuffer | null = null;
+            if (data instanceof ArrayBuffer) {
+                buffer = data;
+            } else if (data instanceof Uint8Array) {
+                buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+            } else if (data?.buffer instanceof ArrayBuffer) {
+                buffer = data.buffer;
+            }
+            if (buffer) {
+                const decoded = decodeInputPacket(buffer);
+                if (decoded && this.onBinaryInputCallback) {
+                    this.onBinaryInputCallback(decoded);
+                }
+            }
+        };
+
+        if (this.channel.onRaw) {
+            this.channel.onRaw(handleBinaryPacket);
+        }
+        this.channel.on(NetMessageType.BINARY_INPUT, handleBinaryPacket);
     }
 
     // Input redundancy ring buffer (last N frames sent with every packet)
@@ -418,6 +445,19 @@ class NetworkManager {
         };
 
         this.channel.emit(NetMessageType.INPUT, netInput, { reliable: false });
+    }
+
+    /**
+     * Send compact 10-byte binary input packet with UDP redundancy for Frame N.
+     */
+    public sendBinaryInput(frame: number, maskN: number, maskN1: number = 0, maskN2: number = 0): void {
+        if (!this.connected || !this.channel) return;
+        const packet = encodeInputPacket(frame, maskN, maskN1, maskN2);
+        if (this.channel.raw) {
+            this.channel.raw.emit(packet);
+        } else {
+            this.channel.emit(NetMessageType.BINARY_INPUT, packet, { reliable: false });
+        }
     }
 
     // Delta compression: track last sent state
@@ -592,6 +632,10 @@ class NetworkManager {
 
     public onGroundPoundLand(callback: GroundPoundLandCallback): void {
         this.onGroundPoundLandCallback = callback;
+    }
+
+    public onBinaryInput(callback: BinaryInputCallback): void {
+        this.onBinaryInputCallback = callback;
     }
 
     /**
