@@ -195,21 +195,47 @@ class NetworkManager {
             if (!hostname || window.location.protocol === 'file:') {
                 hostname = '164.90.235.15'; // Production Droplet IP
             } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
-                hostname = window.location.hostname; // Keep local for dev
+                hostname = '127.0.0.1'; // Explicit IPv4 to avoid IPv6 ::1 connection refused in Chromium
             }
 
             const port = 9208;
             const url = `http://${hostname}`;
 
+            let isResolved = false;
+            let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-            // Geckos.io defaults to ordered: false (unreliable/unordered) for real-time
-            this.channel = geckos({ url, port });
+            const safeResolve = (val: boolean) => {
+                if (isResolved) return;
+                isResolved = true;
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+                resolve(val);
+            };
+
+            // 6-second connection timeout guard
+            timeoutId = setTimeout(() => {
+                console.warn('[NetworkManager] Connection timed out after 6s');
+                this.connected = false;
+                safeResolve(false);
+            }, 6000);
+
+            try {
+                // Geckos.io defaults to ordered: false (unreliable/unordered) for real-time
+                this.channel = geckos({ url, port });
+            } catch (err) {
+                console.error('[NetworkManager] Geckos init exception:', err);
+                this.connected = false;
+                safeResolve(false);
+                return;
+            }
 
             this.channel.onConnect((error) => {
                 if (error) {
                     console.error('[NetworkManager] Connection failed:', error);
                     this.connected = false;
-                    resolve(false);
+                    safeResolve(false);
                     return;
                 }
 
@@ -222,7 +248,7 @@ class NetworkManager {
                 this.confirmedFrame = 0;
 
                 // Setup message handlers and wait for PLAYER_JOINED
-                this.setupMessageHandlers(resolve);
+                this.setupMessageHandlers(safeResolve);
             });
 
             this.channel.onDisconnect(() => {

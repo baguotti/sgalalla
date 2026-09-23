@@ -321,3 +321,12 @@
 - **[Quality]** **Comprehensive Technical Audit**: Published [`docs/PERFORMANCE_AND_CODE_AUDIT.md`](../docs/PERFORMANCE_AND_CODE_AUDIT.md) rating code quality, GC hotspots, determinism, and architecture.
 - **[S]** **STATUS**: Online multiplayer fully revived with competitive platform fighter netcode (GGPO standard) and engine micro-stutters eliminated.
 
+### [2026-09-23] v2.3.1 - Multiplayer Lobby Loading & Server Connection Bugfixes 🛠️🌐
+- **[V]** `v2.3.1`
+- **[Fix]** **Audio Decode Failure in Preload**: Corrected `ui_player_ready.wav` path in `AnimationHelpers.ts` from non-existent `assets/audio/sfx/ui/` to `assets/audio/ui/ui_player_ready.wav`, resolving Web Audio `EncodingError` on scene preload.
+- **[Fix]** **Server Idle Timeout Shutdown**: Disabled the 5-minute auto-shutdown `process.exit(0)` in `server-geckos/index.ts` during local development (`AUTO_SHUTDOWN=true` only), keeping the UDP server continuously alive for testing.
+- **[Fix]** **Local IPv6 Loopback Connection Refused**: Explicitly mapped `localhost` to `127.0.0.1` in `NetworkManager.ts` to prevent modern Chromium browsers from defaulting to IPv6 `::1:9208` where connections were refused by the IPv4 listener. Added a 6-second connection timeout guard.
+- **[Fix]** **Phaser Update Loop Black Screen Freeze**: Guarded `this.controlsOverlay.update()` in `OnlineGameScene.update()` against uninitialized state during async server connection, preventing unhandled TypeError from halting the render loop.
+- **[Fix]** **Fail-Safe ESC & Gamepad Navigation**: Bound ESC and controller exit keys before network connection attempts and guarded `this.chests` so players can smoothly return to Main Menu if disconnected.
+- **[S]** **STATUS**: Online multiplayer entry is rock solid with robust error recovery and verified loopback server connection.
+

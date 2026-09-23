@@ -108,7 +108,7 @@ export class AnimationHelpers {
         // keep old names if there's no new file for it, but assuming all are mapped to new folders
         scene.load.audio('ui_confirm_character', 'assets/audio/sfx/ui/ui_change_character.wav'); // Fallback to change char if no file
         scene.load.audio('ui_back', 'assets/audio/sfx/ui/ui_back.wav');
-        scene.load.audio('ui_player_ready', 'assets/audio/sfx/ui/ui_player_ready.wav');
+        scene.load.audio('ui_player_ready', 'assets/audio/ui/ui_player_ready.wav');
         scene.load.audio('ui_menu_hover', 'assets/audio/sfx/ui/ui_menu_hover.wav');
         scene.load.audio('ui_confirm', 'assets/audio/sfx/ui/ui_confirm.wav');
         scene.load.audio('ui_move_cursor', 'assets/audio/sfx/ui/ui_move_cursor.wav');

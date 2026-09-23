@@ -149,6 +149,16 @@ const channelPlayerMap: Map<string, number> = new Map();
 // Create HTTP server for health checks
 const httpServer = http.createServer((req, res) => {
     console.log(`[HTTP] ${req.method} ${req.url} from ${req.socket.remoteAddress}`);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        res.writeHead(200);
+        res.end();
+        return;
+    }
+
     if (req.url === '/' && req.method === 'GET') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('Geckos.io Game Server is Running! 🎮\n');
@@ -169,12 +179,14 @@ const io: GeckosServer = geckos({
 // Attach to HTTP server
 io.addServer(httpServer);
 
-// IDLE TIMEOUT LOGIC
+// IDLE TIMEOUT LOGIC (Only active if AUTO_SHUTDOWN=true, e.g. ephemeral cloud workers)
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 let totalConnectedPlayers = 0;
 
 function checkIdleStatus() {
+    if (process.env.AUTO_SHUTDOWN !== 'true') return;
+
     if (totalConnectedPlayers === 0) {
         if (!idleTimer) {
             console.log(`[Server] No players connected. Starting idle timer (${IDLE_TIMEOUT_MS / 1000}s)...`);

@@ -318,16 +318,18 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         void this.selectionCountdown;
 
 
+        // Setup escape key immediately so user can exit at any point
+        this.setupEscapeKey();
+
         // Initialize fast with Black Screen + Loading Text (User Request)
         this.cameras.main.setBackgroundColor('#000000');
-        this.showConnectionStatus('LOADING...');
+        this.showConnectionStatus('Connecting to server...');
 
         // Try to connect
         const connected = await this.networkManager.connect();
 
         if (!connected) {
-            this.showConnectionStatus('Connection Failed. Press ESC to return.');
-            this.setupEscapeKey();
+            this.showConnectionStatus('Connection Failed.\nPress ESC or (B) to return.');
             return;
         }
 
@@ -495,10 +497,25 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     }
 
     update(_time: number, delta: number): void {
-        // Poll LB for controls overlay toggle
-        this.controlsOverlay.update();
+        // Poll LB for controls overlay toggle if instantiated
+        if (this.controlsOverlay) {
+            this.controlsOverlay.update();
+        }
 
-        if (!this.isConnected) return;
+        if (!this.isConnected) {
+            // Check gamepad B / Start / Select to return to menu if connection failed or waiting
+            const gamepads = navigator.getGamepads();
+            for (let i = 0; i < gamepads.length; i++) {
+                const pad = gamepads[i];
+                if (pad) {
+                    if (pad.buttons[1]?.pressed || pad.buttons[9]?.pressed || pad.buttons[8]?.pressed) {
+                        this.scene.start('MainMenuScene');
+                        return;
+                    }
+                }
+            }
+            return;
+        }
 
         // Handle selection phase input
         if (this.phase === 'SELECTING') {
@@ -1395,7 +1412,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
                 this.scale.width / 2,
                 this.scale.height / 2,
                 message,
-                { fontSize: '32px', color: '#ffffff', fontFamily: '"Pixeloid Sans"' } // Removed bg color
+                { fontSize: '32px', color: '#ffffff', fontFamily: '"Pixeloid Sans"', align: 'center' }
             ).setOrigin(0.5).setDepth(1000);
             if (this.uiCamera) this.cameras.main.ignore(this.connectionStatusText);
         } else {
@@ -1868,7 +1885,14 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
     private lastEscapeInputTime: number = 0;
 
     private setupEscapeKey(): void {
+        // Remove existing listener if any to prevent duplicates
+        this.input.keyboard?.off('keydown-ESC');
         this.input.keyboard?.on('keydown-ESC', () => {
+            if (!this.isConnected) {
+                this.scene.start('MainMenuScene');
+                return;
+            }
+
             if (this.escapePromptVisible) {
                 // If prompt is already open, dismiss it
                 this.dismissEscapePrompt();
@@ -1876,7 +1900,7 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
             }
 
             // Check if any chest overlay is open
-            const isChestOverlayOpen = (this.chests.getChildren() as Chest[]).some(chest => chest.isOverlayOpen);
+            const isChestOverlayOpen = this.chests ? (this.chests.getChildren() as Chest[]).some(chest => chest.isOverlayOpen) : false;
             if (isChestOverlayOpen) {
                 return; // Let chest handle the ESC key
             }
@@ -2041,6 +2065,8 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
         // Destroy connection status
         this.connectionStatusText?.destroy();
         this.connectionStatusText = null as any;
+        this.connectionStatusBg?.destroy();
+        this.connectionStatusBg = null as any;
 
         // Remove ALL keyboard listeners (prevents stacking on re-entry)
         this.input.keyboard?.removeAllListeners();
