@@ -16,6 +16,7 @@ import { AnimationHelpers } from '../managers/AnimationHelpers';
 import { AudioManager } from '../managers/AudioManager';
 import { CampaignManager } from '../managers/CampaignManager';
 import { FixedStepClock, SIM_STEP_MS } from '../../shared/FixedStepClock';
+import { MatchRecorder } from '../debug/MatchRecorder';
 
 import type { GameSceneInterface } from './GameSceneInterface';
 
@@ -55,6 +56,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     // Gameplay advances in fixed 60 Hz steps, whatever the display refresh rate
     private readonly simClock = new FixedStepClock();
+    private recorder: MatchRecorder | null = null;
 
     // Pause menu
     private isPaused: boolean = false;
@@ -435,6 +437,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     }
                 }
             });
+
+            // Dev tool: ?record records this match for the simulation replay tests (F9 saves it)
+            this.recorder = null;
+            if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('record')) {
+                this.recorder = new MatchRecorder(this.players);
+                this.input.keyboard?.on('keydown-F9', () => this.recorder?.save());
+            }
 
             // If campaign and NOT training, trigger transition to cutscene immediately
             if (this.mode === 'campaign' && !this.isTraining) {
@@ -973,6 +982,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         // Check Blast Zones
         this.checkBlastZones();
+
+        this.recorder?.captureStep(this.players);
     }
 
     private checkBlastZones(): void {

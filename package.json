@@ -9,6 +9,7 @@
     "server": "lsof -ti:9208 | xargs kill -9 2>/dev/null; sleep 1; npm run dev --prefix server-geckos",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test": "tsc -p tests && tsx --test tests/*.test.ts",
     "deploy:campaign": "bash deploy_campaign.sh",
     "electron:dev": "tsc -p tsconfig.electron.json && concurrently \"vite --host 0.0.0.0\" \"sleep 3 && electron electron-dist/main.cjs\"",
     "electron:build": "tsc && vite build && tsc -p tsconfig.electron.json && electron-builder",
@@ -20,6 +21,7 @@
     "concurrently": "^9.2.1",
     "electron": "^35.7.5",
     "electron-builder": "^26.8.1",
+    "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "vite": "^7.2.4"
   },

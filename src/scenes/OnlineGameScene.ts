@@ -34,7 +34,7 @@ import {
     stepPhysics, checkPlatformCollisions, checkWallCollisions,
     type SimInput
 } from '../../shared/PhysicsSimulation';
-import { ADRIA_STAGE } from '../../shared/StageData';
+import { STAGE_LAYOUT } from '../../shared/StageData';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { ControlsOverlay } from '../components/ControlsOverlay';
@@ -774,13 +774,13 @@ export class OnlineGameScene extends Phaser.Scene implements GameSceneInterface 
 
             // Step local body physics
             stepPhysics(localBody, this.tempLocalSimInput, DT);
-            checkPlatformCollisions(localBody, ADRIA_STAGE);
-            checkWallCollisions(localBody, ADRIA_STAGE);
+            checkPlatformCollisions(localBody, STAGE_LAYOUT);
+            checkWallCollisions(localBody, STAGE_LAYOUT);
 
             // Step remote body physics
             stepPhysics(remoteBody, this.tempRemoteSimInput, DT);
-            checkPlatformCollisions(remoteBody, ADRIA_STAGE);
-            checkWallCollisions(remoteBody, ADRIA_STAGE);
+            checkPlatformCollisions(remoteBody, STAGE_LAYOUT);
+            checkWallCollisions(remoteBody, STAGE_LAYOUT);
 
             // Save re-simulated frame
             this.rollbackBuffer.saveFrame(

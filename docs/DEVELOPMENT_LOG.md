@@ -592,3 +592,9 @@ Part 2
 ### [2026-09-24] Netcode rebuild, step 1 - Fixed 60 Hz simulation tick (branch `netcode-rebuild`, unreleased)
 - **[Fix]** **Frame-rate independent gameplay**: `GameScene` advances gameplay in fixed 1/60 s steps through `shared/FixedStepClock.ts` instead of once per rendered frame. Since v2.3.0 removed `forceSetTimeOut`, 120 Hz screens ran horizontal movement at half speed (416 instead of 822 px/s top run speed).
 - **[S]** **Verified**: with the game loop forced to ~30, ~60, ~120 and ~144 Hz, the game runs ~60 steps/s with bit-identical per-step physics (821.554 px/s after 30 steps, 241.889 px jump height).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-24] Netcode rebuild, step 2a - Shared simulation core and replay tests (branch `netcode-rebuild`, unreleased)
+- **[Refactor]** **Stage geometry single-sourced**: `StageFactory` now builds its collision boxes from `STAGE_LAYOUT` in `shared/StageData.ts`. The previous shared copy had drifted from the game (walls off by 30-50 px, left platform by 25 px).
+- **[Feat]** **`shared/GameSim.ts`**: deterministic, plain-data simulation of fighter movement, input buffering, the state machine and timers. Combat comes next.
+- **[Feat]** **Replay tests** (`npm test`): a match recorded in the game with `?record` in the URL (F9 saves it to `tests/replays/`) is replayed through `GameSim`, and every fighter's state must match the recording at every step. First replay: 2,108 steps of movement, identical.

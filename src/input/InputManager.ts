@@ -3,40 +3,17 @@ import { GamepadInput } from './GamepadInput';
 import { KeyboardMapping } from './KeyboardMapping';
 import type { GamepadState } from './GamepadInput';
 import type { TouchController } from '../components/TouchController';
+import type { FighterInput } from '../../shared/FighterInput';
 
 /**
  * Unified Input State
- * Combines keyboard and gamepad input into a single interface
+ * Combines keyboard, gamepad and touch input. The gameplay fields come from
+ * FighterInput, which the simulation consumes.
  */
-export interface InputState {
-    // Movement
-    moveLeft: boolean;
-    moveRight: boolean;
-    moveUp: boolean;
-    moveDown: boolean;
+export interface InputState extends FighterInput {
     moveX: number; // -1 to 1 for analog input
     moveY: number; // -1 to 1 for analog input
-
-    // Actions (single press detection)
-    jump: boolean;
-    jumpHeld: boolean;
-    lightAttack: boolean;
-    lightAttackHeld: boolean; // For charge throws
-    heavyAttack: boolean;
-    heavyAttackHeld: boolean; // For charge attacks
-    dodge: boolean;
-    dodgeHeld: boolean; // For running (dodge key held)
     recovery: boolean;
-    taunt: boolean; // Taunt / Win Animation
-    defeat: boolean; // Manual defeat animation
-
-    // Directional input for attacks
-    aimUp: boolean;
-    aimDown: boolean;
-    aimLeft: boolean;
-    aimRight: boolean;
-
-    // Input source
     usingGamepad: boolean;
 }
 

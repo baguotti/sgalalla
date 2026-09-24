@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { STAGE_LAYOUT } from '../../shared/StageData';
+import type { SimPlatform } from '../../shared/StageData';
 
 
 /**
@@ -52,13 +54,20 @@ export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'ad
 
 
 
-    // --- Main Platform ---
-    // Center: 960. Width 1200. Extended to blast zone (930 height, y=1335)
-    // Top Y = 870. Bottom Y = 1800 (BLAST_ZONE_BOTTOM)
-    const mainPlatform = scene.add.rectangle(960, 1335, 1180, 930, 0x000000, 0); // Invisible, width 1180
-    // mainPlatform.setStrokeStyle(3, PLATFORM_STROKE); // Remove stroke
-
-    (scene as any).matter.add.gameObject(mainPlatform, { isStatic: true });
+    // --- Collision ---
+    // Geometry comes from shared STAGE_LAYOUT (also used by the simulation).
+    // Invisible rectangles; Matter bodies let chests land on them.
+    const collisionRect = (p: SimPlatform): Phaser.GameObjects.Rectangle => {
+        const rect = scene.add.rectangle(p.x, p.y, p.w, p.h);
+        rect.setVisible(false);
+        (scene as any).matter.add.gameObject(rect, { isStatic: true });
+        return rect;
+    };
+    const solidPlatforms = STAGE_LAYOUT.platforms.filter(p => !p.isSoft).map(collisionRect);
+    const mainPlatform = solidPlatforms[0];
+    const sidePlatforms = solidPlatforms.slice(1);
+    const softPlatforms = STAGE_LAYOUT.platforms.filter(p => p.isSoft).map(collisionRect);
+    const wallCollisionRects = STAGE_LAYOUT.walls.map(w => new Phaser.Geom.Rectangle(w.x - w.w / 2, w.y - w.h / 2, w.w, w.h));
 
     // --- Platform Textures ---
     // User requested "Platform_BH4A_adria.png" (renamed to platform_main.png)
@@ -94,94 +103,14 @@ export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'ad
     // Perfect.
 
 
-    // --- Side Platforms (Floaters) ---
-    // MANUAL TUNING GUIDE (SIDE PLATFORMS):
-    // ---------------------------------------------------------
-    // 1. VISUAL: Change scene.add.image(X, Y, ...)
-    // 2. FLOOR (Walkable): Change matter.add.rectangle(X, Y, W, H) below.
-    // 3. WALLS (Slideable): Change wallCollisionRects farther down.
-    // ---------------------------------------------------------
-
-    const sidePlatforms: Phaser.GameObjects.Rectangle[] = [];
-    const sidePlatVisuals: Phaser.GameObjects.Image[] = [];
-
-    // --- Left Side Platform ---
-    // Visual (User set to 40, 450):
+    // --- Side and Top Platform Textures (visual only; collision is in STAGE_LAYOUT) ---
     const leftPlatVisual = scene.add.image(40, 480, sideTexKey);
     leftPlatVisual.setScale(0.8);
-    leftPlatVisual.setDepth(-10)
-    sidePlatVisuals.push(leftPlatVisual);
+    leftPlatVisual.setDepth(-10);
 
-    // Floor Collision (Invisible Walkable Box):
-    // Match visual center initially: 40, 450. Size scaled ~389x731.
-    const leftPlatFloor = scene.add.rectangle(30, 450, 315, 590
-    );
-    leftPlatFloor.setVisible(false);
-    (scene as any).matter.add.gameObject(leftPlatFloor, { isStatic: true });
-    sidePlatforms.push(leftPlatFloor);
-
-
-
-    // --- Soft Platforms (Top) ---
-    // softPlatforms = invisible collision rectangles (debug viz + collision use these).
-    // Platform images below are purely visual.
-    const softPlatforms: Phaser.GameObjects.Rectangle[] = [];
-
-    // MANUAL TUNING GUIDE:
-    // ---------------------------------------------------------
-    // VISUAL: Change scene.add.image(X, Y, ...) and .setScale(...).
-    // COLLISION: Change scene.add.rectangle(X, Y, WIDTH, HEIGHT).
-    //   The collision rectangle is what the debug yellow box shows.
-    //   The player walks on this invisible rectangle.
-    // ---------------------------------------------------------
-
-    // --- Single Top Platform (Centered) ---
-    // User requested "just have one floating platform at the center".
-    // Visual:
     const topPlatVisual = scene.add.image(960, 510, topTexKey);
     topPlatVisual.setScale(0.8);
     topPlatVisual.setDepth(-10);
-    // Collision Rectangle (this is what the player walks on):
-    // Physics Width: 550? Let's keep it same size as before for now.
-    const topPlat = scene.add.rectangle(960, 470, 550, 20);
-    topPlat.setVisible(false); // Invisible — debug mode draws it
-    (scene as any).matter.add.gameObject(topPlat, { isStatic: true });
-    softPlatforms.push(topPlat);
-
-    // Track visual images for camera ignore
-    const topPlatVisuals = [topPlatVisual];
-
-
-    // --- Wall Collisions (Slideable Surfaces) ---
-    // MANUAL TUNING GUIDE (WALLS - RED BOXES):
-    // ---------------------------------------------------------
-    // Adjust these to match the sides of your platforms.
-    // ---------------------------------------------------------
-    const wallCollisionRects = [
-        // Walls 1 & 2 (Main Stage)
-        new Phaser.Geom.Rectangle(425, 890, 20, 500),
-        new Phaser.Geom.Rectangle(1475, 890, 20, 500),
-
-        // --- Left Platform Walls ---
-        // WALL 3 (Inner/Right side of Left Plat): 
-        // Match Visual (40, 450) -> X = 175-20. 
-        // Height Extended to 625 to reach closer to bottom, leaving 60px gap for corner chop.
-        new Phaser.Geom.Rectangle(165 - 50, 160, 20, 450),
-        // WALL 4 (Outer/Left side of Left Plat):
-        // X = 40 - (389/2) approx = -154.
-        new Phaser.Geom.Rectangle(-60, 160, 20, 680),
-
-        // WALL 5 (Horizontal Bottom Wall):
-        // Connects Wall 4 (x=-135) to Wall 3 (x=175). Width ~310.
-        // Y Position: Below Wall 3 (110 + 445 = 555).
-        // Let's place it at Y=555 with height 40.
-        new Phaser.Geom.Rectangle(-60, 555, 170, 20),
-
-        // WALL 6 (Main Stage Bottom Wall):
-        // Connects Wall 1 (x=425) to Wall 2 (x=1475). Width = 1475 - 425 + 20 = 1070.
-        // Y Position: Bottom of Wall 1/2 (890 + 500 = 1390).
-        new Phaser.Geom.Rectangle(425, 1370, 1070, 20),
-    ];
 
     // --- Camera ---
     scene.cameras.main.setZoom(1);
@@ -197,6 +126,6 @@ export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'ad
         sidePlatforms, // Now Rectangles
 
         wallCollisionRects,
-        platformTextures: [leftTex, rightTex, ...sidePlatVisuals, ...topPlatVisuals]
+        platformTextures: [leftTex, rightTex, leftPlatVisual, topPlatVisual]
     };
 }

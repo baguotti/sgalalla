@@ -9,7 +9,6 @@ import http from 'http';
 // ─── Shared Physics (Phase 2: Server-Authoritative) ───
 import { stepPhysics, checkPlatformCollisions, checkWallCollisions, checkBlastZone, createBody, NULL_INPUT, startRecovery } from '../shared/PhysicsSimulation.js';
 import type { SimInput, SimBody } from '../shared/PhysicsSimulation.js';
-import { ADRIA_STAGE } from '../shared/StageData.js';
 
 // Network message types (mirrored from client)
 const NetMessageType = {
