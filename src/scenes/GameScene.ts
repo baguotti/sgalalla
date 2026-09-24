@@ -15,6 +15,7 @@ import { EffectManager } from '../effects/EffectManager';
 import { AnimationHelpers } from '../managers/AnimationHelpers';
 import { AudioManager } from '../managers/AudioManager';
 import { CampaignManager } from '../managers/CampaignManager';
+import { FixedStepClock, SIM_STEP_MS } from '../../shared/FixedStepClock';
 
 import type { GameSceneInterface } from './GameSceneInterface';
 
@@ -51,6 +52,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     // Camera Settings
     private currentZoomLevel: ZoomLevel = 'CLOSE';
+
+    // Gameplay advances in fixed 60 Hz steps, whatever the display refresh rate
+    private readonly simClock = new FixedStepClock();
 
     // Pause menu
     private isPaused: boolean = false;
@@ -880,46 +884,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             }
         }
 
-        // 1. Update Physics (Move)
-        this.players.forEach(p => p.updatePhysics(delta));
-
-        // 2. Resolve Collisions (Snap to Ground)
-        for (const platform of this.platforms) {
-            this.players.forEach(p => p.checkPlatformCollision(platform, false));
+        const steps = this.simClock.advance(delta);
+        for (let i = 0; i < steps && !this.isGameOver; i++) {
+            this.stepSimulation();
         }
-        // Side Platforms (Solid)
-        for (const platform of this.sidePlatforms) {
-            this.players.forEach(p => p.checkPlatformCollision(platform, false));
-        }
-        // Soft Platforms (One-Way)
-        for (const platform of this.softPlatforms) {
-            this.players.forEach(p => p.checkPlatformCollision(platform, true));
-        }
-
-
-
-        // 3. Update Logic (Anim)
-        this.players.forEach(p => p.updateLogic(delta));
-
-        // 4. Wall Collisions (end of frame — sets isTouchingWall for next frame)
-        this.players.forEach(p => p.checkWallCollision(this.walls));
-
-
-        // Combat Hit Checks
-        for (let i = 0; i < this.players.length; i++) {
-            for (let j = 0; j < this.players.length; j++) {
-                if (i !== j) {
-                    this.players[i].checkHitAgainst(this.players[j]);
-                }
-            }
-        }
-
-        // Chest Interaction (attack near chest to open)
-        this.checkChestInteractions();
-
-
-        // Check Blast Zones
-        this.checkBlastZones();
 
         // Camera Follow
         this.updateCamera();
@@ -965,6 +933,46 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.matchHUD.updatePlayers(this.hudPlayerMap);
         }
 
+    }
+
+    /** Advances gameplay by one fixed step of SIM_STEP_MS. */
+    private stepSimulation(): void {
+        // 1. Update Physics (Move)
+        this.players.forEach(p => p.updatePhysics(SIM_STEP_MS));
+
+        // 2. Resolve Collisions (Snap to Ground)
+        for (const platform of this.platforms) {
+            this.players.forEach(p => p.checkPlatformCollision(platform, false));
+        }
+        // Side Platforms (Solid)
+        for (const platform of this.sidePlatforms) {
+            this.players.forEach(p => p.checkPlatformCollision(platform, false));
+        }
+        // Soft Platforms (One-Way)
+        for (const platform of this.softPlatforms) {
+            this.players.forEach(p => p.checkPlatformCollision(platform, true));
+        }
+
+        // 3. Update Logic (Anim)
+        this.players.forEach(p => p.updateLogic(SIM_STEP_MS));
+
+        // 4. Wall Collisions (end of frame — sets isTouchingWall for next frame)
+        this.players.forEach(p => p.checkWallCollision(this.walls));
+
+        // Combat Hit Checks
+        for (let i = 0; i < this.players.length; i++) {
+            for (let j = 0; j < this.players.length; j++) {
+                if (i !== j) {
+                    this.players[i].checkHitAgainst(this.players[j]);
+                }
+            }
+        }
+
+        // Chest Interaction (attack near chest to open)
+        this.checkChestInteractions();
+
+        // Check Blast Zones
+        this.checkBlastZones();
     }
 
     private checkBlastZones(): void {

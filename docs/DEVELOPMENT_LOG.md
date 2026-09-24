@@ -587,3 +587,8 @@ Part 2
     - **PlayerAI Allocation Fix**: Pre-allocated reusable input structure and replaced full scene tree filtering with `scene.getPlayers()`.
 - **[Quality]** **Comprehensive Technical Audit**: Published [`docs/PERFORMANCE_AND_CODE_AUDIT.md`](../docs/PERFORMANCE_AND_CODE_AUDIT.md) rating code quality, GC hotspots, determinism, and architecture.
 - **[S]** **STATUS**: Online multiplayer revived to tournament-grade responsiveness.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-24] Netcode rebuild, step 1 - Fixed 60 Hz simulation tick (branch `netcode-rebuild`, unreleased)
+- **[Fix]** **Frame-rate independent gameplay**: `GameScene` advances gameplay in fixed 1/60 s steps through `shared/FixedStepClock.ts` instead of once per rendered frame. Since v2.3.0 removed `forceSetTimeOut`, 120 Hz screens ran horizontal movement at half speed (416 instead of 822 px/s top run speed).
+- **[S]** **Verified**: with the game loop forced to ~30, ~60, ~120 and ~144 Hz, the game runs ~60 steps/s with bit-identical per-step physics (821.554 px/s after 30 steps, 241.889 px jump height).
