@@ -9,12 +9,15 @@
 
 import { SIM_STEP_MS } from './FixedStepClock.js';
 import { AttackPhase, AttackRegistry, AttackType } from './AttackData.js';
-import type { AttackDirection } from './AttackData.js';
+import { checkHit, handleCombatInput, updateCombat } from './Combat.js';
 import type { FighterInput } from './FighterInput.js';
-import { emptyInput } from './FighterInput.js';
 import {
-    type SimBody, type SimInput as PhysicsInput, type PhysicsEvent,
-    createBody, stepPhysics, checkSinglePlatformCollision, resetWallState, checkSingleWallCollision,
+    FIGHTER_STATES, changeState, consumeBuffered, createFighter, isBuffered, updateInputBuffer, updateState,
+    type FighterSetup, type FighterState, type FighterStateName,
+} from './FighterState.js';
+import {
+    type SimInput as PhysicsInput, type PhysicsEvent,
+    stepPhysics, checkSinglePlatformCollision, resetWallState, checkSingleWallCollision,
     ATTACK_PHASE_NONE, ATTACK_PHASE_STARTUP, ATTACK_PHASE_ACTIVE, ATTACK_PHASE_RECOVERY,
     ATTACK_TYPE_NONE, ATTACK_TYPE_LIGHT, ATTACK_TYPE_HEAVY,
 } from './PhysicsSimulation.js';
@@ -22,129 +25,18 @@ import { STAGE_LAYOUT } from './StageData.js';
 
 const STEP_S = SIM_STEP_MS / 1000;
 
-/** Presses stay usable for this many steps (the old InputBuffer window). */
-const INPUT_BUFFER_STEPS = 6;
-
-// ─── State ───
-
-export const FIGHTER_STATES = [
-    'Idle', 'Run', 'Jump', 'Fall', 'WallSlide', 'Attack', 'Charging', 'HitStun',
-    'Dodge', 'AirDodge', 'Recovery', 'GroundPound', 'Taunt', 'Win', 'Defeat',
-    'Respawning', 'Cinematic',
-] as const;
-export type FighterStateName = typeof FIGHTER_STATES[number];
-
-type BufferedAction = 'jump' | 'lightAttack' | 'heavyAttack' | 'dodge';
-
-/** Steps (per-fighter counter) at which each action was pressed, oldest first. */
-interface InputBuffer {
-    step: number;
-    jump: number[];
-    lightAttack: number[];
-    heavyAttack: number[];
-    dodge: number[];
-}
-
-export interface AttackInstance {
-    key: string;
-    phase: AttackPhase;
-    phaseTimer: number;
-    facing: number;
-    nextHitTimer: number;
-}
-
-export interface CombatState {
-    attack: AttackInstance | null;
-    attackCooldownTimer: number;
-    isCharging: boolean;
-    chargeTime: number;
-    lastChargeTime: number;
-    chargeDirection: AttackDirection;
-    isThrowCharging: boolean;
-    isGroundPounding: boolean;
-    isGroundPoundLanding: boolean;
-    groundPoundStartupTimer: number;
-    groundPoundChargeRatio: number;
-    hitboxActive: boolean;
-}
-
-export interface FighterState {
-    readonly id: number;
-    readonly character: string;
-    body: SimBody;
-    state: FighterStateName;
-    /** Input used on the latest step. */
-    input: FighterInput;
-    buffer: InputBuffer;
-    combat: CombatState;
-
-    /** Fighter-level dodge flag: states set it on enter, physics overwrites it from the body after each physics pass. */
-    isDodging: boolean;
-    isAttacking: boolean;
-    isHitStunned: boolean;
-    hitStunTimer: number;
-    isInvulnerable: boolean;
-    invulnerabilityTimer: number;
-    damagePercent: number;
-    lives: number;
-    isRespawning: boolean;
-    isTaunting: boolean;
-    isShowingDefeat: boolean;
-    isWinner: boolean;
-}
+/** States in which a fighter cannot start attacks. */
+const COMBAT_BLOCKED_STATES: ReadonlySet<FighterStateName> = new Set(['HitStun', 'Taunt', 'Win', 'Defeat', 'Respawning', 'Cinematic']);
 
 export interface MatchState {
     frame: number;
     fighters: FighterState[];
 }
 
-export interface FighterSetup {
-    character: string;
-    x: number;
-    y: number;
-}
-
 export function createMatch(fighters: readonly FighterSetup[]): MatchState {
     return {
         frame: 0,
         fighters: fighters.map((setup, id) => createFighter(id, setup)),
-    };
-}
-
-function createFighter(id: number, setup: FighterSetup): FighterState {
-    return {
-        id,
-        character: setup.character,
-        body: createBody(setup.x, setup.y, 1),
-        state: 'Idle',
-        input: emptyInput(),
-        buffer: { step: 0, jump: [], lightAttack: [], heavyAttack: [], dodge: [] },
-        combat: {
-            attack: null,
-            attackCooldownTimer: 0,
-            isCharging: false,
-            chargeTime: 0,
-            lastChargeTime: 0,
-            chargeDirection: 'neutral',
-            isThrowCharging: false,
-            isGroundPounding: false,
-            isGroundPoundLanding: false,
-            groundPoundStartupTimer: 0,
-            groundPoundChargeRatio: 0,
-            hitboxActive: false,
-        },
-        isDodging: false,
-        isAttacking: false,
-        isHitStunned: false,
-        hitStunTimer: 0,
-        isInvulnerable: false,
-        invulnerabilityTimer: 0,
-        damagePercent: 0,
-        lives: 3,
-        isRespawning: false,
-        isTaunting: false,
-        isShowingDefeat: false,
-        isWinner: false,
     };
 }
 
@@ -165,39 +57,23 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[]): v
 
     for (const f of fighters) {
         updateState(f);
+        updateCombat(f);
+        if (!COMBAT_BLOCKED_STATES.has(f.state)) handleCombatInput(f);
         updateTimers(f);
     }
 
     for (const f of fighters) collideWalls(f);
 
+    for (const attacker of fighters) {
+        for (const target of fighters) {
+            if (attacker !== target) checkHit(attacker, target);
+        }
+    }
+
     match.frame++;
 }
 
-// ─── Input buffer ───
-
-function updateInputBuffer(f: FighterState): void {
-    const buffer = f.buffer;
-    const step = ++buffer.step;
-    if (f.input.jump) buffer.jump.push(step);
-    if (f.input.lightAttack) buffer.lightAttack.push(step);
-    if (f.input.heavyAttack) buffer.heavyAttack.push(step);
-    if (f.input.dodge) buffer.dodge.push(step);
-
-    for (const action of ['jump', 'lightAttack', 'heavyAttack', 'dodge'] as const) {
-        const presses = buffer[action];
-        while (presses.length > 0 && step - presses[0] > INPUT_BUFFER_STEPS) presses.shift();
-    }
-}
-
-function isBuffered(f: FighterState, action: BufferedAction): boolean {
-    return f.buffer[action].length > 0;
-}
-
-function consumeBuffered(f: FighterState, action: BufferedAction): void {
-    f.buffer[action].shift();
-}
-
-// ─── Physics ───
+// ─── Movement ───
 
 const physicsInput: PhysicsInput = {
     moveLeft: false, moveRight: false, moveDown: false, moveUp: false,
@@ -213,7 +89,6 @@ function stepFighterPhysics(f: FighterState): void {
     b.isAttacking = f.isAttacking;
     b.isHitStunned = f.isHitStunned;
     b.isCharging = combat.isCharging;
-    b.isThrowCharging = combat.isThrowCharging;
     const attack = combat.attack;
     if (attack) {
         const data = AttackRegistry[attack.key];
@@ -306,189 +181,6 @@ function updateTimers(f: FighterState): void {
         if (f.invulnerabilityTimer <= 0) {
             f.isInvulnerable = false;
         }
-    }
-}
-
-// ─── State machine ───
-
-export function changeState(f: FighterState, next: FighterStateName): void {
-    exitState(f);
-    f.state = next;
-    enterState(f);
-}
-
-function enterState(f: FighterState): void {
-    const combat = f.combat;
-    switch (f.state) {
-        case 'Run':
-            f.body.isRunning = true;
-            break;
-        case 'Attack':
-            f.isAttacking = true;
-            break;
-        case 'GroundPound':
-            combat.isGroundPounding = true;
-            f.isAttacking = true;
-            break;
-        case 'HitStun':
-            f.isAttacking = false;
-            f.isDodging = false;
-            combat.isGroundPounding = false;
-            combat.attack = null;
-            combat.hitboxActive = false;
-            combat.isCharging = false;
-            combat.chargeTime = 0;
-            break;
-        case 'Dodge':
-        case 'AirDodge':
-            f.isDodging = true;
-            break;
-        case 'Taunt':
-            f.isTaunting = true;
-            break;
-        case 'Defeat':
-            f.isShowingDefeat = true;
-            break;
-        case 'Win':
-            f.isWinner = true;
-            break;
-        case 'Respawning':
-            f.isRespawning = true;
-            break;
-        case 'Cinematic':
-            f.body.vx = 0;
-            f.body.vy = 0;
-            combat.hitboxActive = false;
-            break;
-    }
-}
-
-function exitState(f: FighterState): void {
-    switch (f.state) {
-        case 'Run':
-            f.body.isRunning = false;
-            break;
-        case 'GroundPound':
-            f.combat.isGroundPounding = false;
-            f.isAttacking = false;
-            break;
-        case 'Taunt':
-            f.isTaunting = false;
-            break;
-        case 'Defeat':
-            f.isShowingDefeat = false;
-            break;
-        case 'Win':
-            f.isWinner = false;
-            break;
-        case 'Respawning':
-            f.isRespawning = false;
-            break;
-    }
-}
-
-function airborneState(f: FighterState): FighterStateName {
-    return f.body.vy < 0 ? 'Jump' : 'Fall';
-}
-
-function canDodge(f: FighterState): boolean {
-    return isBuffered(f, 'dodge') && f.body.dodgeCooldownTimer <= 0;
-}
-
-function updateState(f: FighterState): void {
-    const b = f.body;
-    const input = f.input;
-    const isMoving = input.moveLeft || input.moveRight;
-
-    switch (f.state) {
-        case 'Idle':
-            if (f.isHitStunned) return changeState(f, 'HitStun');
-            if (!b.isGrounded) return changeState(f, airborneState(f));
-            if (input.taunt) return changeState(f, 'Taunt');
-            if (input.defeat) return changeState(f, 'Defeat');
-            if (canDodge(f)) return changeState(f, 'Dodge');
-            if (isBuffered(f, 'jump')) return changeState(f, 'Jump');
-            if (isMoving) return changeState(f, 'Run');
-            return;
-
-        case 'Run':
-            if (f.isHitStunned) return changeState(f, 'HitStun');
-            if (!b.isGrounded) return changeState(f, airborneState(f));
-            if (canDodge(f)) return changeState(f, 'Dodge');
-            if (isBuffered(f, 'jump')) return changeState(f, 'Jump');
-            if (!isMoving) return changeState(f, 'Idle');
-            return;
-
-        case 'Jump':
-            if (f.isHitStunned) return changeState(f, 'HitStun');
-            if (b.isGrounded) return changeState(f, 'Idle');
-            if (b.vy > 0) return changeState(f, 'Fall');
-            if (canDodge(f)) return changeState(f, 'AirDodge');
-            return;
-
-        case 'Fall':
-            if (f.isHitStunned) return changeState(f, 'HitStun');
-            if (b.isGrounded) return changeState(f, 'Idle');
-            if (b.vy < 0) return changeState(f, 'Jump');
-            if (b.isWallSliding) return changeState(f, 'WallSlide');
-            if (canDodge(f)) return changeState(f, 'AirDodge');
-            return;
-
-        case 'WallSlide':
-            if (f.isHitStunned) return changeState(f, 'HitStun');
-            if (b.isGrounded) return changeState(f, 'Idle');
-            if (!b.isWallSliding) return changeState(f, airborneState(f));
-            return;
-
-        case 'Dodge':
-            if (!f.isDodging) return changeState(f, b.isGrounded ? (isMoving ? 'Run' : 'Idle') : 'Fall');
-            return;
-
-        case 'AirDodge':
-            if (b.isGrounded) return changeState(f, isMoving ? 'Run' : 'Idle');
-            if (!f.isDodging) return changeState(f, airborneState(f));
-            return;
-
-        case 'Attack':
-            if (f.isHitStunned) return changeState(f, 'HitStun');
-            if (!f.isAttacking) return changeState(f, b.isGrounded ? 'Idle' : airborneState(f));
-            return;
-
-        case 'Charging':
-            if (f.isHitStunned) return changeState(f, 'HitStun');
-            if (!f.combat.isCharging) return changeState(f, b.isGrounded ? 'Idle' : 'Fall');
-            return;
-
-        case 'GroundPound':
-            if (f.isHitStunned) return changeState(f, 'HitStun');
-            if (!f.combat.isGroundPounding) return changeState(f, 'Idle');
-            return;
-
-        case 'HitStun':
-            if (!f.isHitStunned) return changeState(f, b.isGrounded ? 'Idle' : airborneState(f));
-            return;
-
-        case 'Recovery':
-            if (f.isHitStunned) return changeState(f, 'HitStun');
-            if (b.isGrounded) return changeState(f, 'Idle');
-            if (!b.isRecovering) return changeState(f, 'Fall');
-            return;
-
-        case 'Taunt':
-        case 'Defeat':
-            if (f.isHitStunned) return changeState(f, 'HitStun');
-            if (isMoving || input.jump || input.lightAttack || input.heavyAttack || input.dodge || !b.isGrounded) {
-                return changeState(f, 'Idle');
-            }
-            return;
-
-        case 'Respawning':
-            if (!f.isRespawning) return changeState(f, 'Idle');
-            return;
-
-        case 'Win':
-        case 'Cinematic':
-            return;
     }
 }
 

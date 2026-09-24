@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { createMatch, fighterParityValues, PARITY_FIELDS, stepMatch } from '../shared/GameSim.ts';
-import type { FighterSetup } from '../shared/GameSim.ts';
+import type { FighterSetup } from '../shared/FighterState.ts';
 import { unpackInput } from '../shared/FighterInput.ts';
 import { hashValues } from '../shared/StateHash.ts';
 

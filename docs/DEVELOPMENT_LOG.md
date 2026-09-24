@@ -598,3 +598,9 @@ Part 2
 - **[Refactor]** **Stage geometry single-sourced**: `StageFactory` now builds its collision boxes from `STAGE_LAYOUT` in `shared/StageData.ts`. The previous shared copy had drifted from the game (walls off by 30-50 px, left platform by 25 px).
 - **[Feat]** **`shared/GameSim.ts`**: deterministic, plain-data simulation of fighter movement, input buffering, the state machine and timers. Combat comes next.
 - **[Feat]** **Replay tests** (`npm test`): a match recorded in the game with `?record` in the URL (F9 saves it to `tests/replays/`) is replayed through `GameSim`, and every fighter's state must match the recording at every step. First replay: 2,108 steps of movement, identical.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-24] Netcode rebuild, step 2b - Combat in the simulation (branch `netcode-rebuild`, unreleased)
+- **[Feat]** **`shared/Combat.ts`**: light attacks, charged signatures and their ghost projectiles, ground pound, recovery, hitboxes and hits, ported from `PlayerCombat`. Knockback directions come from a table of exact values, so every browser computes identical knockback.
+- **[Refactor]** Fighter data, input buffer and state machine moved to `shared/FighterState.ts`.
+- **[S]** **Verified**: two new recordings replay exactly, including a 16 s fight against the CPU with 9 hits (a side signature, a ground pound, lights).
