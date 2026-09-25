@@ -2,9 +2,9 @@
  * GameSim — deterministic match simulation.
  *
  * Plain data only: no Phaser, no wall-clock time, no Math.random. `stepMatch`
- * advances the match by one fixed step of SIM_STEP_MS. The step order
- * mirrors GameScene.stepSimulation, and tests/sim.test.ts replays matches
- * recorded in the running game to check the simulation reproduces them exactly.
+ * advances the match by one fixed step of SIM_STEP_MS and reports what happened
+ * as events. tests/sim.test.ts replays recorded matches and checks every step
+ * reproduces the recording exactly.
  */
 
 import { SIM_STEP_MS } from './FixedStepClock.js';
@@ -15,6 +15,7 @@ import {
     FIGHTER_STATES, changeState, consumeBuffered, createFighter, isBuffered, isInPlay, updateInputBuffer, updateState,
     type FighterSetup, type FighterState, type FighterStateName,
 } from './FighterState.js';
+import { pushPhysicsSounds, type MatchEvent } from './MatchEvents.js';
 import { PhysicsConfig } from './PhysicsConfig.js';
 import {
     type SimInput as PhysicsInput, type PhysicsEvent,
@@ -27,7 +28,7 @@ import { STAGE_LAYOUT } from './StageData.js';
 const STEP_S = SIM_STEP_MS / 1000;
 
 /** States in which a fighter cannot start attacks. */
-const COMBAT_BLOCKED_STATES: ReadonlySet<FighterStateName> = new Set(['HitStun', 'Taunt', 'Win', 'Defeat', 'Cinematic']);
+const COMBAT_BLOCKED_STATES: ReadonlySet<FighterStateName> = new Set(['HitStun', 'Taunt', 'Defeat']);
 
 /** A KO'd fighter sits out 2 s, then drops in above the stage centre. */
 const RESPAWN_DELAY_STEPS = 120;
@@ -62,28 +63,34 @@ export function createMatch(fighters: readonly FighterSetup[], seed: number): Ma
 
 // ─── Step ───
 
-/** Advances the match by one fixed step. `inputs[i]` is fighter i's input for this step. */
-export function stepMatch(match: MatchState, inputs: readonly FighterInput[]): void {
+/**
+ * Advances the match by one fixed step. `inputs[i]` is fighter i's input for
+ * this step; what happened is appended to `events`.
+ */
+export function stepMatch(match: MatchState, inputs: readonly FighterInput[], events: MatchEvent[] = []): void {
     if (match.isOver) return;
 
     for (const f of match.fighters) {
-        if (f.respawnSteps > 0 && --f.respawnSteps === 0) respawn(match, f);
+        if (f.respawnSteps > 0 && --f.respawnSteps === 0) {
+            respawn(match, f);
+            events.push({ type: 'respawn', fighter: f.id, x: f.body.x, y: f.body.y });
+        }
     }
     const fighters = match.fighters.filter(isInPlay);
 
     for (const f of fighters) {
         Object.assign(f.input, inputs[f.id]);
         updateInputBuffer(f);
-        stepFighterPhysics(f);
+        stepFighterPhysics(f, events);
         updateFacing(f);
     }
 
-    for (const f of fighters) collidePlatforms(f);
+    for (const f of fighters) collidePlatforms(f, events);
 
     for (const f of fighters) {
         updateState(f);
-        updateCombat(f);
-        if (!COMBAT_BLOCKED_STATES.has(f.state)) handleCombatInput(f);
+        updateCombat(f, events);
+        if (!COMBAT_BLOCKED_STATES.has(f.state)) handleCombatInput(f, events);
         updateTimers(f);
     }
 
@@ -91,13 +98,41 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[]): v
 
     for (const attacker of fighters) {
         for (const target of fighters) {
-            if (attacker !== target) checkHit(attacker, target);
+            if (attacker !== target) checkHit(attacker, target, events);
         }
     }
 
-    checkBlastZones(match, fighters);
+    checkBlastZones(match, fighters, events);
 
     match.frame++;
+}
+
+// ─── Outside the step ───
+
+/** Adds a fighter mid-match (training dummies); returns it. */
+export function addFighter(match: MatchState, setup: FighterSetup): FighterState {
+    const f = createFighter(match.fighters.length, setup);
+    match.fighters.push(f);
+    return f;
+}
+
+/** Brings a KO'd fighter back now instead of when its respawn delay ends. */
+export function respawnFighter(match: MatchState, id: number): void {
+    respawn(match, match.fighters[id]);
+}
+
+/**
+ * For cutscenes: stands a fighter still at (x, y), facing `facing` (1 or -1),
+ * with a clean slate except for its damage and lives.
+ */
+export function placeFighter(match: MatchState, id: number, x: number, y: number, facing: number): void {
+    const f = match.fighters[id];
+    const { damagePercent, lives } = f;
+    Object.assign(f, createFighter(f.id, { character: f.character, x, y }));
+    f.damagePercent = damagePercent;
+    f.lives = lives;
+    f.body.facingDirection = facing;
+    f.body.isGrounded = true;
 }
 
 // ─── Movement ───
@@ -108,7 +143,7 @@ const physicsInput: PhysicsInput = {
     aimUp: false, aimDown: false, recoveryRequested: false,
 };
 
-function stepFighterPhysics(f: FighterState): void {
+function stepFighterPhysics(f: FighterState, events: MatchEvent[]): void {
     const b = f.body;
     const combat = f.combat;
 
@@ -142,13 +177,14 @@ function stepFighterPhysics(f: FighterState): void {
     physicsInput.aimUp = input.aimUp;
     physicsInput.aimDown = input.aimDown;
 
-    const events = stepPhysics(b, physicsInput, STEP_S);
+    const physicsEvents = stepPhysics(b, physicsInput, STEP_S);
     f.isDodging = b.isDodging;
-    handlePhysicsEvents(f, events);
+    handlePhysicsEvents(f, physicsEvents);
+    pushPhysicsSounds(events, f.id, physicsEvents);
 }
 
-function handlePhysicsEvents(f: FighterState, events: PhysicsEvent[]): void {
-    for (const event of events) {
+function handlePhysicsEvents(f: FighterState, physicsEvents: readonly PhysicsEvent[]): void {
+    for (const event of physicsEvents) {
         if (event.type === 'consume') {
             consumeBuffered(f, event.input);
         } else if (event.type === 'dodge_start') {
@@ -157,13 +193,13 @@ function handlePhysicsEvents(f: FighterState, events: PhysicsEvent[]): void {
     }
 }
 
-function collidePlatforms(f: FighterState): void {
+function collidePlatforms(f: FighterState, events: MatchEvent[]): void {
     const b = f.body;
     const platforms = STAGE_LAYOUT.platforms;
     for (let i = 0; i < platforms.length; i++) {
         const p = platforms[i];
         if (b.droppingThroughPlatformIdx === i) b.droppingThroughY = p.y;
-        checkSinglePlatformCollision(b, i, p.x, p.y, p.w, p.h, p.isSoft);
+        pushPhysicsSounds(events, f.id, checkSinglePlatformCollision(b, i, p.x, p.y, p.w, p.h, p.isSoft));
     }
     f.isDodging = b.isDodging;
 }
@@ -216,7 +252,7 @@ function updateTimers(f: FighterState): void {
 // ─── KOs ───
 
 /** A fighter whose hurtbox crosses a blast zone edge loses a life. */
-function checkBlastZones(match: MatchState, fighters: readonly FighterState[]): void {
+function checkBlastZones(match: MatchState, fighters: readonly FighterState[], events: MatchEvent[]): void {
     const zone = STAGE_LAYOUT.blastZones;
     let eliminated = false;
 
@@ -229,6 +265,7 @@ function checkBlastZones(match: MatchState, fighters: readonly FighterState[]): 
             f.lives--;
             if (f.lives > 0) f.respawnSteps = RESPAWN_DELAY_STEPS;
             else eliminated = true;
+            events.push({ type: 'ko', fighter: f.id, x: b.x, y: b.y });
         }
     }
 
@@ -281,49 +318,20 @@ export const PARITY_FIELDS = [
     'charging', 'chargeTime', 'groundPounding', 'groundPoundStartupTimer', 'groundPoundLanding',
 ] as const;
 
-/** Parity values in PARITY_FIELDS order. */
-export function parityValues(v: {
-    x: number; y: number; vx: number; vy: number; facing: number;
-    grounded: boolean; jumpsRemaining: number; airActionCounter: number;
-    wallSliding: boolean; wallDirection: number; dodging: boolean; spotDodging: boolean;
-    dodgeTimer: number; dodgeCooldownTimer: number; fastFalling: boolean;
-    recovering: boolean; recoveryAvailable: boolean; recoveryTimer: number; running: boolean;
-    state: string; damage: number; lives: number; hitStunned: boolean; hitStunTimer: number;
-    invulnerable: boolean; invulnerabilityTimer: number; attacking: boolean;
-    attackKey: string | null; attackPhase: string | null; attackPhaseTimer: number;
-    attackCooldownTimer: number; charging: boolean; chargeTime: number;
-    groundPounding: boolean; groundPoundStartupTimer: number; groundPoundLanding: boolean;
-}): number[] {
-    const n = (b: boolean) => (b ? 1 : 0);
-    return [
-        v.x, v.y, v.vx, v.vy, v.facing, n(v.grounded), v.jumpsRemaining, v.airActionCounter,
-        n(v.wallSliding), v.wallDirection, n(v.dodging), n(v.spotDodging), v.dodgeTimer, v.dodgeCooldownTimer,
-        n(v.fastFalling), n(v.recovering), n(v.recoveryAvailable), v.recoveryTimer, n(v.running),
-        FIGHTER_STATES.indexOf(v.state as FighterStateName),
-        v.damage, v.lives, n(v.hitStunned), v.hitStunTimer, n(v.invulnerable), v.invulnerabilityTimer,
-        n(v.attacking), v.attackKey === null ? -1 : ATTACK_KEYS.indexOf(v.attackKey),
-        v.attackPhase === null ? -1 : ATTACK_PHASES.indexOf(v.attackPhase as AttackPhase), v.attackPhaseTimer,
-        v.attackCooldownTimer, n(v.charging), v.chargeTime,
-        n(v.groundPounding), v.groundPoundStartupTimer, n(v.groundPoundLanding),
-    ];
-}
-
+/** A fighter's parity values, in PARITY_FIELDS order. */
 export function fighterParityValues(f: FighterState): number[] {
     const b = f.body;
-    const combat = f.combat;
-    return parityValues({
-        x: b.x, y: b.y, vx: b.vx, vy: b.vy, facing: b.facingDirection,
-        grounded: b.isGrounded, jumpsRemaining: b.jumpsRemaining, airActionCounter: b.airActionCounter,
-        wallSliding: b.isWallSliding, wallDirection: b.wallDirection,
-        dodging: b.isDodging, spotDodging: b.isSpotDodging, dodgeTimer: b.dodgeTimer, dodgeCooldownTimer: b.dodgeCooldownTimer,
-        fastFalling: b.isFastFalling, recovering: b.isRecovering, recoveryAvailable: b.recoveryAvailable,
-        recoveryTimer: b.recoveryTimer, running: b.isRunning, state: f.state,
-        damage: f.damagePercent, lives: f.lives, hitStunned: f.isHitStunned, hitStunTimer: f.hitStunTimer,
-        invulnerable: f.isInvulnerable, invulnerabilityTimer: f.invulnerabilityTimer, attacking: f.isAttacking,
-        attackKey: combat.attack?.key ?? null, attackPhase: combat.attack?.phase ?? null,
-        attackPhaseTimer: combat.attack?.phaseTimer ?? 0, attackCooldownTimer: combat.attackCooldownTimer,
-        charging: combat.isCharging, chargeTime: combat.chargeTime,
-        groundPounding: combat.isGroundPounding, groundPoundStartupTimer: combat.groundPoundStartupTimer,
-        groundPoundLanding: combat.isGroundPoundLanding,
-    });
+    const c = f.combat;
+    const n = (v: boolean) => (v ? 1 : 0);
+    return [
+        b.x, b.y, b.vx, b.vy, b.facingDirection, n(b.isGrounded), b.jumpsRemaining, b.airActionCounter,
+        n(b.isWallSliding), b.wallDirection, n(b.isDodging), n(b.isSpotDodging), b.dodgeTimer, b.dodgeCooldownTimer,
+        n(b.isFastFalling), n(b.isRecovering), n(b.recoveryAvailable), b.recoveryTimer, n(b.isRunning),
+        FIGHTER_STATES.indexOf(f.state),
+        f.damagePercent, f.lives, n(f.isHitStunned), f.hitStunTimer, n(f.isInvulnerable), f.invulnerabilityTimer,
+        n(f.isAttacking), c.attack ? ATTACK_KEYS.indexOf(c.attack.key) : -1,
+        c.attack ? ATTACK_PHASES.indexOf(c.attack.phase) : -1, c.attack?.phaseTimer ?? 0,
+        c.attackCooldownTimer, n(c.isCharging), c.chargeTime,
+        n(c.isGroundPounding), c.groundPoundStartupTimer, n(c.isGroundPoundLanding),
+    ];
 }

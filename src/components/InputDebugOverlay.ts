@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { Player } from '../entities/Player';
-import type { InputState } from '../input/InputManager';
+import type { FighterInput } from '../../shared/FighterInput';
 
 /**
  * InputDebugOverlay — Toggled by F2
@@ -150,7 +150,7 @@ export class InputDebugOverlay {
     }
 
     private formatInputState(
-        input: InputState,
+        input: FighterInput,
         keys: typeof InputDebugOverlay.WASD_KEYS
     ): string {
         if (!input) return '—';
@@ -179,7 +179,6 @@ export class InputDebugOverlay {
         if (input.dodge) parts.push(`${keys.dodge}↓`);
         else if (input.dodgeHeld) parts.push(`${keys.dodge.toLowerCase()}`);
 
-        if (input.recovery) parts.push(`${keys.recovery}↓`);
         if (input.taunt) parts.push(`${keys.taunt}↓`);
 
         return parts.join(' ');

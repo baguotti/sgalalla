@@ -1,25 +1,10 @@
 import Phaser from 'phaser';
-import { STAGE_LAYOUT } from '../../shared/StageData';
-import type { SimPlatform } from '../../shared/StageData';
 
-
-/**
- * Result of creating a stage. Scenes can pick what they need
- * and assign references to their own properties.
- */
+/** The stage's visuals. Collision lives in shared/StageData.ts. */
 export interface StageResult {
     background: Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite;
-
-    mainPlatform: Phaser.GameObjects.Rectangle;
-    softPlatforms: Phaser.GameObjects.Rectangle[];
-    sidePlatforms: Phaser.GameObjects.Rectangle[]; // Added side platforms
-
-    wallCollisionRects: Phaser.Geom.Rectangle[];
     platformTextures: Phaser.GameObjects.Image[];
 }
-
-// Shared color constants for stage visuals
-
 
 /**
  * Creates the standard Sgalalla stage layout.
@@ -53,21 +38,6 @@ export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'ad
 
 
 
-    // --- Collision ---
-    // Geometry comes from shared STAGE_LAYOUT (also used by the simulation).
-    // Invisible rectangles; Matter bodies let chests land on them.
-    const collisionRect = (p: SimPlatform): Phaser.GameObjects.Rectangle => {
-        const rect = scene.add.rectangle(p.x, p.y, p.w, p.h);
-        rect.setVisible(false);
-        (scene as any).matter.add.gameObject(rect, { isStatic: true });
-        return rect;
-    };
-    const solidPlatforms = STAGE_LAYOUT.platforms.filter(p => !p.isSoft).map(collisionRect);
-    const mainPlatform = solidPlatforms[0];
-    const sidePlatforms = solidPlatforms.slice(1);
-    const softPlatforms = STAGE_LAYOUT.platforms.filter(p => p.isSoft).map(collisionRect);
-    const wallCollisionRects = STAGE_LAYOUT.walls.map(w => new Phaser.Geom.Rectangle(w.x - w.w / 2, w.y - w.h / 2, w.w, w.h));
-
     // --- Platform Textures ---
     // User requested "Platform_BH4A_adria.png" (renamed to platform_main.png)
     // The previous implementation used two corner images.
@@ -94,15 +64,10 @@ export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'ad
     rightTex.setScale(0.8, 0.8);
     rightTex.setFlipX(true); // Flip for right side
 
-    // Adjust depths to be behind players (0) but above background (-100)
-    // Main Platform rect is added above... wait.
-    // Phaser adds to display list in order.
-    // mainPlatform is added first. Then these. So these are ON TOP of mainPlatform.
-    // Players are added later in GameScene, so players are ON TOP of these.
-    // Perfect.
+    // Default depth 0: above the background (-100), below the players (10)
 
 
-    // --- Side and Top Platform Textures (visual only; collision is in STAGE_LAYOUT) ---
+    // --- Side and Top Platform Textures ---
     const leftPlatVisual = scene.add.image(40, 480, sideTexKey);
     leftPlatVisual.setScale(0.8);
     leftPlatVisual.setDepth(-10);
@@ -119,12 +84,6 @@ export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'ad
 
     return {
         background,
-
-        mainPlatform,
-        softPlatforms,
-        sidePlatforms, // Now Rectangles
-
-        wallCollisionRects,
         platformTextures: [leftTex, rightTex, leftPlatVisual, topPlatVisual]
     };
 }

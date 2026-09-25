@@ -1,848 +1,549 @@
 import Phaser from 'phaser';
 import { PhysicsConfig } from '../config/PhysicsConfig';
-
 import { InputManager } from '../input/InputManager';
-import type { InputState } from '../input/InputManager';
-import { InputBuffer } from '../input/InputBuffer';
-import { TouchController } from '../components/TouchController';
-import { Fighter } from './Fighter';
-import { PlayerPhysics } from './player/PlayerPhysics';
-import { PlayerCombat } from './player/PlayerCombat';
-import { Attack, AttackPhase, AttackDirection } from '../combat/Attack';
-import { PlayerAI } from './player/PlayerAI';
-import { StateMachine } from '../state/StateMachine';
-import {
-    IdleState, RunState, JumpState, FallState, WallSlideState,
-    AttackState, ChargingState, HitStunState,
-    DodgeState, AirDodgeState,
-    RecoveryState, GroundPoundState,
-    TauntState, WinState, DefeatState, RespawningState,
-    CinematicState
-} from '../state/states';
-import type { Throwable } from './Throwable';
+import type { TouchController } from '../components/TouchController';
+import { AudioManager } from '../managers/AudioManager';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
+import { PlayerAI } from './player/PlayerAI';
+import { AttackDirection, AttackRegistry, AttackType } from '../../shared/AttackData';
+import { GHOST_FADE_MS, GHOST_TRAVEL_MS, HURTBOX_HEIGHT, HURTBOX_WIDTH, currentDamage } from '../../shared/Combat';
+import { emptyInput, type FighterInput } from '../../shared/FighterInput';
+import { isInPlay, type FighterState, type GhostHitbox } from '../../shared/FighterState';
+import { SIM_STEP_MS } from '../../shared/FixedStepClock';
+import type { MatchState } from '../../shared/GameSim';
 
-export const PlayerState = {
-    GROUNDED: 'Grounded',
-    AIRBORNE: 'Airborne',
-    FAST_FALLING: 'Fast-falling',
-    RECOVERING: 'Recovering',
-    ATTACKING: 'Attacking',
-    DODGING: 'Dodging',
-    HIT_STUN: 'Hit-Stun',
-    GROUND_POUND: 'Ground-Pound',
-} as const;
+export interface PlayerConfig {
+    /** Lobby slot: picks the colour, HUD slot and default controls. */
+    playerId: number;
+    character: string;
+    isAI?: boolean;
+    isTrainingDummy?: boolean;
+    gamepadIndex?: number | null;
+    useKeyboard?: boolean;
+    keyboardMapping?: 'wasd' | 'arrows' | 'all';
+    mappingSlot?: number;
+}
 
-export type PlayerState = typeof PlayerState[keyof typeof PlayerState];
+const DAMAGE_FLASH_MS = 150;
 
-export class Player extends Fighter {
-    private sprite!: Phaser.GameObjects.Sprite;
+/**
+ * A fighter on screen and the input that drives it. The match simulation owns
+ * all gameplay state: `render` draws match.fighters[fighterIndex] each frame,
+ * and the scene forwards simulation events for sounds and effects.
+ */
+export class Player extends Phaser.GameObjects.Container {
+    readonly fighterIndex: number;
+    readonly playerId: number;
+    readonly character: string;
+    readonly isAI: boolean;
+    /** A CPU that stands still (training). */
+    isTrainingDummy: boolean;
+    readonly inputType: 'keyboard' | 'gamepad' | 'ai';
+    readonly keyboardMapping: 'wasd' | 'arrows' | 'all';
 
-    public physics: PlayerPhysics; // Public for debugging/GameScene access if needed
+    /** Mirrored from the simulation for the HUD. */
+    damagePercent = 0;
+    lives = 0;
 
-    // Combat system delegated to PlayerCombat
-    private _isAttacking: boolean = false;
-    public get isAttacking(): boolean { return this._isAttacking; }
-    public set isAttacking(value: boolean) { this._isAttacking = value; }
+    private readonly sprite: Phaser.GameObjects.Sprite;
+    private readonly nameTag: Phaser.GameObjects.Text;
+    private readonly hurtboxRect: Phaser.GameObjects.Rectangle;
+    private hitboxRect: Phaser.GameObjects.Rectangle | null = null;
+    private damageLabel: Phaser.GameObjects.Text | null = null;
+    private showDebug = false;
 
-    public combat: PlayerCombat;
+    private readonly inputManager: InputManager | null;
+    private readonly ai: PlayerAI | null;
+    private currentInput: FighterInput = emptyInput();
 
-    public getSprite(): Phaser.GameObjects.Sprite {
-        return this.sprite;
-    }
+    /** Set during cutscenes and the victory pose: shown instead of the state's animation, even out of play. */
+    private pose: string | null = null;
 
-    // FSM — State Machine (Phase 2 forward declaration, wired in Phase 3)
-    public fsm: StateMachine = new StateMachine();
+    private damageFlashMs = 0;
+    private isCharging = false;
+    private chargeGhost: Phaser.GameObjects.Sprite | null = null;
+    private chargeBlurFx: Phaser.FX.Blur | null = null;
+    private chargeSounds: Phaser.Sound.BaseSound[] = [];
+    private isRecovering = false;
+    private recoveryGhost: Phaser.GameObjects.Sprite | null = null;
 
-    // Animation key for network sync (used so remote players play correct animation)
-    public animationKey: string = '';
+    constructor(scene: Phaser.Scene, fighter: FighterState, config: PlayerConfig, touchController?: TouchController) {
+        super(scene, fighter.body.x, fighter.body.y);
 
-    // Dodge system
-    public isDodging: boolean = false; // Public for Physics access
+        this.fighterIndex = fighter.id;
+        this.playerId = config.playerId;
+        this.character = config.character;
+        this.isAI = config.isAI ?? false;
+        this.isTrainingDummy = config.isTrainingDummy ?? false;
+        this.keyboardMapping = config.keyboardMapping ?? 'all';
 
-    private dodgeCooldownTimer: number = 0;
-
-    // Facing direction
-    private facingDirection: number = 1;
-    public getFacingDirection(): number { return this.facingDirection; }
-    public setFacingDirection(dir: number): void {
-        this.facingDirection = dir;
-        if (this.sprite) {
-            this.sprite.setFlipX(dir < 0);
-        }
-    }
-
-    // Damage display
-
-
-    // Unified input system (keyboard + gamepad)
-    private inputManager!: InputManager;
-    private currentInput!: InputState;
-    public getCurrentInput(): InputState { return this.currentInput; }
-    public inputBuffer: InputBuffer = new InputBuffer(6);
-
-    // Exposed input config for debug overlay
-    public inputType: 'keyboard' | 'gamepad' | 'ai' = 'keyboard';
-    public keyboardMapping: 'wasd' | 'arrows' | 'all' = 'all';
-
-    // Network input injection
-    public useExternalInput: boolean = false; // When true, updatePhysics skips internal polling
-    public setInput(input: InputState): void {
-        this.currentInput = input;
-    }
-
-    // Sprite accessor for external tinting
-    public get spriteObject(): Phaser.GameObjects.Sprite {
-        return this.sprite;
-    }
-
-    // AI Control
-    public isAI: boolean = false;
-    public isDead: boolean = false;
-    public isWinner: boolean = false;
-    public isTaunting: boolean = false;
-    public isShowingDefeat: boolean = false;
-    public isRespawning: boolean = false; // Prevents double-deaths and damage immediately after spawning
-    private ai: PlayerAI | null = null;
-    private aiInput: any = {}; // Store AI generated input
-    public isTrainingDummy: boolean = false; // Toggle for training mode
-
-    // Player ID (0 = P1, 1 = P2, etc.)
-    public playerId: number = 0;
-
-    // Character Type
-    // Character config
-    public character: string = 'fok';
-    private animPrefix: string = 'alchemist';
-    private debugRect!: Phaser.GameObjects.Rectangle;
-
-    public lightAttackVariant: number = 0;
-
-    // Item Holding
-    public heldItem: Throwable | null = null;
-
-    public checkItemPickup(): boolean {
-        const gameScene = this.scene as GameSceneInterface;
-
-        // Check throwable chests (bomb mode)
-        const chests = gameScene.getThrowableChests ? gameScene.getThrowableChests() : [];
-        if (chests && chests.length > 0) {
-            const pickupRange = 100;
-            let closest: Throwable | null = null;
-            let minDist = pickupRange;
-
-            for (const chest of chests) {
-                const dist = Phaser.Math.Distance.Between(this.x, this.y, chest.x, chest.y);
-                if (dist < minDist) {
-                    minDist = dist;
-                    closest = chest;
-                }
-            }
-
-            if (closest) {
-                this.pickupItem(closest);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public pickupItem(item: Throwable): void {
-        this.heldItem = item;
-        // Disable physics for the item while holding
-        item.setSensor(true);
-        item.setIgnoreGravity(true);
-        item.setVelocity(0, 0);
-        item.setAngularVelocity(0);
-
-        // Emit event for network sync
-        this.scene.events.emit('bomb_pickup', this);
-    }
-
-    public throwItem(velocityX: number, velocityY: number): void {
-        if (!this.heldItem) return;
-
-        const item = this.heldItem;
-        this.heldItem = null;
-        // Play throw SFX
-        this.scene.sound.play('sfx_chest_throw', { volume: 0.6 });
-
-        // Re-enable physics
-        item.setSensor(false);
-        item.setIgnoreGravity(false);
-
-        item.setVelocity(velocityX, velocityY);
-        // Add some spin
-        item.setAngularVelocity(0.2 * this.getFacingDirection());
-
-        // Offset spawn slightly so it doesn't clip immediately (though sensor is off now.. wait, might need to re-enable sensor after a frame if we want it to hit player? No, usually ignore thrower).
-        // For now, simple throw.
-    }
-
-    public updateHeldItemPosition(): void {
-        if (this.heldItem) {
-            // Position in front of the character, towards the bottom
-            const offsetForward = 50 * this.getFacingDirection(); // Decreased from 55 to 50
-            const offsetDown = 22; // Decreased from 25 to 22 (moves 3px up)
-
-            this.heldItem.setPosition(this.x + offsetForward, this.y + offsetDown);
-            this.heldItem.setVelocity(0, 0); // Force stay
-        }
-    }
-
-    public setDebug(visible: boolean): void {
-
-        if (this.debugRect) {
-            this.debugRect.setVisible(visible);
-        }
-        if (this.nameTag) {
-            this.nameTag.setVisible(visible);
-        }
-        if (this.combat) {
-            this.combat.setDebug(visible);
-        }
-    }
-
-    constructor(scene: Phaser.Scene, x: number, y: number, config: { isAI?: boolean, isTrainingDummy?: boolean, playerId?: number, gamepadIndex?: number | null, useKeyboard?: boolean, keyboardMapping?: 'wasd' | 'arrows' | 'all', character?: string, mappingSlot?: number } = {}, touchController?: TouchController) {
-        super(scene, x, y);
-
-        this.isAI = config.isAI || false;
-        this.isTrainingDummy = config.isTrainingDummy || false;
-        this.playerId = config.playerId || 0;
-
-        // Character Selection
-        this.character = config.character || 'fok'; // Default is fok
-        this.animPrefix = this.character;
-
-        // Create player sprite — use character-specific idle frame
-        const startFrame = `${this.character}_idle_000`;
-
-        this.sprite = scene.add.sprite(0, 7, this.character, startFrame); // Adjusted offset (7) to ground sprite after height increase
-
-
-
-        // Base size is 256 for both characters (User confirmed 1:1 scale)
-        const scale = 1;
-        this.sprite.setScale(scale);
+        this.sprite = scene.add.sprite(0, 0, this.character, `${this.character}_idle_000`);
         this.add(this.sprite);
-
-        // Explicitly set player depth to 10 to guarantee they render above stage platforms (depth 0),
-        // and so that relative child effects (like ghosts at player.depth - 1) still render above platforms.
+        // Above the stage platforms (depth 0); ghosts sit at depth - 1
         this.setDepth(10);
 
-        // Create Name Tag (Player Indicator)
-        let displayName = '';
-        if (this.isAI) {
-            displayName = `CPU ${this.playerId + 1}`;
-        } else {
-            displayName = this.character.toUpperCase();
-        }
-
-        this.nameTag = scene.add.text(0, -100, displayName, {
+        this.nameTag = scene.add.text(0, -100, this.isAI ? `CPU ${this.playerId + 1}` : this.character.toUpperCase(), {
             fontSize: '18px',
             fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
             stroke: '#000000',
-            strokeThickness: 4
+            strokeThickness: 4,
         });
         this.nameTag.setOrigin(0.5);
-        this.add(this.nameTag);
         this.nameTag.setVisible(false);
+        this.add(this.nameTag);
 
+        this.hurtboxRect = scene.add.rectangle(0, 0, HURTBOX_WIDTH, HURTBOX_HEIGHT);
+        this.hurtboxRect.setStrokeStyle(2, 0x00ff00);
+        this.hurtboxRect.setFillStyle(0x00ff00, 0.2);
+        this.hurtboxRect.setVisible(false);
+        this.add(this.hurtboxRect);
 
-        // Initialize Components
-        this.physics = new PlayerPhysics(this);
-        this.combat = new PlayerCombat(this, scene);
-
-        if (this.isAI) {
-            this.ai = new PlayerAI(this, scene);
-        }
-
-        // Explicitly set size (BEFORE Debug Hitbox creation)
-        this.setSize(60, 120); // Default size
-
-        if (this.character === 'fok' || this.character === 'sgu' || this.character === 'sga' || this.character === 'pe' || this.character === 'nock' || this.character === 'greg') {
-            this.setSize(46, PhysicsConfig.PLAYER_HEIGHT - 10);
-        }
-
-        // Create Debug Hitbox (Hidden by default)
-        this.debugRect = scene.add.rectangle(0, 0, this.width, this.height);
-        this.debugRect.setStrokeStyle(2, 0x00ff00);
-        this.debugRect.setFillStyle(0x00ff00, 0.2);
-        this.debugRect.setVisible(false);
-        this.add(this.debugRect);
-
-        const defaultKeyboard = this.playerId === 0 && !this.isAI;
-        const useKeyboard = config.useKeyboard !== undefined ? config.useKeyboard : defaultKeyboard;
-        const gamepadIdx = config.gamepadIndex !== undefined ? config.gamepadIndex : null;
-        // STRICT ROUTING: enableGamepad only when gamepadIndex is explicitly assigned
-        const enableGamepad = gamepadIdx !== null;
-        const keyboardMapping = config.keyboardMapping || 'all';
-
-
-
-        // Physics Body Creation happens in PlayerPhysics using this.width/height
-        // OR it uses its own constants. Let's check PlayerPhysics.
-
-        this.inputManager = new InputManager(scene, {
-            playerId: this.playerId,
-            useKeyboard: useKeyboard,
-            gamepadIndex: gamepadIdx,
-            enableGamepad: enableGamepad,
-            keyboardMapping: keyboardMapping as 'all' | undefined,
-            mappingSlot: config.mappingSlot ?? 0
-        }, touchController);
-
-        // Store input config for debug overlay
         if (this.isAI) {
             this.inputType = 'ai';
-        } else if (enableGamepad && !useKeyboard) {
-            this.inputType = 'gamepad';
+            this.inputManager = null;
+            this.ai = new PlayerAI(this.fighterIndex);
         } else {
-            this.inputType = 'keyboard';
+            const useKeyboard = config.useKeyboard ?? this.playerId === 0;
+            const gamepadIndex = config.gamepadIndex ?? null;
+            this.inputType = gamepadIndex !== null && !useKeyboard ? 'gamepad' : 'keyboard';
+            this.inputManager = new InputManager(scene, {
+                playerId: this.playerId,
+                useKeyboard,
+                gamepadIndex,
+                enableGamepad: gamepadIndex !== null,
+                keyboardMapping: this.keyboardMapping as 'all' | undefined,
+                mappingSlot: config.mappingSlot ?? 0,
+            }, touchController);
+            this.ai = null;
         }
-        this.keyboardMapping = keyboardMapping;
 
-        this.resetVisuals(); // Ensure clean visual state (no tints)
         scene.add.existing(this);
-
-        // ─── FSM: Register all states ───
-        this.fsm.register(new IdleState());
-        this.fsm.register(new RunState());
-        this.fsm.register(new JumpState());
-        this.fsm.register(new FallState());
-        this.fsm.register(new WallSlideState());
-        this.fsm.register(new AttackState());
-        this.fsm.register(new ChargingState());
-        this.fsm.register(new HitStunState());
-        this.fsm.register(new DodgeState());
-        this.fsm.register(new AirDodgeState());
-        this.fsm.register(new RecoveryState());
-        this.fsm.register(new GroundPoundState());
-        this.fsm.register(new TauntState());
-        this.fsm.register(new WinState());
-        this.fsm.register(new DefeatState());
-        this.fsm.register(new RespawningState());
-        this.fsm.register(new CinematicState());
-
-        this.fsm.changeState('Idle', this);
     }
 
-    /**
-     * Override destroy to clean up external shadow object
-     */
-    public destroy(fromScene?: boolean): void {
-        if (this.inputManager) {
-            this.inputManager.destroy();
-        }
-        super.destroy(fromScene);
+    public get spriteObject(): Phaser.GameObjects.Sprite {
+        return this.sprite;
     }
 
-    public setDamage(percent: number): void {
-        this.damagePercent = percent;
-        this.updateDamageDisplay();
+    public setColor(color: number): void {
+        this.nameTag.setColor('#' + color.toString(16).padStart(6, '0'));
     }
 
-    public updatePhysics(delta: number): void {
-        // If in Cinematic state, skip physics entirely — manual positioning only
-        const isCinematic = this.fsm.getCurrentStateName() === 'Cinematic';
+    // ─── Input ───
 
-        if (isCinematic) {
-            this.currentInput = this.inputManager.getEmptyInput();
-            this.inputBuffer.update(this.currentInput);
-            // Apply velocity to position manually (for gravity during intro cutscene)
-            // but skip stepPhysics/syncFromBody to prevent overwriting external positioning
-            const dt = delta / 1000;
-            this.x += this.velocity.x * dt;
-            this.y += this.velocity.y * dt;
-            return;
-        } else if (this.isAI) {
-            if (this.isTrainingDummy) {
-                this.currentInput = this.inputManager.getEmptyInput();
-            } else {
-                this.updateAI(delta);
-                this.currentInput = this.aiInput;
-            }
-        } else if (this.useExternalInput) {
-            // Keep this.currentInput assigned externally (e.g. via setInput)
+    /** This step's input: the controller's, the CPU's, or none for a training dummy. */
+    public readInput(match: MatchState): FighterInput {
+        if (this.ai) {
+            this.currentInput = this.isTrainingDummy ? emptyInput() : this.ai.update(match, SIM_STEP_MS);
         } else {
-            this.currentInput = this.inputManager.poll();
+            this.currentInput = this.inputManager!.poll();
+        }
+        return this.currentInput;
+    }
+
+    public getCurrentInput(): FighterInput {
+        return this.currentInput;
+    }
+
+    public isGamepadConnected(): boolean {
+        return this.inputManager?.isGamepadConnected() ?? false;
+    }
+
+    // ─── Drawing ───
+
+    public render(match: MatchState, deltaMs: number): void {
+        const f = match.fighters[this.fighterIndex];
+        const inPlay = isInPlay(f);
+        this.damagePercent = f.damagePercent;
+        this.lives = f.lives;
+
+        this.setPosition(f.body.x, f.body.y);
+        this.setVisible(inPlay || this.pose !== null);
+
+        this.updateCharge(f, inPlay);
+        this.updateRecoveryGhost(f, inPlay);
+        this.updateFacing(f);
+        this.updateAnimation(f);
+        this.updateAlpha(f);
+
+        if (this.damageFlashMs > 0) {
+            this.damageFlashMs -= deltaMs;
+            if (this.damageFlashMs <= 0) this.sprite.clearTint();
         }
 
-        // Update Input Buffer (stores recent presses for ~100ms)
-        this.inputBuffer.update(this.currentInput);
-
-        // Update Physics Component (Resets isGrounded, Applies Gravity & Move)
-        this.physics.update(delta, this.currentInput);
-
-        // Update Facing (Run after physics/velocity update)
-        this.updateFacing();
+        if (this.showDebug) this.drawHitbox(f, inPlay);
     }
 
-    public updateLogic(delta: number): void {
-        // Remote players don't run combat logic (it's synced from network)
-        // Only local players run combat update/handleInput
-        if (this.currentInput) {
-            // ─── FSM: Delegate state logic ───
-            this.fsm.update(this, delta, this.currentInput);
-
-            // Update Combat Component (timers, attack phases, hitboxes)
-            this.combat.update(delta);
-
-            // Handle input for combat (attacks, charge, throw)
-            // Only if the current state allows it (not taunting, hitstun, etc.)
-            const currentStateName = this.fsm.getCurrentStateName();
-            const combatBlockedStates = ['HitStun', 'Taunt', 'Win', 'Defeat', 'Respawning', 'Cinematic'];
-            if (!combatBlockedStates.includes(currentStateName)) {
-                this.combat.handleInput(this.currentInput);
-            }
-        }
-
-        // Update Combat/Timers (everyone needs this for cooldowns)
-        this.updateTimers(delta);
-
-        // Visuals (Now sees correct isGrounded state from Scene Collisions)
-        this.updateAnimation();
-        this.updateDamageDisplay();
-        this.updateHeldItemPosition();
-
+    /** Holds an animation (cutscenes, victory) until cleared with null. */
+    public setPose(animation: string | null): void {
+        this.pose = animation;
     }
 
-    // Legacy update for safety (deprecate?)
-    update(delta: number): void {
-        if (!this.active) return;
-        this.updatePhysics(delta);
-        this.updateLogic(delta);
-    }
-
-    /**
-     * Safe update for remote players (networked)
-     * updates timers and visuals without physics/input
-     */
-    public updateVisuals(delta: number): void {
-        this.updateTimers(delta);
-        this.updateAnimation();
-        this.updateDamageDisplay();
-        this.updateHeldItemPosition();
-    }
-
-    /**
-     * Minimal update for remote players in server-authoritative mode.
-     * Skips updateAnimation() because animations are derived on the server
-     * via deriveAnimationKey() and applied through snapshot interpolation.
-     */
-    public updateRemoteVisuals(delta: number): void {
-        this.updateTimers(delta);
-        this.updateDamageDisplay();
-        this.updateHeldItemPosition();
-    }
-
-
-
-    private updateTimers(delta: number): void {
-        this.hitStunTimer -= delta;
-
-        if (this.hitStunTimer <= 0 && this.isHitStunned) {
-            this.isHitStunned = false;
-            this.resetVisuals();
-        }
-
-        if (this.invulnerabilityTimer > 0) {
-            this.invulnerabilityTimer -= delta;
-
-            // Visual Flash (Alpha toggle every 50ms)
-            // 6 frames is very short (100ms), so this will blink once or twice.
-            const blink = Math.floor(this.invulnerabilityTimer / 50) % 2 === 0;
-
-            // Visual Tweak: Dash should be opaque, Spot Dodge (and hitstun) should blink
-            // Matches animation logic (velocity > 10 = dash)
-            const isDashing = this.isDodging && Math.abs(this.velocity.x) > 10;
-
-            if (isDashing) {
-                this.sprite.setAlpha(1);
-            } else {
-                this.sprite.setAlpha(blink ? 0.5 : 1);
-            }
-
-            if (this.invulnerabilityTimer <= 0) {
-                this.isInvulnerable = false;
-                this.sprite.setAlpha(1); // Ensure visual reset
-            }
-        }
-
-        if (this.dodgeCooldownTimer > 0) {
-            this.dodgeCooldownTimer -= delta;
+    public setDebug(visible: boolean): void {
+        this.showDebug = visible;
+        this.hurtboxRect.setVisible(visible);
+        this.nameTag.setVisible(visible);
+        if (!visible) {
+            this.hitboxRect?.setVisible(false);
+            this.damageLabel?.setVisible(false);
         }
     }
 
-    private updateFacing(): void {
-        if (this.isHitStunned) return;
+    private updateFacing(f: FighterState): void {
+        // Knockback doesn't turn the sprite
+        if (f.isHitStunned) return;
+        const c = f.combat;
+        const facing = f.body.facingDirection;
+        // The ground pound frames are drawn facing the other way
+        const groundPoundPose = c.isGroundPounding || c.isGroundPoundLanding || isGroundPoundCharge(f);
+        this.sprite.setFlipX(groundPoundPose ? facing > 0 : facing < 0);
+    }
 
-        // Special case: Ground Pound sprite is inverted (faces LEFT?)
-        // So we invert the flip logic: Flip if facing Right (1), Don't flip if facing Left (-1)
-        // This applies during: charge, descent, and landing recovery
-        const isGPCharge = this.combat.isCharging && this.combat.chargeDirection === AttackDirection.DOWN && !this.isGrounded;
-        if (this.combat.isGroundPounding || this.combat.isGroundPoundLanding || isGPCharge) {
-            this.sprite.setFlipX(this.facingDirection > 0);
+    private updateAnimation(f: FighterState): void {
+        const key = this.pose ?? animationFor(f);
+        this.playAnim(key);
+
+        // The run cycle speeds up with running speed
+        this.sprite.anims.timeScale = key === 'run' && f.body.isRunning ? 0.8 + Math.abs(f.body.vx) / 3000 : 1;
+
+        if (this.pose === null && isGroundPoundCharge(f)) {
+            this.sprite.setFrame(`${this.character}_ground_pound_000`);
+        }
+    }
+
+    private updateAlpha(f: FighterState): void {
+        const b = f.body;
+        if (f.invulnerabilityTimer > 0) {
+            // Respawn invulnerability blinks, except while dashing
+            const isDashing = f.isDodging && Math.abs(b.vx) > 10;
+            const blinkOff = Math.floor(f.invulnerabilityTimer / 50) % 2 === 0;
+            this.sprite.setAlpha(!isDashing && blinkOff ? 0.5 : 1);
+        } else {
+            this.sprite.setAlpha(b.isSpotDodging ? PhysicsConfig.SPOT_DODGE_ALPHA : 1);
+        }
+    }
+
+    private playAnim(key: string): void {
+        const fullKey = `${this.character}_${key}`;
+        if (this.sprite.anims.currentAnim?.key === fullKey) return;
+        if (!this.scene.anims.exists(fullKey)) {
+            console.warn(`[Player ${this.playerId}] Animation missing: ${fullKey}`);
+            return;
+        }
+        this.sprite.anims.play(fullKey, true);
+    }
+
+    private drawHitbox(f: FighterState, inPlay: boolean): void {
+        const hitbox = f.combat.hitbox;
+        const active = inPlay && hitbox.active;
+        if (active && !this.hitboxRect) {
+            this.hitboxRect = this.scene.add.rectangle(0, 0, hitbox.w, hitbox.h, 0xff0000, 0.3);
+            this.hitboxRect.setStrokeStyle(2, 0xff0000);
+            this.hitboxRect.setDepth(999);
+            this.damageLabel = this.scene.add.text(0, 0, '', {
+                fontSize: '14px',
+                color: '#ff0000',
+                backgroundColor: '#ffffff',
+                padding: { x: 2, y: 2 },
+            });
+            this.damageLabel.setDepth(100);
+            this.ignoreInUiCamera(this.hitboxRect);
+            this.ignoreInUiCamera(this.damageLabel);
+        }
+        if (!this.hitboxRect || !this.damageLabel) return;
+
+        this.hitboxRect.setVisible(active);
+        this.damageLabel.setVisible(active);
+        if (!active) return;
+        this.hitboxRect.setPosition(hitbox.x, hitbox.y);
+        this.hitboxRect.setSize(hitbox.w, hitbox.h);
+        this.damageLabel.setText(`${currentDamage(f)}`);
+        this.damageLabel.setPosition(hitbox.x, hitbox.y - hitbox.h / 2 - 20);
+    }
+
+    // ─── Charge ───
+
+    private updateCharge(f: FighterState, inPlay: boolean): void {
+        const c = f.combat;
+        const charging = inPlay && c.isCharging;
+        if (charging !== this.isCharging) {
+            this.isCharging = charging;
+            if (charging) this.startChargeSounds();
+            else this.endCharge();
+        }
+        if (!charging) return;
+
+        const chargePercent = Math.min(c.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
+        if (isGroundPoundCharge(f)) {
+            this.shakeSprite(chargePercent * 2.5);
             return;
         }
 
-        if (this.isAttacking) {
-            const currentAttack = this.getCurrentAttack();
-            if (currentAttack && currentAttack.phase !== AttackPhase.RECOVERY) {
-                return;
-            }
+        // Signature charges fade in a ghost in front of the fighter
+        if (!this.chargeGhost) this.chargeGhost = this.createChargeGhost();
+        const facing = f.body.facingDirection;
+        this.chargeGhost.setScale(facing, 1);
+        this.chargeGhost.setPosition(
+            f.body.x + ghostOffset(this.character) * facing + (Math.random() - 0.5),
+            f.body.y + (Math.random() - 0.5),
+        );
+        this.chargeGhost.setAlpha(chargePercent * 0.7);
+        if (this.chargeBlurFx) {
+            this.chargeBlurFx.x = (1 - chargePercent) * 1.5;
+            this.chargeBlurFx.y = (1 - chargePercent) * 1.5;
         }
-
-        if (this.physics.isWallSliding) {
-            this.facingDirection = -this.physics.wallDirection; // Look away from wall
-        } else if (this.velocity.x > 5) {
-            this.facingDirection = 1;
-        } else if (this.velocity.x < -5) {
-            this.facingDirection = -1;
-        }
-
-        // Apply facing to sprite
-        // FlipX true means face LEFT (if original faces Right).
-        // If original faces RIGHT:
-        //   Facing 1 (Right): Flip false.
-        //   Facing -1 (Left): Flip true.
-        // User reported opposite, so trying < 0 to flip when facing LEFT.
-        this.sprite.setFlipX(this.facingDirection < 0);
+        this.shakeSprite(chargePercent * 1.5);
     }
 
-    // Visual Helpers
-    public visualColor: number = 0xffffff;
-    public nameTag: Phaser.GameObjects.Text;
-
-    public setVisualTint(color: number): void {
-        this.sprite.setTint(color);
+    private createChargeGhost(): Phaser.GameObjects.Sprite {
+        const ghost = this.scene.add.sprite(this.x, this.y, this.character, `${this.character}_side_sig_ghost_000`);
+        ghost.setDepth(this.depth - 1);
+        ghost.setAlpha(0);
+        if (ghost.preFX) {
+            ghost.preFX.addGlow(0xffffff, 0.4, 0, false, 0.05, 5);
+            this.chargeBlurFx = ghost.preFX.addBlur(0, 1.5, 1.5, 1);
+        }
+        this.ignoreInUiCamera(ghost);
+        return ghost;
     }
 
-    public resetVisuals(): void {
-        this.sprite.setAlpha(1);
-        // Do NOT tint the body with player color (User request)
-        // Only use tint if we are flashing damage
-        this.sprite.clearTint();
-
-        // Update Name Tag Color
-        if (this.nameTag) {
-            const colorHex = '#' + this.visualColor.toString(16).padStart(6, '0');
-            this.nameTag.setColor(colorHex);
+    private startChargeSounds(): void {
+        const keys = this.character === 'pe' ? ['sfx_fight_charge', 'sfx_pe_charge'] : ['sfx_fight_charge'];
+        for (const key of keys) {
+            const sound = this.scene.sound.add(key, { volume: 0.6, loop: true });
+            sound.play();
+            this.chargeSounds.push(sound);
         }
+    }
 
+    private endCharge(): void {
+        this.chargeGhost?.destroy();
+        this.chargeGhost = null;
+        this.chargeBlurFx = null;
         this.sprite.setPosition(0, 0);
-    }
 
-    public setVisualOffset(x: number, y: number): void {
-        this.sprite.setPosition(x, y);
-    }
-
-    public flashDamageColor(damage: number): void {
-        const gameScene = this.scene as any;
-        if (gameScene.mode === 'campaign' && this.playerId === 1) {
-            return;
-        }
-
-        let colorObj: Phaser.Types.Display.ColorObject;
-
-        if (damage < 50) {
-            // White to Pastel Yellow (0-50)
-            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
-                new Phaser.Display.Color(255, 255, 255),
-                new Phaser.Display.Color(255, 245, 150), // 0xfff596
-                50,
-                damage
-            );
-        } else if (damage < 100) {
-            // Pastel Yellow to Pastel Orange (50-100)
-            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
-                new Phaser.Display.Color(255, 245, 150),
-                new Phaser.Display.Color(255, 200, 150), // 0xffc896
-                50,
-                damage - 50
-            );
-        } else if (damage < 150) {
-            // Pastel Orange to Pastel Red (100-150)
-            colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
-                new Phaser.Display.Color(255, 200, 150),
-                new Phaser.Display.Color(255, 150, 150), // 0xff9696
-                50,
-                damage - 100
-            );
-        } else {
-            // Cap at Pastel Red
-            const r = 255;
-            const g = 150;
-            const b = 150;
-            colorObj = {
-                r, g, b, a: 255,
-                color: Phaser.Display.Color.GetColor(r, g, b)
+        // Fade the charge hum out
+        for (const sound of this.chargeSounds) {
+            const stop = () => {
+                sound.stop();
+                sound.destroy();
             };
+            this.scene.tweens.add({ targets: sound, volume: 0, duration: 200, onComplete: stop });
         }
+        this.chargeSounds = [];
+    }
 
-        const color = Phaser.Display.Color.GetColor(colorObj.r, colorObj.g, colorObj.b);
+    private shakeSprite(intensity: number): void {
+        this.sprite.setPosition((Math.random() - 0.5) * 2 * intensity, (Math.random() - 0.5) * 2 * intensity);
+    }
 
-        // Tint (multiplicative)
-        this.sprite.setTint(color);
-        this.sprite.setAlpha(1);
+    // ─── Ghosts ───
 
-        // Restore after short duration
-        this.scene.time.delayedCall(150, () => {
-            // Only reset if we are not flashing for other reasons (like charge)
-            // But charge stops on hit.
-            this.resetVisuals();
+    /** A signature attack threw its ghost: it flies out, lingers, then fades. */
+    public spawnSignatureGhost(ghost: GhostHitbox): void {
+        const char = this.character;
+        const kind = ghost.vertical ? 'up' : 'side';
+        const sprite = this.effects().spawnGhost(ghost.startX, ghost.startY, char, `${char}_${kind}_sig_ghost_000`, `${char}_${kind}_sig_ghost`, ghost.facing);
+        if (!sprite) return;
+
+        const scale = char === 'nock' && ghost.vertical ? 1.2 : 1;
+        sprite.setDepth(this.depth - 1);
+        sprite.setScale(ghost.facing * scale, scale);
+        sprite.setAngle(0);
+        sprite.setPosition(ghost.startX, ghost.startY);
+        this.ignoreInUiCamera(sprite);
+        const blurFx = this.addGhostFx(sprite);
+
+        this.scene.tweens.add({
+            targets: sprite,
+            ...(ghost.vertical ? { y: ghost.startY - ghost.travel } : { x: ghost.startX + ghost.travel * ghost.facing }),
+            duration: GHOST_TRAVEL_MS,
+            ease: 'Cubic.easeOut',
+        });
+        this.scene.tweens.add({
+            targets: sprite,
+            alpha: 0,
+            delay: ghost.lifetime - GHOST_FADE_MS,
+            duration: GHOST_FADE_MS,
+            onUpdate: () => setGhostBlur(blurFx, sprite),
+            onComplete: () => this.effects().releaseGhost(sprite),
         });
     }
 
-    // Delegated Methods
-    public checkPlatformCollision(platform: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Image, isSoft: boolean = false): void {
-        this.physics.checkPlatformCollision(platform as any, isSoft); // Cast to any or generic GameObject if Physics supports it
+    private updateRecoveryGhost(f: FighterState, inPlay: boolean): void {
+        const recovering = inPlay && f.body.isRecovering;
+        if (recovering === this.isRecovering) return;
+        this.isRecovering = recovering;
+        if (recovering) this.spawnRecoveryGhost(f.body.facingDirection);
+        else this.clearRecoveryGhost();
     }
 
-    public checkWallCollision(walls: Phaser.Geom.Rectangle[]): void {
-        this.physics.checkWallCollision(walls);
+    /** The recovery move flashes an up-signature ghost that follows the fighter. */
+    private spawnRecoveryGhost(facing: number): void {
+        const char = this.character;
+        const sprite = this.effects().spawnGhost(this.x, this.y, char, `${char}_up_sig_ghost_000`, `${char}_up_sig_ghost`, facing);
+        if (!sprite) return;
+
+        const scale = char === 'nock' ? 1.2 : 1;
+        sprite.setDepth(this.depth - 1);
+        sprite.setScale(facing * scale, scale);
+        sprite.setAngle(0);
+        sprite.setPosition(this.x, this.y - 30);
+        this.ignoreInUiCamera(sprite);
+        const blurFx = this.addGhostFx(sprite);
+        this.recoveryGhost = sprite;
+
+        this.scene.tweens.add({
+            targets: sprite,
+            alpha: 0,
+            delay: 150,
+            duration: 250,
+            onUpdate: () => {
+                sprite.setPosition(this.x, this.y - 30);
+                setGhostBlur(blurFx, sprite);
+            },
+            onComplete: () => {
+                if (this.recoveryGhost === sprite) this.recoveryGhost = null;
+                this.effects().releaseGhost(sprite);
+            },
+        });
     }
 
-
-
-
-
-    public checkHitAgainst(target: Player): void {
-        this.combat.checkAttackCollision(target);
+    private clearRecoveryGhost(): void {
+        const sprite = this.recoveryGhost;
+        if (!sprite) return;
+        this.recoveryGhost = null;
+        this.scene.tweens.killTweensOf(sprite);
+        this.scene.tweens.add({
+            targets: sprite,
+            alpha: 0,
+            duration: 150,
+            onComplete: () => this.effects().releaseGhost(sprite),
+        });
     }
 
-    private updateAnimation(): void {
-        const velocity = this.velocity;
+    private addGhostFx(sprite: Phaser.GameObjects.Sprite): Phaser.FX.Blur | null {
+        if (!sprite.preFX) return null;
+        sprite.preFX.clear();
+        sprite.preFX.addGlow(0xffffff, 0.4, 0, false, 0.05, 5);
+        return sprite.preFX.addBlur(0, 0, 0, 1);
+    }
 
-        // Dynamic Run Speed scaling for run animation
-        if (this.sprite.anims.currentAnim && this.sprite.anims.currentAnim.key.includes('run')) {
-            const speed = Math.abs(velocity.x);
-            if (this.physics.isRunning) {
-                const normalizedSpeed = 0.8 + (speed / 3000);
-                this.sprite.anims.timeScale = normalizedSpeed;
-            } else {
-                this.sprite.anims.timeScale = 1;
-            }
-        } else {
-            this.sprite.anims.timeScale = 1;
+    // ─── Event feedback ───
+
+    /** Whiff sound for a light attack, signature sound for a released charge. */
+    public playAttackSound(attackKey: string, charged: boolean): void {
+        const data = AttackRegistry[attackKey];
+        let key = 'sfx_sigs_hurt';
+        if (charged) key = `sfx_${this.character}_sig`;
+        else if (data.type === AttackType.LIGHT) key = data.direction === AttackDirection.RUN ? 'sfx_run_light_miss' : 'sfx_side_light_miss';
+        AudioManager.getInstance().playSFX(key, { volume: 0.5, randomPitchRange: 600 });
+    }
+
+    /** Impact sound when one of this fighter's moves lands; `attackKey` is null for the recovery move. */
+    public playHitSound(attackKey: string | null): void {
+        const data = attackKey ? AttackRegistry[attackKey] : null;
+        let key = 'sfx_sigs_hurt';
+        if (data?.type === AttackType.LIGHT) key = data.direction === AttackDirection.RUN ? 'sfx_run_light_hit' : 'sfx_side_light_hit';
+        AudioManager.getInstance().playSFX(key, { volume: 0.6, randomPitchRange: 600 });
+    }
+
+    /** Tints the fighter briefly, from white towards red as damage grows. */
+    public flashDamage(damage: number): void {
+        const stops = [[255, 255, 255], [255, 245, 150], [255, 200, 150], [255, 150, 150]];
+        const band = Math.min(Math.floor(damage / 50), 3);
+        let color = Phaser.Display.Color.GetColor(255, 150, 150);
+        if (band < 3) {
+            const [from, to] = [stops[band], stops[band + 1]];
+            const c = Phaser.Display.Color.Interpolate.ColorWithColor(
+                new Phaser.Display.Color(from[0], from[1], from[2]),
+                new Phaser.Display.Color(to[0], to[1], to[2]),
+                50,
+                damage - band * 50,
+            );
+            color = Phaser.Display.Color.GetColor(c.r, c.g, c.b);
         }
-
-        // Reset timeScale for combat/hitstun
-        if (this.isAttacking || this.isHitStunned) {
-            this.sprite.anims.timeScale = 1;
-        }
-
-        // Remote players: use synced animationKey directly
-        if (!this.currentInput) {
-            if (this.animationKey) {
-                this.playAnim(this.animationKey, true);
-            }
-            return;
-        }
-
-        // ─── FSM-driven animation ───
-        const fsmAnimKey = this.fsm.getAnimationKey(this);
-        if (fsmAnimKey) {
-            this.animationKey = fsmAnimKey;
-            this.playAnim(fsmAnimKey, true);
-        }
-
-        // Removed custom updateSpriteOffset to standardize characters
+        this.sprite.setTint(color);
+        this.damageFlashMs = DAMAGE_FLASH_MS;
     }
 
+    // ─── Scene helpers ───
 
-
-
-
-    public playAnim(key: string, ignoreIfPlaying: boolean = true): void {
-        const fullKey = `${this.animPrefix}_${key}`;
-
-        // Opt-out if already playing to avoid resetting visual offsets (like shake)
-        if (ignoreIfPlaying && this.sprite.anims.currentAnim && this.sprite.anims.currentAnim.key === fullKey) {
-            return;
-        }
-
-        if (!this.scene.anims.exists(fullKey)) {
-            console.warn(`[Player ${this.playerId}] Animation MISSING: ${fullKey} (Prefix: ${this.animPrefix}, Key: ${key})`);
-            return; // Don't play if missing
-        } else {
-        }
-
-        this.sprite.anims.play(fullKey, ignoreIfPlaying);
-
-        // Removed custom updateSpriteOffset to standardize characters
+    private effects() {
+        return (this.scene as GameSceneInterface).effectManager;
     }
 
-    private updateDamageDisplay(): void {
-        // Damage display removed from player sprite (User request)
-        // Only PlayerHUD shows damage now.
+    private ignoreInUiCamera(object: Phaser.GameObjects.GameObject): void {
+        (this.scene as GameSceneInterface).uiCamera?.ignore(object);
     }
 
-    // Getters for HUD
-    public get damage(): number { return this.damagePercent; }
-    // Lives are public in Fighter, but let's add accessor if needed or just use property
-    // But GameScene expects .lives, which is on Fighter (superclass). So it should be fine if we fix the 'lives does not exist on Player' error by ensuring TS knows Player extends Fighter.
-    // However, the error 'Property lives does not exist on type Player' usually means it wasn't on Fighter when TS checked.
-    // I added it to Fighter just now. So it should be fine.
-    // But let's add explicit getters just in case or for cleaner API.
-    // actually, public lives on Fighter is enough.
-
-
-    setKnockback(x: number, y: number): void {
-        this.velocity.x = x;
-        this.velocity.y = y;
+    public destroy(fromScene?: boolean): void {
+        this.inputManager?.destroy();
+        for (const sound of this.chargeSounds) sound.destroy();
+        this.chargeSounds = [];
+        this.chargeGhost?.destroy();
+        this.hitboxRect?.destroy();
+        this.damageLabel?.destroy();
+        super.destroy(fromScene);
     }
+}
 
-    // Getters
-    getVelocity(): Phaser.Math.Vector2 { return this.velocity; }
+function isGroundPoundCharge(f: FighterState): boolean {
+    const c = f.combat;
+    return c.isCharging && c.chargeDirection === AttackDirection.DOWN && !f.body.isGrounded;
+}
 
-    getState(): PlayerState {
-        const stateName = this.fsm.getCurrentStateName();
+/** Signature ghosts start this far in front of the fighter. */
+function ghostOffset(character: string): number {
+    return character === 'nock' ? 35 : 25;
+}
 
-        switch (stateName) {
-            case 'HitStun': return PlayerState.HIT_STUN;
-            case 'Dodge':
-            case 'AirDodge': return PlayerState.DODGING;
-            case 'GroundPound': return PlayerState.GROUND_POUND;
-            case 'Attack': return PlayerState.ATTACKING;
-            case 'Recovery': return PlayerState.RECOVERING;
-            case 'Idle':
-            case 'Run':
-            case 'Taunt':
-            case 'Win':
-            case 'Defeat': return PlayerState.GROUNDED;
-            case 'Fall':
-            case 'WallSlide':
-                if (this.physics.isFastFalling) return PlayerState.FAST_FALLING;
-                return PlayerState.AIRBORNE;
-            case 'Jump': return PlayerState.AIRBORNE;
-            default: return this.isGrounded ? PlayerState.GROUNDED : PlayerState.AIRBORNE;
-        }
+/** Ghosts blur as they fade. */
+function setGhostBlur(blurFx: Phaser.FX.Blur | null, sprite: Phaser.GameObjects.Sprite): void {
+    if (!blurFx) return;
+    blurFx.x = 0.5 + (1 - sprite.alpha) * 3;
+    blurFx.y = 0.5 + (1 - sprite.alpha) * 3;
+}
+
+/** The animation for a fighter's state. */
+function animationFor(f: FighterState): string {
+    switch (f.state) {
+        case 'Run': return 'run';
+        case 'Jump': return 'jump';
+        case 'Fall': return 'fall';
+        case 'WallSlide': return 'wall_slide';
+        case 'Attack': return attackAnimation(f);
+        case 'Charging': return 'charging';
+        case 'HitStun': return 'hurt';
+        case 'Dodge':
+        case 'AirDodge': return Math.abs(f.body.vx) > 10 ? 'dash' : 'spot_dodge';
+        case 'Recovery': return 'recovery';
+        case 'GroundPound': return 'ground_pound';
+        case 'Taunt': return 'taunt';
+        case 'Defeat': return 'defeat';
+        default: return 'idle';
     }
+}
 
-    getRecoveryAvailable(): boolean { return this.physics.recoveryAvailable; }
-    getIsInvincible(): boolean { return this.isInvincible; }
-    getCurrentAttack(): Attack | null { return this.combat.currentAttack; }
+function attackAnimation(f: FighterState): string {
+    const attack = f.combat.attack;
+    if (!attack) return 'idle';
+    const { type, direction } = AttackRegistry[attack.key];
+    const grounded = f.body.isGrounded;
 
-
-
-    getBounds(): Phaser.Geom.Rectangle {
-        // Reuse pooled rectangle to avoid per-frame allocations
-        // Use this.width/height which are set in constructor (e.g. 46x174)
-        this._boundsRect.x = this.x - this.width / 2;
-        this._boundsRect.y = this.y - this.height / 2;
-        this._boundsRect.width = this.width;
-        this._boundsRect.height = this.height;
-        return this._boundsRect;
-    }
-
-    isGamepadConnected(): boolean {
-        return this.inputManager.isGamepadConnected();
-    }
-
-    private updateAI(delta: number): void {
-        if (!this.ai) return;
-        this.aiInput = this.ai.update(delta);
-    }
-
-    public applyHitStun(): void {
-        super.applyHitStun();
-        // ─── FSM: Transition to HitStun ───
-        // HitStunState.enter() handles clearing all combat/dodge flags
-        this.fsm.changeState('HitStun', this);
-    }
-
-
-    public fullReset(): void {
-        // Clear all combat and state flags
-        this.isAttacking = false;
-        this.isDodging = false;
-        this.isHitStunned = false;
-        this.isTaunting = false;
-        this.isShowingDefeat = false;
-        this.isWinner = false;
-        // Do not clear isRespawning here, as GameScene manages its duration
-        
-        // Terminate any active attacks/charge
-        if (this.combat) {
-            this.combat.endAttack();
-        }
-
-        // Reset physics engine state
-        if (this.physics) {
-            this.physics.reset();
-            this.physics.resetOnGround();
-        }
-
-        // Reset vitals
-        this.velocity.set(0, 0);
-        if (this.physics && this.physics.acceleration) {
-            this.physics.acceleration.set(0, 0);
-        }
-        this.damagePercent = 0;
-        this.invulnerabilityTimer = 0;
-        this.isInvulnerable = false;
-
-        // Reset visuals and FSM
-        this.resetVisuals();
-        if (this.fsm) {
-            this.fsm.changeState('Idle', this);
+    if (type === AttackType.HEAVY) {
+        switch (direction) {
+            case AttackDirection.DOWN: return 'attack_heavy_down';
+            case AttackDirection.SIDE: return 'attack_heavy_side';
+            case AttackDirection.UP: return 'attack_heavy_up';
+            default: return 'attack_heavy_neutral';
         }
     }
-
-    public respawn(): void {
-        this.fullReset();
+    switch (direction) {
+        case AttackDirection.RUN: return 'attack_light_run';
+        case AttackDirection.UP: return grounded ? 'attack_light_up' : 'attack_light_up_air';
+        case AttackDirection.DOWN: return 'attack_light_down';
+        case AttackDirection.SIDE: return grounded ? 'attack_light_side' : 'attack_light_side_air';
+        default: return 'attack_light_neutral';
     }
-
-    public addToCameraIgnore(camera: Phaser.Cameras.Scene2D.Camera): void {
-        camera.ignore(this);
-
-    }
-
-    // ============ NETWORK HELPERS ============
-
-    public onAttack: ((attackKey: string, facingDirection: number) => void) | null = null;
-    public onHit: ((victim: Fighter, damage: number, knockbackX: number, knockbackY: number) => void) | null = null;
-    public onGroundPoundMiss: (() => void) | null = null;
-
-    public playAttackAnimation(attackKey: string): void {
-        // e.g. 'light_neutral_grounded' -> 'attack_light_0'
-        // For now, simpler mapping or just pass the anim key directly if possible.
-        // The OnlineGameScene passes 'light_neutral_grounded'. We need to map it or play a generic one.
-        // Actually, let's just expose a way to play specific animation keys if we knew them.
-        // But better: use the attack logic to set state, but that might duplicate logic.
-        // Simplest: just play a generic attack animation based on type.
-
-        if (attackKey.includes('heavy')) {
-            this.playAnim('attack_heavy', true);
-        } else {
-            this.playAnim('attack_light_0', true);
-        }
-
-        // Also force facing update if needed
-    }
-
-    public takeDamage(amount: number): void {
-        this.damagePercent = Math.min(this.damagePercent + amount, PhysicsConfig.MAX_DAMAGE);
-        this.flashDamageColor(this.damagePercent);
-    }
-
-    public setVelocity(x: number, y: number): void {
-        this.velocity.set(x, y);
-        if (this.physics && this.physics.body) {
-            this.physics.body.vx = x;
-            this.physics.body.vy = y;
-        }
-    }
-
-    public playHurtAnimation(): void {
-        this.animationKey = 'hurt';
-        this.playAnim('hurt', true);
-        // Use hitStunTimer for proper timing (200ms = 0.2s * 1000)
-        this.isHitStunned = true;
-        this.hitStunTimer = 200; // Will be decremented in updateTimers
-    }
-
 }

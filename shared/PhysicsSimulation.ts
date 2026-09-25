@@ -1,12 +1,6 @@
 /**
- * Shared Physics Simulation — Phase 3: Real Physics Extraction
- *
- * This module is the EXACT logic from PlayerPhysics.ts, extracted to be
- * platform-agnostic (no Phaser, no Node.js dependencies).
- * Both client and server import this module to ensure identical physics.
- *
- * Visual/audio effects are emitted as PhysicsEvent[] — the client plays
- * them, the server ignores them.
+ * Fighter movement physics: plain data and pure functions, no Phaser.
+ * Sounds and state changes come back as PhysicsEvent[] for the caller.
  */
 
 import { PhysicsConfig } from './PhysicsConfig.js';
@@ -268,7 +262,7 @@ export function cloneBody(src: SimBody, dst?: SimBody): SimBody {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Run one full physics tick. Matches PlayerPhysics.update() exactly.
+ * Runs one physics tick.
  * @param body   - Mutable physics body (modified in place)
  * @param input  - Input state for this frame
  * @param dt     - Delta time in SECONDS (e.g. 1/60)
@@ -296,7 +290,7 @@ export function stepPhysics(body: SimBody, input: SimInput, dt: number): Physics
     body.ax = 0;
     body.ay = PhysicsConfig.GRAVITY;
 
-    // ── Mechanics (order matches PlayerPhysics.update) ──
+    // ── Mechanics ──
     handleWallMechanics(body, input);
     handleHorizontalMovement(body, input);
     handleJump(body, input, dtMs, events);
@@ -307,7 +301,7 @@ export function stepPhysics(body: SimBody, input: SimInput, dt: number): Physics
     applyPhysics(body, dt, events);
 
     // NOTE: isGrounded is NOT reset here — it's still the previous frame's value.
-    // applyPhysics sets body.isGrounded = false at the end (line 263 in PlayerPhysics.ts).
+    // applyPhysics sets body.isGrounded = false at the end.
     // Collision checks (called separately) will set it back to true if landing.
 
     return events;
@@ -333,7 +327,7 @@ function updateTimers(body: SimBody, dtMs: number, events: PhysicsEvent[]): void
         }
     }
 
-    // Recovery timer is handled in applyPhysics (like PlayerPhysics)
+    // Recovery timer is handled in applyPhysics
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -1,31 +1,13 @@
 import Phaser from 'phaser';
-import { Player } from '../entities/Player';
-import type { Chest } from '../entities/Chest';
+import type { EffectManager } from '../effects/EffectManager';
 
 /**
- * Shared interface for scene properties accessed by entities like Chest and Hitbox.
- * GameScene implements it.
- *
- * Use this to type `this.scene` instead of casting to `any`.
+ * What a Player needs from the scene that draws it. GameScene implements it.
  */
 export interface GameSceneInterface extends Phaser.Scene {
-    /** Exclude a game object from the UI camera (prevents double-rendering) */
-    addToCameraIgnore(object: Phaser.GameObjects.GameObject): void;
+    /** Pooled ghost sprites and other effects */
+    effectManager: EffectManager;
 
-    /** Active chests in the scene */
-    chests: Phaser.GameObjects.Group | Chest[];
-
-    /** Active walls in the scene (Unified: Geom.Rectangle for collision) */
-    walls: Phaser.Geom.Rectangle[];
-    effectManager?: any; // Avoiding circular dependency with EffectManager type for now, or use import type
-
-    /** UI camera (separate from main game camera, used for HUD) */
+    /** UI camera (separate from the zoomed game camera); world objects must be ignored by it */
     uiCamera: Phaser.Cameras.Scene2D.Camera | null;
-
-    /** Unified access to players list (abstracts away Array vs Map storage) */
-    getPlayers(): Player[];
-
-    /** Get chests that are in bomb mode and available for pickup */
-    getThrowableChests(): Chest[];
-
 }

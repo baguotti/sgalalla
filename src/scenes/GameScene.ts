@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Player, PlayerState } from '../entities/Player';
+import { Player, type PlayerConfig } from '../entities/Player';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { getConfirmButtonIndex } from '../input/JoyConMapper';
 import { DebugOverlay } from '../components/DebugOverlay';
@@ -7,7 +7,6 @@ import { InputDebugOverlay } from '../components/InputDebugOverlay';
 import { TouchController } from '../components/TouchController';
 import { PauseMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
-import { Chest } from '../entities/Chest';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
 import { createStage as createSharedStage } from '../stages/StageFactory';
@@ -15,8 +14,14 @@ import { EffectManager } from '../effects/EffectManager';
 import { AnimationHelpers } from '../managers/AnimationHelpers';
 import { AudioManager } from '../managers/AudioManager';
 import { CampaignManager } from '../managers/CampaignManager';
-import { FixedStepClock, SIM_STEP_MS } from '../../shared/FixedStepClock';
 import { MatchRecorder } from '../debug/MatchRecorder';
+import { AttackRegistry, AttackType } from '../../shared/AttackData';
+import type { FighterInput } from '../../shared/FighterInput';
+import { isInPlay, type FighterSetup } from '../../shared/FighterState';
+import { FixedStepClock } from '../../shared/FixedStepClock';
+import { addFighter, createMatch, placeFighter, respawnFighter, stepMatch, type MatchState } from '../../shared/GameSim';
+import type { MatchEvent } from '../../shared/MatchEvents';
+import { STAGE_LAYOUT, type SimRect } from '../../shared/StageData';
 
 import type { GameSceneInterface } from './GameSceneInterface';
 
@@ -24,16 +29,8 @@ import type { GameSceneInterface } from './GameSceneInterface';
 export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private debugOverlay!: DebugOverlay;
     private touchController!: TouchController;
-    private platforms: Phaser.GameObjects.Rectangle[] = [];
-    private softPlatforms: Phaser.GameObjects.Rectangle[] = [];
-    private sidePlatforms: Phaser.GameObjects.Rectangle[] = []; // Track side platforms
-    public chests!: Phaser.GameObjects.Group;
-    public seals: any[] = []; // Seal projectiles
-    private background!: Phaser.GameObjects.Graphics;
     private backgroundImage!: Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite;
-
-    public walls: Phaser.Geom.Rectangle[] = []; // Unified walls (geom)
-    private stageTextures: Phaser.GameObjects.Image[] = []; // Restore this
+    private stageTextures: Phaser.GameObjects.Image[] = [];
 
     // Debug visibility
     public debugVisible: boolean = false;
@@ -54,8 +51,17 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     // Camera Settings
     private currentZoomLevel: ZoomLevel = 'CLOSE';
 
-    // Gameplay advances in fixed 60 Hz steps, whatever the display refresh rate
+    // The match simulation advances in fixed 60 Hz steps, whatever the display refresh rate.
+    // players[i] draws and drives match.fighters[i].
+    private match!: MatchState;
+    private fighterSetups: FighterSetup[] = [];
     private readonly simClock = new FixedStepClock();
+    private readonly stepInputs: FighterInput[] = [];
+    private readonly stepEvents: MatchEvent[] = [];
+    /** Cutscenes hold the match still. */
+    private isCutscene = false;
+    /** Dev tool: `?record` in the URL records each match for the replay tests. */
+    private isRecording = false;
     private recorder: MatchRecorder | null = null;
 
     // Pause menu
@@ -109,15 +115,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
 
-
-    public getPlayers(): Player[] {
-        return this.players;
-    }
-
-    public getThrowableChests(): Chest[] {
-        if (!this.chests) return [];
-        return (this.chests.getChildren() as Chest[]).filter(c => c.active && c.isBombMode);
-    }
 
     private players: Player[] = [];
     // private playerHUDs: PlayerHUD[] = []; // Deprecated
@@ -216,20 +213,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (this.matchHUD) {
                 this.matchHUD.destroy();
             }
-            this.platforms = [];
-            this.softPlatforms = [];
-            this.sidePlatforms = [];
-            this.walls = [];
             this.stageTextures = [];
-
-            if (Array.isArray(this.chests)) {
-                this.chests.forEach(c => c.destroy());
-            }
-            this.chests = this.add.group({
-                classType: Chest,
-                runChildUpdate: true,
-                maxSize: 10
-            });
+            this.isCutscene = false;
             this.isGameOver = false;
             this.isGameOverMenuReady = false;
             this.gameOverSelectedIndex = 0;
@@ -238,13 +223,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 this.gameOverMenuTexts = [];
             }
             this.isPaused = false;
-
-            // --- Physics Setup ---
-            this.matter.world.setGravity(0, 1);
-
-            // --- Error Handler (Visual) ---
-            // (Error text is created dynamically in catch block if needed)
-            // this.matter.world.setBounds(0, 0, width, height); // Removed duplicate
 
             // --- Fok Animations ---
             this.createAnimations();
@@ -347,11 +325,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // BACKGROUND LOGIC
             this.cameras.main.setBackgroundColor('#99d7f0'); // Blue sky behind stage
 
-            // Background graphics are created in createStage(), ensure they are visible
-            if (this.background) {
-                this.background.setVisible(true);
-            }
-
             // Create Players
             this.players = [];
 
@@ -378,21 +351,30 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 this.spawnPoints = spawnPoints;
             }
 
-            this.playerData.forEach(pData => {
-                if (!pData.joined) return;
-
+            const joined = this.playerData.filter(pData => pData.joined);
+            this.fighterSetups = joined.map(pData => {
                 const spawn = this.spawnPoints[pData.playerId] || { x: 960, y: 300 };
+                return { character: pData.character || 'fok', x: spawn.x, y: spawn.y };
+            });
+            this.isRecording = import.meta.env.DEV && new URLSearchParams(window.location.search).has('record');
+            if (this.isRecording) {
+                this.input.keyboard?.on('keydown-F9', () => this.recorder?.save());
+            }
+            this.startMatch();
 
-                const player = new Player(this, spawn.x, spawn.y, {
+            joined.forEach((pData, i) => {
+                const config: PlayerConfig = {
                     playerId: pData.playerId,
+                    character: this.fighterSetups[i].character,
                     isAI: pData.isAI,
-                    isTrainingDummy: pData.isTrainingDummy, // Pass training dummy flag
+                    isTrainingDummy: pData.isTrainingDummy,
                     gamepadIndex: pData.input.gamepadIndex,
                     useKeyboard: pData.input.type === 'KEYBOARD',
                     keyboardMapping: pData.input.keyboardMapping,
-                    character: pData.character,
-                    mappingSlot: pData.input.mappingSlot ?? 0
-                }, pData.playerId === 0 ? this.touchController : undefined); // P1 gets touch control if active
+                    mappingSlot: pData.input.mappingSlot ?? 0,
+                };
+                // P1 gets touch controls if active
+                const player = new Player(this, this.match.fighters[i], config, pData.playerId === 0 ? this.touchController : undefined);
 
                 // Set Color (all players use their assigned color)
                 let color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
@@ -403,8 +385,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     else color = 0xFFFFFF; // White for opponent
                 }
 
-                player.visualColor = color;
-                player.resetVisuals();
+                player.setColor(color);
 
                 this.players.push(player);
 
@@ -437,13 +418,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     }
                 }
             });
-
-            // Dev tool: ?record records this match for the simulation replay tests (F9 saves it)
-            this.recorder = null;
-            if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('record')) {
-                this.recorder = new MatchRecorder(this.players);
-                this.input.keyboard?.on('keydown-F9', () => this.recorder?.save());
-            }
 
             // If campaign and NOT training, trigger transition to cutscene immediately
             if (this.mode === 'campaign' && !this.isTraining) {
@@ -560,74 +534,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     this.input.keyboard?.resetKeys();
                 }
             });
-            // Chest spawn timer: every 30 seconds, 2% chance
-            this.time.addEvent({
-                delay: 30000,
-                callback: () => {
-                    if (Phaser.Math.FloatBetween(0, 1) < 0.02) {
-                        this.spawnChest();
-                    }
-                },
-                loop: true
-            });
-
-            // Manual Chest Spawn (Y key) — training mode only
-            if (this.playerData.some((p: any) => p.isTrainingDummy)) {
-                this.input.keyboard?.on('keydown-Y', () => {
-                    this.spawnChest();
-                });
-            }
-
-
         } catch (e: any) {
             console.error("CRITICAL ERROR in GameScene.create:", e);
-        }
-    }
-
-    private spawnChest(): void {
-        if (this.isPaused) return;
-
-        const { width } = this.scale;
-        const padding = 600; // Constrain to center stage (-600 from edges)
-        const x = Phaser.Math.Between(padding, width - padding);
-        const y = 0;
-
-        const chest = this.chests.get(x, y) as Chest;
-        if (chest) {
-            chest.enable(x, y);
-            if (this.uiCamera) {
-                this.uiCamera.ignore(chest);
-            }
-        }
-    }
-
-    private checkChestInteractions(): void {
-        if (!this.chests || this.chests.getLength() === 0) return;
-
-        const interactRange = 120; // Proximity range to open chest
-
-        for (const player of this.players) {
-            if (!player.isAttacking) continue;
-
-            for (const chest of (this.chests.getChildren() as Chest[])) { // Check all chests
-                const dist = Phaser.Math.Distance.Between(player.x, player.y, chest.x, chest.y);
-
-                if (!chest.isOpened) {
-                    // Unopened: open it (consume attack, no knockback)
-                    if (dist < interactRange) {
-                        chest.open();
-                        // Optional: Reset player attack so they don't immediately punch it away?
-                        // player.isAttacking = false; 
-                        // But let's leave it, just don't apply force HERE.
-                        // Force is only applied in the 'else' block which won't run this frame
-                        // because chest.isOpened was false at start of check.
-
-                        // Actually, chest.open() sets isOpened=true immediately.
-                        // Next frame physics might pick it up.
-                        // But for THIS frame, we just open.
-                    }
-                }
-            }
         }
     }
 
@@ -648,50 +556,17 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         if (!this.uiCamera) return;
 
         // Ignore static world elements
-        if (this.background) this.uiCamera.ignore(this.background);
-        if (this.backgroundImage) this.uiCamera.ignore(this.backgroundImage); // Ignore bg image
-
-        if (this.platforms.length > 0) this.uiCamera.ignore(this.platforms);
-        if (this.softPlatforms.length > 0) this.uiCamera.ignore(this.softPlatforms);
+        if (this.backgroundImage) this.uiCamera.ignore(this.backgroundImage);
         if (this.stageTextures.length > 0) this.uiCamera.ignore(this.stageTextures);
 
         // Ignore entities
-        this.players.forEach(p => p.addToCameraIgnore(this.uiCamera));
+        this.uiCamera.ignore(this.players);
     }
-
-    /**
-     * Expose method to add dynamic objects to camera ignore list
-     * (Called by Hitboxes and other dynamic entities)
-     */
-    public addToCameraIgnore(object: Phaser.GameObjects.GameObject): void {
-        if (this.uiCamera) {
-            this.uiCamera.ignore(object);
-        }
-    }
-
-
 
     private createStage(): void {
         const stage = createSharedStage(this, this.currentStageBackground);
-
-        // Populate ALL tracking arrays so configureCameraExclusions always works
         this.backgroundImage = stage.background;
-
-        this.platforms = [stage.mainPlatform];
-        this.softPlatforms = stage.softPlatforms;
-        this.sidePlatforms = stage.sidePlatforms; // Store side platforms
-        this.walls = stage.wallCollisionRects;
-        this.stageTextures = [...stage.platformTextures]; // Track ALL textures (side visuals are in platformTextures now)
-
-        // Explicitly ignore every stage object in UI camera (with guards for empty arrays)
-        if (this.uiCamera) {
-            this.uiCamera.ignore(stage.background);
-
-            this.uiCamera.ignore(stage.mainPlatform);
-            if (stage.softPlatforms.length > 0) this.uiCamera.ignore(stage.softPlatforms);
-            if (stage.platformTextures.length > 0) this.uiCamera.ignore(stage.platformTextures);
-            if (stage.sidePlatforms.length > 0) this.uiCamera.ignore(stage.sidePlatforms);
-        }
+        this.stageTextures = [...stage.platformTextures];
 
         // Apply campaign visual suppression (desaturation effect) — only on first encounters
         if (this.mode === 'campaign' && !this.isTraining) {
@@ -779,7 +654,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         // Stop updates if game over
         if (this.isGameOver) {
-            this.players.forEach(p => p.updateVisuals(delta));
+            this.players.forEach(p => p.render(this.match, delta));
 
             // Wait until 5 seconds passes and menu appears
             if (!this.isGameOverMenuReady) return;
@@ -839,10 +714,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const pauseKeyPressed = Phaser.Input.Keyboard.JustDown(this.pauseKey);
         const gamepadPausePressed = this.checkGamepadPause();
 
-        // Check if any chest overlay is open
-        const isChestOverlayOpen = (this.chests.getChildren() as Chest[]).some(chest => chest.isOverlayOpen);
-
-        if ((pauseKeyPressed || gamepadPausePressed) && !isChestOverlayOpen) {
+        if (pauseKeyPressed || gamepadPausePressed) {
             if (!this.scene.isActive('DialogueScene')) {
                 this.togglePause();
             }
@@ -866,7 +738,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (!this.debugOverlay.isMinimalMode()) {
                 this.toggleDebugVisuals(this.debugVisible);
                 this.players.forEach(p => p.setDebug(this.debugVisible));
-                this.seals.forEach(s => s.setDebug(this.debugVisible));
             }
         }
 
@@ -893,31 +764,35 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             }
         }
 
-        const steps = this.simClock.advance(delta);
-        for (let i = 0; i < steps && !this.isGameOver; i++) {
-            this.stepSimulation();
+        if (!this.isCutscene) {
+            const steps = this.simClock.advance(delta);
+            for (let i = 0; i < steps && !this.isGameOver; i++) {
+                this.stepSimulation();
+            }
         }
+        this.players.forEach(p => p.render(this.match, delta));
 
         // Camera Follow
         this.updateCamera();
 
         // Update debug overlay (Showing P1 stats for now)
         if (this.players.length > 0) {
-            const displayPlayer = this.players[0]; // Always show first player
-            const velocity = displayPlayer.getVelocity();
-            const currentAttack = displayPlayer.getCurrentAttack();
-            const attackInfo = currentAttack
-                ? `${currentAttack.data.type} ${currentAttack.data.direction} (${currentAttack.phase})`
+            // Always show the first player
+            const fighter = this.match.fighters[0];
+            const attack = fighter.combat.attack;
+            const attackData = attack ? AttackRegistry[attack.key] : null;
+            const attackInfo = attack && attackData
+                ? `${attackData.type} ${attackData.direction} (${attack.phase})`
                 : 'None';
 
             if (this.debugVisible) {
                 this.debugOverlay.update(
-                    velocity.x,
-                    velocity.y,
-                    displayPlayer.getState(),
-                    displayPlayer.getRecoveryAvailable(),
+                    fighter.body.vx,
+                    fighter.body.vy,
+                    fighter.state,
+                    fighter.body.recoveryAvailable,
                     attackInfo,
-                    displayPlayer.isGamepadConnected()
+                    this.players[0].isGamepadConnected()
                 );
                 this.debugOverlay.setVisible(true);
             } else {
@@ -944,201 +819,128 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     }
 
-    /** Advances gameplay by one fixed step of SIM_STEP_MS. */
+    /** Advances the match by one fixed step, then plays what happened in it. */
     private stepSimulation(): void {
-        // 1. Update Physics (Move)
-        this.players.forEach(p => p.updatePhysics(SIM_STEP_MS));
+        for (const p of this.players) this.stepInputs[p.fighterIndex] = p.readInput(this.match);
+        this.stepEvents.length = 0;
+        stepMatch(this.match, this.stepInputs, this.stepEvents);
+        this.recorder?.captureStep(this.match, this.stepInputs);
 
-        // 2. Resolve Collisions (Snap to Ground)
-        for (const platform of this.platforms) {
-            this.players.forEach(p => p.checkPlatformCollision(platform, false));
-        }
-        // Side Platforms (Solid)
-        for (const platform of this.sidePlatforms) {
-            this.players.forEach(p => p.checkPlatformCollision(platform, false));
-        }
-        // Soft Platforms (One-Way)
-        for (const platform of this.softPlatforms) {
-            this.players.forEach(p => p.checkPlatformCollision(platform, true));
-        }
-
-        // 3. Update Logic (Anim)
-        this.players.forEach(p => p.updateLogic(SIM_STEP_MS));
-
-        // 4. Wall Collisions (end of frame — sets isTouchingWall for next frame)
-        this.players.forEach(p => p.checkWallCollision(this.walls));
-
-        // Combat Hit Checks
-        for (let i = 0; i < this.players.length; i++) {
-            for (let j = 0; j < this.players.length; j++) {
-                if (i !== j) {
-                    this.players[i].checkHitAgainst(this.players[j]);
-                }
-            }
-        }
-
-        // Chest Interaction (attack near chest to open)
-        this.checkChestInteractions();
-
-        // Check Blast Zones
-        this.checkBlastZones();
-
-        this.recorder?.captureStep(this.players);
+        for (const event of this.stepEvents) this.playEvent(event);
+        if (this.match.isOver) this.onMatchOver();
     }
 
-    private checkBlastZones(): void {
-        const checkPlayer = (player: Player, playerId: number) => {
-            // Skip checks if player is already dead/eliminated or respawning
-            if (!player.active || player.isRespawning) return; // Phaser active flag
+    /** Starts a fresh match with the current fighters. */
+    private startMatch(): void {
+        const seed = Math.floor(Math.random() * 0x100000000);
+        this.match = createMatch(this.fighterSetups, seed);
+        this.recorder = this.isRecording ? new MatchRecorder(this.fighterSetups, seed) : null;
+    }
 
-            const bounds = player.getBounds();
-            if (bounds.left < MapConfig.BLAST_ZONE_LEFT ||
-                bounds.right > MapConfig.BLAST_ZONE_RIGHT ||
-                bounds.top < MapConfig.BLAST_ZONE_TOP ||
-                bounds.bottom > MapConfig.BLAST_ZONE_BOTTOM) {
+    private playEvent(event: MatchEvent): void {
+        const audio = AudioManager.getInstance();
+        switch (event.type) {
+            case 'sound':
+                audio.playSFX(event.key, { volume: event.volume });
+                break;
+            case 'attack':
+                this.players[event.fighter].playAttackSound(event.key, event.charged);
+                break;
+            case 'ghost':
+                this.players[event.fighter].spawnSignatureGhost(event.ghost);
+                break;
+            case 'hit':
+                this.onHit(event.attacker, event.target, event.attackKey);
+                break;
+            case 'groundPoundMiss':
+                audio.playSFX('sfx_landing', { volume: 1.0 });
+                audio.playSFX('sfx_chest_drop', { volume: 0.6 });
+                break;
+            case 'ko':
+                this.onKnockOut(event.fighter, event.x, event.y);
+                break;
+            case 'respawn':
+                this.showRespawnFlash(event.x, event.y);
+                break;
+        }
+    }
 
-                // --- DEATH IMPACT START ---
-                // Camera Shake
-                this.cameras.main.shake(300, 0.02);
+    private onHit(attacker: number, target: number, attackKey: string | null): void {
+        this.players[attacker].playHitSound(attackKey);
+        if (attackKey && AttackRegistry[attackKey].type === AttackType.HEAVY) {
+            this.cameras.main.shake(100, 0.005);
+        }
 
-                // Spawn Explosion at clamp point
-                const impactX = Phaser.Math.Clamp(bounds.centerX, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
-                const impactY = Phaser.Math.Clamp(bounds.centerY, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
+        // The campaign opponent doesn't flash
+        const victim = this.players[target];
+        if (!(this.mode === 'campaign' && victim.playerId === 1)) {
+            victim.flashDamage(this.match.fighters[target].damagePercent);
+        }
+    }
 
-                // Use generic red for now.
-                this.effectManager.spawnDeathExplosion(impactX, impactY, 0xff4444);
+    /** A fighter left the stage: impact, crowd, and the campaign's reactions. */
+    private onKnockOut(index: number, x: number, y: number): void {
+        const player = this.players[index];
+        const fighter = this.match.fighters[index];
 
-                // Audio
-                AudioManager.getInstance().playSFX('sfx_death', { volume: 0.8 });
-                if (Math.random() > 0.5) {
-                    AudioManager.getInstance().playSFX('sfx_death_crowd_1', { volume: 0.5 });
-                } else {
-                    AudioManager.getInstance().playSFX('sfx_death_crowd_2', { volume: 0.5 });
-                }
-                // --- DEATH IMPACT END ---
+        this.cameras.main.shake(300, 0.02);
+        const impactX = Phaser.Math.Clamp(x, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
+        const impactY = Phaser.Math.Clamp(y, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
+        this.effectManager.spawnDeathExplosion(impactX, impactY, 0xff4444);
 
-                // Score update (lives)
-                player.lives = Math.max(0, player.lives - 1);
+        const audio = AudioManager.getInstance();
+        audio.playSFX('sfx_death', { volume: 0.8 });
+        audio.playSFX(Math.random() > 0.5 ? 'sfx_death_crowd_1' : 'sfx_death_crowd_2', { volume: 0.5 });
 
-                // Campaign Visual Progression: Smoothly restore saturation when opponent loses a life
-                if (this.mode === 'campaign' && player.playerId === 1 && this.campaignColorMatrices.length > 0) {
-                    const maxLives = 3;
-                    // Calculate what fraction of color to restore (0 = desaturated, 1 = full color)
-                    const livesLost = maxLives - player.lives;
-                    const targetProgress = livesLost / maxLives;
-                    const startProgress = this.campaignTintProgress;
+        // Campaign Visual Progression: Smoothly restore saturation when opponent loses a life
+        if (this.mode === 'campaign' && player.playerId === 1 && this.campaignColorMatrices.length > 0) {
+            const maxLives = 3;
+            // Calculate what fraction of color to restore (0 = desaturated, 1 = full color)
+            const livesLost = maxLives - fighter.lives;
+            const targetProgress = livesLost / maxLives;
+            const startProgress = this.campaignTintProgress;
 
-                    this.tweens.addCounter({
-                        from: startProgress * 100,
-                        to: targetProgress * 100,
-                        duration: 3000,
-                        ease: 'Linear',
-                        onUpdate: (_tween: Phaser.Tweens.Tween) => {
-                            const progress = (_tween.getValue() ?? 0) / 100;
-                            this.campaignTintProgress = progress;
-                            // Lerp saturation from -0.5 (50% desaturated) to 0 (full color)
-                            const saturation = -0.5 + (0.5 * progress); // goes from -0.5 → 0
-                            this.campaignColorMatrices.forEach(fx => {
-                                fx.reset();
-                                fx.saturate(saturation);
-                            });
-                        }
+            this.tweens.addCounter({
+                from: startProgress * 100,
+                to: targetProgress * 100,
+                duration: 3000,
+                ease: 'Linear',
+                onUpdate: (_tween: Phaser.Tweens.Tween) => {
+                    const progress = (_tween.getValue() ?? 0) / 100;
+                    this.campaignTintProgress = progress;
+                    // Lerp saturation from -0.5 (50% desaturated) to 0 (full color)
+                    const saturation = -0.5 + (0.5 * progress); // goes from -0.5 → 0
+                    this.campaignColorMatrices.forEach(fx => {
+                        fx.reset();
+                        fx.saturate(saturation);
                     });
                 }
+            });
+        }
 
-                // Deactivate player immediately so camera ignores them
-                player.setActive(false);
-                player.setVisible(false);
-                player.setPosition(-9999, -9999);
-                if (player.body) this.matter.world.remove(player.body); // Remove body to prevent physics interactions while respawning
-
-                if (player.lives > 0) {
-                    // Campaign mid-fight cutscene: trigger when opponent reaches 1 life
-                    if (this.mode === 'campaign' && !this.isTraining && player.playerId === 1 && player.lives === 1 && !this.campaignMidFightPlayed) {
-                        this.campaignMidFightPlayed = true;
-                        const opponent = CampaignManager.getInstance().getCurrentOpponent();
-                        if (opponent && opponent.dialogueMidFight.length > 0) {
-                            // Fade to black, then show cutscene
-                            this.cameras.main.fadeOut(1000, 0, 0, 0);
-                            this.cameras.main.once('camerafadeoutcomplete', () => {
-                                // Respawn opponent and set up cutscene while screen is black
-                                this.respawnPlayer(player, playerId);
-                                this.campaignMidFightCutscene(opponent);
-                                // Fade back in to reveal the cutscene
-                                this.cameras.main.fadeIn(1000, 0, 0, 0);
-                            });
-                        } else {
-                            // No mid-fight dialogue, just respawn normally
-                            this.time.delayedCall(2000, () => {
-                                this.respawnPlayer(player, playerId);
-                            });
-                        }
-                    } else {
-                        // Normal respawn
-                        this.time.delayedCall(2000, () => {
-                            this.respawnPlayer(player, playerId);
-                        });
-                    }
-                } else {
-                    // Elimination
-                    this.killPlayer(player);
-                    this.checkGameOver();
-                }
+        // Campaign mid-fight cutscene: when the opponent is down to its last life
+        if (this.mode === 'campaign' && !this.isTraining && player.playerId === 1 && fighter.lives === 1 && !this.campaignMidFightPlayed) {
+            this.campaignMidFightPlayed = true;
+            const opponent = CampaignManager.getInstance().getCurrentOpponent();
+            if (opponent && opponent.dialogueMidFight.length > 0) {
+                // Fade to black, then show cutscene
+                this.cameras.main.fadeOut(1000, 0, 0, 0);
+                this.cameras.main.once('camerafadeoutcomplete', () => {
+                    // Respawn opponent and set up cutscene while screen is black
+                    respawnFighter(this.match, index);
+                    this.campaignMidFightCutscene(opponent);
+                    // Fade back in to reveal the cutscene
+                    this.cameras.main.fadeIn(1000, 0, 0, 0);
+                });
             }
-        };
-
-        this.players.forEach(p => checkPlayer(p, p.playerId));
-
-        // Debug Text
-        // this.debugText = this.add.text(10, 10, `Debug: ${ this.VERSION } `, { font: '16px "Pixeloid Sans"', color: '#00ff00' });
-        // this.debugText.setScrollFactor(0);
-        // this.debugText.setDepth(1000);
+        }
     }
 
-    private respawnPlayer(player: Player, playerId: number): void {
-        // Reactivate player
-        player.setActive(true);
-        player.setVisible(true);
-
-        // Respawn position - Center them safely instead of original edge spawns
-        // Center is 960. We'll add a slight random offset so they don't perfectly stack
-        const offsetX = Phaser.Math.Between(-50, 50);
-        const spawnX = 960 + offsetX;
-        const spawnY = 200; // Drop from a safe height above the center
-
-        // Grant invulnerability
-        player.isRespawning = true;
-        this.time.delayedCall(1500, () => {
-            player.isRespawning = false;
-        });
-
-        // Reset physics and state
-        console.log(`[Respawn] Player ${playerId} respawning at ${spawnX}, ${spawnY} `);
-        player.setPosition(spawnX, spawnY);
-        // Explicitly reset body physics to prevent ghost velocity/position
-        if (player.body) {
-            // Re-add body to world if it was removed
-            if (!this.matter.world.has(player.body as MatterJS.BodyType)) {
-                this.matter.world.add(player.body as MatterJS.BodyType);
-            }
-            this.matter.body.setPosition(player.body as MatterJS.BodyType, { x: spawnX, y: spawnY });
-            this.matter.body.setVelocity(player.body as MatterJS.BodyType, { x: 0, y: 0 });
-            // Reset rotation/angular velocity too just in case
-            this.matter.body.setAngle(player.body as MatterJS.BodyType, 0);
-            this.matter.body.setAngularVelocity(player.body as MatterJS.BodyType, 0);
-        }
-        
-        // Unified clean slate for all logic/combat/state
-        player.fullReset();
-        
-        player.setState(PlayerState.AIRBORNE); // Force them to fall from the spawn point
-        player.setInvulnerable(1000); // 1 full second of invulnerability
-
-        // Visual respawn effect (flash)
+    private showRespawnFlash(x: number, y: number): void {
         const flash = this.add.graphics();
         flash.fillStyle(0xffffff, 0.8);
-        flash.fillCircle(spawnX, spawnY, 75); // 50->75
-        this.addToCameraIgnore(flash);
+        flash.fillCircle(x, y, 75);
+        this.uiCamera?.ignore(flash);
         this.tweens.add({
             targets: flash,
             alpha: 0,
@@ -1155,7 +957,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private updateCamera(): void {
         // Filter out players who are effectively dead or inactive
         const targets = this.players.filter(p => {
-            if (!p.active) return false; // Ignore inactive (dead/waiting respawn) players
+            if (!isInPlay(this.match.fighters[p.fighterIndex])) return false;
 
             // Check bounds (using slightly tighter bounds than actual kill box)
             return p.x > MapConfig.BLAST_ZONE_LEFT + 50 &&
@@ -1213,13 +1015,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
     private restartMatch(): void {
-        // Reset player positions and damage
-        this.players.forEach(p => this.respawnPlayer(p, p.playerId));
-
-
-        // Reset kill counts
-        this.players.forEach(p => p.lives = 3);
-
+        this.startMatch();
+        this.players.forEach(p => p.setPose(null));
 
         // Clear game over state
         this.isGameOver = false;
@@ -1237,19 +1034,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Close pause menu
         this.isPaused = false;
         this.pauseMenu.hide();
-
-        // Clear all chests
-        if (Array.isArray(this.chests)) {
-            this.chests.forEach(c => c.destroy());
-        }
-        this.chests = this.add.group({
-            classType: Chest,
-            runChildUpdate: true,
-            maxSize: 10
-        });
     }
-
-
 
     private spawnTrainingDummy(): void {
         const maxPlayers = 6; // User requested up to 5 CPUs (assuming +1 user = 6 total)
@@ -1332,23 +1117,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // P5 = 1160
         const spawnY = 300;
 
-        const player = new Player(this, spawnX, spawnY, {
-            playerId: playerId,
-            gamepadIndex: null,
-            useKeyboard: false,
-            character: randomChar,
-            isAI: true
-        });
-
-        player.isTrainingDummy = true;
-
-        // Set Color
-        const color = this.PLAYER_COLORS[playerId] || 0xffffff;
-        player.visualColor = color;
-        player.resetVisuals(); // Apply color
+        const setup = { character: randomChar, x: spawnX, y: spawnY };
+        this.fighterSetups.push(setup);
+        const fighter = addFighter(this.match, setup);
+        const player = new Player(this, fighter, { playerId, character: randomChar, isAI: true, isTrainingDummy: true });
+        player.setColor(this.PLAYER_COLORS[playerId] || 0xffffff);
 
         this.players.push(player);
-        player.addToCameraIgnore(this.uiCamera);
+        this.uiCamera.ignore(player);
 
         // Add to MatchHUD
         this.addPlayerToHUD(player);
@@ -1357,15 +1133,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     // Clean up when scene is shut down (e.g. switching to menu)
     // Clean up when scene is shut down (e.g. switching to menu)
     shutdown(): void {
-        try {
-            // Stop all physics and input
-            if (this.matter && this.matter.world) {
-                this.matter.world.shutdown();
-            }
-        } catch (e) {
-            console.warn("Error shutting down physics:", e);
-        }
-
         try {
             this.input.keyboard?.removeAllKeys();
             this.input.keyboard?.resetKeys();
@@ -1404,45 +1171,21 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.debugOverlay.destroy();
         }
 
-        // Clean up chests
-        if (this.chests) {
-            this.chests.destroy(true);
-        }
-
         // Stop all active tweens
         this.tweens.killAll();
     }
-    private killPlayer(player: Player): void {
-        player.setActive(false);
-        player.setVisible(false);
-        player.setPosition(-9999, -9999); // Move away
-        // Disable body
-        if (player.body) {
-            this.matter.world.remove(player.body);
+    /** The simulation ended the match: at most one fighter has lives left. */
+    private onMatchOver(): void {
+        const winner = this.match.winnerId >= 0 ? this.players[this.match.winnerId] : null;
+
+        // Campaign mode: skip win animation and rematch entirely
+        if (this.mode === 'campaign' && !this.isTraining && winner && winner.playerId === 0) {
+            CampaignManager.getInstance().advanceLadder();
+            this.campaignDefeatCutscene();
+            return;
         }
 
-        // Campaign tint restoration is now handled in checkBlastZones on each life lost
-
-        // Show "ELIMINATED" text briefly? (Optional)
-    }
-
-    private checkGameOver(): void {
-        // Count active players with lives > 0
-        const survivors = this.players.filter(p => p.lives > 0);
-
-        if (survivors.length <= 1) {
-            // Game Over!
-            const winner = survivors.length > 0 ? survivors[0] : null;
-
-            // Campaign mode: skip win animation and rematch entirely
-            if (this.mode === 'campaign' && !this.isTraining && winner && winner.playerId === 0) {
-                CampaignManager.getInstance().advanceLadder();
-                this.campaignDefeatCutscene();
-                return; // Skip normal handleGameOver
-            }
-
-            this.handleGameOver(winner ? winner.playerId : -1);
-        }
+        this.handleGameOver(winner ? winner.playerId : -1);
     }
 
     private handleGameOver(winnerId: number): void {
@@ -1462,13 +1205,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 winnerText += `\nPLAYER ${winnerId + 1} HA ARATO!`; // Custom Text
                 // DRAMATIC ZOOM
                 if (winner) {
-                    winner.isWinner = true;
-                    winner.fsm.changeState('Win', winner); // Auto-taunt on victory
+                    winner.setPose('win'); // Auto-taunt on victory
                     this.cameras.main.pan(winner.x, winner.y, 1500, 'Power2');
                     this.cameras.main.zoomTo(3.5, 1500, 'Power2');
                 }
-            } else if (winner) {
-                winner.isWinner = true; // Still mark as winner to stop movement, but no auto-taunt
             }
         } else {
             if (this.mode !== 'campaign') {
@@ -1726,52 +1466,24 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         if (!visible) return;
 
-        // Draw Solids (Green) - Main Platform
-        this.debugGraphics.lineStyle(2, 0x00ff00, 1);
-        this.debugGraphics.fillStyle(0x00ff00, 0.2);
-
-        this.platforms.forEach((p, index) => {
-            if (!p) return;
-            this.debugGraphics.strokeRect(p.x - p.width / 2, p.y - p.height / 2, p.width, p.height);
-            this.debugGraphics.fillRect(p.x - p.width / 2, p.y - p.height / 2, p.width, p.height);
-            this.addDebugLabel(p.x, p.y - p.height / 2 - 15, `MAIN #${index} (${p.width}x${p.height})`, '#00ff00');
+        // Collision as the simulation sees it (shared/StageData.ts)
+        let side = 0;
+        let top = 0;
+        STAGE_LAYOUT.platforms.forEach((p, index) => {
+            if (p.isSoft) this.drawDebugRect(p, 0xffff00, `TOP #${++top}`);
+            else this.drawDebugRect(p, 0x00ff00, index === 0 ? 'MAIN #0' : `SIDE #${++side}`);
         });
+        STAGE_LAYOUT.walls.forEach((w, index) => this.drawDebugRect(w, 0xff0000, `WALL #${index + 1}`));
+    }
 
-        // Draw Solids (Green) - Side Platforms (Images)
-        this.sidePlatforms.forEach((p, index) => {
-            if (!p) return;
-            // Images use different origin/size logic sometimes, but usually centered.
-            // Use displayWidth/Height for safety.
-            const w = p.displayWidth;
-            const h = p.displayHeight;
-            this.debugGraphics.strokeRect(p.x - w * p.originX, p.y - h * p.originY, w, h);
-            this.debugGraphics.fillRect(p.x - w * p.originX, p.y - h * p.originY, w, h);
-            this.addDebugLabel(p.x, p.y - h * p.originY - 15, `SIDE #${index + 1} (${Math.round(w)}x${Math.round(h)})`, '#00ff00');
-        });
-
-        // Draw Soft (Yellow) - Top Platforms
-        this.debugGraphics.lineStyle(2, 0xffff00, 1);
-        this.debugGraphics.fillStyle(0xffff00, 0.2);
-
-        this.softPlatforms.forEach((p, index) => {
-            if (!p) return;
-            const w = p.displayWidth;
-            const h = p.displayHeight;
-            this.debugGraphics.strokeRect(p.x - w * p.originX, p.y - h * p.originY, w, h);
-            this.debugGraphics.fillRect(p.x - w * p.originX, p.y - h * p.originY, w, h);
-            this.addDebugLabel(p.x, p.y - h * p.originY - 15, `TOP #${index + 1} (${Math.round(w)}x${Math.round(h)})`, '#ffff00');
-        });
-
-        // Draw Walls (Red)
-        this.debugGraphics.lineStyle(2, 0xff0000, 1);
-        this.debugGraphics.fillStyle(0xff0000, 0.2);
-
-        this.walls.forEach((r: Phaser.Geom.Rectangle, index: number) => {
-            if (!r) return;
-            this.debugGraphics.strokeRect(r.x, r.y, r.width, r.height);
-            this.debugGraphics.fillRect(r.x, r.y, r.width, r.height);
-            this.addDebugLabel(r.x + r.width / 2, r.y - 15, `WALL #${index + 1} (${r.width}x${r.height})`, '#ff0000');
-        });
+    private drawDebugRect(r: SimRect, color: number, name: string): void {
+        const left = r.x - r.w / 2;
+        const top = r.y - r.h / 2;
+        this.debugGraphics.lineStyle(2, color, 1);
+        this.debugGraphics.fillStyle(color, 0.2);
+        this.debugGraphics.strokeRect(left, top, r.w, r.h);
+        this.debugGraphics.fillRect(left, top, r.w, r.h);
+        this.addDebugLabel(r.x, top - 15, `${name} (${r.w}x${r.h})`, '#' + color.toString(16).padStart(6, '0'));
     }
 
     private addDebugLabel(x: number, y: number, text: string, color: string): void {
@@ -1794,28 +1506,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     // --- Cinematic Methods ---
     public async transitionToCutscene(positions: { playerId: number, x: number, y: number }[], dialogue: any[], leftChar?: string, rightChar?: string): Promise<void> {
         return new Promise<void>((resolve) => {
-            // 1. Force players into Cinematic state
-            const playersInvolved = this.players.filter(p => positions.some(pos => pos.playerId === p.playerId));
-            playersInvolved.forEach(p => {
-                p.velocity.set(0, 0);
-                p.isGrounded = true;
-                p.animationKey = 'idle';
-                p.fsm.changeState('Cinematic', p);
-                p.playAnim('idle', false);
-            });
-
-            // 2. Snap to positions instantly
+            // Hold the match and stand the fighters at their marks, facing each other
+            this.isCutscene = true;
             positions.forEach(pos => {
                 const player = this.players.find(p => p.playerId === pos.playerId);
-                if (player) {
-                    player.setPosition(pos.x, pos.y);
-                    // Ensure they face each other
-                    if (player.playerId === 0) {
-                        player.setFacingDirection(1); // Face right
-                    } else if (player.playerId === 1) {
-                        player.setFacingDirection(-1); // Face left
-                    }
-                }
+                if (!player) return;
+                placeFighter(this.match, player.fighterIndex, pos.x, pos.y, pos.playerId === 0 ? 1 : -1);
+                player.setPose('idle');
             });
 
             // Wait 600ms for the black LOADING overlay to fade out, then launch dialogue
@@ -1846,12 +1543,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // calls showCurrentLine() which emits dialogue_animation during create().
         diagScene.events.on('dialogue_animation', (side: 'left' | 'right', animation: string) => {
             const targetPlayerId = side === 'left' ? 0 : 1;
-            const player = this.players.find(p => p.playerId === targetPlayerId);
-
-            if (player) {
-                player.animationKey = animation;
-                player.playAnim(animation, true);
-            }
+            this.players.find(p => p.playerId === targetPlayerId)?.setPose(animation);
         });
 
         diagScene.events.once('dialogue_complete', () => {
@@ -1864,11 +1556,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
     private endCutscene(): void {
-        this.players.forEach(p => {
-            if (p.fsm.getCurrentStateName() === 'Cinematic') {
-                p.fsm.changeState('Idle', p);
-            }
-        });
+        this.players.forEach(p => p.setPose(null));
+        this.isCutscene = false;
 
         // Restore HUD visibility
         if (this.mode === 'campaign' && this.matchHUD) {
@@ -1880,21 +1569,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
      * Campaign mid-fight cutscene: freeze both players, play dialogue, then resume fight.
      */
     private campaignMidFightCutscene(opponent: import('../managers/CampaignManager').OpponentConfig): void {
-        // Freeze both players and force them grounded with idle animation
+        // Hold the match and stand both fighters on the stage, facing each other
+        this.isCutscene = true;
         const p1 = this.players.find(p => p.playerId === 0);
         const p2 = this.players.find(p => p.playerId === 1);
-
-        this.players.forEach(p => {
-            p.velocity.set(0, 0);
-            p.isGrounded = true;
-            p.animationKey = 'idle';
-            p.fsm.changeState('Cinematic', p);
-            p.playAnim('idle', false);
-        });
-
-        // Position players on the ground, facing each other
-        if (p1) { p1.setPosition(860, 750); p1.setFacingDirection(1); }
-        if (p2) { p2.setPosition(1060, 750); p2.setFacingDirection(-1); }
+        if (p1) placeFighter(this.match, p1.fighterIndex, 860, 750, 1);
+        if (p2) placeFighter(this.match, p2.fighterIndex, 1060, 750, -1);
+        this.players.forEach(p => p.setPose('idle'));
 
         // Hide HUD during cutscene
         if (this.matchHUD) this.matchHUD.setVisible(false);
@@ -1936,28 +1617,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             const p1 = this.players.find(p => p.playerId === 0);
             const p2 = this.players.find(p => p.playerId === 1);
 
+            // The match is over; the eliminated opponent is posed back on stage
             if (p1) {
-                p1.velocity.set(0, 0);
-                p1.isGrounded = true;
-                p1.setActive(true);
-                p1.setVisible(true);
-                p1.animationKey = 'idle';
-                p1.fsm.changeState('Cinematic', p1);
-                p1.setPosition(860, 750);
-                p1.setFacingDirection(1);
-                p1.playAnim('idle', false);
+                placeFighter(this.match, p1.fighterIndex, 860, 750, 1);
+                p1.setPose('idle');
             }
-
             if (p2) {
-                p2.velocity.set(0, 0);
-                p2.isGrounded = true;
-                p2.setActive(true);
-                p2.setVisible(true);
-                p2.animationKey = 'idle';
-                p2.fsm.changeState('Cinematic', p2);
-                p2.setPosition(1060, 750);
-                p2.setFacingDirection(-1);
-                p2.playAnim('idle', false);
+                placeFighter(this.match, p2.fighterIndex, 1060, 750, -1);
+                p2.setPose('idle');
             }
 
             // Hide HUD
@@ -2037,12 +1704,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Bind BEFORE launch to catch events emitted during create()
         diagScene.events.on('dialogue_animation', (side: 'left' | 'right', animation: string) => {
             const targetPlayerId = side === 'left' ? 0 : 1;
-            const player = this.players.find(p => p.playerId === targetPlayerId);
-
-            if (player) {
-                player.animationKey = animation;
-                player.playAnim(animation, true);
-            }
+            this.players.find(p => p.playerId === targetPlayerId)?.setPose(animation);
         });
 
         diagScene.events.once('dialogue_complete', () => {

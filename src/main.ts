@@ -31,13 +31,6 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  physics: {
-    default: 'matter',
-    matter: {
-      gravity: { x: 0, y: 2 },
-      debug: false
-    }
-  },
   input: {
     gamepad: true
   }

@@ -1,6 +1,6 @@
 /**
  * A fighter in the simulation: plain data, its input buffer, and the state
- * machine (ported from src/state/states).
+ * machine.
  */
 
 import type { AttackDirection, AttackPhase } from './AttackData.js';
@@ -12,8 +12,7 @@ const INPUT_BUFFER_STEPS = 6;
 
 export const FIGHTER_STATES = [
     'Idle', 'Run', 'Jump', 'Fall', 'WallSlide', 'Attack', 'Charging', 'HitStun',
-    'Dodge', 'AirDodge', 'Recovery', 'GroundPound', 'Taunt', 'Win', 'Defeat',
-    'Cinematic',
+    'Dodge', 'AirDodge', 'Recovery', 'GroundPound', 'Taunt', 'Defeat',
 ] as const;
 export type FighterStateName = typeof FIGHTER_STATES[number];
 
@@ -98,9 +97,6 @@ export interface FighterState {
     respawnSteps: number;
     /** Steps after a respawn during which blast zones ignore the fighter. */
     koImmunitySteps: number;
-    isTaunting: boolean;
-    isShowingDefeat: boolean;
-    isWinner: boolean;
 }
 
 export interface FighterSetup {
@@ -144,9 +140,6 @@ export function createFighter(id: number, setup: FighterSetup): FighterState {
         lives: 3,
         respawnSteps: 0,
         koImmunitySteps: 0,
-        isTaunting: false,
-        isShowingDefeat: false,
-        isWinner: false,
     };
 }
 
@@ -213,20 +206,6 @@ function enterState(f: FighterState): void {
         case 'AirDodge':
             f.isDodging = true;
             break;
-        case 'Taunt':
-            f.isTaunting = true;
-            break;
-        case 'Defeat':
-            f.isShowingDefeat = true;
-            break;
-        case 'Win':
-            f.isWinner = true;
-            break;
-        case 'Cinematic':
-            f.body.vx = 0;
-            f.body.vy = 0;
-            combat.hitbox.active = false;
-            break;
     }
 }
 
@@ -238,15 +217,6 @@ function exitState(f: FighterState): void {
         case 'GroundPound':
             f.combat.isGroundPounding = false;
             f.isAttacking = false;
-            break;
-        case 'Taunt':
-            f.isTaunting = false;
-            break;
-        case 'Defeat':
-            f.isShowingDefeat = false;
-            break;
-        case 'Win':
-            f.isWinner = false;
             break;
     }
 }
@@ -344,10 +314,6 @@ export function updateState(f: FighterState): void {
             if (isMoving || input.jump || input.lightAttack || input.heavyAttack || input.dodge || !b.isGrounded) {
                 return changeState(f, 'Idle');
             }
-            return;
-
-        case 'Win':
-        case 'Cinematic':
             return;
     }
 }
