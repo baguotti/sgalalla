@@ -1,27 +1,32 @@
 <!doctype html>
 <!--
-  Dev tool: two game clients side by side for testing online play against the
-  local server (npm run server). Open /tests/online.html on the dev server;
-  its query string is passed to both clients, e.g. ?lag=50&jitter=10&loss=5
-  for 100 ms ping and 5% packet loss.
+  Dev tool: several game clients side by side for testing online play against
+  the local server (npm run server). Open /tests/online.html on the dev server;
+  ?clients=4 shows four (default 2), and the query string is passed to every
+  client, e.g. ?lag=50&jitter=10&loss=5 for 100 ms ping and 5% packet loss.
 -->
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Two clients</title>
+    <title>Online clients</title>
     <link rel="icon" href="data:,">
     <style>
-        body { margin: 0; display: flex; gap: 4px; background: #111; }
+        body { margin: 0; display: flex; flex-wrap: wrap; gap: 4px; background: #111; }
         iframe { width: calc(50vw - 2px); aspect-ratio: 16 / 9; border: 0; }
     </style>
 </head>
 <body>
-    <iframe id="a"></iframe>
-    <iframe id="b"></iframe>
     <script>
-        // anyfocus: both clients read input although only one can have focus
-        const query = '?anyfocus' + (location.search ? '&' + location.search.slice(1) : '');
-        for (const id of ['a', 'b']) document.getElementById(id).src = '/' + query;
+        const params = new URLSearchParams(location.search);
+        const clients = Math.min(Math.max(Number(params.get('clients')) || 2, 1), 4);
+        // anyfocus: every client reads input although only one can have focus
+        params.set('anyfocus', '');
+        for (let i = 0; i < clients; i++) {
+            const frame = document.createElement('iframe');
+            frame.id = 'client' + i;
+            frame.src = '/?' + params.toString();
+            document.body.appendChild(frame);
+        }
     </script>
 </body>
 </html>

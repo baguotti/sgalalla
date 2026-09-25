@@ -163,16 +163,16 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         this.online = null;
         if (this.mode === 'online') {
-            const { client, slot, start } = data.online as { client: NetClient; slot: number; start: MatchStart };
-            this.online = new OnlineMatch(client, slot, start);
-            // Our slot plays with keyboard or the first gamepad; the other is the opponent
-            this.playerData = [0, 1].map(playerId => ({
+            const { client, start } = data.online as { client: NetClient; start: MatchStart };
+            this.online = new OnlineMatch(client, start);
+            // Our slot plays with keyboard or the first gamepad; the others play remotely
+            this.playerData = start.characters.map((character, playerId) => ({
                 playerId,
                 joined: true,
                 ready: true,
                 input: { type: 'KEYBOARD', gamepadIndex: 0, keyboardMapping: 'all' },
-                character: start.characters[playerId],
-                isRemote: playerId !== slot,
+                character,
+                isRemote: playerId !== start.slot,
             }));
         } else if (data.playerData) {
             this.playerData = data.playerData;
@@ -554,7 +554,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     this.online.start = start;
                     this.restartMatch();
                 });
-                client.on(NetEvent.OPPONENT_LEFT, () => this.endOnline("L'AVVERSARIO SE N'È ANDATO"));
+                client.on(NetEvent.PLAYER_LEFT, () => this.endOnline("UN GIOCATORE SE N'È ANDATO"));
                 client.onDisconnect(() => this.endOnline('CONNESSIONE PERSA'));
                 // Network stats on screen by default (Q toggles)
                 this.debugVisible = true;
@@ -1492,7 +1492,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.isGameOverMenuReady = false;
         this.gameOverMenuTexts.forEach(t => t.destroy());
         this.gameOverMenuTexts = [];
-        this.showCenterText("IN ATTESA DELL'AVVERSARIO...");
+        this.showCenterText(this.players.length > 2 ? 'IN ATTESA DEGLI ALTRI GIOCATORI...' : "IN ATTESA DELL'AVVERSARIO...");
     }
 
     /** The online match can't go on: say why, then go back to the menu. */

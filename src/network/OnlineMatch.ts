@@ -6,29 +6,32 @@ import type { MatchStart } from '../../shared/NetProtocol';
 import { RollbackSession } from '../../shared/Rollback';
 
 /**
- * The network side of an online match: runs it in rollback with the opponent
- * (shared/Rollback.ts) and reports how that is going.
+ * The network side of an online match: runs it in rollback with the other
+ * players (shared/Rollback.ts) and reports how that is going.
  */
 export class OnlineMatch {
     readonly client: NetClient;
-    /** Our fighter's index in the match. */
-    readonly slot: number;
     /** The server's start message for the current match. */
     start: MatchStart;
 
     private session: RollbackSession | null = null;
     private desyncReported = false;
 
-    constructor(client: NetClient, slot: number, start: MatchStart) {
+    constructor(client: NetClient, start: MatchStart) {
         this.client = client;
-        this.slot = slot;
         this.start = start;
         client.onPacket(packet => this.session?.receivePacket(packet));
     }
 
+    /** Our fighter's index in the match. */
+    get slot(): number {
+        return this.start.slot;
+    }
+
     /** Plays `match`, freshly created from `start`: the first match or a rematch. */
     begin(match: MatchState): void {
-        this.session = new RollbackSession(this.start.seed, this.slot, this.start.inputDelay, match);
+        const { seed, slot, characters, inputDelay } = this.start;
+        this.session = new RollbackSession(seed, slot, characters.length, inputDelay, match);
         this.desyncReported = false;
     }
 
@@ -43,22 +46,22 @@ export class OnlineMatch {
     }
 
     /**
-     * Simulates the next frame, correcting any wrong guess of the opponent's
-     * input first. Events to play go to `events`. False while waiting for the
-     * opponent or letting them catch up.
+     * Simulates the next frame, correcting any wrong guess of the others'
+     * inputs first. Events to play go to `events`. False while waiting for
+     * someone or letting them catch up.
      */
     step(readLocal: () => FighterInput, events: MatchEvent[]): boolean {
         return this.session!.step(() => packInput(readLocal()), events);
     }
 
-    /** Sends every input the opponent hasn't confirmed. Once per rendered frame, also after the match ends. */
+    /** Sends every input someone hasn't confirmed. Once per rendered frame, also after the match ends. */
     flush(): void {
         const session = this.session;
         if (!session) return;
         this.client.sendPacket(session.buildPacket());
         if (session.desyncFrame >= 0 && !this.desyncReported) {
             this.desyncReported = true;
-            console.error(`[Online] The two simulations differ at frame ${session.desyncFrame}`);
+            console.error(`[Online] Our simulation differs from another player's at frame ${session.desyncFrame}`);
         }
     }
 

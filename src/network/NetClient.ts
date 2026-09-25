@@ -5,7 +5,7 @@ type NetEventName = typeof NetEvent[keyof typeof NetEvent];
 
 const SERVER_PORT = 9208;
 const PING_INTERVAL_MS = 500;
-const SERVER_EVENTS = [NetEvent.REJECTED, NetEvent.WAITING, NetEvent.MATCHED, NetEvent.PICK, NetEvent.START, NetEvent.OPPONENT_LEFT];
+const SERVER_EVENTS = [NetEvent.REJECTED, NetEvent.ROOM, NetEvent.START, NetEvent.PLAYER_LEFT];
 
 /**
  * The connection to the online server.

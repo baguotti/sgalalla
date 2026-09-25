@@ -1,18 +1,18 @@
 /**
- * Rollback for a two-player match.
+ * Rollback for an online match of 2 to 4 players.
  *
- * Each side simulates right away with its own input and a guess of the
- * opponent's: their last known input, minus new presses. When the opponent's
+ * Each player simulates right away with their own input and a guess of every
+ * other player's: that player's last known input, minus new presses. When a
  * real input for a frame already simulated differs from the guess, the match
  * goes back to the state saved before that frame and is simulated again.
  * Sounds and effects already played are not played twice.
  *
- * A side that gets MAX_ROLLBACK frames past the opponent's inputs waits for
- * them, and a side running ahead of the other skips an occasional frame so
- * that the two stay level. Inputs are sampled `inputDelay` frames ahead, which
+ * A player who gets MAX_ROLLBACK frames past someone's inputs waits for them,
+ * and a player running ahead of anyone skips an occasional frame so that
+ * everybody stays level. Inputs are sampled `inputDelay` frames ahead, which
  * makes rollbacks shorter; frames before `inputDelay` have no input.
  *
- * Every packet repeats the inputs the other side hasn't acknowledged, and
+ * Every packet repeats the inputs some other player hasn't acknowledged, and
  * carries a checksum of a confirmed frame every CHECKSUM_INTERVAL frames.
  */
 
@@ -23,22 +23,26 @@ import { MAX_INPUTS_PER_PACKET, decodeInputPacket, encodeInputPacket } from './N
 
 export const MAX_ROLLBACK = 8;
 export const CHECKSUM_INTERVAL = 60;
-/** Frames over which each side averages its frame advantage. */
+/** Frames over which each player averages their frame advantage. */
 const ADVANTAGE_WINDOW = 32;
 /** Frames between two skipped frames while evening out the advantage. */
 const SKIP_SPACING = 8;
+/** Our own checksums kept for comparison, in frames. */
+const CHECKSUM_MEMORY = CHECKSUM_INTERVAL * 20;
 
 export class RollbackSession {
     readonly matchId: number;
+    /** Our slot. */
     readonly slot: number;
+    readonly players: number;
     readonly inputDelay: number;
     /** The match as simulated so far, including guessed frames. */
     match: MatchState;
     /** Next frame to simulate. Keeps counting after the match ends. */
     frame = 0;
-    /** The state at the start of this frame is final: every frame before it used both real inputs. */
+    /** The state at the start of this frame is final: every frame before it used real inputs only. */
     confirmedFrame = 0;
-    /** First frame at which the two sides' checksums differed, or -1. */
+    /** First frame at which our checksum differed from another player's, or -1. */
     desyncFrame = -1;
     /** Called with each newly confirmed frame and the state at its start (tests compare them). */
     onConfirmed: ((frame: number, state: MatchState) => void) | null = null;
@@ -46,66 +50,79 @@ export class RollbackSession {
     rollbacks = 0;
     lastRollbackDepth = 0;
     maxRollbackDepth = 0;
-    /** Steps spent waiting for the opponent's inputs. */
+    /** Steps spent waiting for someone's inputs. */
     waits = 0;
-    /** Frames skipped to let the other side catch up. */
+    /** Frames skipped to let someone catch up. */
     skips = 0;
 
-    /** Packed inputs by frame: ours, the opponent's, and what each simulated frame used for the opponent. */
-    private readonly local: number[] = [];
-    private readonly remote: number[] = [];
-    private readonly used: number[] = [];
+    /** Packed inputs by slot, then frame. Our own slot holds ours. */
+    private readonly inputs: number[][];
+    /** Inputs each simulated frame used, by slot, then frame: real ones and guesses. */
+    private readonly used: number[][];
+    /** By slot: first frame of that player's inputs we don't have yet. */
+    private readonly next: number[];
+    /** By slot: first frame of our inputs that player doesn't have yet. */
+    private readonly theyNeed: number[];
     /** State at the start of each frame that may still be simulated again. */
     private readonly saved = new Map<number, MatchState>();
     /** Keys of the events already played, by frame. */
     private readonly played = new Map<number, Set<string>>();
-    /** Earliest simulated frame whose guess turned out wrong, or -1. */
+    /** Earliest simulated frame with a wrong guess, or -1. */
     private firstWrongGuess = -1;
-    /** First frame of ours the other side doesn't have yet. */
-    private remoteNeeds: number;
-    /** First frame of theirs we don't have yet. */
-    private remoteNext: number;
 
     private readonly localChecksums = new Map<number, number>();
-    private readonly remoteChecksums = new Map<number, number>();
+    private readonly remoteChecksums: Map<number, number>[];
     private latestChecksum: { frame: number; value: number } | null = null;
 
-    private remoteFrame = 0;
-    private remoteAdvantage = 0;
-    private readonly advantages: number[] = [];
+    /** By slot: their latest reported frame, their advantage over us, and our recent advantages over them. */
+    private readonly remoteFrame: number[];
+    private readonly remoteAdvantage: number[];
+    private readonly advantages: number[][];
     private framesSinceSkip = 0;
 
     private sentPackets = 0;
-    private receivedPackets = 0;
-    /** Packets the other side sent before this session started never count as lost. */
-    private firstReceivedSeq = -1;
-    private highestReceivedSeq = -1;
+    /** By slot: packets received, and the first and highest sequence numbers seen. */
+    private readonly received: number[];
+    private readonly firstSeq: number[];
+    private readonly highestSeq: number[];
 
-    /** `matchId` tells this match's packets from a previous one's; both sides use the match seed. */
-    constructor(matchId: number, slot: number, inputDelay: number, match: MatchState) {
+    /** `matchId` tells this match's packets from a previous one's; everyone uses the match seed. */
+    constructor(matchId: number, slot: number, players: number, inputDelay: number, match: MatchState) {
         this.matchId = matchId >>> 0;
         this.slot = slot;
+        this.players = players;
         this.inputDelay = inputDelay;
         this.match = match;
-        this.remoteNeeds = inputDelay;
-        this.remoteNext = inputDelay;
+
+        const each = <T>(make: () => T): T[] => Array.from({ length: players }, make);
+        this.inputs = each(() => []);
+        this.used = each(() => []);
+        this.next = each(() => inputDelay);
+        this.theyNeed = each(() => inputDelay);
+        this.remoteChecksums = each(() => new Map());
+        this.remoteFrame = each(() => 0);
+        this.remoteAdvantage = each(() => 0);
+        this.advantages = each(() => []);
+        this.received = each(() => 0);
+        this.firstSeq = each(() => -1);
+        this.highestSeq = each(() => -1);
     }
 
     /**
-     * Corrects any wrong guess, then simulates the next frame unless this side
-     * has to wait or skip. New events are appended to `events`, including those
-     * of re-simulated frames. Returns whether a frame was simulated.
+     * Corrects any wrong guess, then simulates the next frame unless we have
+     * to wait or skip. New events are appended to `events`, including those of
+     * re-simulated frames. Returns whether a frame was simulated.
      */
     step(readLocal: () => number, events: MatchEvent[]): boolean {
         if (this.firstWrongGuess >= 0) this.rollBack(events);
 
         let simulated = false;
-        if (this.frame - this.remoteNext >= MAX_ROLLBACK) {
+        if (this.frame - this.earliestMissing() >= MAX_ROLLBACK) {
             this.waits++;
         } else if (this.shouldSkip()) {
             this.skips++;
         } else {
-            this.local[this.frame + this.inputDelay] = readLocal();
+            this.inputs[this.slot][this.frame + this.inputDelay] = readLocal();
             this.simulate(events);
             simulated = true;
         }
@@ -118,55 +135,66 @@ export class RollbackSession {
         return this.stateAt(this.confirmedFrame)?.isOver ?? false;
     }
 
-    /** Our inputs the other side hasn't acknowledged, plus sync information. */
+    /** Our inputs that someone hasn't acknowledged, plus sync information for everyone. */
     buildPacket(): Uint8Array {
-        const first = this.remoteNeeds;
-        const count = Math.min(Math.max(this.local.length - first, 0), MAX_INPUTS_PER_PACKET);
+        const first = Math.min(...this.others().map(s => this.theyNeed[s]));
+        const ours = this.inputs[this.slot];
+        const count = Math.min(Math.max(ours.length - first, 0), MAX_INPUTS_PER_PACKET);
         return encodeInputPacket({
             match: this.matchId,
+            slot: this.slot,
             seq: this.sentPackets++,
-            ackNext: this.remoteNext,
             frame: this.frame,
-            advantage: average(this.advantages),
             first,
-            inputs: this.local.slice(first, first + count),
+            inputs: ours.slice(first, first + count),
+            ackNext: this.next,
+            advantage: this.advantages.map(average),
             checksum: this.latestChecksum,
         });
     }
 
     receivePacket(bytes: Uint8Array): void {
         const packet = decodeInputPacket(bytes);
-        if (!packet || packet.match !== this.matchId) return;
+        if (!packet || packet.match !== this.matchId || packet.ackNext.length !== this.players) return;
+        const s = packet.slot;
+        if (s === this.slot || s >= this.players) return;
 
-        this.receivedPackets++;
-        if (this.firstReceivedSeq < 0 || packet.seq < this.firstReceivedSeq) this.firstReceivedSeq = packet.seq;
-        this.highestReceivedSeq = Math.max(this.highestReceivedSeq, packet.seq);
-        this.remoteNeeds = Math.max(this.remoteNeeds, packet.ackNext);
-        if (packet.frame >= this.remoteFrame) {
-            this.remoteFrame = packet.frame;
-            this.remoteAdvantage = packet.advantage;
+        this.received[s]++;
+        if (this.firstSeq[s] < 0 || packet.seq < this.firstSeq[s]) this.firstSeq[s] = packet.seq;
+        this.highestSeq[s] = Math.max(this.highestSeq[s], packet.seq);
+        this.theyNeed[s] = Math.max(this.theyNeed[s], packet.ackNext[this.slot]);
+        if (packet.frame >= this.remoteFrame[s]) {
+            this.remoteFrame[s] = packet.frame;
+            this.remoteAdvantage[s] = packet.advantage[this.slot];
         }
 
+        const theirs = this.inputs[s];
         packet.inputs.forEach((mask, i) => {
             const frame = packet.first + i;
-            if (frame < this.inputDelay || this.remote[frame] !== undefined) return;
-            this.remote[frame] = mask;
-            if (frame < this.frame && this.used[frame] !== mask && (this.firstWrongGuess < 0 || frame < this.firstWrongGuess)) {
+            if (frame < this.inputDelay || theirs[frame] !== undefined) return;
+            theirs[frame] = mask;
+            if (frame < this.frame && this.used[s][frame] !== mask && (this.firstWrongGuess < 0 || frame < this.firstWrongGuess)) {
                 this.firstWrongGuess = frame;
             }
         });
-        while (this.remote[this.remoteNext] !== undefined) this.remoteNext++;
+        while (theirs[this.next[s]] !== undefined) this.next[s]++;
 
         if (packet.checksum) {
-            this.remoteChecksums.set(packet.checksum.frame, packet.checksum.value);
-            this.compareChecksum(packet.checksum.frame);
+            this.remoteChecksums[s].set(packet.checksum.frame, packet.checksum.value);
+            this.compareChecksum(s, packet.checksum.frame);
         }
     }
 
-    /** Share of the other side's packets that never arrived, 0 to 1. */
+    /** Share of the other players' packets that never arrived, 0 to 1. */
     get packetLoss(): number {
-        const expected = this.highestReceivedSeq - this.firstReceivedSeq + 1;
-        return this.receivedPackets > 0 ? 1 - this.receivedPackets / expected : 0;
+        let received = 0;
+        let expected = 0;
+        for (const s of this.others()) {
+            if (this.received[s] === 0) continue;
+            received += this.received[s];
+            expected += this.highestSeq[s] - this.firstSeq[s] + 1;
+        }
+        return expected > 0 ? 1 - received / expected : 0;
     }
 
     // ─── Simulation ───
@@ -176,21 +204,22 @@ export class RollbackSession {
         this.saved.set(f, structuredClone(this.match));
 
         const hasInputs = f >= this.inputDelay;
-        const opponent = hasInputs ? this.remote[f] ?? this.guess() : 0;
-        this.used[f] = opponent;
-        const inputs: FighterInput[] = [];
-        inputs[this.slot] = unpackInput(hasInputs ? this.local[f] : 0);
-        inputs[1 - this.slot] = unpackInput(opponent);
+        const frameInputs: FighterInput[] = [];
+        for (let s = 0; s < this.players; s++) {
+            const mask = !hasInputs ? 0 : this.inputs[s][f] ?? this.guess(s);
+            this.used[s][f] = mask;
+            frameInputs.push(unpackInput(mask));
+        }
 
         const frameEvents: MatchEvent[] = [];
-        stepMatch(this.match, inputs, frameEvents);
+        stepMatch(this.match, frameInputs, frameEvents);
         this.keepNew(f, frameEvents, events);
         this.frame++;
     }
 
-    /** The opponent's latest known input, without presses. */
-    private guess(): number {
-        const latest = this.remote[this.remoteNext - 1];
+    /** A player's latest known input, without presses. */
+    private guess(s: number): number {
+        const latest = this.inputs[s][this.next[s] - 1];
         return latest === undefined ? 0 : latest & ~PRESS_BITS;
     }
 
@@ -223,9 +252,9 @@ export class RollbackSession {
         }
     }
 
-    /** Frames before the first missing opponent input are final: checksum them and forget their saves. */
+    /** Frames before everyone's first missing input are final: checksum them and forget their saves. */
     private confirm(): void {
-        const confirmed = Math.min(this.remoteNext, this.frame);
+        const confirmed = Math.min(this.earliestMissing(), this.frame);
         for (let f = this.confirmedFrame + 1; f <= confirmed; f++) {
             const state = this.stateAt(f)!;
             this.onConfirmed?.(f, state);
@@ -241,19 +270,33 @@ export class RollbackSession {
         return frame === this.frame ? this.match : this.saved.get(frame);
     }
 
-    // ─── Staying level with the other side ───
+    /** First frame for which some other player's input is still missing. */
+    private earliestMissing(): number {
+        return Math.min(...this.others().map(s => this.next[s]));
+    }
+
+    private others(): number[] {
+        const slots: number[] = [];
+        for (let s = 0; s < this.players; s++) if (s !== this.slot) slots.push(s);
+        return slots;
+    }
+
+    // ─── Staying level with the others ───
 
     /**
-     * Each side's advantage is how far its frame is past the other side's latest
-     * report. Both include the trip time, so half their difference is how far
-     * this side really runs ahead.
+     * Our advantage over a player is how far our frame is past their latest
+     * report. Both sides' advantages include the trip time between them, so
+     * half their difference is how far we really run ahead of that player.
      */
     private shouldSkip(): boolean {
-        this.advantages.push(this.frame - this.remoteFrame);
-        if (this.advantages.length > ADVANTAGE_WINDOW) this.advantages.shift();
+        let lead = -Infinity;
+        for (const s of this.others()) {
+            const samples = this.advantages[s];
+            samples.push(this.frame - this.remoteFrame[s]);
+            if (samples.length > ADVANTAGE_WINDOW) samples.shift();
+            lead = Math.max(lead, (average(samples) - this.remoteAdvantage[s]) / 2);
+        }
         this.framesSinceSkip++;
-
-        const lead = (average(this.advantages) - this.remoteAdvantage) / 2;
         if (lead < 1 || this.framesSinceSkip < SKIP_SPACING) return false;
         this.framesSinceSkip = 0;
         return true;
@@ -264,18 +307,17 @@ export class RollbackSession {
     private recordChecksum(frame: number, value: number): void {
         this.localChecksums.set(frame, value);
         this.latestChecksum = { frame, value };
-        this.compareChecksum(frame);
+        for (const s of this.others()) this.compareChecksum(s, frame);
+        for (const f of this.localChecksums.keys()) if (f < frame - CHECKSUM_MEMORY) this.localChecksums.delete(f);
     }
 
-    private compareChecksum(frame: number): void {
+    private compareChecksum(s: number, frame: number): void {
         const local = this.localChecksums.get(frame);
-        const remote = this.remoteChecksums.get(frame);
+        const remote = this.remoteChecksums[s].get(frame);
         if (local === undefined || remote === undefined) return;
         if (local !== remote && this.desyncFrame < 0) this.desyncFrame = frame;
         // Older checksums whose counterpart was lost will never be compared
-        for (const checksums of [this.localChecksums, this.remoteChecksums]) {
-            for (const f of checksums.keys()) if (f <= frame) checksums.delete(f);
-        }
+        for (const f of this.remoteChecksums[s].keys()) if (f <= frame) this.remoteChecksums[s].delete(f);
     }
 }
 

@@ -2,43 +2,61 @@
  * Online protocol shared by the game client and the relay server.
  *
  * Control messages are Geckos events sent reliably. Inputs travel as raw
- * binary packets that repeat every input the other side hasn't acknowledged,
- * so a lost packet needs no resend of its own.
+ * binary packets that the server forwards to every other player in the room.
+ * Each packet repeats all the inputs some other player hasn't acknowledged, so
+ * a lost packet needs no resend of its own.
  */
 
 /** Bump whenever two builds can no longer play each other. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
+
+export const MIN_PLAYERS = 2;
+export const MAX_PLAYERS = 4;
 
 export const NetEvent = {
     /** client → server `{ version }` */
     HELLO: 'hello',
     /** server → client `{ reason }`, then the server closes the connection */
     REJECTED: 'rejected',
-    /** server → client: waiting for an opponent */
-    WAITING: 'waiting',
-    /** server → client `{ slot }`: paired with an opponent */
-    MATCHED: 'matched',
-    /** client → server `{ character }`; server → both `{ slot, character }` */
+    /** server → each player in a room: a RoomState, whenever the room changes */
+    ROOM: 'room',
+    /** client → server `{ character }` */
     PICK: 'pick',
     /** client → server `{ character, rtt }` */
     READY: 'ready',
-    /** server → both: a MatchStart */
+    /** server → each player: a MatchStart */
     START: 'start',
     /** client → server: vote for a rematch */
     REMATCH: 'rematch',
-    /** server → client: the opponent disconnected */
-    OPPONENT_LEFT: 'opponent_left',
+    /** server → the others `{ slot }`: a player left the match */
+    PLAYER_LEFT: 'player_left',
     /** client → server `{ t }`, echoed back unchanged as PONG */
     PING: 'ping',
     PONG: 'pong',
 } as const;
 
+export interface RoomPlayer {
+    character: string;
+    ready: boolean;
+}
+
+export interface RoomState {
+    /** Counts up with every change, since reliable messages can arrive out of order. */
+    version: number;
+    /** The receiving player's index in `players`. */
+    you: number;
+    /** In joining order; a player's index becomes their slot in the match. */
+    players: RoomPlayer[];
+}
+
 export interface MatchStart {
     seed: number;
     /** Frames between sampling an input and the frame it applies to. */
     inputDelay: number;
-    /** Character by slot. */
-    characters: [string, string];
+    /** Character by slot; one per player. */
+    characters: string[];
+    /** The receiving player's slot. */
+    slot: number;
 }
 
 // ─── Input packets ───
@@ -46,43 +64,60 @@ export interface MatchStart {
 export interface InputPacket {
     /** The match's seed: packets from a previous match (before a rematch) are ignored. */
     match: number;
+    /** The sender's slot. */
+    slot: number;
     /** Sender's packet counter, for loss statistics. */
     seq: number;
-    /** First frame of the receiver's inputs the sender doesn't have yet. */
-    ackNext: number;
     /** The frame the sender is about to simulate. */
     frame: number;
-    /** How many frames the sender thinks it runs ahead of the receiver, averaged. */
-    advantage: number;
-    /** Frame of inputs[0]. */
+    /** Frame of inputs[0]; the inputs are the sender's own. */
     first: number;
     inputs: number[];
+    /** By slot: first frame of that player's inputs the sender doesn't have yet. */
+    ackNext: number[];
+    /** By slot: how many frames the sender thinks it runs ahead of that player, averaged. */
+    advantage: number[];
     /** The sender's latest match checksum, if any. */
     checksum: { frame: number; value: number } | null;
 }
 
-const HEADER_BYTES = 23;
-const TRAILER_BYTES = 8;
 export const MAX_INPUTS_PER_PACKET = 255;
+const HEADER_BYTES = 19;
+const TRAILER_BYTES = 8;
+
+function packetBytes(count: number, players: number): number {
+    return HEADER_BYTES + count * 4 + players * 6 + TRAILER_BYTES;
+}
 
 export function encodeInputPacket(packet: InputPacket): Uint8Array {
     const count = packet.inputs.length;
-    const view = new DataView(new ArrayBuffer(HEADER_BYTES + count * 4 + TRAILER_BYTES));
+    const players = packet.ackNext.length;
+    const view = new DataView(new ArrayBuffer(packetBytes(count, players)));
     view.setUint32(0, packet.match, true);
-    view.setUint32(4, packet.seq, true);
-    view.setUint32(8, packet.ackNext, true);
-    view.setUint32(12, packet.frame, true);
-    // Hundredths of a frame, clamped to the Int16 range
-    view.setInt16(16, Math.max(-32768, Math.min(32767, Math.round(packet.advantage * 100))), true);
-    view.setUint32(18, packet.first, true);
-    view.setUint8(22, count);
-    for (let i = 0; i < count; i++) {
-        view.setUint32(HEADER_BYTES + i * 4, packet.inputs[i], true);
+    view.setUint8(4, packet.slot);
+    view.setUint8(5, players);
+    view.setUint32(6, packet.seq, true);
+    view.setUint32(10, packet.frame, true);
+    view.setUint32(14, packet.first, true);
+    view.setUint8(18, count);
+
+    let at = HEADER_BYTES;
+    for (const input of packet.inputs) {
+        view.setUint32(at, input, true);
+        at += 4;
     }
-    const trailer = HEADER_BYTES + count * 4;
+    for (const ack of packet.ackNext) {
+        view.setUint32(at, ack, true);
+        at += 4;
+    }
+    for (const advantage of packet.advantage) {
+        // Hundredths of a frame, clamped to the Int16 range
+        view.setInt16(at, Math.max(-32768, Math.min(32767, Math.round(advantage * 100))), true);
+        at += 2;
+    }
     // Frame + 1 so that 0 means "no checksum yet"
-    view.setUint32(trailer, packet.checksum ? packet.checksum.frame + 1 : 0, true);
-    view.setUint32(trailer + 4, packet.checksum?.value ?? 0, true);
+    view.setUint32(at, packet.checksum ? packet.checksum.frame + 1 : 0, true);
+    view.setUint32(at + 4, packet.checksum?.value ?? 0, true);
     return new Uint8Array(view.buffer);
 }
 
@@ -90,32 +125,41 @@ export function encodeInputPacket(packet: InputPacket): Uint8Array {
 export function decodeInputPacket(bytes: Uint8Array): InputPacket | null {
     if (bytes.byteLength < HEADER_BYTES + TRAILER_BYTES) return null;
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    const count = view.getUint8(22);
-    if (bytes.byteLength !== HEADER_BYTES + count * 4 + TRAILER_BYTES) return null;
+    const players = view.getUint8(5);
+    const count = view.getUint8(18);
+    if (players < 1 || players > MAX_PLAYERS || bytes.byteLength !== packetBytes(count, players)) return null;
 
-    const inputs: number[] = [];
-    for (let i = 0; i < count; i++) {
-        inputs.push(view.getUint32(HEADER_BYTES + i * 4, true));
-    }
-    const trailer = HEADER_BYTES + count * 4;
-    const checksumFrame = view.getUint32(trailer, true);
+    let at = HEADER_BYTES;
+    const read = (n: number, size: number, get: (offset: number) => number): number[] => {
+        const values: number[] = [];
+        for (let i = 0; i < n; i++, at += size) values.push(get(at));
+        return values;
+    };
+    const inputs = read(count, 4, offset => view.getUint32(offset, true));
+    const ackNext = read(players, 4, offset => view.getUint32(offset, true));
+    const advantage = read(players, 2, offset => view.getInt16(offset, true) / 100);
+    const checksumFrame = view.getUint32(at, true);
+
     return {
         match: view.getUint32(0, true),
-        seq: view.getUint32(4, true),
-        ackNext: view.getUint32(8, true),
-        frame: view.getUint32(12, true),
-        advantage: view.getInt16(16, true) / 100,
-        first: view.getUint32(18, true),
+        slot: view.getUint8(4),
+        seq: view.getUint32(6, true),
+        frame: view.getUint32(10, true),
+        first: view.getUint32(14, true),
         inputs,
-        checksum: checksumFrame === 0 ? null : { frame: checksumFrame - 1, value: view.getUint32(trailer + 4, true) },
+        ackNext,
+        advantage,
+        checksum: checksumFrame === 0 ? null : { frame: checksumFrame - 1, value: view.getUint32(at + 4, true) },
     };
 }
 
 /**
- * Input delay for two players, from each one's round trip to the server. It
- * covers about half the one-way trip between them; rollback hides the rest.
+ * Input delay for a match, from each player's round trip to the server. It
+ * covers about half the one-way trip between the two furthest players;
+ * rollback hides the rest.
  */
-export function inputDelayFor(rttA: number, rttB: number): number {
-    const oneWayFrames = (rttA + rttB) / 2 / (1000 / 60);
+export function inputDelayFor(rtts: readonly number[]): number {
+    const [worst, second] = [...rtts].sort((a, b) => b - a);
+    const oneWayFrames = (worst + (second ?? worst)) / 2 / (1000 / 60);
     return Math.min(Math.max(Math.round(oneWayFrames / 2), 1), 3);
 }
