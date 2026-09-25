@@ -4,7 +4,7 @@
 
 set -e
 
-DROPLET_IP="164.90.235.15"
+DROPLET_IP="138.68.126.112"
 
 echo "=== Updating Server Code on Droplet ==="
 ssh root@$DROPLET_IP << 'ENDSSH'

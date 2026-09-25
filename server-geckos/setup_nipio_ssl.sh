@@ -4,7 +4,7 @@
 
 set -e
 
-DOMAIN="164.90.235.15.nip.io"
+DOMAIN="138.68.126.112.nip.io"
 EMAIL="admin@example.com"  # Change this to your email for Let's Encrypt notifications
 
 echo "=== Step 1: Creating Nginx configuration ==="

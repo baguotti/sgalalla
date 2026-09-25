@@ -106,7 +106,7 @@ export class NetClient {
 /** The server is on the host the page came from; the packaged app uses the production server. */
 function serverUrl(): string {
     let host = window.location.hostname;
-    if (!host || window.location.protocol === 'file:') host = '164.90.235.15';
+    if (!host || window.location.protocol === 'file:') host = '138.68.126.112';
     // Chromium can refuse the IPv6 localhost
     else if (host === 'localhost') host = '127.0.0.1';
     return `http://${host}`;
