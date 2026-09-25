@@ -805,19 +805,20 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             }
         }
 
+        let steps = 0;
         if (!this.isCutscene) {
             // Online: raw frame time, since Phaser clamps its smoothed delta while the window is unfocused
-            const steps = this.simClock.advance(this.online ? this.game.loop.rawDelta : delta);
-            for (let i = 0; i < steps && !this.isGameOver; i++) {
-                // A step spent waiting for the opponent is dropped, not caught up later
-                if (!this.stepSimulation()) break;
-            }
+            const due = this.simClock.advance(this.online ? this.game.loop.rawDelta : delta);
+            // A step spent waiting for the opponent is dropped, not caught up later
+            while (steps < due && !this.isGameOver && this.stepSimulation()) steps++;
         }
         this.online?.flush();
         this.players.forEach(p => p.render(this.match, delta));
 
-        // Camera Follow
-        this.updateCamera();
+        // The camera moves once per step, like the fighters: on screens faster than
+        // 60 Hz, moving it on the frames in between makes fighters judder against it
+        const cameraMoves = this.isCutscene ? 1 : steps;
+        for (let i = 0; i < cameraMoves; i++) this.updateCamera();
 
         // Update debug overlay (Showing P1 stats for now)
         if (this.players.length > 0) {
