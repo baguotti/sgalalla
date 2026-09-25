@@ -15,12 +15,15 @@ import { AnimationHelpers } from '../managers/AnimationHelpers';
 import { AudioManager } from '../managers/AudioManager';
 import { CampaignManager } from '../managers/CampaignManager';
 import { MatchRecorder } from '../debug/MatchRecorder';
+import type { NetClient } from '../network/NetClient';
+import { OnlineMatch } from '../network/OnlineMatch';
 import { AttackRegistry, AttackType } from '../../shared/AttackData';
 import type { FighterInput } from '../../shared/FighterInput';
 import { isInPlay, type FighterSetup } from '../../shared/FighterState';
 import { FixedStepClock } from '../../shared/FixedStepClock';
 import { addFighter, createMatch, placeFighter, respawnFighter, stepMatch, type MatchState } from '../../shared/GameSim';
 import type { MatchEvent } from '../../shared/MatchEvents';
+import { NetEvent, type MatchStart } from '../../shared/NetProtocol';
 import { STAGE_LAYOUT, type SimRect } from '../../shared/StageData';
 
 import type { GameSceneInterface } from './GameSceneInterface';
@@ -63,6 +66,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     /** Dev tool: `?record` in the URL records each match for the replay tests. */
     private isRecording = false;
     private recorder: MatchRecorder | null = null;
+    /** Online matches: the opponent's inputs come from the network. */
+    private online: OnlineMatch | null = null;
 
     // Pause menu
     private isPaused: boolean = false;
@@ -126,7 +131,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     public effectManager!: EffectManager;
 
-    private mode: 'versus' | 'training' | 'campaign' = 'versus';
+    private mode: 'versus' | 'training' | 'campaign' | 'online' = 'versus';
 
     // ColorMatrix FX for campaign visual progression (desaturation effect)
     private campaignColorMatrices: Phaser.FX.ColorMatrix[] = [];
@@ -156,7 +161,20 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.currentStageBackground = 'adria_bg';
         }
 
-        if (data.playerData) {
+        this.online = null;
+        if (this.mode === 'online') {
+            const { client, slot, start } = data.online as { client: NetClient; slot: number; start: MatchStart };
+            this.online = new OnlineMatch(client, slot, start);
+            // Our slot plays with keyboard or the first gamepad; the other is the opponent
+            this.playerData = [0, 1].map(playerId => ({
+                playerId,
+                joined: true,
+                ready: true,
+                input: { type: 'KEYBOARD', gamepadIndex: 0, keyboardMapping: 'all' },
+                character: start.characters[playerId],
+                isRemote: playerId !== slot,
+            }));
+        } else if (data.playerData) {
             this.playerData = data.playerData;
         } else {
             // Fallback defaults
@@ -372,9 +390,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     useKeyboard: pData.input.type === 'KEYBOARD',
                     keyboardMapping: pData.input.keyboardMapping,
                     mappingSlot: pData.input.mappingSlot ?? 0,
+                    isRemote: pData.isRemote,
                 };
-                // P1 gets touch controls if active
-                const player = new Player(this, this.match.fighters[i], config, pData.playerId === 0 ? this.touchController : undefined);
+                // The first local player gets touch controls if active
+                const touch = pData.playerId === this.localPlayerId() ? this.touchController : undefined;
+                const player = new Player(this, this.match.fighters[i], config, touch);
 
                 // Set Color (all players use their assigned color)
                 let color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
@@ -527,6 +547,18 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 }
             });
 
+            if (this.online) {
+                const client = this.online.client;
+                client.on(NetEvent.START, (start: MatchStart) => {
+                    this.online?.restart(start);
+                    this.restartMatch();
+                });
+                client.on(NetEvent.OPPONENT_LEFT, () => this.endOnline("L'AVVERSARIO SE N'È ANDATO"));
+                client.onDisconnect(() => this.endOnline('CONNESSIONE PERSA'));
+                // Network stats on screen by default (Q toggles)
+                this.debugVisible = true;
+            }
+
             // Handle Resume from other scenes
             this.events.on('resume', () => {
                 if (this.isPaused) {
@@ -620,7 +652,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // If AI -> Name = "CPU" or Character Name. isLocal = false.
             // If Human -> Name = "P1" etc. isLocal = true (for P1 only maybe?)
 
-            const isYOU = (player.playerId === 0); // Only P1 is "YOU"
+            const isYOU = player.playerId === this.localPlayerId();
 
             let name = `P${player.playerId + 1} `;
             if (player.isAI) {
@@ -655,6 +687,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Stop updates if game over
         if (this.isGameOver) {
             this.players.forEach(p => p.render(this.match, delta));
+            // The opponent may still be simulating the last frames with our inputs
+            this.online?.flush();
 
             // Wait until 5 seconds passes and menu appears
             if (!this.isGameOverMenuReady) return;
@@ -698,7 +732,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             } else if (confirm) {
                 AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
                 if (this.gameOverSelectedIndex === 0) {
-                    this.restartMatch();
+                    if (this.online) this.voteRematch();
+                    else this.restartMatch();
                 } else if (this.gameOverSelectedIndex === 1) {
                     this.returnToLobby();
                 }
@@ -714,6 +749,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const pauseKeyPressed = Phaser.Input.Keyboard.JustDown(this.pauseKey);
         const gamepadPausePressed = this.checkGamepadPause();
 
+        if ((pauseKeyPressed || gamepadPausePressed) && this.online) {
+            // An online match can't pause for both players: ESC leaves it
+            this.returnToLobby();
+            return;
+        }
         if (pauseKeyPressed || gamepadPausePressed) {
             if (!this.scene.isActive('DialogueScene')) {
                 this.togglePause();
@@ -742,7 +782,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
 
         // Handle Training Toggle (T)
-        if (Phaser.Input.Keyboard.JustDown(this.trainingToggleKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.trainingToggleKey) && !this.online) {
             // Find all AI players
             const aiPlayers = this.players.filter(p => p.isAI);
 
@@ -765,11 +805,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
 
         if (!this.isCutscene) {
-            const steps = this.simClock.advance(delta);
+            // Online: raw frame time, since Phaser clamps its smoothed delta while the window is unfocused
+            const steps = this.simClock.advance(this.online ? this.game.loop.rawDelta : delta);
             for (let i = 0; i < steps && !this.isGameOver; i++) {
-                this.stepSimulation();
+                // A step waiting for the opponent is dropped, which lets the side running ahead fall back in step
+                if (!this.stepSimulation()) break;
             }
         }
+        this.online?.flush();
         this.players.forEach(p => p.render(this.match, delta));
 
         // Camera Follow
@@ -792,8 +835,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     fighter.state,
                     fighter.body.recoveryAvailable,
                     attackInfo,
-                    this.players[0].isGamepadConnected()
+                    this.players[0].isGamepadConnected(),
+                    this.online ? Math.round(this.online.client.rtt) : 0
                 );
+                this.debugOverlay.setNetworkStats(this.online?.stats() ?? null);
                 this.debugOverlay.setVisible(true);
             } else {
                 this.debugOverlay.setVisible(false);
@@ -819,20 +864,41 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     }
 
-    /** Advances the match by one fixed step, then plays what happened in it. */
-    private stepSimulation(): void {
-        for (const p of this.players) this.stepInputs[p.fighterIndex] = p.readInput(this.match);
+    /**
+     * Advances the match by one fixed step, then plays what happened in it.
+     * Online, returns false while the opponent's input for the step hasn't arrived.
+     */
+    private stepSimulation(): boolean {
+        const online = this.online;
+        let inputs: FighterInput[];
+        if (online) {
+            const both = online.nextInputs(() => this.players[online.slot].readInput(this.match));
+            if (!both) return false;
+            inputs = both;
+            this.players.forEach((p, i) => p.setCurrentInput(inputs[i]));
+        } else {
+            for (const p of this.players) this.stepInputs[p.fighterIndex] = p.readInput(this.match);
+            inputs = this.stepInputs;
+        }
+
         this.stepEvents.length = 0;
-        stepMatch(this.match, this.stepInputs, this.stepEvents);
-        this.recorder?.captureStep(this.match, this.stepInputs);
+        stepMatch(this.match, inputs, this.stepEvents);
+        online?.afterStep(this.match);
+        this.recorder?.captureStep(this.match, inputs);
 
         for (const event of this.stepEvents) this.playEvent(event);
         if (this.match.isOver) this.onMatchOver();
+        return true;
+    }
+
+    /** The lobby slot this machine's player uses: P1 locally, our slot online. */
+    private localPlayerId(): number {
+        return this.online?.slot ?? 0;
     }
 
     /** Starts a fresh match with the current fighters. */
     private startMatch(): void {
-        const seed = Math.floor(Math.random() * 0x100000000);
+        const seed = this.online?.start.seed ?? Math.floor(Math.random() * 0x100000000);
         this.match = createMatch(this.fighterSetups, seed);
         this.recorder = this.isRecording ? new MatchRecorder(this.fighterSetups, seed) : null;
     }
@@ -1133,6 +1199,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     // Clean up when scene is shut down (e.g. switching to menu)
     // Clean up when scene is shut down (e.g. switching to menu)
     shutdown(): void {
+        this.online?.client.close();
+        this.online = null;
+
         try {
             this.input.keyboard?.removeAllKeys();
             this.input.keyboard?.resetKeys();
@@ -1416,7 +1485,50 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         });
     }
 
+    /** Online: our rematch vote; the server starts the rematch once both players voted. */
+    private voteRematch(): void {
+        this.online?.client.send(NetEvent.REMATCH);
+        this.isGameOverMenuReady = false;
+        this.gameOverMenuTexts.forEach(t => t.destroy());
+        this.gameOverMenuTexts = [];
+        this.showCenterText("IN ATTESA DELL'AVVERSARIO...");
+    }
+
+    /** The online match can't go on: say why, then go back to the menu. */
+    private endOnline(reason: string): void {
+        if (!this.online) return;
+        this.online.client.close();
+        this.online = null;
+        this.isGameOver = true;
+        this.isGameOverMenuReady = false;
+        this.gameOverMenuTexts.forEach(t => t.destroy());
+        this.gameOverMenuTexts = [];
+        this.showCenterText(reason);
+        this.time.delayedCall(2500, () => this.scene.start('MainMenuScene'));
+    }
+
+    private showCenterText(text: string): void {
+        this.winnerTextVisual?.destroy();
+        const { width, height } = this.scale;
+        this.winnerTextVisual = this.add.text(width / 2, height / 2 - 50, text, {
+            fontSize: '48px',
+            fontFamily: '"Pixeloid Sans"',
+            color: '#ffffff',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 8
+        }).setOrigin(0.5).setDepth(1001);
+        this.cameras.main.ignore(this.winnerTextVisual);
+    }
+
     private returnToLobby(): void {
+        if (this.online) {
+            this.online.client.close();
+            this.online = null;
+            this.scene.start('OnlineLobbyScene');
+            return;
+        }
+
         const isTraining = this.playerData.some((p: any) => p.isTrainingDummy);
         const p1Data = this.playerData.find((p: any) => p.playerId === 0);
 

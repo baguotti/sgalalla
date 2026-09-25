@@ -6,6 +6,12 @@ import type { TouchController } from '../components/TouchController';
 import type { FighterInput } from '../../shared/FighterInput';
 
 /**
+ * Testing aid: `?anyfocus` in the page URL keeps reading input while the window
+ * is unfocused, so two game windows on one computer can both be played.
+ */
+const IGNORE_FOCUS = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('anyfocus');
+
+/**
  * Unified Input State
  * Combines keyboard, gamepad and touch input. The gameplay fields come from
  * FighterInput, which the simulation consumes.
@@ -150,7 +156,7 @@ export class InputManager {
      */
     poll(): InputState {
         // FOCUS CHECK
-        if (typeof document !== 'undefined' && !document.hasFocus() && !this.scene.sys.game.device.input.touch) {
+        if (typeof document !== 'undefined' && !document.hasFocus() && !this.scene.sys.game.device.input.touch && !IGNORE_FOCUS) {
             return this.getEmptyInput();
         }
 

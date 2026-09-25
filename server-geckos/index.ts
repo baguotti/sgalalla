@@ -1,677 +1,196 @@
 /**
- * Sgalalla Game Server
- * UDP server using Geckos.io (WebRTC DataChannels) for low-latency multiplayer
+ * Sgalalla online server: pairs players two by two and relays their inputs.
+ *
+ * Matches run on the players' machines, in lockstep on shared/GameSim.ts. The
+ * server introduces the two players, starts the match with a random seed and
+ * an input delay that suits their pings, and forwards their input packets.
  */
 
-import geckos, { GeckosServer, ServerChannel } from '@geckos.io/server';
+import geckos, { type GeckosServer, type ServerChannel } from '@geckos.io/server';
 import http from 'http';
+import { NetEvent, PROTOCOL_VERSION, inputDelayFor, type MatchStart } from '../shared/NetProtocol.js';
 
-// ─── Shared Physics (Phase 2: Server-Authoritative) ───
-import { stepPhysics, checkPlatformCollisions, checkWallCollisions, checkBlastZone, createBody, NULL_INPUT, startRecovery } from '../shared/PhysicsSimulation.js';
-import type { SimInput, SimBody } from '../shared/PhysicsSimulation.js';
+const PORT = Number(process.env.PORT) || 9208;
+const reliable = { reliable: true };
 
-// Network message types (mirrored from client)
-const NetMessageType = {
-    INPUT: 'input',
-    BINARY_INPUT: 'bi',
-    STATE_UPDATE: 'state_update',
-    POSITION_UPDATE: 'position_update',
-    ATTACK_START: 'attack_start',
-    HIT_EVENT: 'hit_event',
-    PLAYER_JOINED: 'player_joined',
-    PLAYER_LEFT: 'player_left',
-    GAME_START: 'game_start',
-    PING: 'ping',
-    PONG: 'pong',
-    INPUT_ACK: 'input_ack',
-    REMATCH_VOTE: 'rematch_vote',
-    REMATCH_START: 'rematch_start',
-    // Character Selection
-    CHARACTER_SELECT: 'character_select',
-    CHARACTER_CONFIRM: 'character_confirm',
-    SELECTION_START: 'selection_start',
-    SELECTION_TICK: 'selection_tick',
-    // Bomb mechanic
-    BOMB_SPAWN: 'bomb_spawn',
-    BOMB_PICKUP: 'bomb_pickup',
-    BOMB_THROW: 'bomb_throw',
-    BOMB_EXPLODE: 'bomb_explode',
-    // Chest mechanic
-    CHEST_SPAWN: 'chest_spawn',
-    CHEST_OPEN: 'chest_open',
-    CHEST_CLOSE: 'chest_close',
-    // Chest bomb mode
-    CHEST_BOMB_PICKUP: 'chest_bomb_pickup',
-    CHEST_BOMB_THROW: 'chest_bomb_throw',
-    CHEST_BOMB_EXPLODE: 'chest_bomb_explode',
-    // Missing ghost visuals
-    RECOVERY_START: 'recovery_start',
-    CHARGE_START: 'charge_start',
-    GROUND_POUND_LAND: 'ground_pound_land'
-} as const;
-
-interface PlayerState {
-    playerId: number;
-    x: number;
-    y: number;
-    velocityX: number;
-    velocityY: number;
-    facingDirection: number;
-    isGrounded: boolean;
-    isAttacking: boolean;
-    animationKey: string;
-    damagePercent: number;
-    lives: number;
+interface Seat {
+    channel: ServerChannel;
     character: string;
-    isConfirmed?: boolean;
-    // ─── Server-Authoritative Physics ───
-    body: SimBody;
-    latestInput: SimInput;       // Most recent input from client
-    lastReceivedFrame: number;   // Highest client frame we've seen (for dedup)
-    fsmState: string;            // Client's current FSM state
-    prevFsmState: string;        // Previous FSM state (for edge detection)
+    ready: boolean;
+    rtt: number;
+    wantsRematch: boolean;
 }
 
-type RoomPhase = 'WAITING' | 'SELECTING' | 'PLAYING';
-
-interface BombState {
-    id: number;
-    x: number;
-    y: number;
-    velocityX: number;
-    velocityY: number;
-    fuseTimer: number;      // ms remaining
-    isThrown: boolean;
-    holderId: number | null; // playerId holding bomb, null if on ground
+interface Room {
+    seats: [Seat, Seat];
+    start: MatchStart | null;
 }
 
-interface GameRoom {
-    players: Map<string, PlayerState>;
-    frame: number;
-    rematchVotes: Set<string>;
-    phase: RoomPhase;
-    selectionTimer: ReturnType<typeof setInterval> | null;
-    selectionCountdown: number;
-    chestSpawnTimer: number;
-    // Bomb mechanic
-    bombs: BombState[];
-    nextBombId: number;
-    bombSpawnTimer: number; // ms until next spawn
-    broadcastCounter: number;
-}
+let waiting: ServerChannel | null = null;
+const roomsByChannel = new Map<string, Room>();
 
-const ANIMATION_KEYS = [
-    '', 'idle', 'run', 'jump', 'fall', 'attack_light', 'attack_heavy',
-    'attack_up', 'hurt', 'slide', 'dash', 'block', 'charge', 'spot_dodge'
-];
+// ─── HTTP (health check) ───
 
-/**
- * Derive animation key from SimBody state.
- * The server doesn't run Phaser animations, but needs to tell clients
- * which animation the character should be in based on physics state.
- */
-function deriveAnimationKey(body: SimBody): string {
-    if (body.isHitStunned) return 'hurt';
-    if (body.isSpotDodging) return 'spot_dodge';
-    if (body.isDodging) return 'dash';
-    if (body.isAttacking) return 'attack_light'; // Simplified — Phase 4 will track attack type
-    if (!body.isGrounded) {
-        return body.vy < 0 ? 'jump' : 'fall';
-    }
-    if (body.isRunning) return 'run';
-    return 'idle';
-}
-
-function decodeBinaryPlayerState(buffer: ArrayBuffer): Partial<PlayerState> | null {
-    if (buffer.byteLength !== 15) return null;
-    const view = new DataView(buffer);
-    return {
-        x: view.getInt16(0, true),
-        y: view.getInt16(2, true),
-        velocityX: view.getInt16(4, true),
-        velocityY: view.getInt16(6, true),
-        facingDirection: view.getInt8(8) >= 0 ? 1 : -1,
-        isGrounded: (view.getUint8(9) & 0x01) === 1,
-        isAttacking: (view.getUint8(9) & 0x02) === 2,
-        animationKey: ANIMATION_KEYS[view.getUint8(10)] || '',
-        damagePercent: view.getUint16(11, true),
-        lives: view.getUint8(13),
-    };
-}
-
-const PORT = Number(process.env.PORT) || 9208; // Geckos default port
-const rooms: Map<string, GameRoom> = new Map();
-
-// Store channel -> playerId mapping
-const channelPlayerMap: Map<string, number> = new Map();
-
-// Create HTTP server for health checks
 const httpServer = http.createServer((req, res) => {
-    console.log(`[HTTP] ${req.method} ${req.url} from ${req.socket.remoteAddress}`);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
     if (req.method === 'OPTIONS') {
         res.writeHead(200);
         res.end();
         return;
     }
-
     if (req.url === '/' && req.method === 'GET') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('Geckos.io Game Server is Running! 🎮\n');
+        res.end(`Sgalalla server, protocol ${PROTOCOL_VERSION}\n`);
     }
 });
 
-// Create Geckos.io server (UDP via WebRTC)
-// ordered: false = Unreliable/Unordered - eliminates Head-of-Line Blocking stutter
+// Unordered and unreliable by default: input packets must never wait for a lost one
 const io: GeckosServer = geckos({
     cors: { origin: '*' },
-    ordered: false, // Critical for real-time: don't wait for lost packets
+    ordered: false,
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-    ]
+        { urls: 'stun:stun1.l.google.com:19302' },
+    ],
 });
-
-// Attach to HTTP server
 io.addServer(httpServer);
 
-// IDLE TIMEOUT LOGIC (Only active if AUTO_SHUTDOWN=true, e.g. ephemeral cloud workers)
+// ─── Idle shutdown (only with AUTO_SHUTDOWN=true, for ephemeral cloud machines) ───
+
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
-let totalConnectedPlayers = 0;
+let connectedPlayers = 0;
 
-function checkIdleStatus() {
+function checkIdleStatus(): void {
     if (process.env.AUTO_SHUTDOWN !== 'true') return;
-
-    if (totalConnectedPlayers === 0) {
-        if (!idleTimer) {
-            console.log(`[Server] No players connected. Starting idle timer (${IDLE_TIMEOUT_MS / 1000}s)...`);
-            idleTimer = setTimeout(() => {
-                console.log('[Server] Idle timeout reached. Shutting down.');
-                process.exit(0);
-            }, IDLE_TIMEOUT_MS);
-        }
-    } else {
-        if (idleTimer) {
-            console.log('[Server] Player connected. Cancelling idle timer.');
-            clearTimeout(idleTimer);
-            idleTimer = null;
-        }
+    if (connectedPlayers === 0 && !idleTimer) {
+        console.log(`[Server] Nobody connected; shutting down in ${IDLE_TIMEOUT_MS / 1000}s`);
+        idleTimer = setTimeout(() => process.exit(0), IDLE_TIMEOUT_MS);
+    } else if (connectedPlayers > 0 && idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
     }
 }
-
 checkIdleStatus();
 
 httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Server] Geckos.io UDP server running on 0.0.0.0:${PORT}`);
+    console.log(`[Server] Listening on 0.0.0.0:${PORT}, protocol ${PROTOCOL_VERSION}`);
 });
 
-// Helper to emit to all channels in room
-function emitToRoom(event: string, data: any) {
-    io.emit(event, data);
-}
+// ─── Players ───
 
 io.onConnection((channel: ServerChannel) => {
-    totalConnectedPlayers++;
+    connectedPlayers++;
     checkIdleStatus();
+    let greeted = false;
 
-    const channelId = channel.id!;
-    const roomId = 'default';
-
-    // Create room if needed
-    if (!rooms.has(roomId)) {
-        rooms.set(roomId, {
-            players: new Map(),
-            frame: 0,
-            rematchVotes: new Set(),
-            phase: 'WAITING',
-            selectionTimer: null,
-            selectionCountdown: 30,
-            chestSpawnTimer: 10000,
-            bombs: [],
-            nextBombId: 1,
-            bombSpawnTimer: 15000 + Math.random() * 10000, // 15-25 seconds initial
-            broadcastCounter: 0
-        });
-    }
-    const room = rooms.get(roomId)!;
-    channel.join(roomId);
-
-    // Enforce 4-player limit
-    if (room.players.size >= 4) {
-        console.log(`[Server] Connection rejected: Room full (4/4 players).`);
-        channel.emit('error', 'Room is full (4 max).');
-        channel.close();
-        totalConnectedPlayers--;
-        return;
-    }
-
-    // Find lowest available player ID
-    const existingIds = new Set<number>();
-    room.players.forEach(p => existingIds.add(p.playerId));
-    let playerId = 0;
-    while (existingIds.has(playerId)) playerId++;
-
-    channelPlayerMap.set(channelId, playerId);
-    console.log(`[Server] Player ${playerId} connected (${channelId})`);
-
-    // Initialize player state
-    const spawnPoints = [400, 1520, 800, 1120];
-    const spawnX = spawnPoints[playerId % 4];
-    const facing = playerId % 2 === 0 ? 1 : -1;
-    const body = createBody(spawnX, 780, facing);
-    body.isGrounded = true;
-
-    const playerState: PlayerState = {
-        playerId,
-        x: spawnX,
-        y: 780,
-        velocityX: 0,
-        velocityY: 0,
-        facingDirection: facing,
-        isGrounded: true,
-        isAttacking: false,
-        animationKey: '',
-        damagePercent: 0,
-        lives: 3,
-        character: 'fok',
-        body,
-        latestInput: { ...NULL_INPUT },
-        lastReceivedFrame: 0,
-        fsmState: 'Idle',
-        prevFsmState: 'Idle',
-    };
-
-    room.players.set(channelId, playerState);
-
-    // Notify player of their ID
-    channel.emit(NetMessageType.PLAYER_JOINED, {
-        playerId,
-        phase: room.phase,
-        countdown: room.selectionCountdown
-    });
-
-    // Start selection phase when 2 players present
-    if (room.players.size >= 2 && room.phase === 'WAITING') {
-        room.phase = 'SELECTING';
-        room.selectionCountdown = 30;
-        console.log('[Server] Minimum 2 players connected - starting selection phase');
-        emitToRoom(NetMessageType.SELECTION_START, { countdown: 30 });
-
-        // Start countdown timer if not already running
-        if (!room.selectionTimer) {
-            room.selectionTimer = setInterval(() => {
-                room.selectionCountdown--;
-                if (room.selectionCountdown > 0) {
-                    emitToRoom(NetMessageType.SELECTION_TICK, { countdown: room.selectionCountdown });
-                } else {
-                    if (room.selectionTimer) {
-                        clearInterval(room.selectionTimer);
-                        room.selectionTimer = null;
-                    }
-                    room.phase = 'PLAYING';
-                    const playerCharacters = Array.from(room.players.values()).map(p => ({
-                        playerId: p.playerId,
-                        character: p.character
-                    }));
-                    console.log('[Server] Selection complete - starting game', playerCharacters);
-                    emitToRoom(NetMessageType.GAME_START, { players: playerCharacters });
-                }
-            }, 1000);
+    channel.on(NetEvent.HELLO, (data) => {
+        if (greeted) return;
+        const version = (data as { version?: unknown } | null)?.version;
+        if (version !== PROTOCOL_VERSION) {
+            channel.emit(NetEvent.REJECTED, { reason: `Game version ${version}, server version ${PROTOCOL_VERSION}` }, reliable);
+            // Give the reliable message time to arrive before closing
+            setTimeout(() => void channel.close(), 3000);
+            return;
         }
-    } else if (room.phase === 'SELECTING') {
-        // Late joiner during selection: send them current state so they can catch up
-        console.log(`[Server] Player ${playerId} joined mid-selection. Sending current state.`);
-        channel.emit(NetMessageType.SELECTION_START, { countdown: room.selectionCountdown });
+        greeted = true;
 
-        // Send existing players' character selections and confirmations
-        room.players.forEach((p) => {
-            if (p.playerId !== playerId) {
-                channel.emit(NetMessageType.CHARACTER_SELECT, { playerId: p.playerId, character: p.character });
-                if (p.isConfirmed) {
-                    channel.emit(NetMessageType.CHARACTER_CONFIRM, { playerId: p.playerId });
-                }
-            }
-        });
-    }
-
-    // Character selection
-    channel.on(NetMessageType.CHARACTER_SELECT, (data: any) => {
-        const player = room.players.get(channelId);
-        if (!player || room.phase !== 'SELECTING' || !data?.character || player.isConfirmed) return;
-        player.character = data.character;
-        console.log(`[Server] Player ${player.playerId} selected: ${data.character}`);
-        emitToRoom(NetMessageType.CHARACTER_SELECT, { playerId: player.playerId, character: data.character });
-    });
-
-    // Character confirmation
-    channel.on(NetMessageType.CHARACTER_CONFIRM, () => {
-        const player = room.players.get(channelId);
-        if (!player || room.phase !== 'SELECTING' || player.isConfirmed) return;
-        player.isConfirmed = true;
-        console.log(`[Server] Player ${player.playerId} confirmed`);
-        emitToRoom(NetMessageType.CHARACTER_CONFIRM, { playerId: player.playerId });
-
-        // Check if all confirmed
-        let allConfirmed = true;
-        room.players.forEach(p => { if (!p.isConfirmed) allConfirmed = false; });
-
-        // Start if 2+ players are present and ALL are confirmed
-        if (room.players.size >= 2 && allConfirmed) {
-            console.log('[Server] All confirmed - starting game');
-            if (room.selectionTimer) {
-                clearInterval(room.selectionTimer);
-                room.selectionTimer = null;
-            }
-            room.phase = 'PLAYING';
-            room.frame = 0;
-            const startPayload = Array.from(room.players.values()).map(p => ({
-                playerId: p.playerId,
-                character: p.character
-            }));
-            emitToRoom(NetMessageType.GAME_START, { players: startPayload });
+        if (waiting) {
+            openRoom(waiting, channel);
+            waiting = null;
+        } else {
+            waiting = channel;
+            channel.emit(NetEvent.WAITING, {}, reliable);
         }
     });
 
-    // ─── BINARY ROLLBACK INPUT RELAY (Direct peer forwarding) ───
-    channel.onRaw((rawMessage) => {
-        channel.raw.broadcast.emit(rawMessage);
+    channel.on(NetEvent.PING, (data) => channel.emit(NetEvent.PONG, data));
+
+    channel.on(NetEvent.PICK, (data) => {
+        const room = roomsByChannel.get(channel.id!);
+        const character = characterFrom(data);
+        if (!room || !character || room.start) return;
+        const slot = slotOf(room, channel);
+        room.seats[slot].character = character;
+        for (const seat of room.seats) seat.channel.emit(NetEvent.PICK, { slot, character }, reliable);
     });
 
-    channel.on(NetMessageType.BINARY_INPUT, (data: any) => {
-        channel.broadcast.emit(NetMessageType.BINARY_INPUT, data);
-    });
-
-    // ─── INPUT HANDLER (Most-Recent-Input + Edge-Trigger Scanning) ───
-    // Client sends last N frames for UDP redundancy.
-    // Server picks the newest input and scans ALL entries for edge-triggered events.
-    channel.on(NetMessageType.INPUT, (data: any) => {
-        const player = room.players.get(channelId);
-        if (!player || room.phase !== 'PLAYING') return;
-
-        const inputs = data?.inputs;
-        if (!inputs || !Array.isArray(inputs)) return;
-
-        let newestFrame = player.lastReceivedFrame;
-        let newestInput: SimInput | null = null;
-        let pendingJump = false;
-        let pendingDodge = false;
-        let pendingRecovery = false;
-
-        for (const entry of inputs) {
-            const frame = entry.frame;
-            const input = entry.input;
-            if (!frame || !input) continue;
-
-            // Only look at frames newer than what we've already seen
-            if (frame <= player.lastReceivedFrame) continue;
-
-            // Scan for edge-triggered events across the entire window
-            if (input.jump) pendingJump = true;
-            if (input.dodge) pendingDodge = true;
-            if (input.recovery) pendingRecovery = true;
-
-            // Track the newest frame's continuous state
-            if (frame > newestFrame) {
-                newestFrame = frame;
-                newestInput = {
-                    moveLeft: !!input.moveLeft,
-                    moveRight: !!input.moveRight,
-                    moveDown: !!input.moveDown,
-                    moveUp: !!input.moveUp,
-                    jumpBuffered: !!input.jump,
-                    jumpHeld: !!input.jumpHeld,
-                    dodgeBuffered: !!input.dodge,
-                    aimUp: !!input.aimUp,
-                    aimDown: !!input.aimDown,
-                    recoveryRequested: !!input.recovery,
-                };
-            }
-        }
-
-        if (newestInput) {
-            // Merge edge-triggers: if ANY frame in the window had jump/dodge/recovery, carry it
-            newestInput.jumpBuffered = newestInput.jumpBuffered || pendingJump;
-            newestInput.dodgeBuffered = newestInput.dodgeBuffered || pendingDodge;
-            newestInput.recoveryRequested = newestInput.recoveryRequested || pendingRecovery;
-
-            player.latestInput = newestInput;
-            player.lastReceivedFrame = newestFrame;
-
-            // Update FSM state from the newest entry
-            const newestEntry = inputs.reduce((best: any, e: any) =>
-                (e.frame > (best?.frame ?? 0)) ? e : best, null);
-            if (newestEntry?.fsmState) {
-                player.fsmState = newestEntry.fsmState;
-            }
-        }
-    });
-
-    // POSITION_UPDATE: Client-Authoritative — accept ALL state from client.
-    // Server relays client-reported position to other clients.
-    channel.on(NetMessageType.POSITION_UPDATE, (data: any) => {
-        const player = room.players.get(channelId);
-        if (!player) return;
-
-        let decoded: Partial<PlayerState> | null = null;
-        if (data instanceof Uint8Array) {
-            decoded = decodeBinaryPlayerState(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer);
-        } else if (data instanceof ArrayBuffer) {
-            decoded = decodeBinaryPlayerState(data);
-        }
-        const src = decoded || data;
-        if (src) {
-            // Position & physics (client-authoritative)
-            if (typeof src.x === 'number') player.x = src.x;
-            if (typeof src.y === 'number') player.y = src.y;
-            if (typeof src.velocityX === 'number') player.velocityX = src.velocityX;
-            if (typeof src.velocityY === 'number') player.velocityY = src.velocityY;
-            if (typeof src.facingDirection === 'number') player.facingDirection = src.facingDirection;
-            if (typeof src.isGrounded === 'boolean') player.isGrounded = src.isGrounded;
-            // Combat state (client-authoritative)
-            player.isAttacking = src.isAttacking ?? player.isAttacking;
-            player.animationKey = src.animationKey ?? player.animationKey;
-            player.damagePercent = src.damagePercent ?? player.damagePercent;
-            player.lives = src.lives ?? player.lives;
-        }
-    });
-
-    // Ping
-    channel.on(NetMessageType.PING, () => {
-        channel.emit(NetMessageType.PONG, {});
-    });
-
-    // Attack relay
-    channel.on(NetMessageType.ATTACK_START, (data: any) => {
-        emitToRoom(NetMessageType.ATTACK_START, data);
-    });
-
-    // Hit relay
-    channel.on(NetMessageType.HIT_EVENT, (data: any) => {
-        emitToRoom(NetMessageType.HIT_EVENT, data);
-    });
-
-    // --- Chest Mechanics ---
-    channel.on(NetMessageType.CHEST_SPAWN, (data: unknown) => {
-        const { x } = data as { x: number };
-        emitToRoom(NetMessageType.CHEST_SPAWN, { x });
-    });
-
-    channel.on(NetMessageType.CHEST_OPEN, (data: unknown) => {
-        emitToRoom(NetMessageType.CHEST_OPEN, data);
-    });
-
-    channel.on(NetMessageType.CHEST_CLOSE, () => {
-        emitToRoom(NetMessageType.CHEST_CLOSE, {});
-    });
-
-    // --- Chest Bomb Mechanics ---
-    channel.on(NetMessageType.CHEST_BOMB_PICKUP, (playerId: unknown) => {
-        emitToRoom(NetMessageType.CHEST_BOMB_PICKUP, playerId as number);
-    });
-
-    channel.on(NetMessageType.CHEST_BOMB_THROW, (data: unknown) => {
-        emitToRoom(NetMessageType.CHEST_BOMB_THROW, data);
-    });
-
-    channel.on(NetMessageType.CHEST_BOMB_EXPLODE, (data: unknown) => {
-        emitToRoom(NetMessageType.CHEST_BOMB_EXPLODE, data);
-    });
-
-    // --- Missing Ghost Visuals ---
-    channel.on(NetMessageType.RECOVERY_START, (playerId: unknown) => {
-        emitToRoom(NetMessageType.RECOVERY_START, playerId as number);
-    });
-
-    channel.on(NetMessageType.CHARGE_START, (data: unknown) => {
-        emitToRoom(NetMessageType.CHARGE_START, data);
-    });
-
-    channel.on(NetMessageType.GROUND_POUND_LAND, (playerId: unknown) => {
-        emitToRoom(NetMessageType.GROUND_POUND_LAND, playerId as number);
-    });
-
-    // Rematch vote
-    channel.on(NetMessageType.REMATCH_VOTE, () => {
-        console.log(`[Server] Player ${playerId} voted for rematch`);
-        room.rematchVotes.add(channelId);
-
-        if (room.rematchVotes.size >= room.players.size && room.players.size >= 2) {
-            console.log('[Server] All voted - rematching');
-            const spawnPoints = [400, 1520, 800, 1120];
-            let idx = 0;
-            room.players.forEach((p) => {
-                const sx = spawnPoints[idx % spawnPoints.length];
-                p.x = sx;
-                p.y = 780;
-                p.velocityX = 0;
-                p.velocityY = 0;
-                p.isGrounded = true;
-                p.isAttacking = false;
-                p.damagePercent = 0;
-                p.lives = 3;
-                // Reset physics body
-                const newBody = createBody(sx, 780, p.facingDirection);
-                newBody.isGrounded = true;
-                newBody.lives = 3;
-                p.body = newBody;
-                p.latestInput = { ...NULL_INPUT };
-                idx++;
+    channel.on(NetEvent.READY, (data) => {
+        const room = roomsByChannel.get(channel.id!);
+        const character = characterFrom(data);
+        if (!room || !character || room.start) return;
+        const seat = room.seats[slotOf(room, channel)];
+        seat.character = character;
+        seat.rtt = Number((data as { rtt?: unknown }).rtt) || 0;
+        seat.ready = true;
+        if (room.seats.every(s => s.ready)) {
+            const [a, b] = room.seats;
+            startMatch(room, {
+                seed: randomSeed(),
+                inputDelay: inputDelayFor(a.rtt, b.rtt),
+                characters: [a.character, b.character],
             });
-            room.frame = 0;
-            room.rematchVotes.clear();
-            emitToRoom(NetMessageType.REMATCH_START, {});
         }
     });
 
-    // Disconnect
-    channel.onDisconnect(() => {
-        console.log(`[Server] Player ${playerId} disconnected (${channelId})`);
-        room.players.delete(channelId);
-        room.rematchVotes.delete(channelId);
-        channelPlayerMap.delete(channelId);
-        totalConnectedPlayers = Math.max(0, totalConnectedPlayers - 1);
-        checkIdleStatus();
-
-        emitToRoom(NetMessageType.PLAYER_LEFT, { playerId });
-
-        if (room.players.size === 0) {
-            console.log('[Server] Room empty - resetting');
-            if (room.selectionTimer) {
-                clearInterval(room.selectionTimer);
-                room.selectionTimer = null;
-            }
-            room.phase = 'WAITING';
-            room.selectionCountdown = 30;
-            room.frame = 0;
-        } else if (room.players.size === 1 && room.phase === 'SELECTING') {
-            console.log('[Server] Only 1 player left - reverting to WAITING');
-            if (room.selectionTimer) {
-                clearInterval(room.selectionTimer);
-                room.selectionTimer = null;
-            }
-            room.phase = 'WAITING';
-            room.selectionCountdown = 30;
+    channel.on(NetEvent.REMATCH, () => {
+        const room = roomsByChannel.get(channel.id!);
+        if (!room?.start) return;
+        room.seats[slotOf(room, channel)].wantsRematch = true;
+        if (room.seats.every(s => s.wantsRematch)) {
+            room.seats.forEach(s => (s.wantsRematch = false));
+            startMatch(room, { ...room.start, seed: randomSeed() });
         }
+    });
+
+    // Input packets go straight to the opponent
+    channel.onRaw((packet) => {
+        const room = roomsByChannel.get(channel.id!);
+        if (!room) return;
+        room.seats[1 - slotOf(room, channel)].channel.raw.emit(packet);
+    });
+
+    channel.onDisconnect(() => {
+        connectedPlayers = Math.max(0, connectedPlayers - 1);
+        checkIdleStatus();
+        if (waiting === channel) waiting = null;
+
+        const room = roomsByChannel.get(channel.id!);
+        if (!room) return;
+        for (const seat of room.seats) roomsByChannel.delete(seat.channel.id!);
+        const other = room.seats[1 - slotOf(room, channel)].channel;
+        other.emit(NetEvent.OPPONENT_LEFT, {}, reliable);
+        console.log('[Server] A player left; room closed');
     });
 });
 
-// ─── Game Loop — Server-Authoritative Physics (Phase 5) ───
-const TICK_RATE = 60;
-const TICK_MS = 1000 / TICK_RATE;
-const DT = 1 / TICK_RATE; // Fixed timestep in seconds
-const BROADCAST_EVERY_N_TICKS = 2; // Broadcast STATE_UPDATE every 2nd tick = 30Hz
-
-setInterval(() => {
-    rooms.forEach((room) => {
-        if (room.phase !== 'PLAYING') return;
-        room.frame++;
-
-        // === CLIENT-AUTHORITATIVE: No server physics for broadcast ===
-        // Server physics runs in shadow mode only (not used for broadcast).
-        // Player positions come from POSITION_UPDATE (client-reported).
-
-        // === CHEST SPAWNING ===
-        room.chestSpawnTimer -= TICK_MS;
-        if (room.chestSpawnTimer <= 0) {
-            if (Math.random() < 0.01) {
-                const chestX = 600 + Math.random() * 720;
-                emitToRoom(NetMessageType.CHEST_SPAWN, { x: Math.round(chestX) });
-                console.log(`[Server] Chest spawned at x=${Math.round(chestX)}`);
-            }
-            room.chestSpawnTimer = 30000;
-        }
-
-        // === BOMB FUSE COUNTDOWN ===
-        const explodedBombs: number[] = [];
-        room.bombs.forEach(bomb => {
-            if (bomb.holderId === null) {
-                bomb.fuseTimer -= TICK_MS;
-                if (bomb.fuseTimer <= 0) {
-                    explodedBombs.push(bomb.id);
-                }
-            }
-        });
-
-        explodedBombs.forEach(bombId => {
-            const bomb = room.bombs.find(b => b.id === bombId);
-            if (bomb) {
-                emitToRoom(NetMessageType.BOMB_EXPLODE, {
-                    id: bombId,
-                    x: bomb.x,
-                    y: bomb.y
-                });
-            }
-        });
-        room.bombs = room.bombs.filter(b => !explodedBombs.includes(b.id));
-
-        // === STATE BROADCAST (Client-Authoritative, 20Hz) ===
-        room.broadcastCounter++;
-        if (room.broadcastCounter >= BROADCAST_EVERY_N_TICKS) {
-            room.broadcastCounter = 0;
-            const state = {
-                frame: room.frame,
-                timestamp: Date.now(),
-                players: Array.from(room.players.values()).map(p => ({
-                    playerId: p.playerId,
-                    x: p.x,
-                    y: p.y,
-                    velocityX: p.velocityX,
-                    velocityY: p.velocityY,
-                    facingDirection: p.facingDirection,
-                    isGrounded: p.isGrounded,
-                    isAttacking: p.isAttacking,
-                    animationKey: p.animationKey,
-                    damagePercent: p.damagePercent,
-                    lives: p.lives,
-                    lastProcessedInputFrame: p.lastReceivedFrame,
-                })),
-            };
-
-            emitToRoom(NetMessageType.STATE_UPDATE, state);
-        }
+function openRoom(first: ServerChannel, second: ServerChannel): void {
+    const seat = (channel: ServerChannel): Seat => ({ channel, character: 'fok', ready: false, rtt: 0, wantsRematch: false });
+    const room: Room = { seats: [seat(first), seat(second)], start: null };
+    room.seats.forEach((s, slot) => {
+        roomsByChannel.set(s.channel.id!, room);
+        s.channel.emit(NetEvent.MATCHED, { slot }, reliable);
     });
-}, TICK_MS);
+    console.log(`[Server] Paired two players (${roomsByChannel.size / 2} rooms)`);
+}
+
+function startMatch(room: Room, start: MatchStart): void {
+    room.start = start;
+    for (const seat of room.seats) seat.channel.emit(NetEvent.START, start, reliable);
+    console.log(`[Server] Match started: ${start.characters.join(' vs ')}, input delay ${start.inputDelay}`);
+}
+
+function slotOf(room: Room, channel: ServerChannel): number {
+    return room.seats[0].channel === channel ? 0 : 1;
+}
+
+function characterFrom(data: unknown): string | null {
+    const character = (data as { character?: unknown } | null)?.character;
+    return typeof character === 'string' && /^[a-z0-9_]{1,16}$/.test(character) ? character : null;
+}
+
+function randomSeed(): number {
+    return Math.floor(Math.random() * 0x100000000);
+}

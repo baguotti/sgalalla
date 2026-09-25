@@ -1,0 +1,26 @@
+<!doctype html>
+<!--
+  Dev tool: two game clients side by side for testing online play against the
+  local server (npm run server). Open /tests/online.html on the dev server;
+  its query string is passed to both clients, e.g. ?lag=50&jitter=10&loss=5
+  for 100 ms ping and 5% packet loss.
+-->
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Two clients</title>
+    <style>
+        body { margin: 0; display: flex; gap: 4px; background: #111; }
+        iframe { width: calc(50vw - 2px); aspect-ratio: 16 / 9; border: 0; }
+    </style>
+</head>
+<body>
+    <iframe id="a"></iframe>
+    <iframe id="b"></iframe>
+    <script>
+        // anyfocus: both clients read input although only one can have focus
+        const query = '?anyfocus' + (location.search ? '&' + location.search.slice(1) : '');
+        for (const id of ['a', 'b']) document.getElementById(id).src = '/' + query;
+    </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 /**
- * Hash of simulation values, used to compare two runs of the same match
- * (recorded game vs. replay) step by step.
+ * Hashes of simulation state, used to check that two runs of the same match
+ * (a recording and its replay, or the two players of an online match) agree.
  */
 
 const scratch = new DataView(new ArrayBuffer(8));
@@ -14,6 +14,16 @@ export function hashValues(values: readonly number[]): number {
             hash ^= scratch.getUint8(i);
             hash = Math.imul(hash, 0x01000193);
         }
+    }
+    return hash >>> 0;
+}
+
+/** FNV-1a over a string's UTF-16 code units. */
+export function hashString(text: string): number {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
     }
     return hash >>> 0;
 }

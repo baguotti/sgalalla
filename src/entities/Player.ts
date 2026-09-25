@@ -18,6 +18,8 @@ export interface PlayerConfig {
     character: string;
     isAI?: boolean;
     isTrainingDummy?: boolean;
+    /** The online opponent: its inputs come from the network. */
+    isRemote?: boolean;
     gamepadIndex?: number | null;
     useKeyboard?: boolean;
     keyboardMapping?: 'wasd' | 'arrows' | 'all';
@@ -38,7 +40,7 @@ export class Player extends Phaser.GameObjects.Container {
     readonly isAI: boolean;
     /** A CPU that stands still (training). */
     isTrainingDummy: boolean;
-    readonly inputType: 'keyboard' | 'gamepad' | 'ai';
+    readonly inputType: 'keyboard' | 'gamepad' | 'ai' | 'remote';
     readonly keyboardMapping: 'wasd' | 'arrows' | 'all';
 
     /** Mirrored from the simulation for the HUD. */
@@ -99,7 +101,11 @@ export class Player extends Phaser.GameObjects.Container {
         this.hurtboxRect.setVisible(false);
         this.add(this.hurtboxRect);
 
-        if (this.isAI) {
+        if (config.isRemote) {
+            this.inputType = 'remote';
+            this.inputManager = null;
+            this.ai = null;
+        } else if (this.isAI) {
             this.inputType = 'ai';
             this.inputManager = null;
             this.ai = new PlayerAI(this.fighterIndex);
@@ -135,10 +141,15 @@ export class Player extends Phaser.GameObjects.Container {
     public readInput(match: MatchState): FighterInput {
         if (this.ai) {
             this.currentInput = this.isTrainingDummy ? emptyInput() : this.ai.update(match, SIM_STEP_MS);
-        } else {
-            this.currentInput = this.inputManager!.poll();
+        } else if (this.inputManager) {
+            this.currentInput = this.inputManager.poll();
         }
         return this.currentInput;
+    }
+
+    /** The input the fighter used on the latest step, when it came from elsewhere (online). */
+    public setCurrentInput(input: FighterInput): void {
+        this.currentInput = input;
     }
 
     public getCurrentInput(): FighterInput {

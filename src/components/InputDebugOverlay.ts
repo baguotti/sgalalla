@@ -139,6 +139,9 @@ export class InputDebugOverlay {
         if (player.inputType === 'ai') {
             return { label: '[ CPU ]', keys: InputDebugOverlay.WASD_KEYS };
         }
+        if (player.inputType === 'remote') {
+            return { label: '[ ONLINE ]', keys: InputDebugOverlay.WASD_KEYS };
+        }
         if (player.inputType === 'gamepad') {
             return { label: '[ GAMEPAD ]', keys: InputDebugOverlay.GAMEPAD_KEYS };
         }

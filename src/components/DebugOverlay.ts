@@ -15,6 +15,8 @@ export class DebugOverlay {
     // Text elements
     private fpsText: Phaser.GameObjects.Text;
     private pingText: Phaser.GameObjects.Text;
+    /** Online matches only: input delay, stalls, packet loss and sync state. */
+    private netText: Phaser.GameObjects.Text;
     private velocityText: Phaser.GameObjects.Text;
     private stateText: Phaser.GameObjects.Text;
     private recoveryText: Phaser.GameObjects.Text;
@@ -65,6 +67,7 @@ export class DebugOverlay {
         // Create text elements
         this.fpsText = scene.add.text(x, startY, '', textStyle).setDepth(1000).setScrollFactor(0);
         this.pingText = scene.add.text(x, startY + lh, '', textStyle).setDepth(1000).setScrollFactor(0);
+        this.netText = scene.add.text(x, startY + lh * 2, '', textStyle).setDepth(1000).setScrollFactor(0);
         this.velocityText = scene.add.text(x, startY + lh * 2.5, '', textStyle).setDepth(1000).setScrollFactor(0);
         this.stateText = scene.add.text(x, startY + lh * 3.5, '', textStyle).setDepth(1000).setScrollFactor(0);
         this.recoveryText = scene.add.text(x, startY + lh * 4.5, '', textStyle).setDepth(1000).setScrollFactor(0);
@@ -143,9 +146,14 @@ export class DebugOverlay {
         );
     }
 
+    /** Online stats line under the ping; null hides it. */
+    public setNetworkStats(text: string | null): void {
+        this.netText.setText(text ?? '');
+    }
+
     private getVisibleTexts(): Phaser.GameObjects.Text[] {
         return [
-            this.fpsText, this.pingText,
+            this.fpsText, this.pingText, this.netText,
             this.velocityText, this.stateText,
             this.recoveryText, this.attackText, this.gamepadText
         ].filter(t => t.visible);
@@ -166,6 +174,7 @@ export class DebugOverlay {
         // FPS and Ping always follow the toggle
         this.fpsText.setVisible(visible);
         this.pingText.setVisible(visible);
+        this.netText.setVisible(visible && this.netText.text !== '');
         this.bgPanel.setVisible(visible);
 
         // Full debug fields only visible in non-minimal mode
@@ -183,6 +192,7 @@ export class DebugOverlay {
             this.bgPanel,
             this.fpsText,
             this.pingText,
+            this.netText,
             this.velocityText,
             this.stateText,
             this.recoveryText,
@@ -195,6 +205,7 @@ export class DebugOverlay {
         this.bgPanel.destroy();
         this.fpsText.destroy();
         this.pingText.destroy();
+        this.netText.destroy();
         this.velocityText.destroy();
         this.stateText.destroy();
         this.recoveryText.destroy();

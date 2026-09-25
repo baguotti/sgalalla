@@ -24,6 +24,7 @@ import {
     ATTACK_TYPE_NONE, ATTACK_TYPE_LIGHT, ATTACK_TYPE_HEAVY,
 } from './PhysicsSimulation.js';
 import { STAGE_LAYOUT } from './StageData.js';
+import { hashString } from './StateHash.js';
 
 const STEP_S = SIM_STEP_MS / 1000;
 
@@ -303,7 +304,15 @@ function randomInt(match: MatchState, min: number, max: number): number {
     return min + ((t ^ (t >>> 14)) >>> 0) % (max - min + 1);
 }
 
-// ─── Replay comparison ───
+// ─── Comparing runs ───
+
+/**
+ * Checksum of the whole match state. JSON number formatting is exactly
+ * specified, so every engine produces the same text for the same state.
+ */
+export function matchChecksum(match: MatchState): number {
+    return hashString(JSON.stringify(match));
+}
 
 const ATTACK_KEYS = Object.keys(AttackRegistry);
 const ATTACK_PHASES = [AttackPhase.NONE, AttackPhase.STARTUP, AttackPhase.ACTIVE, AttackPhase.RECOVERY];
