@@ -13,7 +13,7 @@ const INPUT_BUFFER_STEPS = 6;
 export const FIGHTER_STATES = [
     'Idle', 'Run', 'Jump', 'Fall', 'WallSlide', 'Attack', 'Charging', 'HitStun',
     'Dodge', 'AirDodge', 'Recovery', 'GroundPound', 'Taunt', 'Win', 'Defeat',
-    'Respawning', 'Cinematic',
+    'Cinematic',
 ] as const;
 export type FighterStateName = typeof FIGHTER_STATES[number];
 
@@ -94,7 +94,10 @@ export interface FighterState {
     invulnerabilityTimer: number;
     damagePercent: number;
     lives: number;
-    isRespawning: boolean;
+    /** Steps until a KO'd fighter is back in play; 0 while in play. */
+    respawnSteps: number;
+    /** Steps after a respawn during which blast zones ignore the fighter. */
+    koImmunitySteps: number;
     isTaunting: boolean;
     isShowingDefeat: boolean;
     isWinner: boolean;
@@ -139,11 +142,17 @@ export function createFighter(id: number, setup: FighterSetup): FighterState {
         invulnerabilityTimer: 0,
         damagePercent: 0,
         lives: 3,
-        isRespawning: false,
+        respawnSteps: 0,
+        koImmunitySteps: 0,
         isTaunting: false,
         isShowingDefeat: false,
         isWinner: false,
     };
+}
+
+/** Fighters with lives left that are not waiting to respawn. */
+export function isInPlay(f: FighterState): boolean {
+    return f.lives > 0 && f.respawnSteps === 0;
 }
 
 // ─── Input buffer ───
@@ -213,9 +222,6 @@ function enterState(f: FighterState): void {
         case 'Win':
             f.isWinner = true;
             break;
-        case 'Respawning':
-            f.isRespawning = true;
-            break;
         case 'Cinematic':
             f.body.vx = 0;
             f.body.vy = 0;
@@ -241,9 +247,6 @@ function exitState(f: FighterState): void {
             break;
         case 'Win':
             f.isWinner = false;
-            break;
-        case 'Respawning':
-            f.isRespawning = false;
             break;
     }
 }
@@ -341,10 +344,6 @@ export function updateState(f: FighterState): void {
             if (isMoving || input.jump || input.lightAttack || input.heavyAttack || input.dodge || !b.isGrounded) {
                 return changeState(f, 'Idle');
             }
-            return;
-
-        case 'Respawning':
-            if (!f.isRespawning) return changeState(f, 'Idle');
             return;
 
         case 'Win':

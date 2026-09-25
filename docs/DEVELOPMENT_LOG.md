@@ -604,3 +604,10 @@ Part 2
 - **[Feat]** **`shared/Combat.ts`**: light attacks, charged signatures and their ghost projectiles, ground pound, recovery, hitboxes and hits, ported from `PlayerCombat`. Knockback directions come from a table of exact values, so every browser computes identical knockback.
 - **[Refactor]** Fighter data, input buffer and state machine moved to `shared/FighterState.ts`.
 - **[S]** **Verified**: two new recordings replay exactly, including a 16 s fight against the CPU with 9 hits (a side signature, a ground pound, lights).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-25] Netcode rebuild, step 2c - KOs, respawn and game over in the simulation (branch `netcode-rebuild`, unreleased)
+- **[Feat]** **KOs in `GameSim`**: a fighter whose hurtbox crosses a blast zone loses a life and sits out 2 s, then drops in above the stage centre with 1 s of invulnerability and 1.5 s of blast-zone immunity, the same durations as the game but counted in steps. The match ends when at most one fighter has lives left.
+- **[Feat]** **Seeded random generator** in the match state picks the respawn offset (±50 px) instead of `Math.random`. Recordings now carry the seed.
+- **[Refactor]** Removed the simulation's `Respawning` state, which nothing entered.
+- **[S]** **Verified**: `tests/match.test.ts` covers KO timing, seeded respawn points, blast-zone immunity, wins and draws; the three recordings still replay exactly. The game keeps its own KO code until local play moves onto the simulation (step 2d).

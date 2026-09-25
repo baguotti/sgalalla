@@ -12,6 +12,7 @@ import { unpackInput } from '../shared/FighterInput.ts';
 import { hashValues } from '../shared/StateHash.ts';
 
 interface Recording {
+    seed: number;
     fighters: FighterSetup[];
     inputs: number[][];
     hashes: number[][];
@@ -22,7 +23,7 @@ const replaysDir = new URL('./replays/', import.meta.url);
 for (const file of readdirSync(replaysDir).filter(name => name.endsWith('.json'))) {
     test(`${file} replays exactly`, () => {
         const recording: Recording = JSON.parse(readFileSync(new URL(file, replaysDir), 'utf8'));
-        const match = createMatch(recording.fighters);
+        const match = createMatch(recording.fighters, recording.seed);
         const inputs = recording.fighters.map(() => unpackInput(0));
 
         recording.inputs.forEach((masks, step) => {

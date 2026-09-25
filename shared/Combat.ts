@@ -10,9 +10,9 @@ import { changeState, consumeBuffered, isBuffered, type FighterState, type Ghost
 import { PhysicsConfig } from './PhysicsConfig.js';
 import { startRecovery } from './PhysicsSimulation.js';
 
-/** Hurtbox: narrower and shorter than the physics body. */
-const HURTBOX_WIDTH = 46;
-const HURTBOX_HEIGHT = PhysicsConfig.PLAYER_HEIGHT - 10;
+/** Hurtbox, also used for blast zones: narrower and shorter than the physics body. */
+export const HURTBOX_WIDTH = 46;
+export const HURTBOX_HEIGHT = PhysicsConfig.PLAYER_HEIGHT - 10;
 
 /** Every character's ghost sprite frame is 256×256; the hitbox is a scaled square. */
 const GHOST_HITBOX_SIZE = 256 * PhysicsConfig.GHOST_HITBOX_SCALE;
