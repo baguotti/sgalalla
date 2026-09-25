@@ -3,7 +3,6 @@ import { charConfigs, ALL_CHARACTERS, ANIM_FRAME_RATES } from '../config/Charact
 
 /**
  * Centralized manager for loading assets and creating animations.
- * extracting this logic from GameScene/OnlineGameScene reduces duplication and file size.
  */
 export class AnimationHelpers {
     /**
@@ -11,24 +10,6 @@ export class AnimationHelpers {
      * @param scene The scene to load assets into.
      */
     public static loadCharacterAssets(scene: Phaser.Scene): void {
-        // Load Atlases
-        // V4 FOK (if used, online scene referenced it, game scene didn't explicitely but charConfig might)
-        // GameScene used: sgu, sga, pe, nock, greg. 
-        // OnlineGameScene used: fok_v4, sgu, sga, pe. 
-        // We should ensure we load ALL needed characters.
-
-        // FOK: GameScene likely assumes FOK is loaded or uses a different path?
-        // Checking GameScene again... it didn't explicitly load 'fok'. 
-        // Wait, did I miss it in the file view?
-        // GameScene lines 70-78: sgu, sga, pe, nock, greg. 
-        // FOK might be loaded elsewhere or I missed it. 
-        // However, safest bet is to load what OnlineGameScene loads + what GameScene loads.
-
-        // Actually, let's stick to what GameScene had, plus ensure Fok is handled if needed.
-        // OnlineGameScene loaded 'assets/fok_v4/fok_v4.png'.
-        // GameScene might have loaded it in a previous block or I just missed it in the view.
-        // I will include FOK v4 to be safe as it's the main character.
-
         scene.load.atlas('fok', 'assets/fok/fok.png', 'assets/fok/fok.json');
         scene.load.atlas('sgu', 'assets/sgu/sgu.png', 'assets/sgu/sgu.json');
         scene.load.atlas('sga', 'assets/sga/sga.png', 'assets/sga/sga.json');

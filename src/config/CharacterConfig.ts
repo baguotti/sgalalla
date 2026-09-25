@@ -2,7 +2,6 @@
  * Shared Character Animation Configuration
  *
  * Single source of truth for all character animation definitions.
- * Used by both GameScene and OnlineGameScene.
  */
 
 export interface AnimationDef {

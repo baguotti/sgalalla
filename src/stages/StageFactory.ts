@@ -23,7 +23,6 @@ export interface StageResult {
 
 /**
  * Creates the standard Sgalalla stage layout.
- * Shared between GameScene and OnlineGameScene to eliminate duplication.
  */
 export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'adria_bg'): StageResult {
     // --- Background ---

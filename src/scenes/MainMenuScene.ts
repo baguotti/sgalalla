@@ -15,7 +15,6 @@ export class MainMenuScene extends Phaser.Scene {
         { label: 'CAMPAGNA', mode: 'campaign' },
         { label: 'ALLENAMENTO', mode: 'training' },
         { label: 'BOTTE IN LOCALE', mode: 'versus' },
-        { label: 'BOTTE IN REMOTO', mode: 'online' },
         { label: 'IMPOSTAZIONI', mode: 'settings' }
     ];
     private menuTexts: Phaser.GameObjects.Text[] = [];
@@ -218,12 +217,6 @@ export class MainMenuScene extends Phaser.Scene {
     private selectOption(inputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD', gamepadIndex: number | null = null): void {
         AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
         const mode = this.menuOptions[this.selectedIndex].mode;
-
-        // Handle Online Quick Join
-        if (mode === 'online') {
-            this.scene.start('OnlineGameScene');
-            return;
-        }
 
         if (mode === 'campaign') {
             this.scene.start('SaveFileScene', { mode: 'campaign', inputType: inputType, gamepadIndex: gamepadIndex });

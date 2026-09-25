@@ -4,7 +4,7 @@ import type { Chest } from '../entities/Chest';
 
 /**
  * Shared interface for scene properties accessed by entities like Chest and Hitbox.
- * Both GameScene and OnlineGameScene implement this implicitly.
+ * GameScene implements it.
  *
  * Use this to type `this.scene` instead of casting to `any`.
  */

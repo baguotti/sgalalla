@@ -611,3 +611,8 @@ Part 2
 - **[Feat]** **Seeded random generator** in the match state picks the respawn offset (±50 px) instead of `Math.random`. Recordings now carry the seed.
 - **[Refactor]** Removed the simulation's `Respawning` state, which nothing entered.
 - **[S]** **Verified**: `tests/match.test.ts` covers KO timing, seeded respawn points, blast-zone immunity, wins and draws; the three recordings still replay exactly. The game keeps its own KO code until local play moves onto the simulation (step 2d).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-25] Netcode rebuild, step 2d-1 - Old online mode retired (branch `netcode-rebuild`, unreleased)
+- **[Refactor]** Deleted `OnlineGameScene`, `NetworkManager`, `StateSnapshot`, `BinaryCodec` and `shared/NetworkProtocol.ts`, and removed "BOTTE IN REMOTO" from the main menu. The old online mode runs on the per-player gameplay code that local play is about to replace, and it was not playable. Online play returns in step 4 on the shared simulation; `main` keeps the old version. The Geckos server is untouched.
+- **[S]** **Verified**: typecheck and tests pass; the menu and a local training match start with no console errors.
