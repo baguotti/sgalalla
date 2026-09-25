@@ -56,3 +56,10 @@ export function unpackInput(mask: number, out: FighterInput = {} as FighterInput
     }
     return out;
 }
+
+/**
+ * The one-step presses. A guess of someone's next input repeats their last
+ * input without these, since a held button is likely still held but a press
+ * is not repeated.
+ */
+export const PRESS_BITS = packInput({ ...emptyInput(), jump: true, lightAttack: true, heavyAttack: true, dodge: true, taunt: true, defeat: true });

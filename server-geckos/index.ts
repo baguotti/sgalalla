@@ -1,7 +1,7 @@
 /**
  * Sgalalla online server: pairs players two by two and relays their inputs.
  *
- * Matches run on the players' machines, in lockstep on shared/GameSim.ts. The
+ * Matches run on the players' machines, in rollback on shared/GameSim.ts. The
  * server introduces the two players, starts the match with a random seed and
  * an input delay that suits their pings, and forwards their input packets.
  */

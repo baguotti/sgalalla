@@ -6,8 +6,8 @@
  * so a lost packet needs no resend of its own.
  */
 
-/** Bump whenever client and server no longer understand each other. */
-export const PROTOCOL_VERSION = 1;
+/** Bump whenever two builds can no longer play each other. */
+export const PROTOCOL_VERSION = 2;
 
 export const NetEvent = {
     /** client → server `{ version }` */
@@ -50,6 +50,10 @@ export interface InputPacket {
     seq: number;
     /** First frame of the receiver's inputs the sender doesn't have yet. */
     ackNext: number;
+    /** The frame the sender is about to simulate. */
+    frame: number;
+    /** How many frames the sender thinks it runs ahead of the receiver, averaged. */
+    advantage: number;
     /** Frame of inputs[0]. */
     first: number;
     inputs: number[];
@@ -57,7 +61,7 @@ export interface InputPacket {
     checksum: { frame: number; value: number } | null;
 }
 
-const HEADER_BYTES = 17;
+const HEADER_BYTES = 23;
 const TRAILER_BYTES = 8;
 export const MAX_INPUTS_PER_PACKET = 255;
 
@@ -67,8 +71,11 @@ export function encodeInputPacket(packet: InputPacket): Uint8Array {
     view.setUint32(0, packet.match, true);
     view.setUint32(4, packet.seq, true);
     view.setUint32(8, packet.ackNext, true);
-    view.setUint32(12, packet.first, true);
-    view.setUint8(16, count);
+    view.setUint32(12, packet.frame, true);
+    // Hundredths of a frame, clamped to the Int16 range
+    view.setInt16(16, Math.max(-32768, Math.min(32767, Math.round(packet.advantage * 100))), true);
+    view.setUint32(18, packet.first, true);
+    view.setUint8(22, count);
     for (let i = 0; i < count; i++) {
         view.setUint32(HEADER_BYTES + i * 4, packet.inputs[i], true);
     }
@@ -83,7 +90,7 @@ export function encodeInputPacket(packet: InputPacket): Uint8Array {
 export function decodeInputPacket(bytes: Uint8Array): InputPacket | null {
     if (bytes.byteLength < HEADER_BYTES + TRAILER_BYTES) return null;
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    const count = view.getUint8(16);
+    const count = view.getUint8(22);
     if (bytes.byteLength !== HEADER_BYTES + count * 4 + TRAILER_BYTES) return null;
 
     const inputs: number[] = [];
@@ -96,19 +103,19 @@ export function decodeInputPacket(bytes: Uint8Array): InputPacket | null {
         match: view.getUint32(0, true),
         seq: view.getUint32(4, true),
         ackNext: view.getUint32(8, true),
-        first: view.getUint32(12, true),
+        frame: view.getUint32(12, true),
+        advantage: view.getInt16(16, true) / 100,
+        first: view.getUint32(18, true),
         inputs,
         checksum: checksumFrame === 0 ? null : { frame: checksumFrame - 1, value: view.getUint32(trailer + 4, true) },
     };
 }
 
 /**
- * Input delay for two players, from each one's round trip to the server:
- * enough frames to cover the one-way trip between them plus a margin for
- * jitter and one lost packet.
+ * Input delay for two players, from each one's round trip to the server. It
+ * covers about half the one-way trip between them; rollback hides the rest.
  */
 export function inputDelayFor(rttA: number, rttB: number): number {
-    const oneWayMs = (rttA + rttB) / 2;
-    const frames = Math.ceil((oneWayMs + 25) / (1000 / 60));
-    return Math.min(Math.max(frames, 2), 12);
+    const oneWayFrames = (rttA + rttB) / 2 / (1000 / 60);
+    return Math.min(Math.max(Math.round(oneWayFrames / 2), 1), 3);
 }

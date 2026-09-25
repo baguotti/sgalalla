@@ -550,7 +550,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (this.online) {
                 const client = this.online.client;
                 client.on(NetEvent.START, (start: MatchStart) => {
-                    this.online?.restart(start);
+                    if (!this.online) return;
+                    this.online.start = start;
                     this.restartMatch();
                 });
                 client.on(NetEvent.OPPONENT_LEFT, () => this.endOnline("L'AVVERSARIO SE N'È ANDATO"));
@@ -808,7 +809,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // Online: raw frame time, since Phaser clamps its smoothed delta while the window is unfocused
             const steps = this.simClock.advance(this.online ? this.game.loop.rawDelta : delta);
             for (let i = 0; i < steps && !this.isGameOver; i++) {
-                // A step waiting for the opponent is dropped, which lets the side running ahead fall back in step
+                // A step spent waiting for the opponent is dropped, not caught up later
                 if (!this.stepSimulation()) break;
             }
         }
@@ -866,29 +867,27 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     /**
      * Advances the match by one fixed step, then plays what happened in it.
-     * Online, returns false while the opponent's input for the step hasn't arrived.
+     * Online, returns false while waiting for the opponent or letting them catch up.
      */
     private stepSimulation(): boolean {
         const online = this.online;
-        let inputs: FighterInput[];
+        this.stepEvents.length = 0;
+
+        let simulated = true;
         if (online) {
-            const both = online.nextInputs(() => this.players[online.slot].readInput(this.match));
-            if (!both) return false;
-            inputs = both;
-            this.players.forEach((p, i) => p.setCurrentInput(inputs[i]));
+            simulated = online.step(() => this.players[online.slot].readInput(this.match), this.stepEvents);
+            // A rollback may have gone back to an earlier copy of the match
+            this.match = online.match;
         } else {
             for (const p of this.players) this.stepInputs[p.fighterIndex] = p.readInput(this.match);
-            inputs = this.stepInputs;
+            stepMatch(this.match, this.stepInputs, this.stepEvents);
+            this.recorder?.captureStep(this.match, this.stepInputs);
         }
 
-        this.stepEvents.length = 0;
-        stepMatch(this.match, inputs, this.stepEvents);
-        online?.afterStep(this.match);
-        this.recorder?.captureStep(this.match, inputs);
-
         for (const event of this.stepEvents) this.playEvent(event);
-        if (this.match.isOver) this.onMatchOver();
-        return true;
+        // Online, an ending seen in a guessed frame could still be rolled back
+        if (online ? online.isOverConfirmed : this.match.isOver) this.onMatchOver();
+        return simulated;
     }
 
     /** The lobby slot this machine's player uses: P1 locally, our slot online. */
@@ -900,7 +899,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private startMatch(): void {
         const seed = this.online?.start.seed ?? Math.floor(Math.random() * 0x100000000);
         this.match = createMatch(this.fighterSetups, seed);
-        this.recorder = this.isRecording ? new MatchRecorder(this.fighterSetups, seed) : null;
+        this.online?.begin(this.match);
+        // Online frames can be simulated more than once, so only local matches are recorded
+        this.recorder = this.isRecording && !this.online ? new MatchRecorder(this.fighterSetups, seed) : null;
     }
 
     private playEvent(event: MatchEvent): void {

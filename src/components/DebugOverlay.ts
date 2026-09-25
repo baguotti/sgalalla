@@ -15,7 +15,7 @@ export class DebugOverlay {
     // Text elements
     private fpsText: Phaser.GameObjects.Text;
     private pingText: Phaser.GameObjects.Text;
-    /** Online matches only: input delay, stalls, packet loss and sync state. */
+    /** Online matches only: input delay, rollbacks, waits, packet loss and sync state. */
     private netText: Phaser.GameObjects.Text;
     private velocityText: Phaser.GameObjects.Text;
     private stateText: Phaser.GameObjects.Text;

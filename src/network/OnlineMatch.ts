@@ -1,72 +1,73 @@
 import type { NetClient } from './NetClient';
-import { emptyInput, packInput, unpackInput, type FighterInput } from '../../shared/FighterInput';
-import { matchChecksum, type MatchState } from '../../shared/GameSim';
-import { CHECKSUM_INTERVAL, Lockstep } from '../../shared/Lockstep';
+import { packInput, type FighterInput } from '../../shared/FighterInput';
+import type { MatchState } from '../../shared/GameSim';
+import type { MatchEvent } from '../../shared/MatchEvents';
 import type { MatchStart } from '../../shared/NetProtocol';
+import { RollbackSession } from '../../shared/Rollback';
 
 /**
- * The network side of an online match: trades inputs with the opponent in
- * lockstep and checks that both simulations stay identical.
+ * The network side of an online match: runs it in rollback with the opponent
+ * (shared/Rollback.ts) and reports how that is going.
  */
 export class OnlineMatch {
     readonly client: NetClient;
     /** Our fighter's index in the match. */
     readonly slot: number;
+    /** The server's start message for the current match. */
     start: MatchStart;
-    /** Steps that had to wait for the opponent's input. */
-    stalls = 0;
 
-    private lockstep: Lockstep;
-    private readonly inputs: FighterInput[] = [emptyInput(), emptyInput()];
+    private session: RollbackSession | null = null;
     private desyncReported = false;
 
     constructor(client: NetClient, slot: number, start: MatchStart) {
         this.client = client;
         this.slot = slot;
         this.start = start;
-        this.lockstep = new Lockstep(start.seed, slot, start.inputDelay);
-        client.onPacket(packet => this.lockstep.receivePacket(packet));
+        client.onPacket(packet => this.session?.receivePacket(packet));
     }
 
-    /** A rematch: the same players in a new match. */
-    restart(start: MatchStart): void {
-        this.start = start;
-        this.lockstep = new Lockstep(start.seed, this.slot, start.inputDelay);
-        this.stalls = 0;
+    /** Plays `match`, freshly created from `start`: the first match or a rematch. */
+    begin(match: MatchState): void {
+        this.session = new RollbackSession(this.start.seed, this.slot, this.start.inputDelay, match);
         this.desyncReported = false;
     }
 
-    /**
-     * Both fighters' inputs for the next step, by slot, or null while the
-     * opponent's hasn't arrived. `readLocal` is only called when the step runs.
-     */
-    nextInputs(readLocal: () => FighterInput): FighterInput[] | null {
-        const masks = this.lockstep.advance(() => packInput(readLocal()));
-        if (!masks) {
-            this.stalls++;
-            return null;
-        }
-        masks.forEach((mask, slot) => unpackInput(mask, this.inputs[slot]));
-        return this.inputs;
+    /** The match as simulated so far. A rollback can replace the object. */
+    get match(): MatchState {
+        return this.session!.match;
     }
 
-    afterStep(match: MatchState): void {
-        if (match.frame % CHECKSUM_INTERVAL === 0) this.lockstep.recordChecksum(match.frame, matchChecksum(match));
+    /** The match has ended in a frame no rollback can undo. */
+    get isOverConfirmed(): boolean {
+        return this.session!.isOverConfirmed;
+    }
+
+    /**
+     * Simulates the next frame, correcting any wrong guess of the opponent's
+     * input first. Events to play go to `events`. False while waiting for the
+     * opponent or letting them catch up.
+     */
+    step(readLocal: () => FighterInput, events: MatchEvent[]): boolean {
+        return this.session!.step(() => packInput(readLocal()), events);
     }
 
     /** Sends every input the opponent hasn't confirmed. Once per rendered frame, also after the match ends. */
     flush(): void {
-        this.client.sendPacket(this.lockstep.buildPacket());
-        if (this.lockstep.desyncFrame >= 0 && !this.desyncReported) {
+        const session = this.session;
+        if (!session) return;
+        this.client.sendPacket(session.buildPacket());
+        if (session.desyncFrame >= 0 && !this.desyncReported) {
             this.desyncReported = true;
-            console.error(`[Online] The two simulations differ at frame ${this.lockstep.desyncFrame}`);
+            console.error(`[Online] The two simulations differ at frame ${session.desyncFrame}`);
         }
     }
 
     /** One line for the stats overlay. */
     stats(): string {
-        const loss = Math.round(this.lockstep.packetLoss * 100);
-        const sync = this.lockstep.desyncFrame < 0 ? 'SYNC OK' : `DESYNC @${this.lockstep.desyncFrame}`;
-        return `DLY  ${this.start.inputDelay}f  STALL ${this.stalls}  LOSS ${loss}%  ${sync}`;
+        const s = this.session;
+        if (!s) return '';
+        const loss = Math.round(s.packetLoss * 100);
+        const sync = s.desyncFrame < 0 ? 'SYNC OK' : `DESYNC @${s.desyncFrame}`;
+        return `DLY ${s.inputDelay}f  RB ${s.lastRollbackDepth}/${s.maxRollbackDepth}  WAIT ${s.waits}  SKIP ${s.skips}  LOSS ${loss}%  ${sync}`;
     }
 }

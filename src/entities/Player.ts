@@ -147,11 +147,6 @@ export class Player extends Phaser.GameObjects.Container {
         return this.currentInput;
     }
 
-    /** The input the fighter used on the latest step, when it came from elsewhere (online). */
-    public setCurrentInput(input: FighterInput): void {
-        this.currentInput = input;
-    }
-
     public getCurrentInput(): FighterInput {
         return this.currentInput;
     }
