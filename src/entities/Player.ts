@@ -5,6 +5,7 @@ import type { TouchController } from '../components/TouchController';
 import { AudioManager } from '../managers/AudioManager';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 import { PlayerAI } from './player/PlayerAI';
+import { ghostStyle } from '../effects/GhostStyle';
 import { AttackDirection, AttackRegistry, AttackType } from '../../shared/AttackData';
 import { GHOST_FADE_MS, GHOST_TRAVEL_MS, HURTBOX_HEIGHT, HURTBOX_WIDTH, currentDamage } from '../../shared/Combat';
 import { emptyInput, type FighterInput } from '../../shared/FighterInput';
@@ -293,7 +294,7 @@ export class Player extends Phaser.GameObjects.Container {
             f.body.x + ghostOffset(this.character) * facing + (Math.random() - 0.5),
             f.body.y + (Math.random() - 0.5),
         );
-        this.chargeGhost.setAlpha(chargePercent * 0.7);
+        this.chargeGhost.setAlpha(chargePercent * ghostStyle.opacity);
         if (this.chargeBlurFx) {
             this.chargeBlurFx.x = (1 - chargePercent) * 1.5;
             this.chargeBlurFx.y = (1 - chargePercent) * 1.5;
@@ -306,7 +307,7 @@ export class Player extends Phaser.GameObjects.Container {
         ghost.setDepth(this.depth - 1);
         ghost.setAlpha(0);
         if (ghost.preFX) {
-            ghost.preFX.addGlow(0xffffff, 0.4, 0, false, 0.05, 5);
+            ghost.preFX.addGlow(ghostStyle.color, ghostStyle.glow, 0, false, 0.05, 5);
             this.chargeBlurFx = ghost.preFX.addBlur(0, 1.5, 1.5, 1);
         }
         this.ignoreInUiCamera(ghost);
@@ -349,7 +350,7 @@ export class Player extends Phaser.GameObjects.Container {
     public spawnSignatureGhost(ghost: GhostHitbox): void {
         const char = this.character;
         const kind = ghost.vertical ? 'up' : 'side';
-        const sprite = this.effects().spawnGhost(ghost.startX, ghost.startY, char, `${char}_${kind}_sig_ghost_000`, `${char}_${kind}_sig_ghost`, ghost.facing);
+        const sprite = this.effects().spawnGhost(ghost.startX, ghost.startY, char, `${char}_${kind}_sig_ghost_000`, `${char}_${kind}_sig_ghost`, ghost.facing, { alpha: ghostStyle.opacity });
         if (!sprite) return;
 
         const scale = char === 'nock' && ghost.vertical ? 1.2 : 1;
@@ -387,7 +388,7 @@ export class Player extends Phaser.GameObjects.Container {
     /** The recovery move flashes an up-signature ghost that follows the fighter. */
     private spawnRecoveryGhost(facing: number): void {
         const char = this.character;
-        const sprite = this.effects().spawnGhost(this.x, this.y, char, `${char}_up_sig_ghost_000`, `${char}_up_sig_ghost`, facing);
+        const sprite = this.effects().spawnGhost(this.x, this.y, char, `${char}_up_sig_ghost_000`, `${char}_up_sig_ghost`, facing, { alpha: ghostStyle.opacity });
         if (!sprite) return;
 
         const scale = char === 'nock' ? 1.2 : 1;
@@ -431,7 +432,7 @@ export class Player extends Phaser.GameObjects.Container {
     private addGhostFx(sprite: Phaser.GameObjects.Sprite): Phaser.FX.Blur | null {
         if (!sprite.preFX) return null;
         sprite.preFX.clear();
-        sprite.preFX.addGlow(0xffffff, 0.4, 0, false, 0.05, 5);
+        sprite.preFX.addGlow(ghostStyle.color, ghostStyle.glow, 0, false, 0.05, 5);
         return sprite.preFX.addBlur(0, 0, 0, 1);
     }
 
@@ -507,8 +508,10 @@ function ghostOffset(character: string): number {
 /** Ghosts blur as they fade. */
 function setGhostBlur(blurFx: Phaser.FX.Blur | null, sprite: Phaser.GameObjects.Sprite): void {
     if (!blurFx) return;
-    blurFx.x = 0.5 + (1 - sprite.alpha) * 3;
-    blurFx.y = 0.5 + (1 - sprite.alpha) * 3;
+    // Blurrier as it fades from the ghosts' opacity
+    const faded = 1 - sprite.alpha / Math.max(ghostStyle.opacity, 0.01);
+    blurFx.x = 0.5 + faded * 3;
+    blurFx.y = 0.5 + faded * 3;
 }
 
 /** The animation for a fighter's state. */

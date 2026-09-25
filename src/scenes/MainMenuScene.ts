@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
 import { getConfirmButtonIndex, getMenuNavY } from '../input/JoyConMapper';
+import { LIGHT_LAB_SCENE_DATA } from '../lighting/LightLab';
 
 export class MainMenuScene extends Phaser.Scene {
     private startKey!: Phaser.Input.Keyboard.Key;
@@ -16,6 +17,7 @@ export class MainMenuScene extends Phaser.Scene {
         { label: 'ALLENAMENTO', mode: 'training' },
         { label: 'BOTTE IN LOCALE', mode: 'versus' },
         { label: 'BOTTE IN REMOTO', mode: 'online' },
+        { label: 'STUDIO LAB', mode: 'lab' },
         { label: 'IMPOSTAZIONI', mode: 'settings' }
     ];
     private menuTexts: Phaser.GameObjects.Text[] = [];
@@ -70,10 +72,11 @@ export class MainMenuScene extends Phaser.Scene {
         }
 
         // Version Text
-        this.add.text(this.scale.width - 20, this.scale.height - 20, 'v2.3.1', {
+        this.add.text(this.scale.width - 20, this.scale.height - 20, 'v3.0.0', {
             fontSize: '18px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(1, 1);        // Menu Items
-        const startY = height - 260; // Slightly lower
+        // The last item sits 40 px above the bottom
+        const startY = height - 40 - (this.menuOptions.length - 1) * 55;
         this.menuOptions.forEach((opt, index) => {
             const text = this.add.text(width / 2, startY + (index * 55), opt.label, {
                 fontSize: '40px', fontFamily: '"Pixeloid Sans"', color: '#888888'
@@ -231,6 +234,11 @@ export class MainMenuScene extends Phaser.Scene {
 
         if (mode === 'settings') {
             this.scene.start('SettingsScene');
+            return;
+        }
+
+        if (mode === 'lab') {
+            this.scene.start('GameScene', LIGHT_LAB_SCENE_DATA);
             return;
         }
 

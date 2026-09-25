@@ -654,3 +654,12 @@ Part 2
 ### [2026-09-25] Online rebuild deployed (branch `netcode-rebuild`)
 - **[Deploy]** The droplet at `138.68.126.112` runs `netcode-rebuild` at `0f988cd`: online matches of up to 4 players in rollback, protocol 3. Checked: the server's health page reports protocol 3 and the site serves the new build. Not yet played between separate machines.
 - **[Docs]** The GitHub repository is public again. `deploy_server.sh` keeps pushing the branch from this machine straight to the droplet, so a deploy doesn't depend on what is on GitHub; its comment now says so.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-26] v3.0.0 - Lighting experiment and Studio Lab (branch `lighting-experiment`)
+- **[Feat]** **Studio Lab** in the main menu: Fok and a dummy on Londra with the new lighting, a panel to tune it (H), lights on/off (G), draggable lights, a whole-stage view, settings saved in the browser and copied as JSON.
+- **[Feat]** **Lighting without normal maps** (`src/lighting/`): lit sprites with ambient, per-light fill and a rim light found from the sprite's edges (none on feet standing on a floor or on platform undersides), light orbs and glows drawn behind or in front of the stage or fighters, flashes on hits, KOs and respawns. Lab only for now.
+- **[Feat]** **Camera pass** at quarter resolution: bloom, sun rays blocked by what's in front, mist, exposure, temperature, grain, colour fringes, tilt-shift and a CRT mode. Preset baked from the user's settings.
+- **[Feat]** Contact shadows under fighters and see-through glowing attack ghosts in every match.
+- **[Fix]** **Judder on 120 Hz screens**: the camera moved every drawn frame while fighters move 60 times a second; it now moves once per step, and `FixedStepClock` counts whole display frames so steps land on an even beat.
+- **[S]** Verified: 17 tests pass; cadence simulation with measured timer noise shows no irregular steps at 60 or 120 Hz (before: up to 81 a minute at 60 Hz); GPU per frame on the user's Mac at 1080p 1.17 ms lights off, 3.20 ms default look.

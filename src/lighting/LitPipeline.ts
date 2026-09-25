@@ -1,0 +1,175 @@
+import Phaser from 'phaser';
+
+/** Lights a lit object takes into account at most. */
+export const MAX_LIGHTS = 8;
+
+const VERTEX_SHADER = `
+#define SHADER_NAME SGALALLA_LIT_VS
+
+precision mediump float;
+
+uniform mat4 uProjectionMatrix;
+
+attribute vec2 inPosition;
+attribute vec2 inTexCoord;
+attribute float inTintEffect;
+attribute vec4 inTint;
+
+varying vec2 outTexCoord;
+varying float outTintEffect;
+varying vec4 outTint;
+varying vec2 outScreen;
+
+void main ()
+{
+    gl_Position = uProjectionMatrix * vec4(inPosition, 1.0, 1.0);
+
+    outTexCoord = inTexCoord;
+    outTint = inTint;
+    outTintEffect = inTintEffect;
+    outScreen = inPosition;
+}
+`;
+
+// Phaser's single-texture sprite shader, then lighting: ambient, plus each
+// light's fill fading with distance, plus a rim where the silhouette's edge
+// faces a light. The edge is found from the texture's alpha, no normal maps.
+const FRAGMENT_SHADER = `
+#define SHADER_NAME SGALALLA_LIT_FS
+#extension GL_OES_standard_derivatives : enable
+
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+
+#define MAX_LIGHTS ${MAX_LIGHTS}
+
+uniform sampler2D uMainSampler;
+uniform vec3 uAmbient;
+// Per light: screen x, y and radius in pixels, rim strength
+uniform vec4 uLightPosition[MAX_LIGHTS];
+// Per light: colour times intensity, fill strength
+uniform vec4 uLightColor[MAX_LIGHTS];
+uniform float uLightCount;
+uniform float uRimWidth;
+uniform vec2 uTexelSize;
+// 1 while the object stands on the floor, which hides the bottom edge (the soles) from the lights
+uniform float uFloorContact;
+
+varying vec2 outTexCoord;
+varying float outTintEffect;
+varying vec4 outTint;
+varying vec2 outScreen;
+
+void main ()
+{
+    // Texture coordinates per screen pixel rightward and downward, whichever way the sprite is flipped or scaled
+    vec2 texPerPixelX = dFdx(outTexCoord);
+    vec2 texPerPixelY = dFdy(outTexCoord) * sign(dFdy(outScreen.y));
+
+    vec4 texture = texture2D(uMainSampler, outTexCoord);
+    vec4 texel = vec4(outTint.bgr * outTint.a, outTint.a);
+    vec4 color = texture * texel;
+
+    if (outTintEffect == 1.0)
+    {
+        color.rgb = mix(texture.rgb, outTint.bgr * outTint.a, texture.a);
+    }
+    else if (outTintEffect == 2.0)
+    {
+        color = texel;
+    }
+
+    vec3 light = uAmbient;
+    vec3 rim = vec3(0.0);
+
+    for (int i = 0; i < MAX_LIGHTS; i++)
+    {
+        if (float(i) >= uLightCount) break;
+
+        vec4 position = uLightPosition[i];
+        vec2 toLight = position.xy - outScreen;
+        float dist = length(toLight);
+        float falloff = clamp(1.0 - dist / position.z, 0.0, 1.0);
+        falloff *= falloff;
+
+        light += uLightColor[i].rgb * (falloff * uLightColor[i].a);
+
+        if (uRimWidth > 0.0 && position.w > 0.0 && falloff > 0.0)
+        {
+            // Look toward the light, in texels: where the silhouette ends within the rim width, this pixel is on a lit edge
+            vec2 towardLight = (texPerPixelX * toLight.x + texPerPixelY * toLight.y) / uTexelSize;
+            vec2 stride = towardLight * (uRimWidth / max(length(towardLight), 0.0001)) * uTexelSize;
+            float covered = 0.5 * (texture2D(uMainSampler, outTexCoord + stride * 0.5).a + texture2D(uMainSampler, outTexCoord + stride).a);
+            rim += uLightColor[i].rgb * (falloff * position.w * (1.0 - covered));
+        }
+    }
+
+    if (uFloorContact > 0.0)
+    {
+        // No rim within the rim width of a bottom edge: nothing lights the soles through the floor
+        vec2 downTexels = texPerPixelY / uTexelSize;
+        vec2 down = downTexels * (max(uRimWidth, 1.0) / max(length(downTexels), 0.0001)) * uTexelSize;
+        rim *= 1.0 - uFloorContact * (1.0 - texture2D(uMainSampler, outTexCoord + down).a);
+    }
+
+    // Colours are premultiplied by alpha
+    gl_FragColor = vec4(color.rgb * light + rim * color.a, color.a);
+}
+`;
+
+/**
+ * Draws sprites and images lit by the scene's lights (see Lighting). One
+ * instance per group of objects that share an ambient level and rim setting.
+ */
+export class LitPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
+    private readonly floorContact = new WeakMap<Phaser.GameObjects.GameObject, number>();
+    private textureWidth = 0;
+    private textureHeight = 0;
+    private boundFloorContact = 0;
+
+    constructor(game: Phaser.Game) {
+        super({ game, vertShader: VERTEX_SHADER, fragShader: FRAGMENT_SHADER });
+    }
+
+    /** 1 while `object` stands on the floor, 0 in the air. */
+    setFloorContact(object: Phaser.GameObjects.GameObject, amount: number): void {
+        this.floorContact.set(object, amount);
+    }
+
+    /** Called for every object drawn with this pipeline: the rim needs its texture's size and floor contact. */
+    onBind(gameObject?: Phaser.GameObjects.GameObject): void {
+        const source = (gameObject as Phaser.GameObjects.Image | undefined)?.frame?.source;
+        if (!gameObject || !source) return;
+        const floorContact = this.floorContact.get(gameObject) ?? 0;
+        const sizeChanged = source.width !== this.textureWidth || source.height !== this.textureHeight;
+        if (!sizeChanged && floorContact === this.boundFloorContact) return;
+
+        // Objects already batched are drawn with the values they were batched for
+        this.flush();
+        if (sizeChanged) {
+            this.textureWidth = source.width;
+            this.textureHeight = source.height;
+            this.set2f('uTexelSize', 1 / source.width, 1 / source.height);
+        }
+        if (floorContact !== this.boundFloorContact) {
+            this.boundFloorContact = floorContact;
+            this.set1f('uFloorContact', floorContact);
+        }
+    }
+
+    /**
+     * Lights in screen space, 4 floats each: x, y, radius, rim strength and
+     * red, green, blue, fill strength. The rim width is in texels, at most 4
+     * (the empty padding round each frame in an atlas); 0 turns the rim off.
+     */
+    setLights(ambient: ArrayLike<number>, count: number, positions: Float32Array, colors: Float32Array, rimWidth: number): void {
+        this.set3f('uAmbient', ambient[0], ambient[1], ambient[2]);
+        this.set1f('uLightCount', count);
+        this.set4fv('uLightPosition', positions);
+        this.set4fv('uLightColor', colors);
+        this.set1f('uRimWidth', Math.min(rimWidth, 4));
+    }
+}
