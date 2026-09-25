@@ -2,9 +2,9 @@
 # Deploy Server to DigitalOcean
 # Run this on your LOCAL machine
 #
-# The GitHub repository is private, so the droplet can't pull from it: the
-# current branch goes from this machine straight to the droplet's copy of the
-# repo over SSH.
+# The current branch goes from this machine straight to the droplet's copy of
+# the repo over SSH, so the droplet runs exactly what is committed here, pushed
+# to GitHub or not.
 
 set -e
 
