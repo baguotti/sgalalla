@@ -663,3 +663,7 @@ Part 2
 ------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-09-26] Campaign hidden from the release (branch `netcode-rebuild`)
 - **[Change]** The main menu no longer offers CAMPAGNA: the campaign is a work in progress and lives on the experimental branch (`lighting-experiment`). Its code stays in place.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-26] v3.0.1 - Official release (branch `netcode-rebuild`)
+- **[Release]** The official release is v3.0.1: 4-player online in rollback, smooth play on 120 Hz screens, campaign hidden while it's a work in progress. Live on the droplet.
