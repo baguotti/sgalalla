@@ -12,7 +12,6 @@ export class MainMenuScene extends Phaser.Scene {
     private selectedIndex: number = 0;
     private prevGamepadA: Map<number, boolean> = new Map(); // Edge detection for A/Start
     private menuOptions = [
-        { label: 'CAMPAGNA', mode: 'campaign' },
         { label: 'ALLENAMENTO', mode: 'training' },
         { label: 'BOTTE IN LOCALE', mode: 'versus' },
         { label: 'BOTTE IN REMOTO', mode: 'online' },
@@ -221,11 +220,6 @@ export class MainMenuScene extends Phaser.Scene {
 
         if (mode === 'online') {
             this.scene.start('OnlineLobbyScene');
-            return;
-        }
-
-        if (mode === 'campaign') {
-            this.scene.start('SaveFileScene', { mode: 'campaign', inputType: inputType, gamepadIndex: gamepadIndex });
             return;
         }
 

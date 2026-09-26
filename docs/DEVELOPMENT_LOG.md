@@ -659,3 +659,7 @@ Part 2
 ### [2026-09-26] Smooth play on 120 Hz screens (branch `netcode-rebuild`)
 - **[Fix]** **Judder and ghosting on 120 Hz screens**: the camera eased toward the fighters on every drawn frame while they move 60 times a second, so at 120 Hz they jittered against it. The camera now moves once per simulation step, and `FixedStepClock` counts whole display frames so steps land on an even beat despite noisy browser timestamps.
 - **[S]** Verified: 17 tests pass; a cadence simulation with measured timer noise shows no irregular steps at 60 or 120 Hz (before: up to 81 a minute at 60 Hz), and the clock keeps real time.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-26] Campaign hidden from the release (branch `netcode-rebuild`)
+- **[Change]** The main menu no longer offers CAMPAGNA: the campaign is a work in progress and lives on the experimental branch (`lighting-experiment`). Its code stays in place.
