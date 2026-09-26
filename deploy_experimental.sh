@@ -11,6 +11,9 @@ DROPLET_IP="138.68.126.112"
 BRANCH="experimental-branch"
 SITE_PATH="/var/www/sgalalla-experimental"
 SERVER_PORT=9209
+# One SSH connection for every step: the droplet drops some new connections (bots keep its SSH busy)
+SSH_OPTS="-o ControlMaster=auto -o ControlPath=/tmp/sgalalla-deploy-%r@%h:%p -o ControlPersist=120 -o ConnectTimeout=10"
+export GIT_SSH_COMMAND="ssh $SSH_OPTS"
 
 if [ "$(git rev-parse --abbrev-ref HEAD)" != "$BRANCH" ]; then
     echo "Check out $BRANCH first."; exit 1
@@ -22,15 +25,21 @@ fi
 echo "=== Building $BRANCH ($(git rev-parse --short HEAD)) ==="
 npm run build
 
+echo "=== Connecting ==="
+for attempt in 1 2 3 4 5; do
+    ssh $SSH_OPTS root@$DROPLET_IP "mkdir -p $SITE_PATH" && break
+    [ $attempt = 5 ] && { echo "Can't reach the droplet."; exit 1; }
+    sleep 3
+done
+
 echo "=== Uploading the site ==="
-ssh root@$DROPLET_IP "mkdir -p $SITE_PATH"
-rsync -az --delete dist/ root@$DROPLET_IP:$SITE_PATH/
+rsync -az --delete -e "ssh $SSH_OPTS" dist/ root@$DROPLET_IP:$SITE_PATH/
 
 echo "=== Sending $BRANCH to the droplet ==="
 # Into the release's repo as a branch; the experimental server runs from its own clone of it
 git push "root@$DROPLET_IP:sgalalla" "$BRANCH:$BRANCH"
 
-ssh root@$DROPLET_IP "BRANCH=$BRANCH SITE_PATH=$SITE_PATH SERVER_PORT=$SERVER_PORT bash -s" << 'ENDSSH'
+ssh $SSH_OPTS root@$DROPLET_IP "BRANCH=$BRANCH SITE_PATH=$SITE_PATH SERVER_PORT=$SERVER_PORT bash -s" << 'ENDSSH'
 set -e
 
 echo "=== Updating the experimental game server ==="
@@ -79,5 +88,6 @@ chmod -R 755 "$SITE_PATH"
 nginx -t && systemctl reload nginx
 ENDSSH
 
+ssh $SSH_OPTS -O exit root@$DROPLET_IP 2> /dev/null || true
 echo ""
 echo "=== Experimental version live at http://$DROPLET_IP:8080 ==="
