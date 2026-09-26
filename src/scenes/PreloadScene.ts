@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
+import { MenuInput } from '../input/MenuInput';
 
 export class PreloadScene extends Phaser.Scene {
     constructor() {
@@ -117,12 +118,17 @@ export class PreloadScene extends Phaser.Scene {
         this.input.keyboard?.on('keydown-ENTER', proceed);
         this.input.keyboard?.on('keydown-SPACE', proceed);
 
-        // Gamepad
-        this.input.gamepad?.on('down', (_pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button) => {
-            if (button.index === 0 || button.index === 9) { // A or Start
+        // Gamepad: confirm or Start, whichever button confirm is on this controller.
+        // Key and pointer events stay events: only those let the browser start the audio.
+        const pads = new MenuInput(this, { keyboard: false });
+        const onUpdate = () => {
+            if (pads.poll().some(press => press.action === 'confirm' || press.action === 'start')) {
+                this.events.off('update', onUpdate);
                 proceed();
             }
-        });
+        };
+        this.events.on('update', onUpdate);
+        this.events.once('shutdown', () => this.events.off('update', onUpdate));
 
         // Mouse/Touch
         this.input.on('pointerdown', proceed);

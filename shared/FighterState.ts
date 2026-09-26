@@ -101,6 +101,8 @@ export interface FighterState {
     respawnSteps: number;
     /** Steps after a respawn during which blast zones ignore the fighter. */
     koImmunitySteps: number;
+    /** Steps the fighter stays frozen after landing or taking a hit. */
+    hitstopSteps: number;
 }
 
 export interface FighterSetup {
@@ -146,6 +148,7 @@ export function createFighter(id: number, setup: FighterSetup): FighterState {
         lives: 3,
         respawnSteps: 0,
         koImmunitySteps: 0,
+        hitstopSteps: 0,
     };
 }
 
@@ -159,15 +162,25 @@ export function isInPlay(f: FighterState): boolean {
 export function updateInputBuffer(f: FighterState): void {
     const buffer = f.buffer;
     const step = ++buffer.step;
-    if (f.input.jump) buffer.jump.push(step);
-    if (f.input.lightAttack) buffer.lightAttack.push(step);
-    if (f.input.heavyAttack) buffer.heavyAttack.push(step);
-    if (f.input.dodge) buffer.dodge.push(step);
+    recordPresses(f, step);
 
     for (const action of ['jump', 'lightAttack', 'heavyAttack', 'dodge'] as const) {
         const presses = buffer[action];
         while (presses.length > 0 && step - presses[0] > INPUT_BUFFER_STEPS) presses.shift();
     }
+}
+
+/** In hit-stop the buffer's clock stops: presses are kept for when the fighter moves again. */
+export function holdInputBuffer(f: FighterState): void {
+    recordPresses(f, f.buffer.step);
+}
+
+function recordPresses(f: FighterState, step: number): void {
+    const buffer = f.buffer;
+    if (f.input.jump) buffer.jump.push(step);
+    if (f.input.lightAttack) buffer.lightAttack.push(step);
+    if (f.input.heavyAttack) buffer.heavyAttack.push(step);
+    if (f.input.dodge) buffer.dodge.push(step);
 }
 
 export function isBuffered(f: FighterState, action: BufferedAction): boolean {

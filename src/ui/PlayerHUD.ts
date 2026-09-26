@@ -39,6 +39,7 @@ export class PlayerHudSlot {
     private lastStocks: number = -1; // Force initial render
     private portraitBaseX: number = 0;
     private portraitBaseY: number = 0;
+    private shakeTween: Phaser.Tweens.Tween | null = null;
 
     constructor(
         scene: Phaser.Scene,
@@ -235,15 +236,7 @@ export class PlayerHudSlot {
             const width = this.bigDamageText.width;
             this.percentText.x = this.bigDamageText.x + width + 2;
 
-            // Color Grading for Damage
-            if (damage < 50) {
-                this.bigDamageText.setColor('#ffffff');
-            } else if (damage < 100) {
-                this.bigDamageText.setColor('#ffdd44'); // Yellowish
-            } else {
-                this.bigDamageText.setColor('#ff4444'); // Red
-            }
-
+            this.bigDamageText.setColor(damageColor(damage));
             this.lastDisplayedDamage = d;
         }
 
@@ -253,16 +246,11 @@ export class PlayerHudSlot {
             this.lastStocks = stocks;
         }
 
-        // Shake detection
+        // A hit: the number pops and the portrait trembles, both a little more for harder hits
         if (damage > this.lastDamage) {
-            const diff = damage - this.lastDamage;
-            // Higher damage = more shake
-            // Signatures do ~15-20 damage. Light attacks ~4-8.
-            // Shake intensity: 2px base, +1px per 10 damage?
-            let intensity = 2;
-            if (diff > 12) intensity = 5; // Heavy hit
-
-            this.shake(intensity);
+            const hit = damage - this.lastDamage;
+            this.shake(Phaser.Math.Clamp(1 + hit * 0.18, 1.5, 4.5));
+            this.pop(Phaser.Math.Clamp(1.06 + hit * 0.004, 1.06, 1.14));
         }
         this.lastDamage = damage;
     }
@@ -288,25 +276,32 @@ export class PlayerHudSlot {
         }
     }
 
+    /** A short tremble of the portrait that dies away. */
     private shake(intensity: number): void {
-        // Subtle Y-axis shake only
-        // Check if tween already active? If so, maybe stop it and do new one if stronger?
-        if (this.scene.tweens.isTweening(this.portraitContainer)) {
-            this.scene.tweens.killTweensOf(this.portraitContainer);
-            this.portraitContainer.setPosition(this.portraitBaseX, this.portraitBaseY);
-        }
-
-        this.scene.tweens.add({
-            targets: this.portraitContainer,
-            y: { from: this.portraitBaseY, to: this.portraitBaseY + intensity },
-            duration: 50, // Fast
-            yoyo: true,
-            repeat: 3, // 3 shakes
-            ease: 'Sine.easeInOut',
-            onComplete: () => {
-                this.portraitContainer.setPosition(this.portraitBaseX, this.portraitBaseY);
-            }
+        this.shakeTween?.stop();
+        this.shakeTween = this.scene.tweens.addCounter({
+            from: 1,
+            to: 0,
+            duration: 220,
+            ease: 'Quad.easeOut',
+            onUpdate: tween => {
+                const left = (tween.getValue() ?? 0) * intensity;
+                this.portraitContainer.setPosition(
+                    this.portraitBaseX + (Math.random() - 0.5) * 2 * left,
+                    this.portraitBaseY + (Math.random() - 0.5) * 2 * left,
+                );
+            },
+            onComplete: () => this.portraitContainer.setPosition(this.portraitBaseX, this.portraitBaseY),
+            onStop: () => this.portraitContainer.setPosition(this.portraitBaseX, this.portraitBaseY),
         });
+    }
+
+    /** The damage number grows a touch and settles back. */
+    private pop(scale: number): void {
+        this.scene.tweens.killTweensOf([this.bigDamageText, this.percentText]);
+        this.bigDamageText.setScale(scale);
+        this.percentText.setScale(scale);
+        this.scene.tweens.add({ targets: [this.bigDamageText, this.percentText], scale: 1, duration: 160, ease: 'Quad.easeOut' });
     }
 
     public setVisible(visible: boolean): void {
@@ -320,6 +315,28 @@ export class PlayerHudSlot {
     public addToCameraIgnore(camera: Phaser.Cameras.Scene2D.Camera): void {
         camera.ignore(this.container);
     }
+}
+
+/** Damage colour stops: white, pale yellow, amber, orange, red, then deep red. */
+const DAMAGE_COLORS: readonly [number, number][] = [
+    [0, 0xffffff], [40, 0xfff3b0], [80, 0xffc94a], [120, 0xff8a3a], [170, 0xf04a3a], [230, 0xb3202a],
+];
+
+/** The damage number's colour: a smooth ramp through the stops. */
+function damageColor(damage: number): string {
+    let color = DAMAGE_COLORS[DAMAGE_COLORS.length - 1][1];
+    for (let i = 0; i + 1 < DAMAGE_COLORS.length; i++) {
+        const [from, a] = DAMAGE_COLORS[i];
+        const [to, b] = DAMAGE_COLORS[i + 1];
+        if (damage < to) {
+            const t = Math.max(0, (damage - from) / (to - from));
+            const mix = Phaser.Display.Color.Interpolate.ColorWithColor(
+                Phaser.Display.Color.ValueToColor(a), Phaser.Display.Color.ValueToColor(b), 100, t * 100);
+            color = Phaser.Display.Color.GetColor(mix.r, mix.g, mix.b);
+            break;
+        }
+    }
+    return '#' + color.toString(16).padStart(6, '0');
 }
 
 /**

@@ -129,10 +129,11 @@ test('two players need no rollback on a clean network', () => {
 });
 
 test('two players agree at 100 ms ping with jitter, 5% loss and a late start', () => {
-    const peers = play({ players: 2, latencyMs: 50, jitterMs: 10, loss: 0.05, inputDelay: 2, startTicks: [0, 6], ticks: 3600 });
+    // Long enough for the mashers to finish a match
+    const peers = play({ players: 2, latencyMs: 50, jitterMs: 10, loss: 0.05, inputDelay: 2, startTicks: [0, 6], ticks: 5400 });
     assertInSync(peers);
     const [a, b] = peers.map(p => p.session);
-    assert.ok(Math.min(a.frame, b.frame) > 3300, `advanced ${a.frame} and ${b.frame} frames of 3600`);
+    assert.ok(Math.min(a.frame, b.frame) > 5000, `advanced ${a.frame} and ${b.frame} frames of 5400`);
     assert.ok(a.rollbacks > 0 && b.rollbacks > 0, 'guesses were corrected');
     assert.ok(Math.max(a.maxRollbackDepth, b.maxRollbackDepth) <= MAX_ROLLBACK);
     assert.ok(a.skips > 0, 'the player who started first slowed down');
@@ -141,10 +142,10 @@ test('two players agree at 100 ms ping with jitter, 5% loss and a late start', (
 });
 
 test('four players agree at 100 ms ping with jitter, 5% loss and staggered starts', () => {
-    const peers = play({ players: 4, latencyMs: 50, jitterMs: 10, loss: 0.05, inputDelay: 2, startTicks: [0, 4, 9, 13], ticks: 3600 });
+    const peers = play({ players: 4, latencyMs: 50, jitterMs: 10, loss: 0.05, inputDelay: 2, startTicks: [0, 4, 9, 13], ticks: 5400 });
     assertInSync(peers);
     const frames = peers.map(p => p.session.frame);
-    assert.ok(Math.min(...frames) > 3200, `advanced ${frames.join(', ')} frames of 3600`);
+    assert.ok(Math.min(...frames) > 4800, `advanced ${frames.join(', ')} frames of 5400`);
     assert.ok(Math.max(...frames) - Math.min(...frames) <= 3, `frames ${frames.join(', ')} stayed level`);
     assert.ok(peers.every(p => p.session.rollbacks > 0), 'guesses were corrected');
     assert.ok(peers[0].session.skips > 0, 'the player who started first slowed down');

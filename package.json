@@ -1,7 +1,7 @@
 {
   "name": "sgalalla",
   "private": true,
-  "version": "3.0.2-e",
+  "version": "3.0.3-e",
   "type": "module",
   "main": "electron-dist/main.cjs",
   "scripts": {
@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test": "tsc -p tests && tsx --test tests/*.test.ts",
     "replays:update": "tsx tests/update-replays.ts",
+    "balance": "tsx scripts/ko-table.mts",
     "deploy:experimental": "bash deploy_experimental.sh",
     "electron:dev": "tsc -p tsconfig.electron.json && concurrently \"vite --host 0.0.0.0\" \"sleep 3 && electron electron-dist/main.cjs\"",
     "electron:build": "tsc && vite build && tsc -p tsconfig.electron.json && electron-builder",

@@ -28,6 +28,12 @@ export interface PlayerConfig {
 }
 
 const DAMAGE_FLASH_MS = 150;
+/** Most a fighter trembles in hit-stop, in pixels. */
+const HITSTOP_SHAKE_MAX = 4;
+/** Landing this fast (px/s) raises the most dust. */
+const HARD_LANDING_SPEED = 1600;
+/** Time between afterimages while dashing. */
+const AFTERIMAGE_EVERY_MS = 35;
 
 /**
  * A fighter on screen and the input that drives it. The match simulation owns
@@ -63,6 +69,13 @@ export class Player extends Phaser.GameObjects.Container {
     private pose: string | null = null;
 
     private damageFlashMs = 0;
+    private inHitstop = false;
+    /** The fighter as last drawn, to spot landings, dashes and air jumps. */
+    private wasGrounded = true;
+    private lastState = '';
+    private lastJumps = 0;
+    private lastVy = 0;
+    private afterimageMs = 0;
     private isCharging = false;
     private chargeGhost: Phaser.GameObjects.Sprite | null = null;
     private chargeBlurFx: Phaser.FX.Blur | null = null;
@@ -171,6 +184,8 @@ export class Player extends Phaser.GameObjects.Container {
         this.updateRecoveryGhost(f, inPlay);
         this.updateFacing(f);
         this.updateAnimation(f);
+        this.updateHitstop(f);
+        this.updateMotionEffects(f, inPlay, deltaMs);
         this.updateAlpha(f);
 
         if (this.damageFlashMs > 0) {
@@ -339,6 +354,46 @@ export class Player extends Phaser.GameObjects.Container {
             this.scene.tweens.add({ targets: sound, volume: 0, duration: 200, onComplete: stop });
         }
         this.chargeSounds = [];
+    }
+
+    /** Dust on landing and at a dash's start, a ring on an air jump, afterimages while dashing or chase dodging. */
+    private updateMotionEffects(f: FighterState, inPlay: boolean, deltaMs: number): void {
+        const b = f.body;
+        if (inPlay) {
+            const effects = this.effects();
+            const feet = b.y + b.height / 2;
+            if (b.isGrounded && !this.wasGrounded) {
+                effects.spawnDust(b.x, feet, Phaser.Math.Clamp(this.lastVy / HARD_LANDING_SPEED, 0.3, 1), 0);
+            }
+            if (f.state === 'Dash' && this.lastState !== 'Dash') effects.spawnDust(b.x, feet, 0.7, b.dodgeDirection);
+            if (!b.isGrounded && b.jumpsRemaining < this.lastJumps) effects.spawnJumpRing(b.x, feet);
+
+            if (f.state === 'Dash' || b.isChaseDodging) {
+                this.afterimageMs -= deltaMs;
+                if (this.afterimageMs <= 0) {
+                    effects.spawnAfterimage(this.sprite, this.x + this.sprite.x, this.y + this.sprite.y);
+                    this.afterimageMs = AFTERIMAGE_EVERY_MS;
+                }
+            } else {
+                this.afterimageMs = 0;
+            }
+        }
+        this.wasGrounded = !inPlay || b.isGrounded;
+        this.lastState = f.state;
+        this.lastJumps = b.jumpsRemaining;
+        this.lastVy = b.vy;
+    }
+
+    /** In hit-stop the animation holds and the fighter who was hit trembles, a little less as it runs out. */
+    private updateHitstop(f: FighterState): void {
+        if (f.hitstopSteps > 0) {
+            this.sprite.anims.timeScale = 0;
+            if (f.isHitStunned) this.shakeSprite(Math.min(HITSTOP_SHAKE_MAX, 1 + f.hitstopSteps * 0.4));
+            this.inHitstop = true;
+        } else if (this.inHitstop) {
+            this.inHitstop = false;
+            this.sprite.setPosition(0, 0);
+        }
     }
 
     private shakeSprite(intensity: number): void {

@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
+import { MenuInput } from '../input/MenuInput';
 
 export class CreditsScene extends Phaser.Scene {
     private inputUnlocked: boolean = false;
+    private menuInput!: MenuInput;
 
     constructor() {
         super({ key: 'CreditsScene' });
@@ -25,14 +27,15 @@ export class CreditsScene extends Phaser.Scene {
             this.inputUnlocked = true;
         });
 
-        // Setup input to skip
-        this.input.keyboard?.once('keydown', () => this.advance());
-        if (this.input.gamepad) {
-            this.input.gamepad.once('down', () => this.advance());
-        }
+        this.menuInput = new MenuInput(this);
 
         // Auto-advance after 10 seconds if no input
         this.time.delayedCall(10000, () => this.advance());
+    }
+
+    update() {
+        // Any menu button skips, once the delay is over
+        if (this.menuInput.poll().some(press => press.action === 'confirm' || press.action === 'back' || press.action === 'start')) this.advance();
     }
 
     private advance() {

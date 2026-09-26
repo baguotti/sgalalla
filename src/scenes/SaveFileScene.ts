@@ -3,7 +3,7 @@ import { SaveService } from '../managers/SaveService';
 import type { CampaignSaveData } from '../managers/SaveService';
 import { CampaignManager } from '../managers/CampaignManager';
 import { AudioManager } from '../managers/AudioManager';
-import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavY, getMenuNavX } from '../input/JoyConMapper';
+import { MenuInput, type MenuPress } from '../input/MenuInput';
 import { charConfigs } from '../config/CharacterConfig';
 
 /**
@@ -19,9 +19,7 @@ export class SaveFileScene extends Phaser.Scene {
     private slots: (CampaignSaveData | null)[] = [];
 
     // Gamepad state
-    private prevGamepadA: Map<number, boolean> = new Map();
-    private prevGamepadB: Map<number, boolean> = new Map();
-    private lastGamepadInputTime: number = 0;
+    private menuInput!: MenuInput;
 
     // SubMenu
     private isSubMenuOpen: boolean = false;
@@ -39,13 +37,6 @@ export class SaveFileScene extends Phaser.Scene {
     private confirmMenuArrow!: Phaser.GameObjects.Text;
 
     // Keyboard
-    private upKey!: Phaser.Input.Keyboard.Key;
-    private downKey!: Phaser.Input.Keyboard.Key;
-    private leftKey!: Phaser.Input.Keyboard.Key;
-    private rightKey!: Phaser.Input.Keyboard.Key;
-    private confirmKey!: Phaser.Input.Keyboard.Key;
-    private enterKey!: Phaser.Input.Keyboard.Key;
-    private backKey!: Phaser.Input.Keyboard.Key;
 
     // Character labels for display
     private charLabels: Record<string, string> = {
@@ -62,8 +53,7 @@ export class SaveFileScene extends Phaser.Scene {
         this.selectedIndex = 0;
         this.canInput = false;
         this.slotContainers = [];
-        this.prevGamepadA.clear();
-        this.prevGamepadB.clear();
+        this.menuInput = new MenuInput(this);
         this.isSubMenuOpen = false;
         this.subSelectedIndex = 0;
         this.isConfirmMenuOpen = false;
@@ -239,147 +229,38 @@ export class SaveFileScene extends Phaser.Scene {
         this.confirmMenuContainer.add(this.confirmMenuArrow);
 
         // Input safety delay
-        this.time.delayedCall(400, () => {
-            this.canInput = true;
-            this.upKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
-            this.downKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
-            this.leftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
-            this.rightKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
-            this.confirmKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-            this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-            this.backKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-        });
-
-        // Cleanup
-        this.events.once('shutdown', () => {
-            if (this.input.gamepad && Array.isArray(this.input.gamepad.gamepads)) {
-                // @ts-ignore
-                this.input.gamepad.gamepads = this.input.gamepad.gamepads.filter((p: any) => !!p);
-            }
-        });
+        this.time.delayedCall(400, () => this.canInput = true);
     }
 
     update() {
-        // Poll gamepad states
-        this.pollGamepadEdge();
-
+        // Polled during the delay too, so what's pressed then is used up
+        const presses = this.menuInput.poll();
         if (!this.canInput) return;
+        for (const press of presses) {
+            // Confirm and back can open or close a menu: the rest of this frame's presses would act on the wrong one
+            if (this.onPress(press)) return;
+        }
+    }
 
-        // Keyboard
+    /** One press, for whichever menu is open; true when it opened, closed or left one. */
+    private onPress({ action }: MenuPress): boolean {
         if (this.isConfirmMenuOpen) {
-            if (Phaser.Input.Keyboard.JustDown(this.leftKey)) {
-                this.changeConfirmSelection(-1);
-            } else if (Phaser.Input.Keyboard.JustDown(this.rightKey)) {
-                this.changeConfirmSelection(1);
-            } else if (Phaser.Input.Keyboard.JustDown(this.upKey)) {
-                this.changeConfirmSelection(-1);
-            } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
-                this.changeConfirmSelection(1);
-            } else if (Phaser.Input.Keyboard.JustDown(this.confirmKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-                this.handleConfirmMenuSubmit();
-            } else if (Phaser.Input.Keyboard.JustDown(this.backKey)) {
-                this.closeConfirmMenu();
-            }
+            if (action === 'left' || action === 'up') this.changeConfirmSelection(-1);
+            else if (action === 'right' || action === 'down') this.changeConfirmSelection(1);
+            else if (action === 'confirm') this.handleConfirmMenuSubmit();
+            else if (action === 'back') this.closeConfirmMenu();
         } else if (this.isSubMenuOpen) {
-            if (Phaser.Input.Keyboard.JustDown(this.upKey)) {
-                this.changeSubSelection(-1);
-            } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
-                this.changeSubSelection(1);
-            } else if (Phaser.Input.Keyboard.JustDown(this.confirmKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-                this.handleSubMenuConfirm();
-            } else if (Phaser.Input.Keyboard.JustDown(this.backKey)) {
-                this.closeSubMenu();
-            }
+            if (action === 'up') this.changeSubSelection(-1);
+            else if (action === 'down') this.changeSubSelection(1);
+            else if (action === 'confirm') this.handleSubMenuConfirm();
+            else if (action === 'back') this.closeSubMenu();
         } else {
-            if (Phaser.Input.Keyboard.JustDown(this.upKey)) {
-                this.changeSelection(-1);
-            } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
-                this.changeSelection(1);
-            } else if (Phaser.Input.Keyboard.JustDown(this.confirmKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-                this.selectSlot();
-            } else if (Phaser.Input.Keyboard.JustDown(this.backKey)) {
-                this.goBack();
-            }
+            if (action === 'up') this.changeSelection(-1);
+            else if (action === 'down') this.changeSelection(1);
+            else if (action === 'confirm') this.selectSlot();
+            else if (action === 'back') this.goBack();
         }
-
-        // Gamepad
-        this.handleGamepad();
-    }
-
-    private pollGamepadEdge(): void {
-        const gamepads = navigator.getGamepads();
-        for (let i = 0; i < gamepads.length; i++) {
-            const pad = gamepads[i];
-            if (!pad) continue;
-            const confirmIdx = getConfirmButtonIndex(pad);
-            const backIdx = getBackButtonIndex(pad);
-            const aPressed = pad.buttons[confirmIdx]?.pressed || false;
-            const bPressed = pad.buttons[backIdx]?.pressed || false;
-            if (!this.canInput) {
-                this.prevGamepadA.set(pad.index, aPressed);
-                this.prevGamepadB.set(pad.index, bPressed);
-            }
-        }
-    }
-
-    private handleGamepad(): void {
-        const gamepads = navigator.getGamepads();
-        const now = Date.now();
-        if (now - this.lastGamepadInputTime < 150) return;
-
-        for (let i = 0; i < gamepads.length; i++) {
-            const pad = gamepads[i];
-            if (!pad) continue;
-
-            const navY = getMenuNavY(pad);
-            const navX = getMenuNavX(pad); // Support horizontal selection specifically for YES/NO
-
-            // Prioritize horizontal input if the confirm menu is open, otherwise use vertical
-            if (this.isConfirmMenuOpen) {
-                if (navX < 0 || navY < 0) {
-                    this.changeConfirmSelection(-1);
-                    this.lastGamepadInputTime = now;
-                } else if (navX > 0 || navY > 0) {
-                    this.changeConfirmSelection(1);
-                    this.lastGamepadInputTime = now;
-                }
-            } else {
-                if (navY < 0) {
-                    if (this.isSubMenuOpen) this.changeSubSelection(-1);
-                    else this.changeSelection(-1);
-                    this.lastGamepadInputTime = now;
-                } else if (navY > 0) {
-                    if (this.isSubMenuOpen) this.changeSubSelection(1);
-                    else this.changeSelection(1);
-                    this.lastGamepadInputTime = now;
-                }
-            }
-
-            const confirmIdx = getConfirmButtonIndex(pad);
-            const backIdx = getBackButtonIndex(pad);
-
-            // A button — edge detection
-            const aPressed = pad.buttons[confirmIdx]?.pressed || false;
-            const wasA = this.prevGamepadA.get(pad.index) ?? false;
-            this.prevGamepadA.set(pad.index, aPressed);
-            if (aPressed && !wasA) {
-                if (this.isConfirmMenuOpen) this.handleConfirmMenuSubmit();
-                else if (this.isSubMenuOpen) this.handleSubMenuConfirm();
-                else this.selectSlot();
-                this.lastGamepadInputTime = now;
-            }
-
-            // B button — edge detection
-            const bPressed = pad.buttons[backIdx]?.pressed || false;
-            const wasB = this.prevGamepadB.get(pad.index) ?? false;
-            this.prevGamepadB.set(pad.index, bPressed);
-            if (bPressed && !wasB) {
-                if (this.isConfirmMenuOpen) this.closeConfirmMenu();
-                else if (this.isSubMenuOpen) this.closeSubMenu();
-                else this.goBack();
-                this.lastGamepadInputTime = now;
-            }
-        }
+        return action === 'confirm' || action === 'back';
     }
 
     private changeSelection(dir: number): void {

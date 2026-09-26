@@ -24,7 +24,7 @@ const CENTRE_X = 960;
 const CENTRE_Y = 690;
 /** Scale of the exported textures against the canvas, and the island's empty border in texels (see the script). */
 const ISLAND_SCALE = 0.5;
-const CLOUD_SCALE = 0.45;
+const CLOUD_SCALE = 0.39;
 const ISLAND_PADDING = 4;
 
 /** Where the island's visible pixels start on the canvas. */

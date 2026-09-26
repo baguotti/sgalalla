@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
+import { MenuInput } from '../input/MenuInput';
 
 export class CampaignTitleScene extends Phaser.Scene {
     private inputUnlocked: boolean = false;
+    private menuInput!: MenuInput;
     private initData: any;
 
     constructor() {
@@ -31,14 +33,15 @@ export class CampaignTitleScene extends Phaser.Scene {
             this.inputUnlocked = true;
         });
 
-        // Setup input to skip
-        this.input.keyboard?.on('keydown', () => this.advance());
-        if (this.input.gamepad) {
-            this.input.gamepad.on('down', () => this.advance());
-        }
+        this.menuInput = new MenuInput(this);
 
         // Auto-advance after 5 seconds if no input
         this.time.delayedCall(5000, () => this.advance());
+    }
+
+    update() {
+        // Any menu button skips, once the delay is over
+        if (this.menuInput.poll().some(press => press.action === 'confirm' || press.action === 'back' || press.action === 'start')) this.advance();
     }
 
     private advance() {

@@ -22,6 +22,17 @@ const SNAP_SHARE = 0.04;
 const MIN_FRAME_MS = 3;
 const MAX_FRAME_MS = 50;
 
+/**
+ * A simulation timer (ms) after one step. Counting a whole number of steps'
+ * worth down leaves float dust behind (200 - 12 x 16.67 is not quite 0), which
+ * would stretch the timer by a step; within a millionth of a millisecond of 0
+ * counts as 0. Negative values stay: some timers run past 0 on purpose.
+ */
+export function countDown(timerMs: number, stepMs: number = SIM_STEP_MS): number {
+    const left = timerMs - stepMs;
+    return Math.abs(left) < 1e-6 ? 0 : left;
+}
+
 export class FixedStepClock {
     private accumulatorMs = 0;
     /** Average frame time, from which the display's refresh interval is learnt. */

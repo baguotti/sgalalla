@@ -3,6 +3,7 @@
  * Sounds and state changes come back as PhysicsEvent[] for the caller.
  */
 
+import { countDown } from './FixedStepClock.js';
 import { PhysicsConfig } from './PhysicsConfig.js';
 
 // ─── Attack Phase / Type constants ───
@@ -80,6 +81,11 @@ export interface SimBody {
     droppingThroughY: number;            // NaN = none
     dropGraceTimer: number;              // ms
     currentPlatformIdx: number;          // -1 = none
+
+    /** Steps down has been held, for dropping through soft platforms. */
+    downHeldSteps: number;
+    /** Steps left of the landing recovery: no jump, dodge or attack. */
+    landingLagSteps: number;
 
     // Recovery
     isRecovering: boolean;
@@ -160,6 +166,9 @@ export function createBody(x: number, y: number, facingDirection: number): SimBo
         dropGraceTimer: 0,
         currentPlatformIdx: -1,
 
+        downHeldSteps: 0,
+        landingLagSteps: 0,
+
         isRecovering: false,
         recoveryAvailable: true,
         recoveryTimer: 0,
@@ -192,7 +201,7 @@ export function stepPhysics(body: SimBody, input: SimInput, dt: number, events: 
 
     // ── Drop-through grace timer ──
     if (body.dropGraceTimer > 0) {
-        body.dropGraceTimer -= dtMs;
+        body.dropGraceTimer = countDown(body.dropGraceTimer, dtMs);
         if (body.dropGraceTimer <= 0) {
             body.droppingThroughPlatformIdx = -1;
         }
@@ -214,6 +223,7 @@ export function stepPhysics(body: SimBody, input: SimInput, dt: number, events: 
     if (!body.isHitStunned) {
         handleWallMechanics(body, input);
         handleHorizontalMovement(body, input);
+        handleDropHold(body, input);
         handleJump(body, input, events);
         handleFastFall(body, input);
         handleDodgeInput(body, input, events);
@@ -233,15 +243,15 @@ export function stepPhysics(body: SimBody, input: SimInput, dt: number, events: 
 
 function updateTimers(body: SimBody, dtMs: number): void {
     if (body.lastWallTouchTimer > 0) {
-        body.lastWallTouchTimer -= dtMs;
+        body.lastWallTouchTimer = countDown(body.lastWallTouchTimer, dtMs);
     }
 
     if (body.dodgeCooldownTimer > 0) {
-        body.dodgeCooldownTimer -= dtMs;
+        body.dodgeCooldownTimer = countDown(body.dodgeCooldownTimer, dtMs);
     }
 
     if (body.dodgeTimer > 0) {
-        body.dodgeTimer -= dtMs;
+        body.dodgeTimer = countDown(body.dodgeTimer, dtMs);
         if (body.dodgeTimer <= 0) {
             endDodge(body);
         } else if (body.isChaseDodging && body.dodgeTimer <= PhysicsConfig.CHASE_DODGE_DURATION - PhysicsConfig.CHASE_DODGE_INVINCIBLE) {
@@ -250,11 +260,11 @@ function updateTimers(body: SimBody, dtMs: number): void {
     }
 
     if (body.dashCooldownTimer > 0) {
-        body.dashCooldownTimer -= dtMs;
+        body.dashCooldownTimer = countDown(body.dashCooldownTimer, dtMs);
     }
 
     if (body.dashTimer > 0) {
-        body.dashTimer -= dtMs;
+        body.dashTimer = countDown(body.dashTimer, dtMs);
         if (body.dashTimer <= 0) {
             endDash(body);
         }
@@ -349,8 +359,17 @@ function handleHorizontalMovement(body: SimBody, input: SimInput): void {
 //  JUMP
 // ═══════════════════════════════════════════════════════════════
 
+/** Holding down on a soft platform drops through it, after long enough for a down attack to come out instead. */
+function handleDropHold(body: SimBody, input: SimInput): void {
+    body.downHeldSteps = input.moveDown ? body.downHeldSteps + 1 : 0;
+    if (body.downHeldSteps >= PhysicsConfig.DROP_HOLD_STEPS && body.isGrounded && body.currentPlatformIdx !== -1 &&
+        !body.isAttacking && !body.isDodging && !body.isDashing && !body.isCharging) {
+        handlePlatformDrop(body);
+    }
+}
+
 function handleJump(body: SimBody, input: SimInput, events: PhysicsEvent[]): void {
-    if (body.isDodging) return;
+    if (body.isDodging || body.landingLagSteps > 0) return;
 
     // Block during heavy attacks
     if (body.isAttacking && body.attackType === ATTACK_TYPE_HEAVY) return;
@@ -455,7 +474,7 @@ function axis(negative: boolean, positive: boolean): number {
 }
 
 function handleDodgeInput(body: SimBody, input: SimInput, events: PhysicsEvent[]): void {
-    if (!input.dodgeBuffered || body.isDodging || body.isCharging) return;
+    if (!input.dodgeBuffered || body.isDodging || body.isCharging || body.landingLagSteps > 0) return;
 
     const dx = axis(input.moveLeft, input.moveRight);
     const dy = body.isGrounded ? 0 : axis(input.moveUp, input.moveDown);
@@ -719,7 +738,7 @@ function applyPhysics(body: SimBody, dt: number): void {
 
     // ── Recovery State ──
     if (body.isRecovering) {
-        body.recoveryTimer -= dt * 1000;
+        body.recoveryTimer = countDown(body.recoveryTimer, dt * 1000);
         if (body.recoveryTimer <= 0) {
             body.isRecovering = false;
         }
@@ -770,6 +789,14 @@ export function checkSinglePlatformCollision(
     if (body.vy < 0) return;
     if (bodyBottom > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) return;
 
+    // A stunned fighter coming down hard bounces off
+    if (body.isHitStunned && body.vy > PhysicsConfig.BOUNCE_SPEED) {
+        body.y = platTop - halfH;
+        body.vy = -body.vy * PhysicsConfig.BOUNCE_KEEP;
+        events.push({ type: 'sfx', key: 'sfx_landing', volume: 0.6 });
+        return;
+    }
+
     // Landing
     if (body.vy >= 0) {
         const wasGrounded = body.wasGroundedLastFrame;
@@ -796,6 +823,7 @@ export function checkSinglePlatformCollision(
         }
 
         if (!wasGrounded) {
+            body.landingLagSteps = PhysicsConfig.LANDING_LAG_STEPS;
             events.push({ type: 'sfx', key: 'sfx_landing', volume: 0.8 });
         }
     }
@@ -832,6 +860,11 @@ export function checkSingleWallCollision(
         bodyBottom > wallTop && bodyTop < wallBottom;
 
     if (overlaps) {
+        // A stunned fighter flying into a wall bounces off it
+        const intoWall = body.x < wallCx ? body.vx > 0 : body.vx < 0;
+        if (body.isHitStunned && intoWall && Math.abs(body.vx) > PhysicsConfig.BOUNCE_SPEED) {
+            body.vx = -body.vx * PhysicsConfig.BOUNCE_KEEP;
+        }
         if (body.x < wallCx) {
             body.x = wallLeft - halfW;
             body.isTouchingWall = true;
@@ -848,21 +881,50 @@ export function checkSingleWallCollision(
     }
 }
 
+/**
+ * Check collision against a platform's underside (center-origin coordinates):
+ * a fighter moving up into it stops below it, or bounces off it while stunned.
+ */
+export function checkSingleCeilingCollision(
+    body: SimBody,
+    ceilingCx: number, ceilingCy: number, ceilingW: number, ceilingH: number
+): void {
+    const halfW = body.width / 2;
+    const halfH = body.height / 2;
+    const bottom = ceilingCy + ceilingH / 2;
+    const overlaps = body.x + halfW > ceilingCx - ceilingW / 2 && body.x - halfW < ceilingCx + ceilingW / 2 &&
+        body.y + halfH > ceilingCy - ceilingH / 2 && body.y - halfH < bottom;
+    // Only from below: a fighter's middle under the underside's middle
+    if (!overlaps || body.y < ceilingCy) return;
+
+    body.y = bottom + halfH;
+    if (body.vy < 0) {
+        const bounce = body.isHitStunned && -body.vy > PhysicsConfig.BOUNCE_SPEED;
+        body.vy = bounce ? -body.vy * PhysicsConfig.BOUNCE_KEEP : 0;
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  RECOVERY
 // ═══════════════════════════════════════════════════════════════
 
-/** Starts the recovery move if it's available: false if it isn't. */
+/**
+ * Starts the recovery move: false if it can't. Once used, it can go again
+ * before landing as a weaker, exhausted recovery that costs an air jump.
+ */
 export function startRecovery(body: SimBody, events: PhysicsEvent[]): boolean {
-    if (!body.recoveryAvailable) return false;
+    const exhausted = !body.recoveryAvailable;
+    if (exhausted && body.jumpsRemaining <= 0) return false;
 
     body.isRecovering = true;
+    if (exhausted) body.jumpsRemaining--;
     body.recoveryAvailable = false;
     body.recoveryTimer = PhysicsConfig.RECOVERY_DURATION;
     body.airActionCounter++;
 
-    body.vy = PhysicsConfig.RECOVERY_FORCE_Y;
-    body.vx = body.facingDirection * PhysicsConfig.RECOVERY_FORCE_X;
+    const push = exhausted ? PhysicsConfig.EXHAUSTED_RECOVERY_FORCE : 1;
+    body.vy = PhysicsConfig.RECOVERY_FORCE_Y * push;
+    body.vx = body.facingDirection * PhysicsConfig.RECOVERY_FORCE_X * push;
 
     body.isWallSliding = false;
     body.isFastFalling = false;

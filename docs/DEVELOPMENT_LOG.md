@@ -739,3 +739,18 @@ Part 2
 ### [2026-09-26] Experimental version on the droplet (branch `experimental-branch`)
 - **[Deploy]** `deploy_experimental.sh` (was `deploy_campaign.sh`) builds `experimental-branch`, publishes it at http://138.68.126.112:8080 in place of the old campaign build, and runs its own game server on port 9209 (PM2 `geckos-experimental`, from a separate clone), next to the release's on 9208. It refuses to run from another branch or with uncommitted changes.
 - **[Change]** The client connects to game server 9209 when the page is served on port 8080, else 9208.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-26] v3.0.3e - Feel pass: hitstop, flying stun, bounces, effects, menu input, campaign flow (branch `experimental-branch`)
+- **[V]** `v3.0.3-e`. Protocol version 6 (simulation state and rules changed).
+- **[Feel]** **Hitstop**: both fighters freeze 3 to 9 steps per hit, scaled by damage; presses during it are buffered. Deterministic, so it works online.
+- **[Feel]** **Stun while flying fast** (Brawlhalla's rule): hitstun lasts while the fighter moves faster than 1300 px/s, up to 1.5 s. Stunned fighters bounce off floors and walls when they hit them fast.
+- **[Balance]** Knockback and KO pass after the stun change, measured with `npm run balance` (`scripts/ko-table.mts`, lowest KO damage per move): neutral heavy growth 8 → 3.6, side heavy 9.5 → 10.5.
+- **[Feel]** **Rest of Brawlhalla movement**: a weaker second recovery after the first (costs a jump, 0.6 push), holding down drops through soft platforms, a short landing recovery (4 steps) after air landings.
+- **[Visual]** Hit sparks sized by damage (ring on heavy hits), camera kick on hard hits, KO shake and zoom punch; subtle dust on dashes and landings, afterimages behind dashes and chase dodges, rings on air jumps; HUD damage colour ramp white → deep red, number pop and a damped portrait shake on hits.
+- **[Fix]** **Collision**: the two platform undersides were side walls and shoved fighters jumping up into them about 130 px sideways; they are now ceilings (push down only; stunned fighters bounce).
+- **[Fix]** **Timers count whole frames** (`countDown` in `FixedStepClock`): a 300 ms timer now lasts 18 steps, not 19.
+- **[Refactor]** **One menu input** (`src/input/MenuInput.ts`) for keyboard and every gamepad, with held-button guarding and direction repeat, used by all menus (main, save files, campaign map and title, pause, game over, credits, preload, online lobby, dialogue, lobby, settings).
+- **[Refactor]** **Campaign flow out of GameScene**: `src/scenes/CampaignFlow.ts` holds the opponent setup, colour drain and return, cutscenes, retry and practice prompts and map/credits transitions; GameScene is ~1200 lines, down from ~1600.
+- **[Art]** Londra (Studio Lab) uses the new cloud sheet `Londra_Clouds_V2`: five clouds cut at native resolution, cloud scale 0.39.
+- **[S]** Verified: typecheck, 43 tests (26 movement tests incl. hitstop, stun, bounces, drop-through, landing lag, ceilings, exact timer lengths), replays re-baselined, build. Campaign flow tested by the user.

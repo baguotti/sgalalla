@@ -7,19 +7,19 @@
  * reproduces the recording exactly.
  */
 
-import { SIM_STEP_MS } from './FixedStepClock.js';
+import { countDown, SIM_STEP_MS } from './FixedStepClock.js';
 import { AttackPhase, AttackRegistry, AttackType } from './AttackData.js';
 import { HURTBOX_HEIGHT, HURTBOX_WIDTH, cancelAttackForChaseDodge, checkHit, handleCombatInput, updateCombat } from './Combat.js';
 import type { FighterInput } from './FighterInput.js';
 import {
-    FIGHTER_STATES, changeState, consumeBuffered, createFighter, isBuffered, isInPlay, updateInputBuffer, updateState,
+    FIGHTER_STATES, changeState, consumeBuffered, createFighter, holdInputBuffer, isBuffered, isInPlay, updateInputBuffer, updateState,
     type FighterSetup, type FighterState, type FighterStateName,
 } from './FighterState.js';
 import { pushPhysicsSounds, type MatchEvent } from './MatchEvents.js';
 import { PhysicsConfig } from './PhysicsConfig.js';
 import {
     type SimInput as PhysicsInput, type PhysicsEvent,
-    stepPhysics, checkSinglePlatformCollision, resetWallState, checkSingleWallCollision,
+    stepPhysics, checkSinglePlatformCollision, resetWallState, checkSingleWallCollision, checkSingleCeilingCollision,
     ATTACK_PHASE_NONE, ATTACK_PHASE_STARTUP, ATTACK_PHASE_ACTIVE, ATTACK_PHASE_RECOVERY,
     ATTACK_TYPE_NONE, ATTACK_TYPE_LIGHT, ATTACK_TYPE_HEAVY,
 } from './PhysicsSimulation.js';
@@ -78,26 +78,33 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[], ev
         }
     }
     const fighters = match.fighters.filter(isInPlay);
-
-    for (const f of fighters) {
+    // Fighters in hit-stop are frozen this step, though they can still be hit by someone else
+    const moving = fighters.filter(f => {
         Object.assign(f.input, inputs[f.id]);
+        if (f.hitstopSteps <= 0) return true;
+        f.hitstopSteps--;
+        holdInputBuffer(f);
+        return false;
+    });
+
+    for (const f of moving) {
         updateInputBuffer(f);
         stepFighterPhysics(f, events);
         updateFacing(f);
     }
 
-    for (const f of fighters) collidePlatforms(f, events);
+    for (const f of moving) collidePlatforms(f, events);
 
-    for (const f of fighters) {
+    for (const f of moving) {
         updateState(f);
         updateCombat(f, events);
         if (!COMBAT_BLOCKED_STATES.has(f.state)) handleCombatInput(f, events);
         updateTimers(f);
     }
 
-    for (const f of fighters) collideWalls(f);
+    for (const f of moving) collideWalls(f);
 
-    for (const attacker of fighters) {
+    for (const attacker of moving) {
         for (const target of fighters) {
             if (attacker !== target) checkHit(attacker, target, events);
         }
@@ -217,6 +224,9 @@ function collideWalls(f: FighterState): void {
     for (const w of STAGE_LAYOUT.walls) {
         checkSingleWallCollision(b, w.x, w.y, w.w, w.h);
     }
+    for (const c of STAGE_LAYOUT.ceilings) {
+        checkSingleCeilingCollision(b, c.x, c.y, c.w, c.h);
+    }
     f.isDodging = b.isDodging;
 }
 
@@ -241,19 +251,24 @@ function updateFacing(f: FighterState): void {
 }
 
 function updateTimers(f: FighterState): void {
-    f.hitStunTimer -= SIM_STEP_MS;
+    f.hitStunTimer = countDown(f.hitStunTimer);
     if (f.hitStunTimer <= 0 && f.isHitStunned) {
-        f.isHitStunned = false;
+        // Still flying fast across or upward: the stun goes on, up to its limit (falling doesn't count)
+        const b = f.body;
+        const flying = Math.abs(b.vx) > PhysicsConfig.STUN_FLYING_SPEED || b.vy < -PhysicsConfig.STUN_FLYING_SPEED;
+        const overLimit = f.hitStunTimer <= PhysicsConfig.HIT_STUN_DURATION - PhysicsConfig.MAX_HIT_STUN;
+        if (!flying || overLimit) f.isHitStunned = false;
     }
 
     if (f.invulnerabilityTimer > 0) {
-        f.invulnerabilityTimer -= SIM_STEP_MS;
+        f.invulnerabilityTimer = countDown(f.invulnerabilityTimer);
         if (f.invulnerabilityTimer <= 0) {
             f.isInvulnerable = false;
         }
     }
 
     if (f.koImmunitySteps > 0) f.koImmunitySteps--;
+    if (f.body.landingLagSteps > 0) f.body.landingLagSteps--;
 }
 
 // ─── KOs ───

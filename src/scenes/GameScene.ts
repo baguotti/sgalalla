@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { Player, type PlayerConfig } from '../entities/Player';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
-import { getConfirmButtonIndex } from '../input/JoyConMapper';
 import { GamepadPresses } from '../input/GamepadPresses';
+import { MenuInput } from '../input/MenuInput';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { InputDebugOverlay } from '../components/InputDebugOverlay';
 import { TouchController } from '../components/TouchController';
@@ -19,7 +19,6 @@ import type { Lighting } from '../lighting/Lighting';
 import { startLightLab } from '../lighting/LightLab';
 import { AnimationHelpers } from '../managers/AnimationHelpers';
 import { AudioManager } from '../managers/AudioManager';
-import { CampaignManager, type OpponentConfig } from '../managers/CampaignManager';
 import { MatchRecorder } from '../debug/MatchRecorder';
 import type { NetClient } from '../network/NetClient';
 import { OnlineMatch } from '../network/OnlineMatch';
@@ -28,12 +27,12 @@ import { AttackRegistry, AttackType } from '../../shared/AttackData';
 import type { FighterInput } from '../../shared/FighterInput';
 import { isInPlay, type FighterSetup } from '../../shared/FighterState';
 import { FixedStepClock } from '../../shared/FixedStepClock';
-import { addFighter, createMatch, placeFighter, respawnFighter, stepMatch, type MatchState } from '../../shared/GameSim';
+import { addFighter, createMatch, stepMatch, type MatchState } from '../../shared/GameSim';
 import type { MatchEvent } from '../../shared/MatchEvents';
 import { NetEvent, type MatchStart } from '../../shared/NetProtocol';
 import { STAGE_LAYOUT, type SimRect } from '../../shared/StageData';
 
-import type { DialogueLine } from './DialogueScene';
+import { CampaignFlow } from './CampaignFlow';
 import type { GameSceneInterface } from './GameSceneInterface';
 
 /** A player taking part in the match, as the lobby, the campaign or the online lobby set it up. */
@@ -66,11 +65,17 @@ export interface GameSceneData {
 /** Standard gamepad button indices. */
 const GAMEPAD_SELECT = 8;
 const GAMEPAD_START = 9;
-const GAMEPAD_UP = 12;
-const GAMEPAD_DOWN = 13;
 
 /** The Studio Lab's whole-stage view: centre and zoom showing every platform with room round them for lights. */
 const STAGE_VIEW = { x: 900, y: 620, zoom: 0.62 };
+
+/** Camera kick on hard hits: knockback (px/s) it starts at, knockback per pixel of kick, most pixels, share left each step. */
+const CAMERA_KICK_FROM = 1200;
+const CAMERA_KICK_PER_PIXEL = 300;
+const CAMERA_KICK_MAX = 10;
+const CAMERA_KICK_DECAY = 0.75;
+/** A KO zooms the camera in by this factor for a moment. */
+const KO_ZOOM_PUNCH = 1.04;
 
 export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private debugOverlay!: DebugOverlay;
@@ -112,6 +117,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private lighting: Lighting | null = null;
     /** The lab can hold the camera on the whole stage instead of following the fighters. */
     private stageView = false;
+    /** The camera's centre before any kick, eased towards the fighters; null until the first camera move. */
+    private cameraCentre: { x: number; y: number } | null = null;
+    private readonly cameraKick = { x: 0, y: 0 };
     private contactShadows: ContactShadows | null = null;
 
     // Pause menu
@@ -127,13 +135,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private gameOverMenuTexts: Phaser.GameObjects.Text[] = [];
     private gameOverMenuOptions: string[] = ['RIVINCITA', 'TORNA ALLA LOBBY'];
     private readonly padPresses = new GamepadPresses();
-    private gameOverUpKey!: Phaser.Input.Keyboard.Key;
-    private gameOverDownKey!: Phaser.Input.Keyboard.Key;
-    private gameOverEnterKey!: Phaser.Input.Keyboard.Key;
+    private gameOverInput!: MenuInput;
 
     // Pre-allocated for update() — avoids per-frame GC
     private readonly hudPlayerMap: Map<number, Player> = new Map();
-    private gameOverSpaceKey!: Phaser.Input.Keyboard.Key;
 
     constructor() {
         super({ key: 'GameScene' });
@@ -170,27 +175,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     public effectManager!: EffectManager;
 
     private mode: 'versus' | 'training' | 'campaign' | 'online' = 'versus';
-
-    // ColorMatrix FX for campaign visual progression (desaturation effect)
-    private campaignColorMatrices: Phaser.FX.ColorMatrix[] = [];
-    private campaignTintProgress: number = 0; // 0 = fully desaturated, 1 = fully restored
-
-    // Campaign multi-phase fight flow
-    private campaignMidFightPlayed: boolean = false;
-
-    // Training mode state
-    private isTraining: boolean = false;
-    private trainingOpponentIndex: number = 0;
+    /** Campaign mode: the opponent, the cutscenes and where the fight leads. */
+    private campaign: CampaignFlow | null = null;
 
     private currentStageBackground: StageKey = 'adria_bg';
 
     init(data: GameSceneData): void {
         this.mode = data.mode || 'versus';
-        this.campaignMidFightPlayed = false; // Reset for each new match
-        this.campaignColorMatrices = []; // Reset stale FX references from previous rounds
-        this.campaignTintProgress = 0;
-        this.isTraining = data.isTraining || false;
-        this.trainingOpponentIndex = data.trainingOpponentIndex || 0;
         this.isLab = data.lab === true;
 
         this.currentStageBackground = isStageKey(data.selectedMap) ? data.selectedMap : 'adria_bg';
@@ -218,34 +209,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             ];
         }
 
+        this.campaign = null;
         if (this.mode === 'campaign') {
-            const campaign = CampaignManager.getInstance();
-            const selectedChar = this.playerData[0]?.character || 'fok';
-            const slotIndex = data.slotIndex ?? campaign.getActiveSlotIndex();
-
-            campaign.ensureActive(selectedChar, slotIndex);
-
-            const opponent = this.isTraining
-                ? campaign.ladder[this.trainingOpponentIndex]
-                : campaign.getCurrentOpponent();
-
-            if (opponent) {
-                // Force P1 and Opponent
-                this.playerData = [
-                    this.playerData[0], // P1
-                    {
-                        playerId: 1,
-                        joined: true,
-                        ready: true,
-                        input: { type: 'KEYBOARD', gamepadIndex: null },
-                        character: opponent.character,
-                        isAI: true,
-                        // Stands still: the campaign's opponents don't fight back yet
-                        isTrainingDummy: true,
-                    }
-                ];
-                if (isStageKey(opponent.stage)) this.currentStageBackground = opponent.stage;
-            }
+            this.campaign = new CampaignFlow(this, data, this.playerData[0]);
+            this.playerData = this.campaign.fighters(this.playerData[0]) ?? this.playerData;
+            this.currentStageBackground = this.campaign.stage ?? this.currentStageBackground;
         }
 
         // Register shutdown handler
@@ -393,15 +361,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 const touch = pData.playerId === this.localPlayerId() ? this.touchController : undefined;
                 const player = new Player(this, this.match.fighters[i], config, touch);
 
-                // Set Color (all players use their assigned color)
-                let color = this.PLAYER_COLORS[pData.playerId] || 0xffffff;
-
-                // Campaign color overrides for indicators (HUD and name tags)
-                if (this.mode === 'campaign') {
-                    if (pData.playerId === 0) color = 0xF0F0F0; // Off-white for player
-                    else color = 0xFFFFFF; // White for opponent
-                }
-
+                const color = this.campaign?.indicatorColor(pData.playerId) ?? this.PLAYER_COLORS[pData.playerId] ?? 0xffffff;
                 player.setColor(color);
 
                 this.players.push(player);
@@ -423,21 +383,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     });
                 }
 
-                // If campaign first encounter, apply visual suppression to opponent (playerId 1)
-                if (this.mode === 'campaign' && !this.isTraining && pData.playerId === 1) {
-                    if (player.spriteObject.postFX) {
-                        const fx = player.spriteObject.postFX.addColorMatrix();
-                        fx.saturate(-0.5);
-                        this.campaignColorMatrices.push(fx);
-                    }
-                }
+                if (pData.playerId === 1) this.campaign?.drain([player.spriteObject]);
             });
-
-            // A campaign fight (not a practice rematch) opens with a cutscene
-            if (this.mode === 'campaign' && !this.isTraining) {
-                const opponent = CampaignManager.getInstance().getCurrentOpponent();
-                if (opponent) this.startIntroCutscene(opponent.dialogueBefore, this.playerData[0].character, opponent.character);
-            }
 
             // Re-run camera exclusions now that players exist
             // (setupCameras was moved up before createStage, but players are created after)
@@ -445,6 +392,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
             this.contactShadows = new ContactShadows(this, [this.uiCamera]);
             this.stageView = false;
+            this.cameraCentre = null;
+            this.cameraKick.x = this.cameraKick.y = 0;
             if (this.isLab) {
                 this.lighting = startLightLab(this, {
                     uiCamera: this.uiCamera,
@@ -475,15 +424,21 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // Create HUDs
             this.createHUDs();
 
+            // Getters: the match is replaced on a restart
+            const scene = this;
+            this.campaign?.start({
+                get match() { return scene.match; },
+                get players() { return scene.players; },
+                get hud() { return scene.matchHUD; },
+                setCutscene: on => { this.isCutscene = on; },
+            });
+
             // Toggle key
             this.debugToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
             this.inputDebugKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F2);
             this.trainingToggleKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
             this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-            this.gameOverSpaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-            this.gameOverUpKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
-            this.gameOverDownKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
-            this.gameOverEnterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+            this.gameOverInput = new MenuInput(this);
 
             // Input Debug Overlay (F2)
             this.inputDebugOverlay = new InputDebugOverlay(this);
@@ -530,15 +485,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.events.on('pauseMenuExit', () => {
                 this.scene.start('MainMenuScene');
             });
-            this.events.on('pauseMenuMap', () => {
-                const campaign = CampaignManager.getInstance();
-                this.scene.start('CampaignMapScene', {
-                    playerData: [this.playerData[0]],
-                    mode: 'campaign',
-                    slotIndex: campaign.getActiveSlotIndex(),
-                    targetIslandIndex: this.trainingOpponentIndex
-                });
-            });
+            this.events.on('pauseMenuMap', () => this.campaign?.backToMap());
             this.events.on('spawnDummy', () => {
                 this.togglePause(); // Unpause
                 if (this.players.length < 4) {
@@ -596,27 +543,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.londraLayers = this.isLab ? new LondraLayers(this) : null;
         this.stageTextures = [...stage.platformTextures];
 
-        // Apply campaign visual suppression (desaturation effect) — only on first encounters
-        if (this.mode === 'campaign' && !this.isTraining) {
-            this.campaignColorMatrices = [];
-            this.campaignTintProgress = 0;
-
-            // Background
-            if (stage.background?.postFX) {
-                const bgFx = stage.background.postFX.addColorMatrix();
-                bgFx.saturate(-0.5);
-                this.campaignColorMatrices.push(bgFx);
-            }
-
-            // Platform Textures
-            stage.platformTextures.forEach(tex => {
-                if (tex.postFX) {
-                    const fx = tex.postFX.addColorMatrix();
-                    fx.saturate(-0.5);
-                    this.campaignColorMatrices.push(fx);
-                }
-            });
-        }
+        this.campaign?.drain([stage.background, ...stage.platformTextures]);
 
         // Re-run full exclusion pass (catches anything missed above)
         this.configureCameraExclusions();
@@ -662,26 +589,23 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // The menu appears 2 s after the end
             if (!this.isGameOverMenuReady) return;
 
-            const JustDown = Phaser.Input.Keyboard.JustDown;
-            const moveUp = JustDown(this.gameOverUpKey) || this.padPresses.justPressed(GAMEPAD_UP);
-            const moveDown = JustDown(this.gameOverDownKey) || this.padPresses.justPressed(GAMEPAD_DOWN);
-            const confirm = JustDown(this.gameOverEnterKey) || JustDown(this.gameOverSpaceKey) || this.padPresses.justPressed(getConfirmButtonIndex);
-
-            if (moveUp || moveDown) {
-                const count = this.gameOverMenuOptions.length;
-                this.gameOverSelectedIndex = (this.gameOverSelectedIndex + (moveUp ? count - 1 : 1)) % count;
-                this.updateGameOverMenuHighlight();
-                AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.5 });
-            } else if (confirm) {
-                AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
-                if (this.gameOverSelectedIndex === 0) {
-                    if (this.online) this.voteRematch();
-                    else this.restartMatch();
-                } else if (this.gameOverSelectedIndex === 1) {
-                    this.returnToLobby();
+            for (const { action } of this.gameOverInput.poll()) {
+                if (action === 'up' || action === 'down') {
+                    const count = this.gameOverMenuOptions.length;
+                    this.gameOverSelectedIndex = (this.gameOverSelectedIndex + (action === 'up' ? count - 1 : 1)) % count;
+                    this.updateGameOverMenuHighlight();
+                    AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.5 });
+                } else if (action === 'confirm') {
+                    AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
+                    if (this.gameOverSelectedIndex === 0) {
+                        if (this.online) this.voteRematch();
+                        else this.restartMatch();
+                    } else if (this.gameOverSelectedIndex === 1) {
+                        this.returnToLobby();
+                    }
+                    return;
                 }
             }
-
             return;
         }
 
@@ -862,7 +786,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 this.players[event.fighter].spawnSignatureGhost(event.ghost);
                 break;
             case 'hit':
-                this.onHit(event.attacker, event.target, event.attackKey);
+                this.onHit(event);
                 break;
             case 'groundPoundMiss':
                 audio.playSFX('sfx_landing', { volume: 1.0 });
@@ -877,28 +801,36 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
     }
 
-    private onHit(attacker: number, target: number, attackKey: string | null): void {
+    private onHit(hit: Extract<MatchEvent, { type: 'hit' }>): void {
+        const { attacker, target, attackKey } = hit;
         this.players[attacker].playHitSound(attackKey);
         if (attackKey && AttackRegistry[attackKey].type === AttackType.HEAVY) {
             this.cameras.main.shake(100, 0.005);
+        }
+        this.effectManager.spawnHitSpark(hit.x, hit.y, hit.damage);
+
+        // Hard hits nudge the camera the way the target flies
+        const knockback = Math.hypot(hit.knockbackX, hit.knockbackY);
+        const kick = Phaser.Math.Clamp((knockback - CAMERA_KICK_FROM) / CAMERA_KICK_PER_PIXEL, 0, CAMERA_KICK_MAX);
+        if (kick > 0) {
+            this.cameraKick.x += (hit.knockbackX / knockback) * kick;
+            this.cameraKick.y += (hit.knockbackY / knockback) * kick;
         }
 
         const body = this.match.fighters[target].body;
         this.lighting?.flash('hit', body.x, body.y);
 
-        // The campaign opponent doesn't flash
         const victim = this.players[target];
-        if (!(this.mode === 'campaign' && victim.playerId === 1)) {
+        if (this.campaign?.flashesOnHit(victim.playerId) ?? true) {
             victim.flashDamage(this.match.fighters[target].damagePercent);
         }
     }
 
     /** A fighter left the stage: impact, crowd, and the campaign's reactions. */
     private onKnockOut(index: number, x: number, y: number): void {
-        const player = this.players[index];
-        const fighter = this.match.fighters[index];
-
-        this.cameras.main.shake(300, 0.02);
+        // A short, punchy shake and a slight zoom in, which the camera eases back out of
+        this.cameras.main.shake(220, 0.012);
+        this.cameras.main.zoom *= KO_ZOOM_PUNCH;
         const impactX = Phaser.Math.Clamp(x, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
         const impactY = Phaser.Math.Clamp(y, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
         this.lighting?.flash('ko', impactX, impactY);
@@ -907,48 +839,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         audio.playSFX('sfx_death', { volume: 0.8 });
         audio.playSFX(Math.random() > 0.5 ? 'sfx_death_crowd_1' : 'sfx_death_crowd_2', { volume: 0.5 });
 
-        // Campaign Visual Progression: Smoothly restore saturation when opponent loses a life
-        if (this.mode === 'campaign' && player.playerId === 1 && this.campaignColorMatrices.length > 0) {
-            const maxLives = 3;
-            // Calculate what fraction of color to restore (0 = desaturated, 1 = full color)
-            const livesLost = maxLives - fighter.lives;
-            const targetProgress = livesLost / maxLives;
-            const startProgress = this.campaignTintProgress;
-
-            this.tweens.addCounter({
-                from: startProgress * 100,
-                to: targetProgress * 100,
-                duration: 3000,
-                ease: 'Linear',
-                onUpdate: (_tween: Phaser.Tweens.Tween) => {
-                    const progress = (_tween.getValue() ?? 0) / 100;
-                    this.campaignTintProgress = progress;
-                    // Lerp saturation from -0.5 (50% desaturated) to 0 (full color)
-                    const saturation = -0.5 + (0.5 * progress); // goes from -0.5 → 0
-                    this.campaignColorMatrices.forEach(fx => {
-                        fx.reset();
-                        fx.saturate(saturation);
-                    });
-                }
-            });
-        }
-
-        // Campaign mid-fight cutscene: when the opponent is down to its last life
-        if (this.mode === 'campaign' && !this.isTraining && player.playerId === 1 && fighter.lives === 1 && !this.campaignMidFightPlayed) {
-            this.campaignMidFightPlayed = true;
-            const opponent = CampaignManager.getInstance().getCurrentOpponent();
-            if (opponent && opponent.dialogueMidFight.length > 0) {
-                // Fade to black, then show cutscene
-                this.cameras.main.fadeOut(1000, 0, 0, 0);
-                this.cameras.main.once('camerafadeoutcomplete', () => {
-                    // Respawn opponent and set up cutscene while screen is black
-                    respawnFighter(this.match, index);
-                    this.campaignMidFightCutscene(opponent);
-                    // Fade back in to reveal the cutscene
-                    this.cameras.main.fadeIn(1000, 0, 0, 0);
-                });
-            }
-        }
+        this.campaign?.onKnockOut(index);
     }
 
     private showRespawnFlash(x: number, y: number): void {
@@ -967,10 +858,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
     private updateCamera(): void {
+        const cam = this.cameras.main;
+        this.cameraCentre ??= { x: cam.midPoint.x, y: cam.midPoint.y };
         if (this.stageView) {
-            const cam = this.cameras.main;
             cam.zoom = Phaser.Math.Linear(cam.zoom, STAGE_VIEW.zoom, 0.1);
-            cam.centerOn(Phaser.Math.Linear(cam.midPoint.x, STAGE_VIEW.x, 0.2), Phaser.Math.Linear(cam.midPoint.y, STAGE_VIEW.y, 0.2));
+            this.moveCameraTowards(STAGE_VIEW.x, STAGE_VIEW.y);
             return;
         }
 
@@ -1012,13 +904,18 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Clamp zoom
         const targetZoom = Phaser.Math.Clamp(Math.min(zoomX, zoomY), settings.minZoom, settings.maxZoom);
 
-        // Lerp Camera
-        const cam = this.cameras.main;
         cam.zoom = Phaser.Math.Linear(cam.zoom, targetZoom, 0.1);
-        cam.centerOn(
-            Phaser.Math.Linear(cam.midPoint.x, centerX, 0.2),
-            Phaser.Math.Linear(cam.midPoint.y, centerY, 0.2)
-        );
+        this.moveCameraTowards(centerX, centerY);
+    }
+
+    /** Eases the camera's centre towards (x, y), plus what's left of the last hit's kick. Once per step. */
+    private moveCameraTowards(x: number, y: number): void {
+        const centre = this.cameraCentre!;
+        centre.x = Phaser.Math.Linear(centre.x, x, 0.2);
+        centre.y = Phaser.Math.Linear(centre.y, y, 0.2);
+        this.cameras.main.centerOn(centre.x + this.cameraKick.x, centre.y + this.cameraKick.y);
+        this.cameraKick.x *= CAMERA_KICK_DECAY;
+        this.cameraKick.y *= CAMERA_KICK_DECAY;
     }
 
 
@@ -1120,205 +1017,54 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     /** The simulation ended the match: at most one fighter has lives left. */
     private onMatchOver(): void {
-        const winner = this.match.winnerId >= 0 ? this.players[this.match.winnerId] : null;
-
-        // Campaign mode: skip win animation and rematch entirely
-        if (this.mode === 'campaign' && !this.isTraining && winner && winner.playerId === 0) {
-            CampaignManager.getInstance().advanceLadder();
-            this.campaignDefeatCutscene();
+        const winnerId = this.match.winnerId >= 0 ? this.players[this.match.winnerId].playerId : -1;
+        if (this.campaign) {
+            // No victory screen or rematch menu: the campaign says what comes next
+            this.isGameOver = true;
+            this.campaign.onMatchOver(winnerId);
             return;
         }
-
-        this.handleGameOver(winner ? winner.playerId : -1);
+        this.handleGameOver(winnerId);
     }
 
     private handleGameOver(winnerId: number): void {
         if (this.isGameOver) return;
         this.isGameOver = true;
 
-        const { width, height } = this.scale;
-
-        let winnerText = "GAME!";
-        let winner: Player | undefined;
-
-        if (winnerId >= 0) {
+        let winnerText = 'GAME!';
+        const winner = this.players.find(p => p.playerId === winnerId);
+        if (winner) {
             AudioManager.getInstance().playSFX('sfx_knockout', { volume: 0.8 });
-            winner = this.players.find(p => p.playerId === winnerId);
-
-            if (this.mode !== 'campaign') {
-                winnerText += `\nPLAYER ${winnerId + 1} HA ARATO!`; // Custom Text
-                // DRAMATIC ZOOM
-                if (winner) {
-                    winner.setPose('win'); // Auto-taunt on victory
-                    this.cameras.main.pan(winner.x, winner.y, 1500, 'Power2');
-                    this.cameras.main.zoomTo(3.5, 1500, 'Power2');
-                }
-            }
+            winnerText += `\nPLAYER ${winnerId + 1} HA ARATO!`;
+            // Dramatic zoom on the winner's victory pose
+            winner.setPose('win');
+            this.cameras.main.pan(winner.x, winner.y, 1500, 'Power2');
+            this.cameras.main.zoomTo(3.5, 1500, 'Power2');
         } else {
-            if (this.mode !== 'campaign') {
-                winnerText += "\nDRAW GAME!";
-            }
+            winnerText += '\nDRAW GAME!';
         }
 
-        if (this.mode !== 'campaign') {
-            this.winnerTextVisual = this.add.text(width / 2, height / 2 - 50, winnerText, {
-                fontSize: '64px',
-                fontFamily: '"Pixeloid Sans"',
-                fontStyle: 'bold',
-                color: '#ffffff',
-                align: 'center',
-                stroke: '#000000',
-                strokeThickness: 8
-            });
-            this.winnerTextVisual.setOrigin(0.5);
-            this.winnerTextVisual.setDepth(1001);
-            this.cameras.main.ignore(this.winnerTextVisual); // Only UI camera sees it
-        }
-
-        if (this.mode === 'campaign' && this.isTraining) {
-            // Instantly transition to black screen dialogue
-            this.cameras.main.fade(1500, 0, 0, 0, false, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
-                if (progress === 1) {
-                    this.handleTrainingGameOver(winnerId);
-                }
-            });
-        } else if (this.mode === 'campaign' && !this.isTraining) {
-            // Player lost campaign match! Instantly transition to black screen retry dialogue
-            this.cameras.main.fade(1500, 0, 0, 0, false, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
-                if (progress === 1) {
-                    this.handleCampaignLoseGameOver();
-                }
-            });
-        } else {
-            // 2-second delay (normal versus matches)
-            this.time.delayedCall(2000, () => {
-                this.showGameOverMenu();
-            });
-        }
-    }
-
-    private handleTrainingGameOver(winnerId: number): void {
-        const campaign = CampaignManager.getInstance();
-        const opponent = campaign.ladder[this.trainingOpponentIndex];
-        const oppCharKey = opponent?.character || 'sgu';
-
-        const isWin = winnerId === 0;
-
-        // Get dialogue text from the data files
-        const dialogueLines = isWin
-            ? (opponent?.dialogueTrainingWin ?? [])
-            : (opponent?.dialogueTrainingLose ?? []);
-
-        const dialogueText = (dialogueLines.length > 0
-            ? dialogueLines[0].text
-            : (isWin ? 'Well done!' : 'You should train more.')) + ' Want to train more?';
-        const speakerName = dialogueLines.length > 0
-            ? dialogueLines[0].speaker
-            : oppCharKey;
-
-        // Launch Dialogue Scene with YES/NO choices
-        if (this.scene.isActive('DialogueScene') || this.scene.isSleeping('DialogueScene')) {
-            this.scene.stop('DialogueScene');
-        }
-
-        this.scene.launch('DialogueScene', {
-            leftCharacter: this.playerData[0]?.character || 'fok',
-            rightCharacter: oppCharKey,
-            dialogueData: [
-                {
-                    speaker: speakerName,
-                    text: dialogueText,
-                    side: 'right',
-                    animation: 'idle',
-                    choices: [
-                        {
-                            text: 'YES', action: () => {
-                                // Restart match
-                                this.scene.restart({
-                                    playerData: this.playerData,
-                                    mode: 'campaign',
-                                    slotIndex: campaign.getActiveSlotIndex(),
-                                    isTraining: true,
-                                    trainingOpponentIndex: this.trainingOpponentIndex
-                                });
-                            }
-                        },
-                        {
-                            text: 'NO', action: () => {
-                                // Return to minimap
-                                this.scene.start('CampaignMapScene', {
-                                    playerData: [this.playerData[0]],
-                                    mode: 'campaign',
-                                    slotIndex: campaign.getActiveSlotIndex(),
-                                    targetIslandIndex: this.trainingOpponentIndex
-                                });
-                            }
-                        }
-                    ]
-                }
-            ],
-            blackBackground: true
+        const { width, height } = this.scale;
+        this.winnerTextVisual = this.add.text(width / 2, height / 2 - 50, winnerText, {
+            fontSize: '64px',
+            fontFamily: '"Pixeloid Sans"',
+            fontStyle: 'bold',
+            color: '#ffffff',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 8
         });
-    }
+        this.winnerTextVisual.setOrigin(0.5);
+        this.winnerTextVisual.setDepth(1001);
+        this.cameras.main.ignore(this.winnerTextVisual); // Only UI camera sees it
 
-    private handleCampaignLoseGameOver(): void {
-        const campaign = CampaignManager.getInstance();
-        const opponent = campaign.getCurrentOpponent();
-        const oppCharKey = opponent?.character || 'sgu';
-
-        const dialogueLines = opponent?.dialogueCampaignLose ?? [];
-
-        // Grab the dialogue data (use the first line)
-        const dialogueData = dialogueLines.length > 0
-            ? dialogueLines[0]
-            : { speaker: oppCharKey, text: "You lost. Want to try again?", side: 'right', animation: "idle" };
-
-        // Ensure choices are appended
-        const choiceData = {
-            speaker: dialogueData.speaker,
-            text: dialogueData.text,
-            side: dialogueData.side as 'left' | 'right',
-            animation: dialogueData.animation || 'idle',
-            choices: [
-                {
-                    text: 'YES', action: () => {
-                        // Restart match (same level)
-                        this.scene.restart({
-                            playerData: this.playerData,
-                            mode: 'campaign',
-                            slotIndex: campaign.getActiveSlotIndex(),
-                            isTraining: false
-                        });
-                    }
-                },
-                {
-                    text: 'NO', action: () => {
-                        // Return to minimap
-                        this.scene.start('CampaignMapScene', {
-                            playerData: [this.playerData[0]],
-                            mode: 'campaign',
-                            slotIndex: campaign.getActiveSlotIndex(),
-                            targetIslandIndex: this.trainingOpponentIndex
-                        });
-                    }
-                }
-            ]
-        };
-
-        if (this.scene.isActive('DialogueScene') || this.scene.isSleeping('DialogueScene')) {
-            this.scene.stop('DialogueScene');
-        }
-
-        this.scene.launch('DialogueScene', {
-            leftCharacter: this.playerData[0]?.character || 'fok',
-            rightCharacter: oppCharKey,
-            dialogueData: [choiceData],
-            blackBackground: true
-        });
+        this.time.delayedCall(2000, () => this.showGameOverMenu());
     }
 
     private showGameOverMenu(): void {
         this.isGameOverMenuReady = true;
+        // Buttons still held from the fight wait to be let go
+        this.gameOverInput.holdEverything();
         this.gameOverSelectedIndex = 0;
         const { width, height } = this.scale;
 
@@ -1407,26 +1153,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const isTraining = this.playerData.some(p => p.isTrainingDummy);
         const p1Data = this.playerData.find(p => p.playerId === 0);
 
-        let targetMode = 'versus';
-        if (this.mode === 'training' || isTraining) targetMode = 'training';
-        if (this.mode === 'campaign') targetMode = 'campaign';
-
-        // Check if campaign is completed (no next opponent)
-        if (this.mode === 'campaign' && CampaignManager.getInstance().getCurrentOpponent() === null) {
-            // Campaign is complete — go back to map so player can do training rematch.
-            // Save is kept intact.
-            this.scene.start('CampaignMapScene', {
-                playerData: [this.playerData[0]],
-                mode: 'campaign',
-                slotIndex: CampaignManager.getInstance().getActiveSlotIndex(),
-                targetIslandIndex: this.trainingOpponentIndex
-            });
-            return;
-        }
-
         // Back to character selection
         this.scene.start('LobbyScene', {
-            mode: targetMode,
+            mode: this.mode === 'training' || isTraining ? 'training' : 'versus',
             inputType: p1Data?.input?.type || 'KEYBOARD',
             gamepadIndex: p1Data?.input?.gamepadIndex ?? null,
         });
@@ -1454,6 +1183,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             else this.drawDebugRect(p, 0x00ff00, index === 0 ? 'MAIN #0' : `SIDE #${++side}`);
         });
         STAGE_LAYOUT.walls.forEach((w, index) => this.drawDebugRect(w, 0xff0000, `WALL #${index + 1}`));
+        STAGE_LAYOUT.ceilings.forEach((c, index) => this.drawDebugRect(c, 0xff8800, `CEILING #${index + 1}`));
     }
 
     private drawDebugRect(r: SimRect, color: number, name: string): void {
@@ -1481,105 +1211,4 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.debugLabels.push(t);
     }
 
-
-
-    // ─── Cutscenes (campaign) ───
-
-    /** Holds the match and stands P1 and P2 on the main platform facing each other. */
-    private holdFightersForCutscene(): void {
-        this.isCutscene = true;
-        const marks = [{ playerId: 0, x: 860, facing: 1 }, { playerId: 1, x: 1060, facing: -1 }];
-        for (const mark of marks) {
-            const player = this.players.find(p => p.playerId === mark.playerId);
-            if (!player) continue;
-            placeFighter(this.match, player.fighterIndex, mark.x, 750, mark.facing);
-            player.setPose('idle');
-        }
-    }
-
-    /** Before a campaign fight: the opponent's opening lines, once the loading screen has faded. */
-    private startIntroCutscene(dialogue: DialogueLine[], leftChar: string, rightChar: string): void {
-        this.holdFightersForCutscene();
-        this.time.delayedCall(600, () => {
-            this.matchHUD?.setVisible(false);
-            this.playDialogue(dialogue, leftChar, rightChar, () => this.endCutscene());
-        });
-    }
-
-    private endCutscene(): void {
-        this.players.forEach(p => p.setPose(null));
-        this.isCutscene = false;
-        if (this.mode === 'campaign') this.matchHUD?.setVisible(true);
-    }
-
-    /** The opponent is down to its last life: a pause for words, then the fight resumes. */
-    private campaignMidFightCutscene(opponent: OpponentConfig): void {
-        this.holdFightersForCutscene();
-        this.matchHUD?.setVisible(false);
-        this.playDialogue(opponent.dialogueMidFight, this.playerData[0]?.character || 'fok', opponent.character, () => this.endCutscene());
-    }
-
-    /** The opponent is beaten: no victory screen, their parting lines, then on to the map. */
-    private campaignDefeatCutscene(): void {
-        this.isGameOver = true;
-        const campaign = CampaignManager.getInstance();
-        // advanceLadder() has already moved on: the beaten opponent is the previous level's
-        const opponent = campaign.ladder[campaign.getCurrentLevel() - 1];
-
-        const camera = this.cameras.main;
-        camera.fadeOut(1000, 0, 0, 0);
-        camera.once('camerafadeoutcomplete', () => {
-            camera.stopFollow();
-            camera.resetFX();
-            camera.setZoom(1);
-            camera.centerOn(960, 540);
-            this.holdFightersForCutscene();
-            this.matchHUD?.setVisible(false);
-            camera.fadeIn(1000, 0, 0, 0);
-
-            if (opponent && opponent.dialogueAfterWin.length > 0) {
-                const playerChar = this.playerData[0]?.character || 'fok';
-                this.playDialogue(opponent.dialogueAfterWin, playerChar, opponent.character, () => this.campaignTransitionToNextOpponent());
-            } else {
-                this.campaignTransitionToNextOpponent();
-            }
-        });
-    }
-
-    /** A long fade, then the map on the island just beaten, or the credits after the last. */
-    private campaignTransitionToNextOpponent(): void {
-        this.cameras.main.fadeOut(2000, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-            const campaign = CampaignManager.getInstance();
-            if (campaign.getCurrentOpponent()) {
-                this.scene.start('CampaignMapScene', {
-                    playerData: [this.playerData[0]],
-                    mode: 'campaign',
-                    slotIndex: campaign.getActiveSlotIndex(),
-                    targetIslandIndex: Math.max(0, campaign.getCurrentLevel() - 1),
-                });
-            } else {
-                // The save file is kept
-                this.scene.start('CreditsScene');
-            }
-        });
-    }
-
-    /** Plays `dialogue` over the match; the fighters strike the poses its lines ask for. */
-    private playDialogue(dialogue: DialogueLine[], leftChar: string, rightChar: string, onComplete: () => void): void {
-        if (this.scene.isActive('DialogueScene')) this.scene.stop('DialogueScene');
-
-        // Listen before launching: DialogueScene.create() already emits the first line's pose
-        const dialogueScene = this.scene.get('DialogueScene');
-        dialogueScene.events.on('dialogue_animation', (side: 'left' | 'right', animation: string) => {
-            const playerId = side === 'left' ? 0 : 1;
-            this.players.find(p => p.playerId === playerId)?.setPose(animation);
-        });
-        dialogueScene.events.once('dialogue_complete', () => {
-            dialogueScene.events.off('dialogue_animation');
-            onComplete();
-        });
-
-        this.scene.launch('DialogueScene', { dialogueData: dialogue, leftCharacter: leftChar, rightCharacter: rightChar });
-    }
 }

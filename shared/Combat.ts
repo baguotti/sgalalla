@@ -4,7 +4,7 @@
  */
 
 import { AttackDirection, AttackPhase, AttackRegistry, AttackType, attackKey } from './AttackData.js';
-import { SIM_STEP_MS } from './FixedStepClock.js';
+import { countDown, SIM_STEP_MS } from './FixedStepClock.js';
 import { changeState, consumeBuffered, isBuffered, type FighterState, type GhostHitbox } from './FighterState.js';
 import { pushPhysicsSounds, type MatchEvent } from './MatchEvents.js';
 import { PhysicsConfig } from './PhysicsConfig.js';
@@ -46,11 +46,11 @@ export function updateCombat(f: FighterState, events: MatchEvent[]): void {
     const c = f.combat;
 
     if (c.attackCooldownTimer > 0) {
-        c.attackCooldownTimer -= SIM_STEP_MS;
+        c.attackCooldownTimer = countDown(c.attackCooldownTimer);
         if (c.attackCooldownTimer <= 0) c.isGroundPoundLanding = false;
     }
 
-    if (c.chaseDodgeTimer > 0) c.chaseDodgeTimer -= SIM_STEP_MS;
+    if (c.chaseDodgeTimer > 0) c.chaseDodgeTimer = countDown(c.chaseDodgeTimer);
 
     if (c.ghost) {
         c.ghost.age += SIM_STEP_MS;
@@ -93,7 +93,7 @@ function updateAttack(f: FighterState, events: MatchEvent[]): void {
 
     if (c.isGroundPounding) {
         if (c.groundPoundStartupTimer > 0) {
-            c.groundPoundStartupTimer -= SIM_STEP_MS;
+            c.groundPoundStartupTimer = countDown(c.groundPoundStartupTimer);
             b.vx = 0;
             b.vy = 0;
             return;
@@ -173,7 +173,7 @@ export function handleCombatInput(f: FighterState, events: MatchEvent[]): void {
         b.vy = 0;
     }
 
-    if (c.attackCooldownTimer > 0) return;
+    if (c.attackCooldownTimer > 0 || b.landingLagSteps > 0) return;
     if (f.isHitStunned || f.isAttacking) return;
 
     const lightRequested = isBuffered(f, 'lightAttack');
@@ -572,9 +572,9 @@ function applyHit(attacker: FighterState, target: FighterState, events: MatchEve
     let knockbackY = -sin * knockback;
 
     const tb = target.body;
-    // Spiking a grounded target bounces it up
+    // Spiking a grounded target pops it up
     if (tb.isGrounded && knockbackY > 0) {
-        knockbackY *= -0.8;
+        knockbackY *= -PhysicsConfig.GROUNDED_SPIKE_BOUNCE;
         tb.y -= 10;
     }
 
@@ -594,7 +594,20 @@ function applyHit(attacker: FighterState, target: FighterState, events: MatchEve
     // The attacker can chase: a directional dodge until a moment after this attack ends
     c.chaseDodgeTimer = remainingAttackTime(attacker) + PhysicsConfig.CHASE_DODGE_WINDOW;
 
-    events.push({ type: 'hit', attacker: attacker.id, target: target.id, attackKey: c.attack?.key ?? null });
+    // Both freeze for a moment, longer for harder hits
+    const hitstop = Math.min(PhysicsConfig.HITSTOP_MAX_STEPS,
+        PhysicsConfig.HITSTOP_MIN_STEPS + Math.round(damage * PhysicsConfig.HITSTOP_PER_DAMAGE));
+    attacker.hitstopSteps = Math.max(attacker.hitstopSteps, hitstop);
+    target.hitstopSteps = Math.max(target.hitstopSteps, hitstop);
+
+    // Where the hit landed: the hitbox's middle, within the target's hurtbox
+    const hitbox = c.hitbox;
+    events.push({
+        type: 'hit', attacker: attacker.id, target: target.id, attackKey: c.attack?.key ?? null,
+        x: Math.min(Math.max(hitbox.x, tb.x - HURTBOX_WIDTH / 2), tb.x + HURTBOX_WIDTH / 2),
+        y: Math.min(Math.max(hitbox.y, tb.y - HURTBOX_HEIGHT / 2), tb.y + HURTBOX_HEIGHT / 2),
+        damage, knockbackX: tb.vx, knockbackY: tb.vy,
+    });
 }
 
 /** Time left in the fighter's current move, in ms. */

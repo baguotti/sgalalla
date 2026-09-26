@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavY } from '../input/JoyConMapper';
+import { MenuInput } from '../input/MenuInput';
 import { KeyboardMapping, keyCodeToLabel } from '../input/KeyboardMapping';
 
 const MenuOption = {
@@ -30,22 +30,7 @@ export class PauseMenu {
 
     private menuOptions: Array<{ label: string, value: MenuOption }> = [];
 
-    private upKey!: Phaser.Input.Keyboard.Key;
-    private downKey!: Phaser.Input.Keyboard.Key;
-    private enterKey!: Phaser.Input.Keyboard.Key;
-    private spaceKey!: Phaser.Input.Keyboard.Key;
-    private escKey!: Phaser.Input.Keyboard.Key;
-
-    // Gamepad state tracking
-    private previousGamepadState = {
-        up: false,
-        down: false,
-        left: false,
-        right: false,
-        a: false,
-        b: false,
-        start: false
-    };
+    private readonly menuInput: MenuInput;
 
     private hintText!: Phaser.GameObjects.Text;
     private controlsContainer!: Phaser.GameObjects.Container;
@@ -54,7 +39,7 @@ export class PauseMenu {
         this.scene = scene;
         this.createMenu();
         this.createControlsPage();
-        this.setupInput();
+        this.menuInput = new MenuInput(scene);
     }
 
     private createMenu(): void {
@@ -277,14 +262,6 @@ export class PauseMenu {
         });
     }
 
-    private setupInput(): void {
-        this.upKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
-        this.downKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
-        this.enterKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-        this.spaceKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-        this.escKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-    }
-
     // State
     private menuState: 'MAIN' | 'CONTROLS' = 'MAIN';
 
@@ -296,8 +273,8 @@ export class PauseMenu {
         // Sound: Open (Player Ready -> Confirm Character)
         this.scene.sound.play('ui_confirm_character', { volume: 0.5 });
 
-        // Sync gamepad state to prevent immediate re-trigger
-        this.syncGamepadState();
+        // The press that paused doesn't also act on the menu
+        this.menuInput.holdEverything();
 
         this.updateLayout();
 
@@ -357,34 +334,28 @@ export class PauseMenu {
     }
 
     private handleInput(): void {
-        const gp = this.getGamepadInput();
-
-        if (this.menuState === 'MAIN') {
-            if (Phaser.Input.Keyboard.JustDown(this.upKey) || gp.upPressed) {
-                this.scene.sound.play('ui_move_cursor', { volume: 0.5 });
-                this.mainSelectedIndex = (this.mainSelectedIndex - 1 + this.menuOptions.length) % this.menuOptions.length;
-                this.updateSelection();
-            } else if (Phaser.Input.Keyboard.JustDown(this.downKey) || gp.downPressed) {
-                this.scene.sound.play('ui_move_cursor', { volume: 0.5 });
-                this.mainSelectedIndex = (this.mainSelectedIndex + 1) % this.menuOptions.length;
-                this.updateSelection();
-            }
-
-            if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.spaceKey) || gp.aPressed) {
-                this.selectOption();
-            }
-
-            if (Phaser.Input.Keyboard.JustDown(this.escKey) || gp.bPressed || gp.startPressed) {
-                this.scene.sound.play('ui_back', { volume: 0.5 });
-                this.executeOption(MenuOption.RESUME);
-            }
-        } else if (this.menuState === 'CONTROLS') {
-            // Back to Main Menu
-            if (Phaser.Input.Keyboard.JustDown(this.escKey) || gp.bPressed || gp.aPressed || gp.startPressed) {
+        for (const { action } of this.menuInput.poll()) {
+            if (this.menuState === 'MAIN') {
+                if (action === 'up' || action === 'down') {
+                    this.scene.sound.play('ui_move_cursor', { volume: 0.5 });
+                    const step = action === 'up' ? -1 : 1;
+                    this.mainSelectedIndex = (this.mainSelectedIndex + step + this.menuOptions.length) % this.menuOptions.length;
+                    this.updateSelection();
+                } else if (action === 'confirm') {
+                    this.selectOption();
+                    return;
+                } else if (action === 'back' || action === 'start') {
+                    this.scene.sound.play('ui_back', { volume: 0.5 });
+                    this.executeOption(MenuOption.RESUME);
+                    return;
+                }
+            } else if (action === 'back' || action === 'confirm' || action === 'start') {
+                // The controls page: back to the main menu
                 this.scene.sound.play('ui_back', { volume: 0.5 });
                 this.menuState = 'MAIN';
                 this.hideControlsMenu();
                 this.showMainMenu();
+                return;
             }
         }
     }
@@ -435,65 +406,6 @@ export class PauseMenu {
                 this.scene.events.emit('pauseMenuExit');
                 break;
         }
-    }
-
-    private getGamepadInput() {
-        const gamepads = navigator.getGamepads();
-        let currentState = {
-            up: false, down: false, left: false, right: false,
-            a: false, b: false, start: false
-        };
-
-        // Aggregate input from ALL connected gamepads (any player can navigate)
-        for (let i = 0; i < gamepads.length; i++) {
-            const gamepad = gamepads[i];
-            if (gamepad) {
-                const navY = getMenuNavY(gamepad);
-                const confirmIdx = getConfirmButtonIndex(gamepad);
-                const backIdx = getBackButtonIndex(gamepad);
-
-                if (navY < 0) currentState.up = true;
-                if (navY > 0) currentState.down = true;
-                if (gamepad.buttons[confirmIdx]?.pressed) currentState.a = true;
-                if (gamepad.buttons[backIdx]?.pressed) currentState.b = true;
-                if (gamepad.buttons[9]?.pressed) currentState.start = true;
-            }
-        }
-
-        const result = {
-            upPressed: currentState.up && !this.previousGamepadState.up,
-            downPressed: currentState.down && !this.previousGamepadState.down,
-            aPressed: currentState.a && !this.previousGamepadState.a,
-            bPressed: currentState.b && !this.previousGamepadState.b,
-            startPressed: currentState.start && !this.previousGamepadState.start
-        };
-
-        this.previousGamepadState = currentState;
-        return result;
-    }
-
-    private syncGamepadState(): void {
-        const gamepads = navigator.getGamepads();
-        let currentState = {
-            up: false, down: false, left: false, right: false,
-            a: false, b: false, start: false
-        };
-
-        for (let i = 0; i < gamepads.length; i++) {
-            const gamepad = gamepads[i];
-            if (gamepad) {
-                const navY = getMenuNavY(gamepad);
-                const confirmIdx = getConfirmButtonIndex(gamepad);
-                const backIdx = getBackButtonIndex(gamepad);
-
-                if (navY < 0) currentState.up = true;
-                if (navY > 0) currentState.down = true;
-                if (gamepad.buttons[confirmIdx]?.pressed) currentState.a = true;
-                if (gamepad.buttons[backIdx]?.pressed) currentState.b = true;
-                if (gamepad.buttons[9]?.pressed) currentState.start = true;
-            }
-        }
-        this.previousGamepadState = currentState;
     }
 
     getElements(): Phaser.GameObjects.GameObject[] {

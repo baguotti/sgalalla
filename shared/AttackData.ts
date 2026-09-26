@@ -205,7 +205,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         damage: 6,
         baseKnockback: 250, // Heavy Base
-        knockbackGrowth: 8,
+        knockbackGrowth: 3.6,
         knockbackAngle: 80,
         startupDuration: PhysicsConfig.HEAVY_STARTUP_MS,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_MS,
@@ -221,7 +221,7 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         damage: 8,
         baseKnockback: 300,
-        knockbackGrowth: 9.5,
+        knockbackGrowth: 10.5,
         knockbackAngle: 4, // Changed from 5 to 4
         startupDuration: PhysicsConfig.HEAVY_STARTUP_MS + 50,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_MS,

@@ -1,6 +1,6 @@
 """
-Builds Londra's layered background for the game from the full-size layers
-(9862x8263, the same canvas as the painting):
+Builds Londra's layered background for the game from the island layer
+(9862x8263, the same canvas as the painting) and a sheet of five clouds:
 
   python3 scripts/londra-layers.py "../assets/Stages/Londra/Layers"
 
@@ -8,10 +8,11 @@ Builds Londra's layered background for the game from the full-size layers
   public/assets/stages/londra/layers/clouds.webp   5 cloud pieces in one atlas
   public/assets/stages/londra/layers/clouds.json   their frames (Phaser 3 hash)
 
-The island is exported at half the canvas resolution and the clouds at 0.45:
-the game draws the canvas at 0.389 world px per pixel, so that is about one
-texel per screen pixel at the camera's closer zooms. src/stages/LondraLayers.ts places the
-pieces in canvas coordinates. Needs Pillow, numpy and cwebp.
+The island is exported at half the canvas resolution. The clouds keep the
+sheet's own pixels, each standing for 1 / CLOUD_SCALE canvas pixels: the game
+draws the canvas at 0.389 world px per pixel, so that is about one texel per
+screen pixel at the camera's closer zooms. src/stages/LondraLayers.ts places
+the pieces in canvas coordinates. Needs Pillow, numpy and cwebp.
 """
 import json
 import subprocess
@@ -25,22 +26,15 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = None
 
 SCALE = 0.5
-# The soft clouds a little less, so the widest fits a 2048 atlas
-CLOUD_SCALE = 0.45
+# Cloud sheet texels per canvas pixel (LondraLayers.ts has the same number)
+CLOUD_SCALE = 0.39
 # Transparent pixels round every frame: the lit shader reads up to 4 texels past an edge
 PADDING = 4
 OUT = Path(__file__).resolve().parent.parent / 'public' / 'assets' / 'stages' / 'londra' / 'layers'
 
-# Each piece: where it sits on the clouds canvas (x, y, w, h), and which of the
-# clouds inside that box it is, largest first
-PIECES = {
-    # These two touch in the art: a straight cut under the big one parts them
-    'cumulus_big': ((2528, 5533, 4641, 1440), 0),
-    'cumulus_low': ((4028, 6973, 2700, 635), 0),
-    'cumulus_flat': ((1264, 4777, 2596, 897), 0),
-    'tower': ((5201, 2679, 1978, 1130), 0),
-    'puff': ((6954, 2288, 1434, 549), 0),
-}
+CLOUD_SHEET = 'Londra_Clouds_V2.png'
+# The sheet's clouds, largest first
+PIECES = ['cumulus_big', 'tower', 'cumulus_flat', 'cumulus_low', 'puff']
 
 
 def components(alpha: np.ndarray, cell: int = 2, reach: int = 30) -> list[np.ndarray]:
@@ -119,14 +113,16 @@ def main(layers: Path) -> None:
     webp(padded, OUT / 'island.webp')
     print(f'island: canvas x {x}, y {y}, {island.shape[1]}x{island.shape[0]}')
 
-    clouds = np.asarray(Image.open(layers / 'Londra_Clouds.png').convert('RGBA'))
+    clouds = np.asarray(Image.open(layers / CLOUD_SHEET).convert('RGBA'))
+    # The pixel-art wisps reach well out from each cloud's body
+    masks = components(clouds[..., 3].copy(), reach=40)
+    if len(masks) != len(PIECES):
+        sys.exit(f'Expected {len(PIECES)} clouds on the sheet, found {len(masks)}')
     frames = {}
-    for name, ((bx, by, bw, bh), index) in PIECES.items():
-        box = clouds[by:by + bh, bx:bx + bw].copy()
-        box[~components(box[..., 3])[index]] = 0
-        piece, px, py = trimmed(box)
-        frames[name] = (scaled(piece, CLOUD_SCALE), bx + px, by + py, piece.shape[1], piece.shape[0])
-        print(f'{name}: canvas x {bx + px}, y {by + py}, {piece.shape[1]}x{piece.shape[0]}')
+    for name, mask in zip(PIECES, masks):
+        piece, _x, _y = trimmed(np.where(mask[..., None], clouds, 0).astype(np.uint8))
+        frames[name] = (Image.fromarray(piece),)
+        print(f'{name}: {piece.shape[1]}x{piece.shape[0]}, {piece.shape[1] / CLOUD_SCALE:.0f} canvas px wide')
 
     # One row per piece, tallest first, in a 2048-wide atlas
     width = 2048
@@ -155,5 +151,5 @@ def main(layers: Path) -> None:
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        sys.exit('Usage: python3 scripts/londra-layers.py <folder with Londra_Main.png and Londra_Clouds.png>')
+        sys.exit(f'Usage: python3 scripts/londra-layers.py <folder with Londra_Main.png and {CLOUD_SHEET}>')
     main(Path(sys.argv[1]))

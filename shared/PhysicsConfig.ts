@@ -34,9 +34,16 @@ export const PhysicsConfig = {
     RECOVERY_FORCE_Y: -1760,
     RECOVERY_FORCE_X: 550,
     RECOVERY_DURATION: 300,
+    // A recovery used again before landing (or touching a wall) costs an air jump and has this share of the push
+    EXHAUSTED_RECOVERY_FORCE: 0.6,
 
     // Platform drop-through
     PLATFORM_DROP_GRACE_PERIOD: 200,
+    // Holding down this many steps on a soft platform drops through it (a down attack comes out first)
+    DROP_HOLD_STEPS: 4,
+
+    // Landing from the air: steps with no jump, dodge or attack
+    LANDING_LAG_STEPS: 4,
 
     // Dodges are invincible: a spot dodge on the ground or in the air, or an 8-way dodge in the air
     SPOT_DODGE_DURATION: 300,
@@ -78,6 +85,19 @@ export const PhysicsConfig = {
     // Damage system
     MAX_DAMAGE: 999,
     HIT_STUN_DURATION: 300,
+    // Stun lasts past HIT_STUN_DURATION while the fighter still flies faster than this across or upward, up to MAX_HIT_STUN
+    STUN_FLYING_SPEED: 1300,
+    MAX_HIT_STUN: 1500,
+    // A downward hit on a fighter standing on the floor pops it up with this share of the knockback
+    GROUNDED_SPIKE_BOUNCE: 0.3,
+    // A stunned fighter hitting a floor or wall faster than this bounces off, keeping BOUNCE_KEEP of its speed
+    BOUNCE_SPEED: 600,
+    BOUNCE_KEEP: 0.8,
+
+    // Hit-stop: both fighters freeze on a hit, in steps: MIN plus PER_DAMAGE for each point of damage, up to MAX
+    HITSTOP_MIN_STEPS: 3,
+    HITSTOP_PER_DAMAGE: 0.3,
+    HITSTOP_MAX_STEPS: 9,
 
     // Player dimensions
     PLAYER_WIDTH: 120,

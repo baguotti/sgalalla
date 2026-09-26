@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { ALL_CHARACTERS } from '../config/CharacterConfig';
-import { getBackButtonIndex, getConfirmButtonIndex } from '../input/JoyConMapper';
+import { MenuInput, type MenuAction } from '../input/MenuInput';
 import { AudioManager } from '../managers/AudioManager';
 import { NetClient } from '../network/NetClient';
 import { MAX_PLAYERS, MIN_PLAYERS, NetEvent, type MatchStart, type RoomState } from '../../shared/NetProtocol';
@@ -14,6 +14,7 @@ type Phase = 'connecting' | 'picking' | 'ready' | 'closed';
  */
 export class OnlineLobbyScene extends Phaser.Scene {
     private client!: NetClient;
+    private menuInput!: MenuInput;
     private phase: Phase = 'connecting';
     private room: RoomState | null = null;
     private characterIndex = 0;
@@ -52,30 +53,26 @@ export class OnlineLobbyScene extends Phaser.Scene {
             if (this.client === client) this.fail('SERVER NON RAGGIUNGIBILE');
         });
 
-        this.input.keyboard?.on('keydown', (event: KeyboardEvent) => this.onKey(event.code));
-        this.input.gamepad?.on('down', (pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button) => {
-            const raw = pad.pad;
-            if (button.index === getConfirmButtonIndex(raw)) this.onKey('Enter');
-            else if (button.index === getBackButtonIndex(raw)) this.onKey('Escape');
-            else if (button.index === 14) this.onKey('ArrowLeft');
-            else if (button.index === 15) this.onKey('ArrowRight');
-        });
-        this.events.once('shutdown', () => {
-            this.input.keyboard?.off('keydown');
-            this.input.gamepad?.off('down');
-        });
+        this.menuInput = new MenuInput(this);
     }
 
-    private onKey(code: string): void {
-        if (code === 'Escape') {
+    update(): void {
+        for (const { action } of this.menuInput.poll()) {
+            this.onAction(action);
+            if (action === 'back') return;
+        }
+    }
+
+    private onAction(action: MenuAction): void {
+        if (action === 'back') {
             this.leave();
             return;
         }
         if (this.phase !== 'picking') return;
 
-        if (code === 'ArrowLeft' || code === 'KeyA') this.cycleCharacter(-1);
-        else if (code === 'ArrowRight' || code === 'KeyD') this.cycleCharacter(1);
-        else if (code === 'Enter' || code === 'Space' || code === 'KeyJ') this.confirm();
+        if (action === 'left') this.cycleCharacter(-1);
+        else if (action === 'right') this.cycleCharacter(1);
+        else if (action === 'confirm') this.confirm();
     }
 
     private onRoom(room: RoomState): void {
