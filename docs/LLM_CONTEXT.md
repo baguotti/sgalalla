@@ -1,65 +1,60 @@
-# Sgalalla - LLM Context & Protocol (v1.2.0)
+# Sgalalla: context for AI assistants
 
-> [!IMPORTANT]
-> **MANDATORY**: Read this file first in every new session. It defines the core architecture and development protocols for the Sgalalla platform fighter.
+> Read this first. It describes the game as it is today (v3, September 2026); `DEVELOPMENT_LOG.md` has the history.
 
-## Project Vision
-A snappy, high-fidelity platform fighter (Brawlhalla-style). Features deterministic physics, local and online multiplayer (Geckos.io), and a 6-character roster.
+## What it is
+Super Smash Fioi: a 2 to 4 player platform fighter in the style of Brawlhalla, built with Phaser 3.90 and TypeScript. Local matches, CPU opponents, online matches of up to 4 players with rollback netcode, a single-player campaign (work in progress) and the Studio Lab for the lighting experiment.
 
-## Sources of Truth
-1. [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md): Full technical history and feature trace.
-2. [shared/PhysicsSimulation.ts](../shared/PhysicsSimulation.ts): The "Source of Truth" for all movement and collision logic.
+## Branches
+- `main`: the official release (v3.0.x), live at http://138.68.126.112. The campaign is hidden from its menu.
+- `experimental-branch`: work in progress (v3.0.xe): the release plus the campaign, the lighting experiment and the Studio Lab.
+- Old branches are archived as `archive/*` tags.
 
-## Technical Architecture
+## Architecture
 
-### 1. Character Logic (FSM)
-Character behavior is driven by a **Finite State Machine (FSM)**.
-- **Core**: `Player.ts` delegates logic to `fsm: StateMachine`.
-- **States**: 15+ discrete classes in `src/state/states/` (e.g., `Idle`, `Run`, `Attack`, `HitStun`, `GroundPound`).
-- **Logic**: Each state handles its own `enter`, `update`, and `exit` hooks, managing animations and transitions.
+### The simulation (`shared/`)
+All gameplay is a deterministic simulation of plain data: no Phaser, no wall-clock time, no `Math.random`, no `Math.sin`/`cos`.
+- `GameSim.ts`: `MatchState` and `stepMatch(match, inputs, events)`, one step of exactly 1/60 s.
+- `FighterState.ts`: a fighter's data, its input buffer and its state machine (states are names, not classes).
+- `PhysicsSimulation.ts` + `PhysicsConfig.ts`: movement, jumps, dodges, walls, platforms.
+- `Combat.ts` + `AttackData.ts`: attacks, charging, ground pound, recovery, signature ghosts, hits and knockback (knockback directions are precomputed numbers).
+- `FixedStepClock.ts`: turns real frame time into whole 60 Hz steps, on a steady beat on 120 Hz screens.
+- `Rollback.ts`: rollback netcode for 2 to 4 players; `NetProtocol.ts`: messages, packet layout, `PROTOCOL_VERSION`.
 
-### 2. Physics Simulation
-- **Shared Logic**: All physics math resides in `shared/PhysicsSimulation.ts`. This module is platform-agnostic and used by both Client and Server.
-- **Thin Wrapper**: `PlayerPhysics.ts` acts as a thin wrapper that:
-    1. Syncs current state to a `SimBody` interface.
-    2. Calls `stepPhysics(body, input, dt)`.
-    3. Syncs the resulting body back to Phaser properties.
-    4. Processes `PhysicsEvent` results (SFX, landings, FSM triggers).
+Changing gameplay means changing the simulation, and then:
+1. bump `PROTOCOL_VERSION`, so builds with different rules can't meet online;
+2. update the replay tests (`tests/replays/`), which check recorded matches play out identically.
 
-### 3. Multiplayer & Networking
-- **Authority**: Client-authoritative for player movement to ensure "perfect" local feel.
-- **Protocol**: Uses Geckos.io (UDP/WebRTC).
-- **Redundancy**: Every input packet contains a ring buffer of the last 10 frames of input to mitigate UDP packet loss.
-- **Sync**: Remote players are interpolated from snapshots with a tunable `RENDER_DELAY_MS` (currently 60ms).
+### The view (`src/`)
+Phaser only draws and reads input.
+- `scenes/GameScene.ts`: the match scene for every mode (versus, training, campaign, online, Studio Lab). Each drawn frame it runs the simulation steps that are due, then draws.
+- `entities/Player.ts`: draws a fighter from its simulation state, and reads its input from the keyboard, a gamepad, touch, the CPU (`player/PlayerAI.ts`) or the network.
+- Sounds and effects react to the simulation's `MatchEvent`s.
+- `network/`: `NetClient` (Geckos.io over WebRTC) and `OnlineMatch` (the rollback session).
+- `lighting/`: the lighting experiment: lit sprites with rim light, the camera's post-processing, the Studio Lab. Drawing only.
+- `stages/`: stage visuals (`StageFactory`) and backgrounds (`StageBackgrounds`: a match loads only its own, menus use small previews).
+- The HUD is drawn by a second camera (`uiCamera`); world objects must be hidden from it with `uiCamera.ignore(obj)`.
 
-### 4. Assets & UI
-- **Atlases**: Characters (fok, sgu, sga, pe, nock, greg) use texture atlases.
-- **UI Tracking**: `GameScene` uses a dedicated `uiCamera`. Always call `uiCamera.ignore(newGameObject)` for game-world entities.
-- **Controls**: Hold-to-show behavior for [F1] / Gamepad [LB].
+### The server (`server-geckos/index.ts`)
+Rooms of 2 to 4 players, the match start (seed and input delay), and a relay for input packets. It doesn't simulate. PM2 runs it on the droplet.
 
----
+## Testing
+- `npm test`: recorded matches replay exactly, rollback players agree over a lossy simulated network, combat and KO rules.
+- Recording a replay: dev server, `http://localhost:5175/?record`, play, F9.
+- Several online clients on one machine: `npm run server` and `npm run dev`, then `/tests/online.html?clients=4&lag=50&loss=5`.
 
-## Update Protocol (MANDATORY)
+## Commands
+- `npm run dev` (Vite, port 5175), `npm run server` (game server, port 9208), `npm run build`, `npm test`.
+- Deploying the release, from `main`: `ssh-add ~/.ssh/id_rsa` once, then `./deploy_server.sh` and `./deploy_client.sh`, always together.
+- Packing a character's sprites into its atlas: `node scripts/pack-character.cjs <character> <folder of sprites>`.
 
-### Logging Prefix System
-When updating `DEVELOPMENT_LOG.md`, use these tags:
-- `[V]` **Version** (e.g., `v1.2.0`)
-- `[Feat]` **Feature**: New functionality.
-- `[Fix]` **Fix**: Bug resolutions.
-- `[Refactor]` **Refactor**: Architectural changes/cleanup.
-- `[Polish]` **Polish**: Visual/Audio/UX improvements.
-- `[S]` **Status**: Current project health/readiness.
+## Update protocol
 
-### PROCEDURE Protocol
-When the user says "**PROCEDURE**", perform these EXACT steps:
-1.  **Bump Version**: Update `package.json` (e.g., `1.2.1`).
-2.  **Update UI**: Sync version string in `MainMenuScene.ts`.
-3.  **Log**: Add every change since previous version to the devlog (chronological).
-4.  **Commit**: Message format: `v[VERSION]: [Short Summary]`.
-5.  **Push**: Execute `git push` to deploy online.
+### Devlog tags
+Entries in `DEVELOPMENT_LOG.md` use: `[Feat]` feature, `[Fix]` bug fix, `[Refactor]` restructuring and cleanup, `[Polish]` visual, audio and UX polish, `[Deploy]` deployment, `[S]` status and how it was verified.
 
-## Development Commands & URLs
-- **Client**: `npm run dev` (Vite on port `5175`). URL: `http://localhost:5175`
-- **Server**: `npm run server` (Kills port `9208` then starts Geckos). URL: `http://localhost:9208`
-- **Deployment**: `./deploy_client.sh` and `./deploy_server.sh` (Pass: 3003)
-- **Node**: v25.6.0+
+### PROCEDURE
+When the user says "**PROCEDURE**":
+1. Bump the version in `package.json` (and `package-lock.json`); the main menu shows it by itself. Experimental versions end in `-e` (`3.0.1-e` shows as v3.0.1e).
+2. Log every change since the previous version in the devlog.
+3. Commit as `v[VERSION]: [short summary]` and push. Deploying is separate: only when asked.

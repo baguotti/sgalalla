@@ -41,12 +41,16 @@ export class OnlineLobbyScene extends Phaser.Scene {
         this.characterIndex = Math.max(0, ALL_CHARACTERS.indexOf('fok'));
         this.setStatus('CONNESSIONE...');
 
-        this.client = new NetClient();
-        this.client.on(NetEvent.REJECTED, (data: { reason?: string }) => this.fail(`VERSIONE DIVERSA DAL SERVER\n${data?.reason ?? ''}`));
-        this.client.on(NetEvent.ROOM, (room: RoomState) => this.onRoom(room));
-        this.client.on(NetEvent.START, (start: MatchStart) => this.onStart(start));
-        this.client.onDisconnect(() => this.fail('CONNESSIONE PERSA'));
-        this.client.connect().catch(() => this.fail('SERVER NON RAGGIUNGIBILE'));
+        const client = new NetClient();
+        this.client = client;
+        client.on(NetEvent.REJECTED, (data: { reason?: string }) => this.fail(`VERSIONE DIVERSA DAL SERVER\n${data?.reason ?? ''}`));
+        client.on(NetEvent.ROOM, (room: RoomState) => this.onRoom(room));
+        client.on(NetEvent.START, (start: MatchStart) => this.onStart(start));
+        client.onDisconnect(() => this.fail('CONNESSIONE PERSA'));
+        // The scene is reused: a connection given up on in an earlier visit can fail after the lobby is reopened
+        client.connect().catch(() => {
+            if (this.client === client) this.fail('SERVER NON RAGGIUNGIBILE');
+        });
 
         this.input.keyboard?.on('keydown', (event: KeyboardEvent) => this.onKey(event.code));
         this.input.gamepad?.on('down', (pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button) => {

@@ -212,10 +212,6 @@ export class ControlsOverlay {
         }
     }
 
-    public toggle(): void {
-        if (this.isVisible) this.hide(); else this.show();
-    }
-
     /** Call from scene update() to poll LB gamepad button (hold-to-show) */
     public update(): void {
         const gamepads = navigator.getGamepads();

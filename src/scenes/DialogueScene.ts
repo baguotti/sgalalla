@@ -13,7 +13,6 @@ export class DialogueScene extends Phaser.Scene {
     private nameElement!: Phaser.GameObjects.Text;
     private lines: DialogueLine[] = [];
     private currentLineIndex: number = 0;
-    private onDialogueComplete: (() => void) | null = null;
 
     private leftCharacterKey: string = 'fok';
     private rightCharacterKey: string = 'sgu';
@@ -176,16 +175,6 @@ export class DialogueScene extends Phaser.Scene {
         }
     }
 
-    public playDialogue(lines: DialogueLine[]): Promise<void> {
-        this.lines = lines;
-        this.currentLineIndex = 0;
-
-        return new Promise<void>((resolve) => {
-            this.onDialogueComplete = resolve;
-            this.showCurrentLine();
-        });
-    }
-
     private showCurrentLine() {
         if (this.currentLineIndex >= this.lines.length) {
             this.finishDialogue();
@@ -194,10 +183,6 @@ export class DialogueScene extends Phaser.Scene {
 
         const line = this.lines[this.currentLineIndex];
         this.nameElement.setText(line.speaker.toUpperCase());
-
-        // Name is statically right-aligned inside the dialogue bubble now.
-        // We only change the color or highlight based on active speaker if desired,
-        // but for now, we just ensure the text is updated.
 
         // --- Typewriter Effect via Masking ---
         if (this.typewriterTimer) this.typewriterTimer.remove();
@@ -434,12 +419,7 @@ export class DialogueScene extends Phaser.Scene {
         this.isShowingChoices = false;
         this.choiceButtons = [];
 
-        if (this.onDialogueComplete) {
-            this.onDialogueComplete();
-            this.onDialogueComplete = null;
-        }
-
-        // Emit event so GameScene can listen for dialogue completion
+        // GameScene listens for the end of the dialogue
         this.events.emit('dialogue_complete');
 
         // Stop the scene completely and restore focus to GameScene underneath

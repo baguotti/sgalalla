@@ -349,7 +349,7 @@ export class Player extends Phaser.GameObjects.Container {
     public spawnSignatureGhost(ghost: GhostHitbox): void {
         const char = this.character;
         const kind = ghost.vertical ? 'up' : 'side';
-        const sprite = this.effects().spawnGhost(ghost.startX, ghost.startY, char, `${char}_${kind}_sig_ghost_000`, `${char}_${kind}_sig_ghost`, ghost.facing);
+        const sprite = this.effects().spawnGhost(ghost.startX, ghost.startY, char, `${char}_${kind}_sig_ghost_000`, `${char}_${kind}_sig_ghost`, ghost.facing, 1);
         if (!sprite) return;
 
         const scale = char === 'nock' && ghost.vertical ? 1.2 : 1;
@@ -387,7 +387,7 @@ export class Player extends Phaser.GameObjects.Container {
     /** The recovery move flashes an up-signature ghost that follows the fighter. */
     private spawnRecoveryGhost(facing: number): void {
         const char = this.character;
-        const sprite = this.effects().spawnGhost(this.x, this.y, char, `${char}_up_sig_ghost_000`, `${char}_up_sig_ghost`, facing);
+        const sprite = this.effects().spawnGhost(this.x, this.y, char, `${char}_up_sig_ghost_000`, `${char}_up_sig_ghost`, facing, 1);
         if (!sprite) return;
 
         const scale = char === 'nock' ? 1.2 : 1;

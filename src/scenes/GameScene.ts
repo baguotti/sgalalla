@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Player, type PlayerConfig } from '../entities/Player';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
 import { getConfirmButtonIndex } from '../input/JoyConMapper';
+import { GamepadPresses } from '../input/GamepadPresses';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { InputDebugOverlay } from '../components/InputDebugOverlay';
 import { TouchController } from '../components/TouchController';
@@ -9,14 +10,16 @@ import { PauseMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
+import { isStageKey, loadStageBackground, type StageKey } from '../stages/StageBackgrounds';
 import { createStage as createSharedStage } from '../stages/StageFactory';
 import { EffectManager } from '../effects/EffectManager';
 import { AnimationHelpers } from '../managers/AnimationHelpers';
 import { AudioManager } from '../managers/AudioManager';
-import { CampaignManager } from '../managers/CampaignManager';
+import { CampaignManager, type OpponentConfig } from '../managers/CampaignManager';
 import { MatchRecorder } from '../debug/MatchRecorder';
 import type { NetClient } from '../network/NetClient';
 import { OnlineMatch } from '../network/OnlineMatch';
+import { ALL_CHARACTERS } from '../config/CharacterConfig';
 import { AttackRegistry, AttackType } from '../../shared/AttackData';
 import type { FighterInput } from '../../shared/FighterInput';
 import { isInPlay, type FighterSetup } from '../../shared/FighterState';
@@ -26,8 +29,39 @@ import type { MatchEvent } from '../../shared/MatchEvents';
 import { NetEvent, type MatchStart } from '../../shared/NetProtocol';
 import { STAGE_LAYOUT, type SimRect } from '../../shared/StageData';
 
+import type { DialogueLine } from './DialogueScene';
 import type { GameSceneInterface } from './GameSceneInterface';
 
+/** A player taking part in the match, as the lobby, the campaign or the online lobby set it up. */
+export interface PlayerSlot {
+    playerId: number;
+    joined: boolean;
+    ready: boolean;
+    input: { type: 'KEYBOARD' | 'GAMEPAD'; gamepadIndex: number | null; keyboardMapping?: 'all'; mappingSlot?: number };
+    character: string;
+    isAI?: boolean;
+    isTrainingDummy?: boolean;
+    /** Online: another player's fighter, driven by their packets. */
+    isRemote?: boolean;
+}
+
+/** What GameScene is started with. */
+export interface GameSceneData {
+    mode?: 'versus' | 'training' | 'campaign' | 'online';
+    playerData?: PlayerSlot[];
+    selectedMap?: string;
+    /** Campaign: a practice rematch against an island's opponent. */
+    isTraining?: boolean;
+    trainingOpponentIndex?: number;
+    slotIndex?: number;
+    online?: { client: NetClient; start: MatchStart };
+}
+
+/** Standard gamepad button indices. */
+const GAMEPAD_SELECT = 8;
+const GAMEPAD_START = 9;
+const GAMEPAD_UP = 12;
+const GAMEPAD_DOWN = 13;
 
 export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private debugOverlay!: DebugOverlay;
@@ -44,15 +78,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private inputDebugOverlay!: InputDebugOverlay;
     private trainingToggleKey!: Phaser.Input.Keyboard.Key;
 
-    // Kill tracking
-
-
-    // Wall configuration
-
     public uiCamera!: Phaser.Cameras.Scene2D.Camera;
 
-    // Camera Settings
-    private currentZoomLevel: ZoomLevel = 'CLOSE';
+    private readonly currentZoomLevel: ZoomLevel = 'CLOSE';
 
     // The match simulation advances in fixed 60 Hz steps, whatever the display refresh rate.
     // players[i] draws and drives match.fighters[i].
@@ -81,9 +109,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private gameOverSelectedIndex: number = 0;
     private gameOverMenuTexts: Phaser.GameObjects.Text[] = [];
     private gameOverMenuOptions: string[] = ['RIVINCITA', 'TORNA ALLA LOBBY'];
-    private previousAButtonPressed: boolean = false;
-    private previousSelectPressed: boolean = false;
-    private previousStartPressed: boolean = false;
+    private readonly padPresses = new GamepadPresses();
     private gameOverUpKey!: Phaser.Input.Keyboard.Key;
     private gameOverDownKey!: Phaser.Input.Keyboard.Key;
     private gameOverEnterKey!: Phaser.Input.Keyboard.Key;
@@ -98,34 +124,23 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     preload(): void {
         this.loadCharacterAssets();
+        loadStageBackground(this, this.currentStageBackground);
     }
 
+    /** Fighters, stage platforms and sounds; the music is global (PreloadScene). */
     private loadCharacterAssets(): void {
         AnimationHelpers.loadCharacterAssets(this);
         AnimationHelpers.loadCommonAssets(this);
         AnimationHelpers.loadUIAudio(this);
-
-        // Music is now global (loaded in PreloadScene)
-        // this.load.audio('music_match_loop_main', ...); 
-
         this.load.on('loaderror', (file: { src: string }) => {
             console.error('Asset load failed:', file.src);
         });
-
-        // Stage Background loaded in AnimationHelpers
     }
-
-    private createAnimations(): void {
-        AnimationHelpers.createAnimations(this);
-    }
-
-
 
     private players: Player[] = [];
-    // private playerHUDs: PlayerHUD[] = []; // Deprecated
     private matchHUD!: MatchHUD;
     public spawnPoints: { x: number, y: number }[] = [];
-    private playerData: any[] = [];
+    private playerData: PlayerSlot[] = [];
 
     private winnerTextVisual?: Phaser.GameObjects.Text;
 
@@ -144,9 +159,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private isTraining: boolean = false;
     private trainingOpponentIndex: number = 0;
 
-    private currentStageBackground: string = 'adria_bg';
+    private currentStageBackground: StageKey = 'adria_bg';
 
-    init(data: any): void {
+    init(data: GameSceneData): void {
         this.mode = data.mode || 'versus';
         this.campaignMidFightPlayed = false; // Reset for each new match
         this.campaignColorMatrices = []; // Reset stale FX references from previous rounds
@@ -154,16 +169,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.isTraining = data.isTraining || false;
         this.trainingOpponentIndex = data.trainingOpponentIndex || 0;
 
-        // Apply selected map from lobby (non-campaign)
-        if (data.selectedMap) {
-            this.currentStageBackground = data.selectedMap;
-        } else {
-            this.currentStageBackground = 'adria_bg';
-        }
+        this.currentStageBackground = isStageKey(data.selectedMap) ? data.selectedMap : 'adria_bg';
 
         this.online = null;
         if (this.mode === 'online') {
-            const { client, start } = data.online as { client: NetClient; start: MatchStart };
+            const { client, start } = data.online!;
             this.online = new OnlineMatch(client, start);
             // Our slot plays with keyboard or the first gamepad; the others play remotely
             this.playerData = start.characters.map((character, playerId) => ({
@@ -206,10 +216,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                         input: { type: 'KEYBOARD', gamepadIndex: null },
                         character: opponent.character,
                         isAI: true,
-                        isTrainingDummy: true // Added for testing purposes so AI stands still
+                        // Stands still: the campaign's opponents don't fight back yet
+                        isTrainingDummy: true,
                     }
                 ];
-                this.currentStageBackground = opponent.stage;
+                if (isStageKey(opponent.stage)) this.currentStageBackground = opponent.stage;
             }
         }
 
@@ -223,11 +234,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // Initialize Effect Manager
             this.effectManager = new EffectManager(this);
 
-            // CRITICAL: Reset state arrays on scene restart
-            // CRITICAL: Reset state arrays on scene restart
+            // The scene object survives restarts: clear the previous match
             this.players.forEach(p => p.destroy());
             this.players = [];
-            // this.playerHUDs = [];
             if (this.matchHUD) {
                 this.matchHUD.destroy();
             }
@@ -242,34 +251,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             }
             this.isPaused = false;
 
-            // --- Fok Animations ---
-            this.createAnimations();
+            AnimationHelpers.createAnimations(this);
 
-
-            // BACKGROUND LOGIC
-            // Move background creation here to ensure it's managed, but depth should handle order.
-            // If SetDepth(-20) isn't working, it might be due to display list order if depth sorting isn't enabled or is buggy.
-            // Safest: create background FIRST.
-            // But since we are patching, let's try to force it to back of display list AND use depth.
-
-            // Note: I added background loading in createAnimations() earlier, which is called above.
-            // Let's remove it from there and put it here cleanly.
-            // Actually, let's just use what was added in createAnimations (which I effectively patched into 'create' in previous step? No, wait.)
-
-            // In the previous patch, I added the background code inside 'createAnimations'??
-            // Let's check where line 271 is. 
-            // Ah, I see "this.createAnimations();" at line 271.
-            // And then "Set background color (fallback)" at line 274.
-            // It seems I added the background code AFTER createAnimations, inside 'create'.
-
-            // If z-index -20 is obscuring, maybe the camera transform is ignored for background?
-            // Or maybe the players have lower Z?
-            // Player Z is 0.
-
-            // Let's try setScrollFactor(0) to make it static and ensure depth is comfortably low.
-            // And also `sendToBack()`.
-
-            // Setup cameras (Must be before createStage so UI camera exists for ignore logic)
+            // Cameras first, so the UI camera exists when the stage and fighters are told to skip it
             this.setupCameras();
 
             // Touch Controller Overlay
@@ -281,7 +265,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // Create stage platforms
             this.createStage();
 
-            // LOADING SCREEN (User Request: Hide blue transition)
+            // A black loading screen hides the first frames while the stage settles
             const loadingOverlay = this.add.rectangle(
                 this.scale.width / 2, this.scale.height / 2,
                 this.scale.width, this.scale.height, 0x000000
@@ -293,16 +277,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 { fontSize: '32px', color: '#ffffff', fontFamily: '"Pixeloid Sans"' }
             ).setOrigin(0.5).setDepth(10001);
 
-            // Ignore loading screen for UI camera if it exists (though UI camera is created inside setupCameras)
-            if (this.uiCamera) {
-                this.uiCamera.ignore([loadingOverlay, loadingText]);
-            }
-            // Actually, we want it ON the main camera or UI camera?
-            // If we put it on Main, it covers everything.
-            // If UI camera ignores it, it won't be drawn by UI camera.
-            // But Main camera sees it.
-            // However, verify if UI Camera clears the screen? No, it usually overlays.
-            // So this is fine.
+            this.uiCamera.ignore([loadingOverlay, loadingText]);
 
             // Ensure Global Music loops at lower volume
             const globalMusic = this.sound.get('global_music_loop');
@@ -323,8 +298,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 // Fallback if not started yet (e.g. dev reload on GameScene)
                 this.sound.play('global_music_loop', { loop: true, volume: targetVolume });
             }
-
-            // this.sound.stopAll(); // Removed to allow global music persistence
 
             // Fade out after a short delay to ensure assets/rendering is ready
             this.time.delayedCall(100, () => {
@@ -426,9 +399,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     });
                 }
 
-                // Add to HUD
-                this.addPlayerToHUD(player);
-
                 // If campaign first encounter, apply visual suppression to opponent (playerId 1)
                 if (this.mode === 'campaign' && !this.isTraining && pData.playerId === 1) {
                     if (player.spriteObject.postFX) {
@@ -439,16 +409,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 }
             });
 
-            // If campaign and NOT training, trigger transition to cutscene immediately
+            // A campaign fight (not a practice rematch) opens with a cutscene
             if (this.mode === 'campaign' && !this.isTraining) {
                 const opponent = CampaignManager.getInstance().getCurrentOpponent();
-                if (opponent) {
-                    // Start cutscene, moving P1 slightly left and P2 slightly right of center
-                    this.transitionToCutscene([
-                        { playerId: 0, x: 860, y: 750 },
-                        { playerId: 1, x: 1060, y: 750 }
-                    ], opponent.dialogueBefore, this.playerData[0].character, opponent.character).catch((e: Error | unknown) => console.error(e));
-                }
+                if (opponent) this.startIntroCutscene(opponent.dialogueBefore, this.playerData[0].character, opponent.character);
             }
 
             // Re-run camera exclusions now that players exist
@@ -460,7 +424,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.debugOverlay.setCameraIgnore(this.cameras.main);
 
             // Versus mode: only show FPS/Ping. Full debug is training-only.
-            const isTrainingMode = this.playerData.some((p: any) => p.isTrainingDummy);
+            const isTrainingMode = this.playerData.some(p => p.isTrainingDummy);
             if (!isTrainingMode) {
                 this.debugOverlay.setMinimalMode(true);
             }
@@ -469,9 +433,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.debugGraphics = this.add.graphics();
             this.debugGraphics.setDepth(9999);
             this.uiCamera.ignore(this.debugGraphics); // Only visible in main camera (world space)
-
-            // Add controls hint
-            // this.createControlsHint();
 
             // Create HUDs
             this.createHUDs();
@@ -516,8 +477,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 this.time.delayedCall(10, () => {
                     try {
                         // Infer mode from playerData (if dummy exists, it's training)
-                        const isTraining = this.playerData.some((p: any) => p.isTrainingDummy);
-                        const p1Data = this.playerData.find((p: any) => p.playerId === 0);
+                        const isTraining = this.playerData.some(p => p.isTrainingDummy);
+                        const p1Data = this.playerData.find(p => p.playerId === 0);
                         this.scene.start('LobbyScene', {
                             mode: isTraining ? 'training' : 'versus',
                             inputType: p1Data?.input?.type || 'KEYBOARD',
@@ -560,14 +521,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 this.debugVisible = true;
             }
 
-            // Handle Resume from other scenes
-            this.events.on('resume', () => {
-                if (this.isPaused) {
-                    this.pauseMenu.show();
-                    this.input.keyboard?.resetKeys();
-                }
-            });
-        } catch (e: any) {
+            this.events.on('resume', this.onResume, this);
+        } catch (e) {
             console.error("CRITICAL ERROR in GameScene.create:", e);
         }
     }
@@ -615,8 +570,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
             // Platform Textures
             stage.platformTextures.forEach(tex => {
-                if ((tex as any).postFX) {
-                    const fx = (tex as any).postFX.addColorMatrix();
+                if (tex.postFX) {
+                    const fx = tex.postFX.addColorMatrix();
                     fx.saturate(-0.5);
                     this.campaignColorMatrices.push(fx);
                 }
@@ -640,96 +595,43 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.players.forEach(p => this.addPlayerToHUD(p));
     }
 
+    /** HUD name: CPU for computer fighters, P1-P4 otherwise; the local player's is marked as theirs. */
     private addPlayerToHUD(player: Player): void {
         if (this.matchHUD) {
-            // Local game logic
-            // If strictly 1 human vs CPU, P1 is You. 
-            // If local multiplayer (P1 vs P2 human), both are "You"? No, that's confusing.
-            // Let's say Player 1 is ALWAYS "You" in single/local? 
-            // Or just P1 / P2 tags.
-            // User complained: "In training mode I'm currently battling a CPU, display the correct name (it's not P2 (YOU))"
-
-            // Logic:
-            // If AI -> Name = "CPU" or Character Name. isLocal = false.
-            // If Human -> Name = "P1" etc. isLocal = true (for P1 only maybe?)
-
             const isYOU = player.playerId === this.localPlayerId();
 
             let name = `P${player.playerId + 1} `;
             if (player.isAI) {
-                name = "CPU"; // or player.character
+                name = "CPU";
             }
 
             this.matchHUD.addPlayer(player.playerId, name, isYOU, player.character || 'fok');
         }
     }
 
-    private debugUpdateCounter = 0;
-
-    /**
-     * Chromatic Aberration Implementation:
-     * Uses built-in Camera Shake + Flash red/blue as a cheap "vibe" alternative 
-     * if simple CA shader isn't available, but here we will try to use the ColorMatrix 
-     * or simple camera shake which natively does some of this feeling.
-     * 
-     * ACTUALLY: Let's use a "Glitch" shake.
-     */
-
-
     update(_time: number, delta: number): void {
-        // Poll LB for controls overlay toggle
+        this.padPresses.poll();
+        // LB held shows the controls
         this.controlsOverlay.update();
 
-        // --- HITSTOP REMOVED --- 
-        // Logic flows normally now.
-
-        this.debugUpdateCounter++;
-
-        // Stop updates if game over
         if (this.isGameOver) {
             this.players.forEach(p => p.render(this.match, delta));
             // The opponent may still be simulating the last frames with our inputs
             this.online?.flush();
 
-            // Wait until 5 seconds passes and menu appears
+            // The menu appears 2 s after the end
             if (!this.isGameOverMenuReady) return;
 
-            // Handle Menu Navigation
-            let moveUp = Phaser.Input.Keyboard.JustDown(this.gameOverUpKey);
-            let moveDown = Phaser.Input.Keyboard.JustDown(this.gameOverDownKey);
-            let confirm = Phaser.Input.Keyboard.JustDown(this.gameOverEnterKey) || Phaser.Input.Keyboard.JustDown(this.gameOverSpaceKey);
+            const JustDown = Phaser.Input.Keyboard.JustDown;
+            const moveUp = JustDown(this.gameOverUpKey) || this.padPresses.justPressed(GAMEPAD_UP);
+            const moveDown = JustDown(this.gameOverDownKey) || this.padPresses.justPressed(GAMEPAD_DOWN);
+            const confirm = JustDown(this.gameOverEnterKey) || JustDown(this.gameOverSpaceKey) || this.padPresses.justPressed(getConfirmButtonIndex);
 
-            // Also check gamepads for navigation
-            const gamepads = navigator.getGamepads();
-            for (const gp of gamepads) {
-                if (!gp) continue;
-                // Basic D-Pad checking
-                if (gp.buttons[12]?.pressed) moveUp = true;
-                if (gp.buttons[13]?.pressed) moveDown = true;
-                const confirmIdx = getConfirmButtonIndex(gp);
-                if (gp.buttons[confirmIdx]?.pressed) {
-                    if (!this.previousAButtonPressed) {
-                        this.previousAButtonPressed = true;
-                        confirm = true;
-                    }
-                }
-            }
-
-            // A Button Edge Detection Release
-            const isAnyAPressed = Array.from(gamepads).some(gp => {
-                if (!gp) return false;
-                return gp.buttons[getConfirmButtonIndex(gp)]?.pressed;
-            });
-            if (!isAnyAPressed) this.previousAButtonPressed = false;
-
-            if (moveUp) {
-                this.gameOverSelectedIndex = (this.gameOverSelectedIndex - 1 + this.gameOverMenuOptions.length) % this.gameOverMenuOptions.length;
+            if (moveUp || moveDown) {
+                const count = this.gameOverMenuOptions.length;
+                this.gameOverSelectedIndex = (this.gameOverSelectedIndex + (moveUp ? count - 1 : 1)) % count;
                 this.updateGameOverMenuHighlight();
-                // AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.5 }); // Optional
-            } else if (moveDown) {
-                this.gameOverSelectedIndex = (this.gameOverSelectedIndex + 1) % this.gameOverMenuOptions.length;
-                this.updateGameOverMenuHighlight();
-                // AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.5 }); // Optional
+                AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.5 });
             } else if (confirm) {
                 AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
                 if (this.gameOverSelectedIndex === 0) {
@@ -743,12 +645,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             return;
         }
 
-        if (this.debugUpdateCounter % 60 === 0) {
-        }
-
-        // Handle Pause Toggle (ESC key or START button on gamepad)
+        // ESC or Start pauses
         const pauseKeyPressed = Phaser.Input.Keyboard.JustDown(this.pauseKey);
-        const gamepadPausePressed = this.checkGamepadPause();
+        const gamepadPausePressed = this.padPresses.justPressed(GAMEPAD_START);
 
         if ((pauseKeyPressed || gamepadPausePressed) && this.online) {
             // An online match can't pause for both players: ESC leaves it
@@ -769,7 +668,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         // Check for Debug Toggle (Q key or SELECT button on gamepad)
         const qKeyPressed = Phaser.Input.Keyboard.JustDown(this.debugToggleKey);
-        const gamepadSelectPressed = this.checkGamepadSelect();
+        const gamepadSelectPressed = this.padPresses.justPressed(GAMEPAD_SELECT);
 
         if (qKeyPressed || gamepadSelectPressed) {
             this.debugVisible = !this.debugVisible;
@@ -820,7 +719,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const cameraMoves = this.isCutscene ? 1 : steps;
         for (let i = 0; i < cameraMoves; i++) this.updateCamera();
 
-        // Update debug overlay (Showing P1 stats for now)
+        // Debug overlay: P1's movement and attack state, and the network stats online
         if (this.players.length > 0) {
             // Always show the first player
             const fighter = this.match.fighters[0];
@@ -925,7 +824,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 audio.playSFX('sfx_chest_drop', { volume: 0.6 });
                 break;
             case 'ko':
-                this.onKnockOut(event.fighter, event.x, event.y);
+                this.onKnockOut(event.fighter);
                 break;
             case 'respawn':
                 this.showRespawnFlash(event.x, event.y);
@@ -947,14 +846,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
     /** A fighter left the stage: impact, crowd, and the campaign's reactions. */
-    private onKnockOut(index: number, x: number, y: number): void {
+    private onKnockOut(index: number): void {
         const player = this.players[index];
         const fighter = this.match.fighters[index];
 
         this.cameras.main.shake(300, 0.02);
-        const impactX = Phaser.Math.Clamp(x, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
-        const impactY = Phaser.Math.Clamp(y, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
-        this.effectManager.spawnDeathExplosion(impactX, impactY, 0xff4444);
 
         const audio = AudioManager.getInstance();
         audio.playSFX('sfx_death', { volume: 0.8 });
@@ -1018,10 +914,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         });
     }
 
-    public setZoomLevel(level: ZoomLevel): void {
-        this.currentZoomLevel = level;
-    }
-
     private updateCamera(): void {
         // Filter out players who are effectively dead or inactive
         const targets = this.players.filter(p => {
@@ -1063,9 +955,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         // Lerp Camera
         const cam = this.cameras.main;
-        cam.zoom = Phaser.Math.Linear(cam.zoom, targetZoom, 0.1); // Increased from 0.05
+        cam.zoom = Phaser.Math.Linear(cam.zoom, targetZoom, 0.1);
         cam.centerOn(
-            Phaser.Math.Linear(cam.midPoint.x, centerX, 0.2), // Increased from 0.1
+            Phaser.Math.Linear(cam.midPoint.x, centerX, 0.2),
             Phaser.Math.Linear(cam.midPoint.y, centerY, 0.2)
         );
     }
@@ -1104,91 +996,26 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.pauseMenu.hide();
     }
 
+    /** Training: adds a CPU dummy, a character not yet on stage, in the first free player slot (up to 6). */
     private spawnTrainingDummy(): void {
-        const maxPlayers = 6; // User requested up to 5 CPUs (assuming +1 user = 6 total)
-
-        // Find first available player ID
-        let availableId = -1;
-        for (let i = 0; i < maxPlayers; i++) {
-            if (!this.players.find(p => p.playerId === i)) {
-                availableId = i;
-                break;
-            }
-        }
-
-        if (availableId === -1) {
-            console.log("Max players reached");
-            return;
-        }
-
-        // --- Random Character Logic ---
-        // Get list of currently used characters
+        const playerId = [0, 1, 2, 3, 4, 5].find(id => !this.players.some(p => p.playerId === id));
         const usedCharacters = this.players.map(p => p.character);
+        const characters = ALL_CHARACTERS.filter(c => !usedCharacters.includes(c));
+        if (playerId === undefined || characters.length === 0) return;
 
-        // Filter available characters from ALL_CHARACTERS
-        // Import ALL_CHARACTERS is needed. 
-        // Since I cannot import easily in replace_block without adding to top, I will use hardcoded list or assume imports.
-        // Actually, I can use Object.keys(charConfigs) if imported, or just hardcode the list for now if import is missing.
-        // Let's check imports. MainMenuScene has no imports of config. 
-        // GameScene imports `charConfigs`? 
-        // I will assume `ALL_CHARACTERS` or `charConfigs` is available or I will add the import.
-        // Let's just use the keys from `charConfigs` if available, or list them.
-        // GameScene likely has `charConfigs` imported.
-        // Wait, `CharacterConfig` was imported in recent changes.
-        // Let's assume `ALL_CHARACTERS` is available or use a local list to be safe.
-        // validChars = ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'];
-        const validChars = ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'];
-
-        const availableChars = validChars.filter(c => !usedCharacters.includes(c));
-
-        if (availableChars.length === 0) {
-            console.log("All characters already on screen");
-            return;
+        const character = characters[Phaser.Math.Between(0, characters.length - 1)];
+        if (!this.playerData.some(pd => pd.playerId === playerId)) {
+            this.playerData.push({
+                playerId, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null },
+                character, isAI: true, isTrainingDummy: true,
+            });
         }
 
-        const randomChar = availableChars[Phaser.Math.Between(0, availableChars.length - 1)];
-
-        const playerId = availableId;
-
-        // Data
-        const dummyData = {
-            playerId: playerId,
-            joined: true,
-            ready: true,
-            input: { type: 'KEYBOARD', gamepadIndex: null },
-            character: randomChar,
-            isAI: true,
-            isTrainingDummy: true // Keep this flag for now, maybe rename to isCPU later?
-        };
-
-        // Check if already exists in data (shouldn't if check passed)
-        if (!this.playerData.find(pd => pd.playerId === playerId)) {
-            this.playerData.push(dummyData);
-        }
-
-        // Create dynamic spawn points for up to 6 players
-        // Center area is around 960.
-        // Let's distribute them: 
-        // 4 players: 400, 800, 1120, 1520
-        // 6 players: Need to squeeze or spread.
-        // Let's stick to the center cluster logic for now, but widen it.
-        // 960 center. 
-        // Logic was: 960 + (playerId * 40).
-        // P0=960, P1=1000, P2=1040, P3=1080, P4=1120, P5=1160
-        // That's fine, prevents stacking.
-        const spawnX = 960 + (playerId * 60) - 100; // Shift left a bit so P0 isn't center
-        // P0 (User) = 860
-        // P1 = 920
-        // P2 = 980
-        // P3 = 1040
-        // P4 = 1100
-        // P5 = 1160
-        const spawnY = 300;
-
-        const setup = { character: randomChar, x: spawnX, y: spawnY };
+        // Spread along the top of the stage so dummies don't stack
+        const setup = { character, x: 860 + playerId * 60, y: 300 };
         this.fighterSetups.push(setup);
         const fighter = addFighter(this.match, setup);
-        const player = new Player(this, fighter, { playerId, character: randomChar, isAI: true, isTrainingDummy: true });
+        const player = new Player(this, fighter, { playerId, character, isAI: true, isTrainingDummy: true });
         player.setColor(this.PLAYER_COLORS[playerId] || 0xffffff);
 
         this.players.push(player);
@@ -1198,53 +1025,37 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.addPlayerToHUD(player);
     }
 
-    // Clean up when scene is shut down (e.g. switching to menu)
-    // Clean up when scene is shut down (e.g. switching to menu)
+    /** Back from a scene launched over this one (settings, dialogue): the pause menu comes back if it was up. */
+    private onResume(): void {
+        if (!this.isPaused) return;
+        this.pauseMenu.show();
+        this.input.keyboard?.resetKeys();
+    }
+
+    /** Scene shutdown (leaving the match): everything create() set up. */
     shutdown(): void {
         this.online?.client.close();
         this.online = null;
 
-        try {
-            this.input.keyboard?.removeAllKeys();
-            this.input.keyboard?.resetKeys();
-        } catch (e) {
-            console.warn("Error clearing input keys:", e);
+        this.input.keyboard?.removeAllKeys();
+        this.input.keyboard?.resetKeys();
+        this.input.keyboard?.off('keydown-F9');
+
+        for (const event of ['pauseMenuResume', 'pauseMenuRestart', 'pauseMenuSettings', 'pauseMenuLobby', 'pauseMenuExit', 'pauseMenuMap', 'spawnDummy']) {
+            this.events.off(event);
         }
+        this.events.off('resume', this.onResume, this);
 
-        // Kill event listeners
-        this.events.off('pauseMenuResume');
-        this.events.off('pauseMenuRestart');
-        this.events.off('pauseMenuSettings');
-        this.events.off('pauseMenuLobby');
-        this.events.off('pauseMenuExit');
-        this.events.off('spawnDummy');
-
-        // Destroy players
         this.players.forEach(p => p.destroy());
         this.players = [];
-
-        // Destroy HUD
-        if (this.matchHUD) {
-            this.matchHUD.destroy();
-        }
-
-        // Destroy overlays and menus
-        if (this.pauseMenu) {
-            this.pauseMenu.destroy();
-        }
-        if (this.controlsOverlay) {
-            this.controlsOverlay.destroy();
-        }
-        if (this.inputDebugOverlay) {
-            this.inputDebugOverlay.destroy();
-        }
-        if (this.debugOverlay) {
-            this.debugOverlay.destroy();
-        }
-
-        // Stop all active tweens
+        this.matchHUD?.destroy();
+        this.pauseMenu?.destroy();
+        this.controlsOverlay?.destroy();
+        this.inputDebugOverlay?.destroy();
+        this.debugOverlay?.destroy();
         this.tweens.killAll();
     }
+
     /** The simulation ended the match: at most one fighter has lives left. */
     private onMatchOver(): void {
         const winner = this.match.winnerId >= 0 ? this.players[this.match.winnerId] : null;
@@ -1377,7 +1188,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                                     playerData: [this.playerData[0]],
                                     mode: 'campaign',
                                     slotIndex: campaign.getActiveSlotIndex(),
-                                    targetIslandIndex: this.trainingOpponentIndex // Add this!
+                                    targetIslandIndex: this.trainingOpponentIndex
                                 });
                             }
                         }
@@ -1405,7 +1216,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             speaker: dialogueData.speaker,
             text: dialogueData.text,
             side: dialogueData.side as 'left' | 'right',
-            animation: (dialogueData as any).animation || 'idle',
+            animation: dialogueData.animation || 'idle',
             choices: [
                 {
                     text: 'YES', action: () => {
@@ -1425,7 +1236,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                             playerData: [this.playerData[0]],
                             mode: 'campaign',
                             slotIndex: campaign.getActiveSlotIndex(),
-                            targetIslandIndex: this.trainingOpponentIndex // Add this!
+                            targetIslandIndex: this.trainingOpponentIndex
                         });
                     }
                 }
@@ -1531,8 +1342,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             return;
         }
 
-        const isTraining = this.playerData.some((p: any) => p.isTrainingDummy);
-        const p1Data = this.playerData.find((p: any) => p.playerId === 0);
+        const isTraining = this.playerData.some(p => p.isTrainingDummy);
+        const p1Data = this.playerData.find(p => p.playerId === 0);
 
         let targetMode = 'versus';
         if (this.mode === 'training' || isTraining) targetMode = 'training';
@@ -1551,14 +1362,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             return;
         }
 
-        // Just start GameScene directly if we are in campaign?
-        // Actually, if campaign, we may want to skip lobby. Let Lobby check and auto-start maybe?
-        // Let's just go back to Lobby in 'campaign' mode, and Lobby auto-assigns and starts? 
-        // No, lobby doesn't auto-start. 
-        // Let's go to Lobby but pass the 'campaign' mode so player can select character again?
-        // Or we can just restart GameScene if campaign continues.
-        // Let's go to Lobby so they can pick character for next round.
-
+        // Back to character selection
         this.scene.start('LobbyScene', {
             mode: targetMode,
             inputType: p1Data?.input?.type || 'KEYBOARD',
@@ -1617,264 +1421,103 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
 
 
-    // --- Cinematic Methods ---
-    public async transitionToCutscene(positions: { playerId: number, x: number, y: number }[], dialogue: any[], leftChar?: string, rightChar?: string): Promise<void> {
-        return new Promise<void>((resolve) => {
-            // Hold the match and stand the fighters at their marks, facing each other
-            this.isCutscene = true;
-            positions.forEach(pos => {
-                const player = this.players.find(p => p.playerId === pos.playerId);
-                if (!player) return;
-                placeFighter(this.match, player.fighterIndex, pos.x, pos.y, pos.playerId === 0 ? 1 : -1);
-                player.setPose('idle');
-            });
+    // ─── Cutscenes (campaign) ───
 
-            // Wait 600ms for the black LOADING overlay to fade out, then launch dialogue
-            this.time.delayedCall(600, () => {
-                // Hide match HUD now that it's fully constructed
-                if (this.matchHUD) this.matchHUD.setVisible(false);
-                this.launchDialogue(dialogue, resolve, leftChar, rightChar);
-            });
-        });
+    /** Holds the match and stands P1 and P2 on the main platform facing each other. */
+    private holdFightersForCutscene(): void {
+        this.isCutscene = true;
+        const marks = [{ playerId: 0, x: 860, facing: 1 }, { playerId: 1, x: 1060, facing: -1 }];
+        for (const mark of marks) {
+            const player = this.players.find(p => p.playerId === mark.playerId);
+            if (!player) continue;
+            placeFighter(this.match, player.fighterIndex, mark.x, 750, mark.facing);
+            player.setPose('idle');
+        }
     }
 
-    private launchDialogue(dialogue: any[], resolve: () => void, leftChar?: string, rightChar?: string): void {
-        const diagData = {
-            dialogueData: dialogue,
-            leftCharacter: leftChar,
-            rightCharacter: rightChar
-        };
-
-        // Stop any stale DialogueScene first, then launch fresh
-        if (this.scene.isActive('DialogueScene')) {
-            this.scene.stop('DialogueScene');
-        }
-
-        // Get scene reference BEFORE launch so we can listen for lifecycle events
-        const diagScene = this.scene.get('DialogueScene');
-
-        // Bind animation listener BEFORE launch — DialogueScene.create() synchronously
-        // calls showCurrentLine() which emits dialogue_animation during create().
-        diagScene.events.on('dialogue_animation', (side: 'left' | 'right', animation: string) => {
-            const targetPlayerId = side === 'left' ? 0 : 1;
-            this.players.find(p => p.playerId === targetPlayerId)?.setPose(animation);
+    /** Before a campaign fight: the opponent's opening lines, once the loading screen has faded. */
+    private startIntroCutscene(dialogue: DialogueLine[], leftChar: string, rightChar: string): void {
+        this.holdFightersForCutscene();
+        this.time.delayedCall(600, () => {
+            this.matchHUD?.setVisible(false);
+            this.playDialogue(dialogue, leftChar, rightChar, () => this.endCutscene());
         });
-
-        diagScene.events.once('dialogue_complete', () => {
-            diagScene.events.off('dialogue_animation');
-            this.endCutscene();
-            resolve();
-        });
-
-        this.scene.launch('DialogueScene', diagData);
     }
 
     private endCutscene(): void {
         this.players.forEach(p => p.setPose(null));
         this.isCutscene = false;
-
-        // Restore HUD visibility
-        if (this.mode === 'campaign' && this.matchHUD) {
-            this.matchHUD.setVisible(true);
-        }
+        if (this.mode === 'campaign') this.matchHUD?.setVisible(true);
     }
 
-    /**
-     * Campaign mid-fight cutscene: freeze both players, play dialogue, then resume fight.
-     */
-    private campaignMidFightCutscene(opponent: import('../managers/CampaignManager').OpponentConfig): void {
-        // Hold the match and stand both fighters on the stage, facing each other
-        this.isCutscene = true;
-        const p1 = this.players.find(p => p.playerId === 0);
-        const p2 = this.players.find(p => p.playerId === 1);
-        if (p1) placeFighter(this.match, p1.fighterIndex, 860, 750, 1);
-        if (p2) placeFighter(this.match, p2.fighterIndex, 1060, 750, -1);
-        this.players.forEach(p => p.setPose('idle'));
-
-        // Hide HUD during cutscene
-        if (this.matchHUD) this.matchHUD.setVisible(false);
-
-        // Launch mid-fight dialogue
-        const playerChar = this.playerData[0]?.character || 'fok';
-        this.launchDialogueWithCallback(
-            opponent.dialogueMidFight,
-            playerChar,
-            opponent.character,
-            () => {
-                // Resume fight after mid-fight cutscene
-                this.endCutscene();
-            }
-        );
+    /** The opponent is down to its last life: a pause for words, then the fight resumes. */
+    private campaignMidFightCutscene(opponent: OpponentConfig): void {
+        this.holdFightersForCutscene();
+        this.matchHUD?.setVisible(false);
+        this.playDialogue(opponent.dialogueMidFight, this.playerData[0]?.character || 'fok', opponent.character, () => this.endCutscene());
     }
 
-    /**
-     * Campaign defeat cutscene: plays after opponent is eliminated.
-     * Skips win animation and rematch prompt entirely.
-     */
+    /** The opponent is beaten: no victory screen, their parting lines, then on to the map. */
     private campaignDefeatCutscene(): void {
-        this.isGameOver = true; // Prevent normal game over flow
+        this.isGameOver = true;
+        const campaign = CampaignManager.getInstance();
+        // advanceLadder() has already moved on: the beaten opponent is the previous level's
+        const opponent = campaign.ladder[campaign.getCurrentLevel() - 1];
 
-        const opponent = CampaignManager.getInstance().ladder[
-            (CampaignManager.getInstance() as any).currentData.currentLevel - 1
-        ];
-
-        // Fade to black immediately after death
-        this.cameras.main.fadeOut(1000, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-            // Reset camera to default state (stop any pan/zoom/shake from death)
-            this.cameras.main.stopFollow();
-            this.cameras.main.resetFX();
-            this.cameras.main.setZoom(1);
-            this.cameras.main.centerOn(960, 540);
-
-            // Position both players face-to-face like the intro cutscene
-            const p1 = this.players.find(p => p.playerId === 0);
-            const p2 = this.players.find(p => p.playerId === 1);
-
-            // The match is over; the eliminated opponent is posed back on stage
-            if (p1) {
-                placeFighter(this.match, p1.fighterIndex, 860, 750, 1);
-                p1.setPose('idle');
-            }
-            if (p2) {
-                placeFighter(this.match, p2.fighterIndex, 1060, 750, -1);
-                p2.setPose('idle');
-            }
-
-            // Hide HUD
-            if (this.matchHUD) this.matchHUD.setVisible(false);
-
-            // Fade back in to reveal the cutscene
-            this.cameras.main.fadeIn(1000, 0, 0, 0);
+        const camera = this.cameras.main;
+        camera.fadeOut(1000, 0, 0, 0);
+        camera.once('camerafadeoutcomplete', () => {
+            camera.stopFollow();
+            camera.resetFX();
+            camera.setZoom(1);
+            camera.centerOn(960, 540);
+            this.holdFightersForCutscene();
+            this.matchHUD?.setVisible(false);
+            camera.fadeIn(1000, 0, 0, 0);
 
             if (opponent && opponent.dialogueAfterWin.length > 0) {
                 const playerChar = this.playerData[0]?.character || 'fok';
-                this.launchDialogueWithCallback(
-                    opponent.dialogueAfterWin,
-                    playerChar,
-                    opponent.character,
-                    () => {
-                        // After defeat cutscene → transition to next opponent
-                        this.campaignTransitionToNextOpponent();
-                    }
-                );
+                this.playDialogue(opponent.dialogueAfterWin, playerChar, opponent.character, () => this.campaignTransitionToNextOpponent());
             } else {
-                // No defeat dialogue, go straight to transition
                 this.campaignTransitionToNextOpponent();
             }
         });
     }
 
-    /**
-     * Transition to next campaign opponent with a fade effect.
-     */
+    /** A long fade, then the map on the island just beaten, or the credits after the last. */
     private campaignTransitionToNextOpponent(): void {
-        // Fade camera to black (longer transition for dramatic effect)
         this.cameras.main.fadeOut(2000, 0, 0, 0);
-
         this.cameras.main.once('camerafadeoutcomplete', () => {
-            const nextOpponent = CampaignManager.getInstance().getCurrentOpponent();
-
-            if (nextOpponent) {
-                // Next opponent exists — go to map scene positioned on the island just beaten
-                // getCurrentLevel() has already been incremented by advanceLadder(), so -1 gives
-                // the last defeated opponent's island (player then steps right to the new one).
-                const justBeatenIndex = CampaignManager.getInstance().getCurrentLevel() - 1;
+            const campaign = CampaignManager.getInstance();
+            if (campaign.getCurrentOpponent()) {
                 this.scene.start('CampaignMapScene', {
                     playerData: [this.playerData[0]],
                     mode: 'campaign',
-                    slotIndex: CampaignManager.getInstance().getActiveSlotIndex(),
-                    targetIslandIndex: Math.max(0, justBeatenIndex)
+                    slotIndex: campaign.getActiveSlotIndex(),
+                    targetIslandIndex: Math.max(0, campaign.getCurrentLevel() - 1),
                 });
             } else {
-                // Campaign complete! Show credits — save file is kept.
+                // The save file is kept
                 this.scene.start('CreditsScene');
             }
         });
     }
 
-    /**
-     * Launch dialogue with a custom completion callback (used by mid-fight and defeat cutscenes).
-     */
-    private launchDialogueWithCallback(
-        dialogue: { speaker: string; text: string; side: 'left' | 'right' }[],
-        leftChar: string,
-        rightChar: string,
-        onComplete: () => void
-    ): void {
-        const diagData = {
-            dialogueData: dialogue,
-            leftCharacter: leftChar,
-            rightCharacter: rightChar
-        };
+    /** Plays `dialogue` over the match; the fighters strike the poses its lines ask for. */
+    private playDialogue(dialogue: DialogueLine[], leftChar: string, rightChar: string, onComplete: () => void): void {
+        if (this.scene.isActive('DialogueScene')) this.scene.stop('DialogueScene');
 
-        // Stop any stale DialogueScene first
-        if (this.scene.isActive('DialogueScene')) {
-            this.scene.stop('DialogueScene');
-        }
-
-        const diagScene = this.scene.get('DialogueScene');
-
-        // Bind BEFORE launch to catch events emitted during create()
-        diagScene.events.on('dialogue_animation', (side: 'left' | 'right', animation: string) => {
-            const targetPlayerId = side === 'left' ? 0 : 1;
-            this.players.find(p => p.playerId === targetPlayerId)?.setPose(animation);
+        // Listen before launching: DialogueScene.create() already emits the first line's pose
+        const dialogueScene = this.scene.get('DialogueScene');
+        dialogueScene.events.on('dialogue_animation', (side: 'left' | 'right', animation: string) => {
+            const playerId = side === 'left' ? 0 : 1;
+            this.players.find(p => p.playerId === playerId)?.setPose(animation);
         });
-
-        diagScene.events.once('dialogue_complete', () => {
-            diagScene.events.off('dialogue_animation');
+        dialogueScene.events.once('dialogue_complete', () => {
+            dialogueScene.events.off('dialogue_animation');
             onComplete();
         });
 
-        this.scene.launch('DialogueScene', diagData);
-    }
-
-    // --- Gamepad Helper Methods (Raw Input for reliability) ---
-    private checkGamepadPause(): boolean {
-        // Pause is usually Start (9)
-        const gamepads = navigator.getGamepads();
-        for (const gp of gamepads) {
-            if (!gp) continue;
-            // Check Start (9)
-            if (gp.buttons[9]?.pressed) {
-                if (!this.previousStartPressed) {
-                    this.previousStartPressed = true;
-                    return true;
-                }
-            } else {
-                // Reset only if THIS gamepad released it? 
-                // Simple approach: if ANY gamepad holds start, we set flag. 
-                // If NO gamepad holds start, we reset flag.
-            }
-        }
-
-        // Reset flag if no gamepad is pressing start
-        const isAnyStartPressed = Array.from(gamepads).some(gp => gp && gp.buttons[9]?.pressed);
-        if (!isAnyStartPressed) {
-            this.previousStartPressed = false;
-        }
-
-        return false;
-    }
-
-    private checkGamepadSelect(): boolean {
-        // Debug/Select is usually Back/Select (8)
-        const gamepads = navigator.getGamepads();
-        for (const gp of gamepads) {
-            if (!gp) continue;
-            if (gp.buttons[8]?.pressed) {
-                if (!this.previousSelectPressed) {
-                    this.previousSelectPressed = true;
-                    return true;
-                }
-            }
-        }
-
-        const isAnySelectPressed = Array.from(gamepads).some(gp => gp && gp.buttons[8]?.pressed);
-        if (!isAnySelectPressed) {
-            this.previousSelectPressed = false;
-        }
-
-        return false;
+        this.scene.launch('DialogueScene', { dialogueData: dialogue, leftCharacter: leftChar, rightCharacter: rightChar });
     }
 }

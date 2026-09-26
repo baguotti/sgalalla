@@ -216,10 +216,6 @@ export class InputDebugOverlay {
         ]);
     }
 
-    getElements(): Phaser.GameObjects.GameObject[] {
-        return [this.bgPanel, this.titleText, ...this.playerTexts];
-    }
-
     destroy(): void {
         this.bgPanel.destroy();
         this.titleText.destroy();

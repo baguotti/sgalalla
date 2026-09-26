@@ -46,6 +46,13 @@ export default defineConfig({
         '__APP_VERSION__': JSON.stringify(packageJson.version)
     },
     plugins: [saveReplays()],
+    build: {
+        rollupOptions: {
+            // Phaser in its own file: after an update, players only download the game's code again
+            output: { manualChunks: { phaser: ['phaser'] } },
+        },
+        chunkSizeWarningLimit: 1300,
+    },
     server: {
         host: '0.0.0.0',
         port: 5175,

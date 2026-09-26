@@ -9,17 +9,18 @@ import * as sguDialogue from '../data/dialogue/sgu';
 import * as sgaDialogue from '../data/dialogue/sga';
 import * as fokDialogue from '../data/dialogue/fok';
 import * as gregDialogue from '../data/dialogue/greg';
+import type { DialogueLine } from '../scenes/DialogueScene';
 
 export interface OpponentConfig {
     character: string;
     stage: string;
-    dialogueBefore: { speaker: string; text: string; side: 'left' | 'right' }[];
-    dialogueMidFight: { speaker: string; text: string; side: 'left' | 'right' }[];
-    dialogueAfterWin: { speaker: string; text: string; side: 'left' | 'right' }[];
-    dialogueTrainingPrompt: { speaker: string; text: string; side: 'left' | 'right' }[];
-    dialogueTrainingWin: { speaker: string; text: string; side: 'left' | 'right' }[];
-    dialogueTrainingLose: { speaker: string; text: string; side: 'left' | 'right' }[];
-    dialogueCampaignLose: { speaker: string; text: string; side: 'left' | 'right' }[];
+    dialogueBefore: DialogueLine[];
+    dialogueMidFight: DialogueLine[];
+    dialogueAfterWin: DialogueLine[];
+    dialogueTrainingPrompt: DialogueLine[];
+    dialogueTrainingWin: DialogueLine[];
+    dialogueTrainingLose: DialogueLine[];
+    dialogueCampaignLose: DialogueLine[];
     difficulty: number; // 1-10 mapped to AI aggressiveness
 }
 
@@ -188,13 +189,6 @@ export class CampaignManager {
         if (this.currentData.currentLevel >= this.ladder.length) {
             this.currentData.currentLevel = this.ladder.length;
         }
-        this.updatePlayTime();
-        SaveService.saveSlot(this.activeSlotIndex, this.currentData);
-    }
-
-    /** Call this when leaving the campaign to persist accumulated play time. */
-    public savePlayTime(): void {
-        if (!this.currentData) return;
         this.updatePlayTime();
         SaveService.saveSlot(this.activeSlotIndex, this.currentData);
     }

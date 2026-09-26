@@ -138,11 +138,13 @@ export function placeFighter(match: MatchState, id: number, x: number, y: number
 
 // ─── Movement ───
 
+// Reused every step: the physics' input and the events it reports
 const physicsInput: PhysicsInput = {
     moveLeft: false, moveRight: false, moveDown: false, moveUp: false,
     jumpBuffered: false, jumpHeld: false, dodgeBuffered: false,
-    aimUp: false, aimDown: false, recoveryRequested: false,
+    aimUp: false, aimDown: false,
 };
+const physicsEvents: PhysicsEvent[] = [];
 
 function stepFighterPhysics(f: FighterState, events: MatchEvent[]): void {
     const b = f.body;
@@ -178,7 +180,8 @@ function stepFighterPhysics(f: FighterState, events: MatchEvent[]): void {
     physicsInput.aimUp = input.aimUp;
     physicsInput.aimDown = input.aimDown;
 
-    const physicsEvents = stepPhysics(b, physicsInput, STEP_S);
+    physicsEvents.length = 0;
+    stepPhysics(b, physicsInput, STEP_S, physicsEvents);
     f.isDodging = b.isDodging;
     handlePhysicsEvents(f, physicsEvents);
     pushPhysicsSounds(events, f.id, physicsEvents);
@@ -197,11 +200,13 @@ function handlePhysicsEvents(f: FighterState, physicsEvents: readonly PhysicsEve
 function collidePlatforms(f: FighterState, events: MatchEvent[]): void {
     const b = f.body;
     const platforms = STAGE_LAYOUT.platforms;
+    physicsEvents.length = 0;
     for (let i = 0; i < platforms.length; i++) {
         const p = platforms[i];
         if (b.droppingThroughPlatformIdx === i) b.droppingThroughY = p.y;
-        pushPhysicsSounds(events, f.id, checkSinglePlatformCollision(b, i, p.x, p.y, p.w, p.h, p.isSoft));
+        checkSinglePlatformCollision(b, i, p.x, p.y, p.w, p.h, p.isSoft, physicsEvents);
     }
+    pushPhysicsSounds(events, f.id, physicsEvents);
     f.isDodging = b.isDodging;
 }
 

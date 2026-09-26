@@ -21,16 +21,14 @@
     "concurrently": "^9.2.1",
     "electron": "^35.7.5",
     "electron-builder": "^26.8.1",
+    "free-tex-packer-core": "^0.3.9",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "vite": "^7.2.4"
   },
   "dependencies": {
     "@geckos.io/client": "^3.0.2",
-    "@geckos.io/snapshot-interpolation": "^1.1.1",
-    "free-tex-packer-core": "^0.3.5",
-    "phaser": "^3.90.0",
-    "socket.io-client": "^4.8.3"
+    "phaser": "^3.90.0"
   },
   "build": {
     "appId": "com.sgalalla.game",

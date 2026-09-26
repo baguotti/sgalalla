@@ -397,10 +397,4 @@ export class GamepadInput {
     isConnected(): boolean {
         return this.gamepadIndex !== null;
     }
-
-    getGamepadId(): string | null {
-        if (this.gamepadIndex === null) return null;
-        const gamepads = navigator.getGamepads();
-        return gamepads[this.gamepadIndex]?.id || null;
-    }
 }

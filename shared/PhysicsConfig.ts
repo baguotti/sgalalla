@@ -1,8 +1,7 @@
 /**
- * Shared Physics Configuration
- * Single source of truth for all physics constants.
- * Used by both client (Phaser) and server (Node.js headless).
- * NO PHASER DEPENDENCIES — pure constants only.
+ * Tuning constants for the simulation (shared/). Speeds are in pixels per
+ * second, accelerations in pixels per second squared, durations and timers in
+ * milliseconds; friction multiplies the horizontal speed twice per step.
  */
 export const PhysicsConfig = {
     // Gravity - high value for fast, heavy feel (like Brawlhalla)
@@ -21,7 +20,6 @@ export const PhysicsConfig = {
     // Jump mechanics
     JUMP_FORCE: -1050,
     SHORT_HOP_FORCE: -540,
-    JUMP_HOLD_THRESHOLD: 150,
     DOUBLE_JUMP_FORCE: -900,
     MAX_JUMPS: 3,
 
@@ -32,33 +30,15 @@ export const PhysicsConfig = {
     // Recovery attack
     RECOVERY_FORCE_Y: -1760,
     RECOVERY_FORCE_X: 550,
-    RECOVERY_COOLDOWN: 1000,
     RECOVERY_DURATION: 300,
 
     // Platform drop-through
     PLATFORM_DROP_GRACE_PERIOD: 200,
 
-    // Attack system
-    LIGHT_ATTACK_DAMAGE: 4,
-    HEAVY_ATTACK_DAMAGE: 9,
-    LIGHT_ATTACK_KNOCKBACK: 25000,
-    HEAVY_ATTACK_KNOCKBACK: 45000,
-    LIGHT_ATTACK_DURATION: 200,
-    HEAVY_ATTACK_DURATION: 400,
-    LIGHT_ATTACK_COOLDOWN: 300,
-    HEAVY_ATTACK_COOLDOWN: 600,
-
-    // Hitbox sizes
-    LIGHT_HITBOX_WIDTH: 120,
-    LIGHT_HITBOX_HEIGHT: 80,
-    HEAVY_HITBOX_WIDTH: 600,
-    HEAVY_HITBOX_HEIGHT: 120,
-
     // Dodge/Dash - Brawlhalla style
     DODGE_DISTANCE: 210,
     DODGE_DURATION: 180,
     DODGE_COOLDOWN: 800,
-    DODGE_INVINCIBILITY: 150,
     SPOT_DODGE_DURATION: 300,
 
     // Run mechanics
@@ -69,55 +49,30 @@ export const PhysicsConfig = {
     MAX_DAMAGE: 999,
     HIT_STUN_DURATION: 300,
 
-    // Ledge detection
-    LEDGE_SNAP_DISTANCE: 30,
-
     // Player dimensions
     PLAYER_WIDTH: 120,
     PLAYER_HEIGHT: 184,
-    NOSE_SIZE: 24,
 
-    // Attack frame timing
-    LIGHT_STARTUP_FRAMES: 50,
-    LIGHT_ACTIVE_FRAMES: 100,
-    LIGHT_RECOVERY_FRAMES: 50,
-
-    // Heavy attacks
-    HEAVY_STARTUP_FRAMES: 30,
-    HEAVY_ACTIVE_FRAMES: 300,
-    HEAVY_RECOVERY_FRAMES: 200,
+    // Attack phases
+    LIGHT_STARTUP_MS: 50,
+    LIGHT_ACTIVE_MS: 100,
+    LIGHT_RECOVERY_MS: 50,
+    HEAVY_STARTUP_MS: 30,
+    HEAVY_ACTIVE_MS: 300,
+    HEAVY_RECOVERY_MS: 200,
 
     // Ground pound
     GROUND_POUND_STARTUP: 100,
-    GROUND_POUND_SPEED: 3200,
     GROUND_POUND_DAMAGE: 8,
-    GROUND_POUND_KNOCKBACK: 500,
-
-    // Directional attack hitbox offsets
-    SIDE_ATTACK_OFFSET_X: 300,
-    UP_ATTACK_OFFSET_Y: -150,
-    DOWN_ATTACK_OFFSET_Y: 150,
 
     // Chargeable heavy attacks
     CHARGE_MAX_TIME: 1500,
-    CHARGE_DAMAGE_MULT: 2.0,
-    CHARGE_KNOCKBACK_MULT: 1.8,
 
     // Wall mechanics
     WALL_SLIDE_SPEED: 400,
     WALL_JUMP_FORCE_X: 1600,
     WALL_JUMP_FORCE_Y: -1050,
-    WALL_FRICTION: 0.7,
     WALL_COYOTE_TIME: 200,
-
-    // Edge grab mechanics
-    EDGE_GRAB_HORIZONTAL_RANGE: 60,
-    EDGE_GRAB_VERTICAL_RANGE: 90,
-    LEDGE_HANG_OFFSET_X: 45,
-    LEDGE_HANG_OFFSET_Y: 45,
-    LEDGE_CLIMB_SPEED: -1000,
-    LEDGE_JUMP_X: 1200,
-    LEDGE_JUMP_Y: -1600,
 
     // State-dependent friction multipliers
     AIR_FRICTION: 0.91,
@@ -131,8 +86,6 @@ export const PhysicsConfig = {
     SHORT_HOP_VELOCITY_DAMP: 0.5,
 
     // Combat hitbox overrides
-    DOWN_SIG_HITBOX_WIDTH: 180,
-    DOWN_SIG_HITBOX_HEIGHT: 30,
     UP_SIG_HITBOX_WIDTH: 147,
     UP_SIG_HITBOX_HEIGHT: 34,
     SIDE_LIGHT_HITBOX_WIDTH: 81,
@@ -158,30 +111,4 @@ export const PhysicsConfig = {
     SPOT_DODGE_AERIAL_Y_DAMP: 0.2,
     SPOT_DODGE_ALPHA: 0.7,
     AIR_DODGE_VERTICAL_DAMP: 0.3,
-
-    // Bomb item properties
-    BOMB_RADIUS: 30,
-    BOMB_BOUNCE: 0.8,
-    BOMB_FRICTION: 0.005,
-    BOMB_DENSITY: 0.01,
-    BOMB_FUSE_TIME: 3000,
-    BOMB_GRACE_TIME: 200,
-    BOMB_EXPLOSION_VISUAL_RADIUS: 60,
-    BOMB_EXPLOSION_FADE_MS: 150,
-    BOMB_BLAST_RADIUS: 160,
-    BOMB_EXPLOSION_DAMAGE: 15,
-    BOMB_EXPLOSION_KNOCKBACK: 12,
-    BOMB_CONTACT_THRESHOLD: 90,
-    BOMB_SHAKE_DURATION: 150,
-    BOMB_SHAKE_INTENSITY: 0.01,
-
-    CHEST_DAMAGE: 25,
-    CHEST_PROJECTILE_DAMAGE: 15,
-    CHEST_PROJECTILE_SPEED_THRESHOLD: 8,
-    CHEST_KNOCKBACK_FORCE: 2500,
-    CHEST_SHAKE_DURATION: 150,
-    CHEST_SHAKE_INTENSITY: 0.01,
-    CHEST_GROUND_SHAKE_INTENSITY: 0.008,
-    CHEST_GROUND_SHAKE_DURATION: 150,
-    CHEST_SPEED_THRESHOLD: 2,
 } as const;

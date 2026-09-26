@@ -667,3 +667,12 @@ Part 2
 ------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-09-26] v3.0.1 - Official release (branch `netcode-rebuild`)
 - **[Release]** The official release is v3.0.1: 4-player online in rollback, smooth play on 120 Hz screens, campaign hidden while it's a work in progress. Live on the droplet.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-26] Deep clean and lobby fix (branch `main`)
+- **[Refactor]** The deep clean from `experimental-branch` (`checkpoint/deep-clean`), without its lighting parts: dead simulation code, unused fields, tuning constants and methods removed; typed `GameScene` data, one gamepad "just pressed" check for the match's menus (fixes the game-over menu skipping entries while the D-pad is held), a cleaner shutdown; the old JavaScript server, Docker/Fly.io files and unused packages gone; one character-packing script; rewritten `LLM_CONTEXT.md` and a `README.md`.
+- **[Perf]** A match loads only its own stage background (each is about 330 MB of video memory; the lobby and every match loaded all four), and the lobby shows small previews. Unused files are out of `public/`, halving the build; Phaser is its own cached chunk.
+- **[Fix]** **Online lobby**: leaving while it was still connecting threw an error and left you stuck on "CONNESSIONE...", and the abandoned connection went on to join a room. A failed connection now shows its message.
+- **[Fix]** The desktop app's dev mode pointed at the wrong port, and a hidden window slowed the game down.
+- **[Change]** Protocol version 4: the match state lost unused fields. The live server runs protocol 3, so the next deploy must update server and client together (as always).
+- **[S]** Verified: typecheck (game and server), 17 tests pass, production build. The main menu video, which an earlier pass of the clean had deleted by mistake on the experimental branch, is kept.

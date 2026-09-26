@@ -17,6 +17,8 @@ function createWindow(): void {
             preload: path.join(__dirname, 'preload.cjs'),
             contextIsolation: true,
             nodeIntegration: false,
+            // Keep the game running at full speed when the window is hidden: an online match can't wait for it
+            backgroundThrottling: false,
         },
     });
 
@@ -24,7 +26,7 @@ function createWindow(): void {
     win.setAspectRatio(16 / 9);
 
     if (isDev) {
-        win.loadURL('http://localhost:5173');
+        win.loadURL('http://localhost:5175');
         win.webContents.openDevTools({ mode: 'detach' });
     } else {
         win.loadFile(path.join(__dirname, '../dist/index.html'));

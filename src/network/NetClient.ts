@@ -20,6 +20,7 @@ export class NetClient {
     rtt = 0;
 
     private channel: ClientChannel | null = null;
+    private connected = false;
     private pingTimer: ReturnType<typeof setInterval> | null = null;
     private readonly handlers = new Map<NetEventName, (data: any) => void>();
     private packetHandler: ((packet: Uint8Array) => void) | null = null;
@@ -35,10 +36,17 @@ export class NetClient {
 
             channel.onConnect(error => {
                 clearTimeout(timeout);
+                if (this.channel !== channel) {
+                    // Closed while connecting: Geckos can only close a connected channel, so it's closed now
+                    if (!error) channel.close();
+                    reject(new Error('Closed'));
+                    return;
+                }
                 if (error) {
                     reject(error);
                     return;
                 }
+                this.connected = true;
                 // Geckos can't remove listeners, so each event gets one that forwards to the current handler
                 for (const event of SERVER_EVENTS) {
                     channel.on(event, data => this.handlers.get(event)?.(data));
@@ -82,8 +90,9 @@ export class NetClient {
         this.handlers.clear();
         this.packetHandler = null;
         this.disconnectHandler = null;
-        this.channel?.close();
+        if (this.connected) this.channel?.close();
         this.channel = null;
+        this.connected = false;
     }
 
     private onPong(data: Data): void {

@@ -3,15 +3,10 @@ import { AudioManager } from '../managers/AudioManager';
 import { SMASH_COLORS } from '../ui/PlayerHUD';
 import { charConfigs } from '../config/CharacterConfig';
 import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavX } from '../input/JoyConMapper';
+import { STAGES, STAGE_KEYS, loadStagePreviews, previewKey } from '../stages/StageBackgrounds';
 
 type CharacterType = 'fok' | 'dummy';
 
-const MAP_OPTIONS = [
-    { key: 'adria_bg', label: 'Adria' },
-    { key: 'bg_la_sala_prove', label: 'La Sala Prove' },
-    { key: 'sguzia_bg', label: 'Sguzia' },
-    { key: 'londra_bg', label: 'Londra' },
-];
 
 export interface PlayerSelection {
     playerId: number;
@@ -41,7 +36,6 @@ export class LobbyScene extends Phaser.Scene {
     // Character Data
     private characters: CharacterType[] = ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'] as any;
     private charLabels: string[] = ['Fok', 'Sgu', 'Sga', 'Pe', 'Nock', 'Greg'];
-    // P1_KEYS removed (unused in Lobby)
 
     // Input debounce & Safety
     private lastInputTime: Map<number, number> = new Map();
@@ -107,11 +101,7 @@ export class LobbyScene extends Phaser.Scene {
         this.load.audio('ui_back', 'assets/audio/ui/ui_back.wav');
         this.load.audio('ui_player_ready', 'assets/audio/ui/ui_player_ready.wav');
 
-        // Stage backgrounds (for map selection preview)
-        this.load.image('adria_bg', 'assets/stages/adria_v2.2_web.webp');
-        this.load.image('bg_la_sala_prove', 'assets/images/bg_la_sala_prove.webp');
-        this.load.image('sguzia_bg', 'assets/stages/sguzia_bg.webp');
-        this.load.image('londra_bg', 'assets/stages/londra_bg.webp');
+        loadStagePreviews(this);
     }
 
 
@@ -248,8 +238,8 @@ export class LobbyScene extends Phaser.Scene {
         // Auto-join P2 as Dummy
         const p2 = this.slots[1];
         p2.joined = true;
-        p2.input.type = 'KEYBOARD'; // Placeholder
-        p2.input.keyboardMapping = 'all'; // Placeholder
+        p2.input.type = 'KEYBOARD';
+        p2.input.keyboardMapping = 'all';
         p2.isAI = true;
         p2.isTrainingDummy = true;
         p2.ready = false; // Dummy starts NOT ready (waiting for selection)
@@ -265,19 +255,8 @@ export class LobbyScene extends Phaser.Scene {
         let cardHeight = 300;
         let spacing = 200;
 
-        // If 6 players, scale down slightly to fit comfortably
+        // Up to 6 cards fit across 1920 px at these spacings
         if (count > 4) {
-            // 1920 width. 6 cards.
-            // Max width per card+gap = 1920 / 6 = 320.
-            // With 200 spacing, total width = 5 * 200 = 1000.  (Wait, spacing logic was (i * spacing))
-            // Old logic: startX + (i * spacing). Total width assumed (count-1)*spacing.
-            // 5 * 200 = 1000. StartX = 1920/2 - 500 = 460.
-            // Last card at 460 + 1000 = 1460.
-            // Card width 180. Right edge at 1460 + 90 = 1550.
-            // Fits easily. 6 players fits without resizing.
-            spacing = 260; // Spread them out more if space allows?
-            // Actually, 6 * 260 = 1560 total width. Start 960 - 780 = 180. Ends 180 + 1300 = 1480. Fits.
-            // Let's keep strict spacing to avoid overlapping if we had even more.
             spacing = count <= 2 ? 300 : 220;
         } else {
             spacing = count <= 2 ? 260 : 200;
@@ -581,7 +560,7 @@ export class LobbyScene extends Phaser.Scene {
                                 playerData: joinedSlots,
                                 mode: this.mode,
                                 slotIndex: (this._initData as any)?.slotIndex ?? 0,
-                                selectedMap: MAP_OPTIONS[this.selectedMapIndex].key
+                                selectedMap: STAGE_KEYS[this.selectedMapIndex]
                             });
                         });
                     }
@@ -711,7 +690,7 @@ export class LobbyScene extends Phaser.Scene {
             this.scene.start('GameScene', {
                 playerData: [this.slots[0], this.slots[1]],
                 mode: 'training',
-                selectedMap: MAP_OPTIONS[this.selectedMapIndex].key
+                selectedMap: STAGE_KEYS[this.selectedMapIndex]
             });
         });
     }
@@ -769,9 +748,7 @@ export class LobbyScene extends Phaser.Scene {
             color: '#ffffff'
         }).setOrigin(0.5);
 
-        // Map preview (thumbnail of the background texture)
-        const mapKey = MAP_OPTIONS[this.selectedMapIndex].key;
-        this.mapPreview = this.add.image(0, 0, mapKey);
+        this.mapPreview = this.add.image(0, 0, previewKey(STAGE_KEYS[this.selectedMapIndex]));
         // Scale to fit a preview box (400x225 = 16:9)
         const previewW = 500;
         const previewH = 280;
@@ -784,7 +761,7 @@ export class LobbyScene extends Phaser.Scene {
         frame.strokeRoundedRect(-previewW / 2, -previewH / 2, previewW, previewH, 8);
 
         // Map name
-        this.mapNameText = this.add.text(0, previewH / 2 + 30, MAP_OPTIONS[this.selectedMapIndex].label, {
+        this.mapNameText = this.add.text(0, previewH / 2 + 30, STAGES[STAGE_KEYS[this.selectedMapIndex]].label, {
             fontSize: '36px',
             fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
@@ -825,18 +802,17 @@ export class LobbyScene extends Phaser.Scene {
 
     private changeMap(dir: number): void {
         AudioManager.getInstance().playSFX('ui_change_character', { volume: 0.4 });
-        this.selectedMapIndex = (this.selectedMapIndex + dir + MAP_OPTIONS.length) % MAP_OPTIONS.length;
+        this.selectedMapIndex = (this.selectedMapIndex + dir + STAGE_KEYS.length) % STAGE_KEYS.length;
         // Update preview
         if (this.mapPreview) {
-            const mapKey = MAP_OPTIONS[this.selectedMapIndex].key;
-            this.mapPreview.setTexture(mapKey);
+            this.mapPreview.setTexture(previewKey(STAGE_KEYS[this.selectedMapIndex]));
             const previewW = 500;
             const previewH = 280;
             const imgScale = Math.max(previewW / this.mapPreview.width, previewH / this.mapPreview.height);
             this.mapPreview.setScale(imgScale);
         }
         if (this.mapNameText) {
-            this.mapNameText.setText(MAP_OPTIONS[this.selectedMapIndex].label);
+            this.mapNameText.setText(STAGES[STAGE_KEYS[this.selectedMapIndex]].label);
         }
     }
 
