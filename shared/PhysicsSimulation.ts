@@ -20,7 +20,8 @@ export const ATTACK_TYPE_HEAVY = 2;
 export type PhysicsEvent =
     | { type: 'sfx'; key: string; volume: number }
     | { type: 'consume'; input: 'jump' | 'dodge' }
-    | { type: 'dodge_start'; isGrounded: boolean };
+    | { type: 'dodge_start'; isGrounded: boolean; chase: boolean }
+    | { type: 'dash_start' };
 
 // ─── SimBody ───
 
@@ -43,8 +44,8 @@ export interface SimBody {
 
     // Jump
     jumpsRemaining: number;
+    /** Air jumps, wall jumps and recoveries since landing, hitting or being hit (wall slip). */
     airActionCounter: number;
-    wasJumpHeld: boolean;
     isFastFalling: boolean;
 
     // Wall
@@ -54,11 +55,23 @@ export interface SimBody {
     lastWallTouchTimer: number;  // ms
     lastWallDirection: number;
 
+    // Dash
+    isDashing: boolean;
+    dashTimer: number;           // ms
+    dashCooldownTimer: number;   // ms
+    /** In the air out of a dash: coasting with less air friction. */
+    hasDashMomentum: boolean;
+
     // Dodge
     isDodging: boolean;
     isSpotDodging: boolean;
+    isChaseDodging: boolean;
     dodgeTimer: number;          // ms
     dodgeCooldownTimer: number;  // ms
+    /** The cooldown came from an air dodge, so landing shortens it. */
+    landingShortensDodgeCooldown: boolean;
+    chaseDodgesInAir: number;
+    /** Dash or dodge direction: -1, 0 or 1. */
     dodgeDirection: number;
     isInvincible: boolean;
 
@@ -100,8 +113,8 @@ export interface SimInput {
     jumpBuffered: boolean;
     jumpHeld: boolean;
     dodgeBuffered: boolean;
-    aimUp: boolean;
-    aimDown: boolean;
+    /** The fighter's last attack hit recently enough for a chase dodge. */
+    chaseDodgeReady: boolean;
 }
 
 // ─── Factory ───
@@ -119,7 +132,6 @@ export function createBody(x: number, y: number, facingDirection: number): SimBo
 
         jumpsRemaining: PhysicsConfig.MAX_JUMPS,
         airActionCounter: 0,
-        wasJumpHeld: false,
         isFastFalling: false,
 
         isWallSliding: false,
@@ -128,10 +140,18 @@ export function createBody(x: number, y: number, facingDirection: number): SimBo
         lastWallTouchTimer: 0,
         lastWallDirection: 0,
 
+        isDashing: false,
+        dashTimer: 0,
+        dashCooldownTimer: 0,
+        hasDashMomentum: false,
+
         isDodging: false,
         isSpotDodging: false,
+        isChaseDodging: false,
         dodgeTimer: 0,
         dodgeCooldownTimer: 0,
+        landingShortensDodgeCooldown: false,
+        chaseDodgesInAir: 0,
         dodgeDirection: 0,
         isInvincible: false,
 
@@ -162,7 +182,7 @@ export function createBody(x: number, y: number, facingDirection: number): SimBo
 
 /**
  * Runs one physics step on `body` (in place), `dt` in seconds, and appends
- * what happened (sounds, consumed presses, dodge starts) to `events`.
+ * what happened (sounds, consumed presses, dodge and dash starts) to `events`.
  */
 export function stepPhysics(body: SimBody, input: SimInput, dt: number, events: PhysicsEvent[]): void {
     const dtMs = dt * 1000;
@@ -178,19 +198,29 @@ export function stepPhysics(body: SimBody, input: SimInput, dt: number, events: 
         }
     }
 
+    // A dash that runs off a platform carries on as momentum
+    if (body.isDashing && !body.isGrounded) {
+        endDash(body);
+        body.hasDashMomentum = true;
+    }
+
     // ── Frame state bookkeeping ──
     // Capture previous grounded state BEFORE resetting
     body.wasGroundedLastFrame = body.isGrounded;
-    // Acceleration reset: gravity is always applied
     body.ax = 0;
-    body.ay = PhysicsConfig.GRAVITY;
 
     // ── Mechanics ──
-    handleWallMechanics(body, input);
-    handleHorizontalMovement(body, input);
-    handleJump(body, input, events);
-    handleFastFall(body, input);
-    handleDodgeInput(body, input, events);
+    // Stunned fighters have no control until the stun ends
+    if (!body.isHitStunned) {
+        handleWallMechanics(body, input);
+        handleHorizontalMovement(body, input);
+        handleJump(body, input, events);
+        handleFastFall(body, input);
+        handleDodgeInput(body, input, events);
+    }
+
+    // Directional dodges in the air float
+    body.ay = body.isDodging && !body.isSpotDodging && !body.isGrounded ? 0 : PhysicsConfig.GRAVITY;
 
     // ── Physics integration ──
     // Ends with isGrounded false: the platform collisions that follow set it again on landing
@@ -214,6 +244,19 @@ function updateTimers(body: SimBody, dtMs: number): void {
         body.dodgeTimer -= dtMs;
         if (body.dodgeTimer <= 0) {
             endDodge(body);
+        } else if (body.isChaseDodging && body.dodgeTimer <= PhysicsConfig.CHASE_DODGE_DURATION - PhysicsConfig.CHASE_DODGE_INVINCIBLE) {
+            body.isInvincible = false;
+        }
+    }
+
+    if (body.dashCooldownTimer > 0) {
+        body.dashCooldownTimer -= dtMs;
+    }
+
+    if (body.dashTimer > 0) {
+        body.dashTimer -= dtMs;
+        if (body.dashTimer <= 0) {
+            endDash(body);
         }
     }
 
@@ -224,13 +267,23 @@ function updateTimers(body: SimBody, dtMs: number): void {
 //  WALL MECHANICS
 // ═══════════════════════════════════════════════════════════════
 
+/** After too many air actions, walls stop holding the fighter until it lands, hits or is hit. */
+function isWallSlipping(body: SimBody): boolean {
+    return body.airActionCounter >= PhysicsConfig.MAX_AIR_ACTIONS;
+}
+
 function handleWallMechanics(body: SimBody, input: SimInput): void {
     if (body.isGrounded) {
         body.isWallSliding = false;
         return;
     }
 
-    if (body.isTouchingWall) {
+    if (body.isTouchingWall && !isWallSlipping(body)) {
+        // A wall gives back the air jumps and the recovery, and stops dash momentum
+        body.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
+        body.recoveryAvailable = true;
+        body.hasDashMomentum = false;
+
         const pushingWall = (body.wallDirection === -1 && input.moveLeft) ||
             (body.wallDirection === 1 && input.moveRight);
 
@@ -255,7 +308,8 @@ function handleWallMechanics(body: SimBody, input: SimInput): void {
 
 function handleHorizontalMovement(body: SimBody, input: SimInput): void {
     if (body.isWallSliding) return;
-    if (body.isDodging && body.isSpotDodging) return; // Spot dodge locks X
+    // Dodges and dashes set their own speed
+    if (body.isDodging || body.isDashing) return;
 
     // Prevent movement during attack startup and active frames
     if (body.isAttacking) {
@@ -268,12 +322,16 @@ function handleHorizontalMovement(body: SimBody, input: SimInput): void {
         }
     }
 
-    if (body.isDodging) return;
+    // Coasting out of a dash: steering starts once the momentum runs out or the fighter pushes against it
+    if (body.hasDashMomentum) {
+        const against = body.vx > 0 ? input.moveLeft : input.moveRight;
+        if (against || Math.abs(body.vx) < PhysicsConfig.DASH_MOMENTUM_MIN_SPEED) body.hasDashMomentum = false;
+        else return;
+    }
 
     // Run mechanic: default movement is RUN
     const isMoving = input.moveLeft || input.moveRight;
-    const inRecovery = body.isAttacking;
-    body.isRunning = body.isGrounded && isMoving && !inRecovery;
+    body.isRunning = body.isGrounded && isMoving && !body.isAttacking;
 
     let accel = PhysicsConfig.MOVE_ACCEL;
     if (body.isRunning) {
@@ -297,21 +355,12 @@ function handleJump(body: SimBody, input: SimInput, events: PhysicsEvent[]): voi
     // Block during heavy attacks
     if (body.isAttacking && body.attackType === ATTACK_TYPE_HEAVY) return;
 
-    const jumpRequested = input.jumpBuffered;
-
-    // Platform Drop: Down + Jump while on a soft platform
-    if (input.moveDown && jumpRequested && body.currentPlatformIdx !== -1) {
+    if (input.jumpBuffered) {
         events.push({ type: 'consume', input: 'jump' });
-        handlePlatformDrop(body);
-        return;
+        // Platform Drop: Down + Jump while on a soft platform
+        if (input.moveDown && body.currentPlatformIdx !== -1) handlePlatformDrop(body);
+        else performJump(body, events);
     }
-
-    // New Jump (first frame of press, not held from previous)
-    if (jumpRequested && !body.wasJumpHeld) {
-        events.push({ type: 'consume', input: 'jump' });
-        performJump(body, events);
-    }
-    body.wasJumpHeld = input.jumpHeld;
 
     // Short Hop: releasing jump while ascending slowly → dampen
     if (!input.jumpHeld && body.vy < 0 && body.vy > PhysicsConfig.SHORT_HOP_FORCE) {
@@ -320,21 +369,34 @@ function handleJump(body: SimBody, input: SimInput, events: PhysicsEvent[]): voi
 }
 
 function handlePlatformDrop(body: SimBody): void {
-    if (body.currentPlatformIdx === -1) return;
-
     body.droppingThroughPlatformIdx = body.currentPlatformIdx;
     // The simulation fills in droppingThroughY from the stage while colliding
     body.dropGraceTimer = PhysicsConfig.PLATFORM_DROP_GRACE_PERIOD;
     body.isGrounded = false;
+    body.isDashing = false;
     body.currentPlatformIdx = -1;
     body.y += PhysicsConfig.PLATFORM_DROP_NUDGE_Y;
     body.vy = PhysicsConfig.PLATFORM_DROP_PUSH_Y;
 }
 
 function performJump(body: SimBody, events: PhysicsEvent[]): void {
+    body.isFastFalling = false;
+
     // Wall Jump (current wall or coyote time)
-    if (body.isWallSliding || (body.lastWallTouchTimer > 0 && !body.isGrounded)) {
+    if (!body.isGrounded && (body.isWallSliding || body.lastWallTouchTimer > 0) && !isWallSlipping(body)) {
         wallJump(body, events);
+        return;
+    }
+
+    // Dash Jump: low and fast, keeping the dash's speed
+    if (body.isDashing) {
+        endDash(body);
+        body.hasDashMomentum = true;
+        body.isRunning = false;
+        body.vx = body.dodgeDirection * PhysicsConfig.DASH_JUMP_SPEED;
+        body.vy = PhysicsConfig.DASH_JUMP_FORCE;
+        body.isGrounded = false;
+        events.push({ type: 'sfx', key: 'sfx_jump_1', volume: 0.5 });
         return;
     }
 
@@ -347,10 +409,11 @@ function performJump(body: SimBody, events: PhysicsEvent[]): void {
     }
 
     // Air Jump (double/triple jump)
-    if (body.jumpsRemaining > 0 && body.airActionCounter < PhysicsConfig.MAX_AIR_ACTIONS) {
+    if (body.jumpsRemaining > 0) {
         body.vy = PhysicsConfig.DOUBLE_JUMP_FORCE;
         body.jumpsRemaining--;
         body.airActionCounter++;
+        body.hasDashMomentum = false;
         events.push({ type: 'sfx', key: 'sfx_jump_2', volume: 0.5 });
     }
 }
@@ -362,6 +425,7 @@ function wallJump(body: SimBody, events: PhysicsEvent[]): void {
     body.vx = -dir * PhysicsConfig.WALL_JUMP_FORCE_X;
 
     body.isWallSliding = false;
+    body.hasDashMomentum = false;
     body.airActionCounter++;
     events.push({ type: 'sfx', key: 'sfx_jump_1', volume: 0.5 });
 }
@@ -370,40 +434,83 @@ function wallJump(body: SimBody, events: PhysicsEvent[]): void {
 //  FAST FALL
 // ═══════════════════════════════════════════════════════════════
 
+/** Holding down while descending falls faster, up to MAX_FAST_FALL_SPEED. */
 function handleFastFall(body: SimBody, input: SimInput): void {
-    if (!body.isGrounded &&
-        body.vy >= PhysicsConfig.FAST_FALL_THRESHOLD &&
-        input.moveDown &&
-        !body.isFastFalling) {
-        body.isFastFalling = true;
-        body.vy *= PhysicsConfig.FAST_FALL_MULTIPLIER;
+    const busy = body.isWallSliding || body.isDodging || body.isRecovering || body.isCharging ||
+        (body.isAttacking && (body.attackType === ATTACK_TYPE_HEAVY || body.shouldStallInAir));
+    const fastFalling = input.moveDown && !body.isGrounded && body.vy >= 0 && !busy;
+    if (fastFalling && !body.isFastFalling) {
+        body.vy = Math.max(body.vy, PhysicsConfig.FAST_FALL_SPEED);
     }
+    body.isFastFalling = fastFalling;
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  DODGE
+//  DASH AND DODGE
 // ═══════════════════════════════════════════════════════════════
+
+/** -1, 0 or 1 from a pair of opposite directions. */
+function axis(negative: boolean, positive: boolean): number {
+    return (positive ? 1 : 0) - (negative ? 1 : 0);
+}
 
 function handleDodgeInput(body: SimBody, input: SimInput, events: PhysicsEvent[]): void {
+    if (!input.dodgeBuffered || body.isDodging || body.isCharging) return;
+
+    const dx = axis(input.moveLeft, input.moveRight);
+    const dy = body.isGrounded ? 0 : axis(input.moveUp, input.moveDown);
+    const hasDirection = dx !== 0 || dy !== 0;
+
+    // After a hit, a directional dodge chases: it cancels the rest of the attack
+    const chase = input.chaseDodgeReady && hasDirection &&
+        (body.isGrounded || body.chaseDodgesInAir < PhysicsConfig.MAX_AIR_CHASE_DODGES);
+    if (chase) {
+        events.push({ type: 'consume', input: 'dodge' });
+        startChaseDodge(body, dx, dy, events);
+        return;
+    }
+
+    // Otherwise attacks and the recovery move are commitments
+    if (body.isAttacking || body.isRecovering) return;
+
+    if (body.isGrounded && dx !== 0) {
+        // Dashing back the other way is immediate; the same way again waits DASH_REPEAT_DELAY
+        if (dx === body.dodgeDirection && (body.isDashing || body.dashCooldownTimer > 0)) return;
+        events.push({ type: 'consume', input: 'dodge' });
+        startDash(body, dx, events);
+        return;
+    }
+
     if (body.dodgeCooldownTimer > 0) return;
-
-    if (body.isAttacking && body.attackType === ATTACK_TYPE_HEAVY) return;
-
-    if (!input.dodgeBuffered) return;
     events.push({ type: 'consume', input: 'dodge' });
-
-    startDodge(body, input, events);
+    startDodge(body, dx, dy, events);
 }
 
-function startDodge(body: SimBody, input: SimInput, events: PhysicsEvent[]): void {
-    body.isDodging = true;
-    body.isInvincible = true;
+function startDash(body: SimBody, direction: number, events: PhysicsEvent[]): void {
+    // The dash sets the speed on its own, without this step's running push
+    body.ax = 0;
+    body.isRunning = false;
+    body.isDashing = true;
+    body.dashTimer = PhysicsConfig.DASH_DURATION;
+    body.dodgeDirection = direction;
+    body.vx = direction * PhysicsConfig.DASH_SPEED;
+    events.push({ type: 'sfx', key: 'sfx_dash', volume: 0.5 });
+    events.push({ type: 'dash_start' });
+}
 
-    const hasDirectionalInput = input.moveLeft || input.moveRight;
-    const isSpotDodge = !hasDirectionalInput ||
-        ((input.aimUp || input.aimDown) && !input.moveLeft && !input.moveRight);
+/** Ends a dash early or on time; another can start after DASH_REPEAT_DELAY. */
+export function endDash(body: SimBody): void {
+    if (!body.isDashing) return;
+    body.isDashing = false;
+    body.dashTimer = 0;
+    body.dashCooldownTimer = PhysicsConfig.DASH_REPEAT_DELAY;
+}
 
-    if (isSpotDodge) {
+/** A spot dodge, or in the air a dodge in any of 8 directions. */
+function startDodge(body: SimBody, dx: number, dy: number, events: PhysicsEvent[]): void {
+    beginDodge(body);
+
+    if (dx === 0 && dy === 0) {
         // SPOT DODGE
         body.isSpotDodging = true;
         body.dodgeDirection = 0;
@@ -413,38 +520,103 @@ function startDodge(body: SimBody, input: SimInput, events: PhysicsEvent[]): voi
         if (!body.isGrounded) {
             body.vy *= PhysicsConfig.SPOT_DODGE_AERIAL_Y_DAMP;
         }
-
-        events.push({ type: 'dodge_start', isGrounded: body.isGrounded });
     } else {
-        // DIRECTIONAL DODGE
-        body.isSpotDodging = false;
-        body.dodgeTimer = PhysicsConfig.DODGE_DURATION;
-
-        if (input.moveLeft && !input.moveRight) {
-            body.dodgeDirection = -1;
-        } else if (input.moveRight && !input.moveLeft) {
-            body.dodgeDirection = 1;
-        } else {
-            body.dodgeDirection = body.facingDirection;
-        }
-
-        const dodgeSpeed = body.dodgeDirection * (PhysicsConfig.DODGE_DISTANCE / (PhysicsConfig.DODGE_DURATION / 1000));
-        body.vx = dodgeSpeed;
-
-        if (!body.isGrounded) {
-            body.vy *= PhysicsConfig.AIR_DODGE_VERTICAL_DAMP;
-        }
-
+        // DIRECTIONAL AIR DODGE
+        body.dodgeDirection = dx;
+        body.dodgeTimer = PhysicsConfig.AIR_DODGE_DURATION;
+        const speed = directionalSpeed(PhysicsConfig.AIR_DODGE_DISTANCE / (PhysicsConfig.AIR_DODGE_DURATION / 1000), dx, dy);
+        body.vx = dx * speed;
+        body.vy = dy * speed;
         events.push({ type: 'sfx', key: 'sfx_dash', volume: 0.5 });
-        events.push({ type: 'dodge_start', isGrounded: body.isGrounded });
     }
+
+    events.push({ type: 'dodge_start', isGrounded: body.isGrounded, chase: false });
+}
+
+function startChaseDodge(body: SimBody, dx: number, dy: number, events: PhysicsEvent[]): void {
+    beginDodge(body);
+    body.isChaseDodging = true;
+    body.dodgeDirection = dx;
+    body.dodgeTimer = PhysicsConfig.CHASE_DODGE_DURATION;
+    const speed = directionalSpeed(PhysicsConfig.CHASE_DODGE_SPEED, dx, dy);
+    body.vx = dx * speed;
+    body.vy = dy * speed;
+    body.isRecovering = false;
+    if (!body.isGrounded) body.chaseDodgesInAir++;
+
+    events.push({ type: 'sfx', key: 'sfx_dash', volume: 0.5 });
+    events.push({ type: 'dodge_start', isGrounded: body.isGrounded, chase: true });
+}
+
+function beginDodge(body: SimBody): void {
+    // The dodge sets the speed on its own, without this step's movement push
+    body.ax = 0;
+    endDash(body);
+    body.isDodging = true;
+    body.isInvincible = true;
+    body.isSpotDodging = false;
+    body.isChaseDodging = false;
+    body.isFastFalling = false;
+    body.hasDashMomentum = false;
+}
+
+/** Diagonals share the speed between both axes. */
+function directionalSpeed(speed: number, dx: number, dy: number): number {
+    return dx !== 0 && dy !== 0 ? speed * Math.SQRT1_2 : speed;
 }
 
 function endDodge(body: SimBody): void {
+    if (!body.isSpotDodging && !body.isGrounded) {
+        body.vy *= PhysicsConfig.AIR_DODGE_END_SPEED;
+    }
+    const chase = body.isChaseDodging;
+    stopDodging(body);
+    if (chase) return;
+
+    if (body.isGrounded) {
+        body.dodgeCooldownTimer = PhysicsConfig.DODGE_COOLDOWN;
+        body.landingShortensDodgeCooldown = false;
+    } else {
+        body.dodgeCooldownTimer = PhysicsConfig.AIR_DODGE_COOLDOWN;
+        body.landingShortensDodgeCooldown = true;
+    }
+}
+
+function stopDodging(body: SimBody): void {
     body.isDodging = false;
     body.isInvincible = false;
-    body.dodgeCooldownTimer = PhysicsConfig.DODGE_COOLDOWN;
     body.isSpotDodging = false;
+    body.isChaseDodging = false;
+    body.dodgeTimer = 0;
+}
+
+/** An attack out of a chase dodge: the dodge ends at no cost, and the attack keeps some of its speed. */
+export function endChaseDodge(body: SimBody): void {
+    stopDodging(body);
+    body.vx *= PhysicsConfig.CHASE_ATTACK_SPEED_KEPT;
+    body.vy *= PhysicsConfig.CHASE_ATTACK_SPEED_KEPT;
+}
+
+/**
+ * Gravity cancel: an attack out of an aerial spot dodge. The dodge ends, and
+ * its cooldown is the full air cooldown even after landing.
+ */
+export function gravityCancel(body: SimBody): void {
+    stopDodging(body);
+    body.dodgeCooldownTimer = PhysicsConfig.AIR_DODGE_COOLDOWN;
+    body.landingShortensDodgeCooldown = false;
+}
+
+/** A hit stops whatever the fighter was doing: dash, dodge, fast fall, wall slide, recovery. */
+export function interruptMovement(body: SimBody): void {
+    endDash(body);
+    stopDodging(body);
+    body.isFastFalling = false;
+    body.isWallSliding = false;
+    body.hasDashMomentum = false;
+    body.isRunning = false;
+    body.isRecovering = false;
+    body.recoveryTimer = 0;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -471,12 +643,20 @@ function applyPhysics(body: SimBody, dt: number): void {
         body.vx += body.ax * dt;
     }
 
-    body.vy += body.ay * dt;
+    // Gravity accelerates a fall up to its terminal speed. Faster falls (knockback, ground pound)
+    // keep their speed, except what's left of a fast fall, which eases back.
+    const maxFall = body.isFastFalling ? PhysicsConfig.MAX_FAST_FALL_SPEED : PhysicsConfig.MAX_FALL_SPEED;
+    if (body.vy < maxFall) {
+        body.vy = Math.min(body.vy + body.ay * dt, maxFall);
+    } else if (!body.isHitStunned && !body.isAttacking) {
+        body.vy = maxFall + (body.vy - maxFall) * PhysicsConfig.FALL_SPEED_EASE;
+    }
 
     // ── Friction ──
     // isGrounded is still the previous step's value here
 
-    let friction: number = body.isGrounded ? PhysicsConfig.FRICTION : PhysicsConfig.AIR_FRICTION;
+    let friction: number = body.isGrounded ? PhysicsConfig.FRICTION
+        : body.hasDashMomentum ? PhysicsConfig.DASH_JUMP_AIR_FRICTION : PhysicsConfig.AIR_FRICTION;
 
     // Dynamic friction
     const isHighSpeed = Math.abs(body.vx) > PhysicsConfig.MAX_SPEED * PhysicsConfig.HIGH_SPEED_THRESHOLD_MULT;
@@ -508,8 +688,8 @@ function applyPhysics(body: SimBody, dt: number): void {
         friction = PhysicsConfig.HITSTUN_FRICTION;
     }
 
-    // Dash: maintain exact velocity (friction = 1.0)
-    if (body.isDodging && !body.isSpotDodging) {
+    // Dashes and directional dodges keep their exact speed
+    if (body.isDashing || (body.isDodging && !body.isSpotDodging)) {
         friction = 1.0;
     }
 
@@ -598,6 +778,7 @@ export function checkSinglePlatformCollision(
         body.vy = 0;
         body.isGrounded = true;
         body.isFastFalling = false;
+        body.hasDashMomentum = false;
 
         body.isRecovering = false;
         body.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
@@ -605,7 +786,14 @@ export function checkSinglePlatformCollision(
         body.droppingThroughPlatformIdx = -1;
         body.droppingThroughY = NaN;
         body.airActionCounter = 0;
+        body.chaseDodgesInAir = 0;
         body.currentPlatformIdx = isSoft ? platIdx : -1;
+
+        if (body.landingShortensDodgeCooldown) {
+            body.landingShortensDodgeCooldown = false;
+            body.dodgeCooldownTimer = Math.max(0,
+                body.dodgeCooldownTimer - (PhysicsConfig.AIR_DODGE_COOLDOWN - PhysicsConfig.LANDED_AIR_DODGE_COOLDOWN));
+        }
 
         if (!wasGrounded) {
             events.push({ type: 'sfx', key: 'sfx_landing', volume: 0.8 });
@@ -671,12 +859,14 @@ export function startRecovery(body: SimBody, events: PhysicsEvent[]): boolean {
     body.isRecovering = true;
     body.recoveryAvailable = false;
     body.recoveryTimer = PhysicsConfig.RECOVERY_DURATION;
+    body.airActionCounter++;
 
     body.vy = PhysicsConfig.RECOVERY_FORCE_Y;
     body.vx = body.facingDirection * PhysicsConfig.RECOVERY_FORCE_X;
 
     body.isWallSliding = false;
     body.isFastFalling = false;
+    body.hasDashMomentum = false;
 
     events.push({ type: 'sfx', key: 'sfx_jump_2', volume: 0.6 });
     return true;

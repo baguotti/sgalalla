@@ -222,11 +222,12 @@ export class Player extends Phaser.GameObjects.Container {
         const b = f.body;
         if (f.invulnerabilityTimer > 0) {
             // Respawn invulnerability blinks, except while dashing
-            const isDashing = f.isDodging && Math.abs(b.vx) > 10;
+            const isDashing = (f.isDodging || b.isDashing) && Math.abs(b.vx) > 10;
             const blinkOff = Math.floor(f.invulnerabilityTimer / 50) % 2 === 0;
             this.sprite.setAlpha(!isDashing && blinkOff ? 0.5 : 1);
         } else {
-            this.sprite.setAlpha(b.isSpotDodging ? PhysicsConfig.SPOT_DODGE_ALPHA : 1);
+            // See-through while a dodge makes the fighter invincible
+            this.sprite.setAlpha(b.isInvincible ? PhysicsConfig.SPOT_DODGE_ALPHA : 1);
         }
     }
 
@@ -518,6 +519,7 @@ function setGhostBlur(blurFx: Phaser.FX.Blur | null, sprite: Phaser.GameObjects.
 function animationFor(f: FighterState): string {
     switch (f.state) {
         case 'Run': return 'run';
+        case 'Dash': return 'dash';
         case 'Jump': return 'jump';
         case 'Fall': return 'fall';
         case 'WallSlide': return 'wall_slide';
@@ -537,8 +539,9 @@ function animationFor(f: FighterState): string {
 function attackAnimation(f: FighterState): string {
     const attack = f.combat.attack;
     if (!attack) return 'idle';
-    const { type, direction } = AttackRegistry[attack.key];
-    const grounded = f.body.isGrounded;
+    // The move decides, not the ground: a gravity cancel does grounded moves in the air
+    const { type, direction, isAerial } = AttackRegistry[attack.key];
+    const grounded = !isAerial;
 
     if (type === AttackType.HEAVY) {
         switch (direction) {

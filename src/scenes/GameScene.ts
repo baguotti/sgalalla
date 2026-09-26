@@ -10,7 +10,8 @@ import { PauseMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
-import { isStageKey, loadStageBackground, type StageKey } from '../stages/StageBackgrounds';
+import { freeStageBackgrounds, isStageKey, loadStageBackground, type StageKey } from '../stages/StageBackgrounds';
+import { freeLondraLayers, loadLondraLayers, LondraLayers } from '../stages/LondraLayers';
 import { createStage as createSharedStage } from '../stages/StageFactory';
 import { ContactShadows, DEFAULT_SHADOW_DARKNESS } from '../effects/ContactShadows';
 import { EffectManager } from '../effects/EffectManager';
@@ -74,7 +75,9 @@ const STAGE_VIEW = { x: 900, y: 620, zoom: 0.62 };
 export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private debugOverlay!: DebugOverlay;
     private touchController!: TouchController;
-    private backgroundImage!: Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite;
+    private backgroundImage: Phaser.GameObjects.Image | null = null;
+    /** The Studio Lab draws Londra in layers instead of the painting. */
+    private londraLayers: LondraLayers | null = null;
     private stageTextures: Phaser.GameObjects.Image[] = [];
 
     // Debug visibility
@@ -138,7 +141,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     preload(): void {
         this.loadCharacterAssets();
-        loadStageBackground(this, this.currentStageBackground);
+        if (this.isLab) {
+            freeStageBackgrounds(this);
+            loadLondraLayers(this);
+        } else {
+            freeLondraLayers(this);
+            loadStageBackground(this, this.currentStageBackground);
+        }
     }
 
     /** Fighters, stage platforms and sounds; the music is global (PreloadScene). */
@@ -439,10 +448,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (this.isLab) {
                 this.lighting = startLightLab(this, {
                     uiCamera: this.uiCamera,
-                    sky: this.backgroundImage,
+                    sky: this.backgroundImage ? [this.backgroundImage] : [],
+                    layers: this.londraLayers,
                     stage: this.stageTextures,
                     fighters: this.players.map(p => p.spriteObject),
                     setStageView: on => this.stageView = on,
+                    statsLeftOf: () => this.debugOverlay?.panelRight ?? 0,
                 });
             }
 
@@ -572,6 +583,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
         // Ignore static world elements
         if (this.backgroundImage) this.uiCamera.ignore(this.backgroundImage);
+        if (this.londraLayers) this.uiCamera.ignore(this.londraLayers.objects);
         if (this.stageTextures.length > 0) this.uiCamera.ignore(this.stageTextures);
 
         // Ignore entities
@@ -579,8 +591,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
     private createStage(): void {
-        const stage = createSharedStage(this, this.currentStageBackground);
+        const stage = createSharedStage(this, this.currentStageBackground, !this.isLab);
         this.backgroundImage = stage.background;
+        this.londraLayers = this.isLab ? new LondraLayers(this) : null;
         this.stageTextures = [...stage.platformTextures];
 
         // Apply campaign visual suppression (desaturation effect) — only on first encounters
@@ -589,7 +602,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.campaignTintProgress = 0;
 
             // Background
-            if (stage.background.postFX) {
+            if (stage.background?.postFX) {
                 const bgFx = stage.background.postFX.addColorMatrix();
                 bgFx.saturate(-0.5);
                 this.campaignColorMatrices.push(bgFx);

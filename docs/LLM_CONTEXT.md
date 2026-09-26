@@ -23,7 +23,17 @@ All gameplay is a deterministic simulation of plain data: no Phaser, no wall-clo
 
 Changing gameplay means changing the simulation, and then:
 1. bump `PROTOCOL_VERSION`, so builds with different rules can't meet online;
-2. update the replay tests (`tests/replays/`), which check recorded matches play out identically.
+2. run `npm run replays:update`, which stores the recorded matches' new outcomes (`tests/replays/`, checked step by step by `npm test`).
+
+### Movement (experimental branch), after Brawlhalla
+- Ground: running; **dodge + direction dashes** (not invincible, no dodge cooldown; a jump, attack or spot dodge cancels it). A **jump out of a dash** is low and fast and coasts.
+- Air: 1 ground jump + 2 air jumps; **hold down to fast fall**; falls stop accelerating at a terminal speed.
+- **Dodges** are invincible: a spot dodge on the ground, a spot or **8-way dodge in the air**. Cooldown 1 s on the ground, 2.7 s in the air, shortened by landing.
+- **Chase dodge**: after a hit, a directional dodge cancels the rest of the attack, costs no cooldown, and an attack cancels it. Otherwise attacks can't be dodge cancelled.
+- **Gravity cancel**: an attack out of an aerial spot dodge is the grounded move.
+- **Walls** give back the air jumps and the recovery; after 9 air actions without landing, hitting or being hit, walls stop holding the fighter (wall slip).
+- **Hitstun** takes all control away; a hit gives a fighter out of jumps one back.
+- Every value is in `PhysicsConfig.ts`; `tests/movement.test.ts` checks each rule.
 
 ### The view (`src/`)
 Phaser only draws and reads input.
@@ -32,7 +42,7 @@ Phaser only draws and reads input.
 - Sounds and effects react to the simulation's `MatchEvent`s.
 - `network/`: `NetClient` (Geckos.io over WebRTC) and `OnlineMatch` (the rollback session).
 - `lighting/`: the lighting experiment: lit sprites with rim light, the camera's post-processing, the Studio Lab. Drawing only.
-- `stages/`: stage visuals (`StageFactory`) and backgrounds (`StageBackgrounds`: a match loads only its own, menus use small previews).
+- `stages/`: stage visuals (`StageFactory`) and backgrounds (`StageBackgrounds`: a match loads only its own, menus use small previews). The Studio Lab draws Londra in layers instead (`LondraLayers`): an engine sky gradient, cloud pieces repeated behind and in front of the island, each layer with its own position, size, parallax, opacity, rim and order (even in front of the fighters), all tunable in the Lab. Lights can sit behind any layer (`behind:<element>`), at its depth and parallax; the island and clouds use the `scenery` lit group, where a light behind an object outlines its silhouette instead of lighting its face.
 - The HUD is drawn by a second camera (`uiCamera`); world objects must be hidden from it with `uiCamera.ignore(obj)`.
 
 ### The server (`server-geckos/index.ts`)
@@ -47,6 +57,7 @@ Rooms of 2 to 4 players, the match start (seed and input delay), and a relay for
 - `npm run dev` (Vite, port 5175), `npm run server` (game server, port 9208), `npm run build`, `npm test`.
 - Deploying the release, from `main`: `ssh-add ~/.ssh/id_rsa` once, then `./deploy_server.sh` and `./deploy_client.sh`, always together.
 - Packing a character's sprites into its atlas: `node scripts/pack-character.cjs <character> <folder of sprites>`.
+- Londra's layers from the full-size artwork: `python3 scripts/londra-layers.py "../assets/Stages/Londra/Layers"` (Pillow, numpy, cwebp).
 
 ## Update protocol
 

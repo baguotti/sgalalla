@@ -34,6 +34,8 @@ void main ()
 // Phaser's single-texture sprite shader, then lighting: ambient, plus each
 // light's fill fading with distance, plus a rim where the silhouette's edge
 // faces a light. The edge is found from the texture's alpha, no normal maps.
+// A light behind the object doesn't light its face: it outlines the whole
+// silhouette instead, brightest nearest the light.
 const FRAGMENT_SHADER = `
 #define SHADER_NAME SGALALLA_LIT_FS
 #extension GL_OES_standard_derivatives : enable
@@ -57,6 +59,9 @@ uniform float uRimWidth;
 uniform vec2 uTexelSize;
 // 1 while the object stands on the floor, which hides the bottom edge (the soles) from the lights
 uniform float uFloorContact;
+// This object's rim strength, and 1 for each light behind it
+uniform float uObjectRim;
+uniform float uBehind[MAX_LIGHTS];
 
 varying vec2 outTexCoord;
 varying float outTintEffect;
@@ -95,15 +100,28 @@ void main ()
         float falloff = clamp(1.0 - dist / position.z, 0.0, 1.0);
         falloff *= falloff;
 
-        light += uLightColor[i].rgb * (falloff * uLightColor[i].a);
+        float behind = uBehind[i];
+        light += uLightColor[i].rgb * (falloff * uLightColor[i].a * (1.0 - behind));
 
-        if (uRimWidth > 0.0 && position.w > 0.0 && falloff > 0.0)
+        if (uRimWidth > 0.0 && position.w > 0.0 && falloff > 0.0 && uObjectRim > 0.0)
         {
-            // Look toward the light, in texels: where the silhouette ends within the rim width, this pixel is on a lit edge
-            vec2 towardLight = (texPerPixelX * toLight.x + texPerPixelY * toLight.y) / uTexelSize;
-            vec2 stride = towardLight * (uRimWidth / max(length(towardLight), 0.0001)) * uTexelSize;
-            float covered = 0.5 * (texture2D(uMainSampler, outTexCoord + stride * 0.5).a + texture2D(uMainSampler, outTexCoord + stride).a);
-            rim += uLightColor[i].rgb * (falloff * position.w * (1.0 - covered));
+            float covered;
+            if (behind > 0.5)
+            {
+                // Backlit: any edge within the rim width, whichever way it faces
+                vec2 across = vec2(uRimWidth * uTexelSize.x, 0.0);
+                vec2 down = vec2(0.0, uRimWidth * uTexelSize.y);
+                covered = min(min(texture2D(uMainSampler, outTexCoord + across).a, texture2D(uMainSampler, outTexCoord - across).a),
+                    min(texture2D(uMainSampler, outTexCoord + down).a, texture2D(uMainSampler, outTexCoord - down).a));
+            }
+            else
+            {
+                // Look toward the light, in texels: where the silhouette ends within the rim width, this pixel is on a lit edge
+                vec2 towardLight = (texPerPixelX * toLight.x + texPerPixelY * toLight.y) / uTexelSize;
+                vec2 stride = towardLight * (uRimWidth / max(length(towardLight), 0.0001)) * uTexelSize;
+                covered = 0.5 * (texture2D(uMainSampler, outTexCoord + stride * 0.5).a + texture2D(uMainSampler, outTexCoord + stride).a);
+            }
+            rim += uLightColor[i].rgb * (falloff * position.w * uObjectRim * (1.0 - covered));
         }
     }
 
@@ -126,12 +144,22 @@ void main ()
  */
 export class LitPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
     private readonly floorContact = new WeakMap<Phaser.GameObjects.GameObject, number>();
+    private readonly objectRim = new WeakMap<Phaser.GameObjects.GameObject, number>();
+    private readonly behind = new WeakMap<Phaser.GameObjects.GameObject, number>();
+    private readonly behindFlags = new Float32Array(MAX_LIGHTS);
     private textureWidth = 0;
     private textureHeight = 0;
     private boundFloorContact = 0;
+    private boundRim = 1;
+    private boundBehind = 0;
 
     constructor(game: Phaser.Game) {
         super({ game, vertShader: VERTEX_SHADER, fragShader: FRAGMENT_SHADER });
+    }
+
+    onPreRender(): void {
+        this.set1f('uObjectRim', this.boundRim);
+        this.set1fv('uBehind', this.behindFlags);
     }
 
     /** 1 while `object` stands on the floor, 0 in the air. */
@@ -139,13 +167,25 @@ export class LitPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline 
         this.floorContact.set(object, amount);
     }
 
-    /** Called for every object drawn with this pipeline: the rim needs its texture's size and floor contact. */
+    /** How strongly lights outline `object`: 1 unless set. */
+    setObjectRim(object: Phaser.GameObjects.GameObject, rim: number): void {
+        this.objectRim.set(object, rim);
+    }
+
+    /** Which lights are behind `object`, one bit per light in the order setLights got them. */
+    setBehind(object: Phaser.GameObjects.GameObject, mask: number): void {
+        this.behind.set(object, mask);
+    }
+
+    /** Called for every object drawn with this pipeline: the rim needs its texture's size, floor contact, strength and lights behind. */
     onBind(gameObject?: Phaser.GameObjects.GameObject): void {
         const source = (gameObject as Phaser.GameObjects.Image | undefined)?.frame?.source;
         if (!gameObject || !source) return;
         const floorContact = this.floorContact.get(gameObject) ?? 0;
+        const rim = this.objectRim.get(gameObject) ?? 1;
+        const behind = this.behind.get(gameObject) ?? 0;
         const sizeChanged = source.width !== this.textureWidth || source.height !== this.textureHeight;
-        if (!sizeChanged && floorContact === this.boundFloorContact) return;
+        if (!sizeChanged && floorContact === this.boundFloorContact && rim === this.boundRim && behind === this.boundBehind) return;
 
         // Objects already batched are drawn with the values they were batched for
         this.flush();
@@ -157,6 +197,15 @@ export class LitPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline 
         if (floorContact !== this.boundFloorContact) {
             this.boundFloorContact = floorContact;
             this.set1f('uFloorContact', floorContact);
+        }
+        if (rim !== this.boundRim) {
+            this.boundRim = rim;
+            this.set1f('uObjectRim', rim);
+        }
+        if (behind !== this.boundBehind) {
+            this.boundBehind = behind;
+            for (let i = 0; i < MAX_LIGHTS; i++) this.behindFlags[i] = (behind >> i) & 1;
+            this.set1fv('uBehind', this.behindFlags);
         }
     }
 

@@ -9,7 +9,7 @@
 
 import { SIM_STEP_MS } from './FixedStepClock.js';
 import { AttackPhase, AttackRegistry, AttackType } from './AttackData.js';
-import { HURTBOX_HEIGHT, HURTBOX_WIDTH, checkHit, handleCombatInput, updateCombat } from './Combat.js';
+import { HURTBOX_HEIGHT, HURTBOX_WIDTH, cancelAttackForChaseDodge, checkHit, handleCombatInput, updateCombat } from './Combat.js';
 import type { FighterInput } from './FighterInput.js';
 import {
     FIGHTER_STATES, changeState, consumeBuffered, createFighter, isBuffered, isInPlay, updateInputBuffer, updateState,
@@ -141,8 +141,7 @@ export function placeFighter(match: MatchState, id: number, x: number, y: number
 // Reused every step: the physics' input and the events it reports
 const physicsInput: PhysicsInput = {
     moveLeft: false, moveRight: false, moveDown: false, moveUp: false,
-    jumpBuffered: false, jumpHeld: false, dodgeBuffered: false,
-    aimUp: false, aimDown: false,
+    jumpBuffered: false, jumpHeld: false, dodgeBuffered: false, chaseDodgeReady: false,
 };
 const physicsEvents: PhysicsEvent[] = [];
 
@@ -177,8 +176,7 @@ function stepFighterPhysics(f: FighterState, events: MatchEvent[]): void {
     physicsInput.jumpBuffered = isBuffered(f, 'jump');
     physicsInput.jumpHeld = input.jumpHeld;
     physicsInput.dodgeBuffered = isBuffered(f, 'dodge');
-    physicsInput.aimUp = input.aimUp;
-    physicsInput.aimDown = input.aimDown;
+    physicsInput.chaseDodgeReady = combat.chaseDodgeTimer > 0;
 
     physicsEvents.length = 0;
     stepPhysics(b, physicsInput, STEP_S, physicsEvents);
@@ -192,7 +190,10 @@ function handlePhysicsEvents(f: FighterState, physicsEvents: readonly PhysicsEve
         if (event.type === 'consume') {
             consumeBuffered(f, event.input);
         } else if (event.type === 'dodge_start') {
+            if (event.chase) cancelAttackForChaseDodge(f);
             changeState(f, event.isGrounded ? 'Dodge' : 'AirDodge');
+        } else if (event.type === 'dash_start') {
+            changeState(f, 'Dash');
         }
     }
 }

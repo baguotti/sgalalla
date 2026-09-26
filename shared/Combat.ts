@@ -8,7 +8,7 @@ import { SIM_STEP_MS } from './FixedStepClock.js';
 import { changeState, consumeBuffered, isBuffered, type FighterState, type GhostHitbox } from './FighterState.js';
 import { pushPhysicsSounds, type MatchEvent } from './MatchEvents.js';
 import { PhysicsConfig } from './PhysicsConfig.js';
-import { startRecovery, type PhysicsEvent } from './PhysicsSimulation.js';
+import { endChaseDodge, gravityCancel, interruptMovement, startRecovery, type PhysicsEvent } from './PhysicsSimulation.js';
 
 /** Hurtbox, also used for blast zones: narrower and shorter than the physics body. */
 export const HURTBOX_WIDTH = 46;
@@ -49,6 +49,8 @@ export function updateCombat(f: FighterState, events: MatchEvent[]): void {
         c.attackCooldownTimer -= SIM_STEP_MS;
         if (c.attackCooldownTimer <= 0) c.isGroundPoundLanding = false;
     }
+
+    if (c.chaseDodgeTimer > 0) c.chaseDodgeTimer -= SIM_STEP_MS;
 
     if (c.ghost) {
         c.ghost.age += SIM_STEP_MS;
@@ -172,24 +174,42 @@ export function handleCombatInput(f: FighterState, events: MatchEvent[]): void {
     }
 
     if (c.attackCooldownTimer > 0) return;
-    if (f.isDodging || f.isHitStunned || f.isAttacking) return;
+    if (f.isHitStunned || f.isAttacking) return;
 
-    if (isBuffered(f, 'lightAttack')) {
+    const lightRequested = isBuffered(f, 'lightAttack');
+    const heavyRequested = isBuffered(f, 'heavyAttack') && !c.isCharging;
+    const fromChaseDodge = f.isDodging && b.isChaseDodging;
+    if (f.isDodging) {
+        // An attack cancels a chase dodge, or gravity cancels an aerial spot dodge
+        const gravityCancels = b.isSpotDodging && !b.isGrounded;
+        if (!(lightRequested || heavyRequested) || !(b.isChaseDodging || gravityCancels)) return;
+        if (b.isChaseDodging) {
+            endChaseDodge(b);
+        } else {
+            gravityCancel(b);
+            c.gravityCancel = true;
+        }
+        f.isDodging = false;
+    }
+    // A gravity cancel uses the grounded moves in the air
+    const isAerial = !b.isGrounded && !c.gravityCancel;
+
+    if (lightRequested) {
         consumeBuffered(f, 'lightAttack');
         const direction = inputDirection(f);
+        // Out of a chase dodge it's the aimed attack, not the running one
         const isRunSpeed = Math.abs(b.vx) > PhysicsConfig.MAX_SPEED * 0.8;
-        if ((b.isRunning || isRunSpeed) && b.isGrounded && direction !== AttackDirection.DOWN) {
+        if ((b.isRunning || isRunSpeed) && b.isGrounded && direction !== AttackDirection.DOWN && !fromChaseDodge) {
             startAttack(f, 'light_run_grounded', events);
         } else {
-            startAttack(f, attackKey(AttackType.LIGHT, direction, !b.isGrounded), events);
+            startAttack(f, attackKey(AttackType.LIGHT, direction, isAerial), events);
         }
         return;
     }
 
-    if (isBuffered(f, 'heavyAttack') && !c.isCharging) {
+    if (heavyRequested) {
         consumeBuffered(f, 'heavyAttack');
         const direction = inputDirection(f);
-        const isAerial = !b.isGrounded;
 
         // Up or neutral heavy in the air is the recovery move
         if ((direction === AttackDirection.UP || direction === AttackDirection.NEUTRAL) && isAerial) {
@@ -265,7 +285,7 @@ function startChargedAttack(f: FighterState, key: string, events: MatchEvent[]):
 function executeChargedAttack(f: FighterState, events: MatchEvent[]): void {
     const c = f.combat;
     const direction = c.chargeDirection;
-    const isAerial = !f.body.isGrounded;
+    const isAerial = !f.body.isGrounded && !c.gravityCancel;
     const chargePercent = Math.min(c.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
     c.lastChargeTime = c.chargeTime;
 
@@ -304,6 +324,7 @@ function endAttack(f: FighterState): void {
     c.isGroundPounding = false;
     c.attack = null;
     c.hitbox.active = false;
+    c.gravityCancel = false;
     clearGhost(f);
     clearCharge(f);
 
@@ -325,6 +346,7 @@ function endGroundPound(f: FighterState, events: MatchEvent[]): void {
     c.isGroundPoundLanding = true;
     c.attack = null;
     c.hitbox.active = false;
+    c.gravityCancel = false;
     c.attackCooldownTimer = PhysicsConfig.GROUND_POUND_STARTUP;
     if (f.body.isGrounded) f.body.vx *= 0.5;
 }
@@ -332,6 +354,22 @@ function endGroundPound(f: FighterState, events: MatchEvent[]): void {
 function clearCharge(f: FighterState): void {
     f.combat.isCharging = false;
     f.combat.chargeTime = 0;
+}
+
+/** A chase dodge cuts the attack that hit short, leaving no cooldown so it can go straight into the next. */
+export function cancelAttackForChaseDodge(f: FighterState): void {
+    const c = f.combat;
+    f.isAttacking = false;
+    c.isGroundPounding = false;
+    // The cooldown that would end the ground pound's landing pose is gone too
+    c.isGroundPoundLanding = false;
+    c.attack = null;
+    c.hitbox.active = false;
+    c.gravityCancel = false;
+    c.attackCooldownTimer = 0;
+    c.lastChargeTime = 0;
+    c.chaseDodgeTimer = 0;
+    clearGhost(f);
 }
 
 // ─── Hitboxes ───
@@ -541,14 +579,34 @@ function applyHit(attacker: FighterState, target: FighterState, events: MatchEve
     }
 
     target.damagePercent = Math.min(target.damagePercent + damage, PhysicsConfig.MAX_DAMAGE);
+    interruptMovement(tb);
     tb.vx = knockbackX;
     tb.vy = knockbackY;
     target.isHitStunned = true;
     target.hitStunTimer = PhysicsConfig.HIT_STUN_DURATION;
     changeState(target, 'HitStun');
 
+    // Hitting or being hit restarts the wall slip count; a target out of jumps gets one back
     tb.airActionCounter = 0;
+    attacker.body.airActionCounter = 0;
+    if (tb.jumpsRemaining === 0) tb.jumpsRemaining = 1;
+
+    // The attacker can chase: a directional dodge until a moment after this attack ends
+    c.chaseDodgeTimer = remainingAttackTime(attacker) + PhysicsConfig.CHASE_DODGE_WINDOW;
 
     events.push({ type: 'hit', attacker: attacker.id, target: target.id, attackKey: c.attack?.key ?? null });
+}
+
+/** Time left in the fighter's current move, in ms. */
+function remainingAttackTime(f: FighterState): number {
+    const attack = f.combat.attack;
+    if (!attack) return f.body.isRecovering ? f.body.recoveryTimer : 0;
+    const data = AttackRegistry[attack.key];
+    switch (attack.phase) {
+        case AttackPhase.STARTUP: return data.startupDuration - attack.phaseTimer + data.activeDuration + data.recoveryDuration;
+        case AttackPhase.ACTIVE: return data.activeDuration - attack.phaseTimer + data.recoveryDuration;
+        case AttackPhase.RECOVERY: return data.recoveryDuration - attack.phaseTimer;
+        default: return 0;
+    }
 }
 

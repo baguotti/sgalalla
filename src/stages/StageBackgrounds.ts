@@ -28,10 +28,15 @@ export function previewKey(stage: StageKey): string {
 
 /** Queues `stage`'s background for the scene's loader and frees any other stage's. */
 export function loadStageBackground(scene: Phaser.Scene, stage: StageKey): void {
-    for (const key of STAGE_KEYS) {
-        if (key !== stage && scene.textures.exists(key)) scene.textures.remove(key);
-    }
+    freeStageBackgrounds(scene, stage);
     if (!scene.textures.exists(stage)) scene.load.image(stage, STAGES[stage].image);
+}
+
+/** Frees every stage background but `keep`. */
+export function freeStageBackgrounds(scene: Phaser.Scene, keep?: StageKey): void {
+    for (const key of STAGE_KEYS) {
+        if (key !== keep && scene.textures.exists(key)) scene.textures.remove(key);
+    }
 }
 
 export function loadStagePreviews(scene: Phaser.Scene): void {

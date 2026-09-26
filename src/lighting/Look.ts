@@ -160,14 +160,28 @@ export const LOOK_SECTIONS: readonly [string, readonly (keyof Look)[]][] = [
     ['CRT', ['crt', 'crtLineSize', 'crtMask']],
 ];
 
-/** Where a light's orb and glow are drawn: in front of the sky, the platforms, or the fighters. */
-export type LightLayer = 'back' | 'stage' | 'front';
+/**
+ * Where a light's orb and glow are drawn: in front of the background, the
+ * platforms or the fighters, or `behind:<element>` for right behind one of a
+ * layered stage's elements, at its depth and scroll rate.
+ */
+export type LightLayer = string;
 
-export const LIGHT_LAYERS: Record<LightLayer, string> = {
+export const LIGHT_LAYERS: Record<string, string> = {
     back: 'behind the stage',
     stage: 'behind the fighters',
     front: 'in front of everything',
 };
+
+/** The layer right behind a layered stage's element. */
+export function behindLayer(element: string): LightLayer {
+    return `behind:${element}`;
+}
+
+/** The element a `behind:` layer names, or null. */
+export function elementBehind(layer: LightLayer): string | null {
+    return layer.startsWith('behind:') ? layer.slice('behind:'.length) : null;
+}
 
 export interface LightDef {
     /** The sun casts the rays and is scaled by the look's sun setting; lamps by its lamps setting. */
@@ -181,7 +195,7 @@ export interface LightDef {
     /** How much it lights what faces the camera, and how brightly it outlines fighters' edges. */
     fill: number;
     rim: number;
-    /** How much it brightens the sky painting. */
+    /** How much it brightens the sky and the stage's scenery (island, clouds). */
     sky: number;
     /** Glow in the air round it, and the size of the bright orb at its centre. */
     halo: number;

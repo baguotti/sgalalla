@@ -15,7 +15,6 @@ export const PhysicsConfig = {
     SLIDE_ATTACK_SPEED: 2200,
     SLIDE_ATTACK_DECELERATION: 0.96,
     MAX_SPEED: 1400,
-    MAX_FALL_SPEED: 1800,
 
     // Jump mechanics
     JUMP_FORCE: -1050,
@@ -23,9 +22,13 @@ export const PhysicsConfig = {
     DOUBLE_JUMP_FORCE: -900,
     MAX_JUMPS: 3,
 
-    // Fast-fall
-    FAST_FALL_MULTIPLIER: 1.7,
-    FAST_FALL_THRESHOLD: 300,
+    // Falling: gravity accelerates a fall up to these speeds
+    MAX_FALL_SPEED: 1800,
+    MAX_FAST_FALL_SPEED: 2200,
+    // Fast fall: holding down while descending; starts at least this fast
+    FAST_FALL_SPEED: 1100,
+    // Above the terminal speed once a fast fall ends, the excess shrinks by this share per step
+    FALL_SPEED_EASE: 0.85,
 
     // Recovery attack
     RECOVERY_FORCE_Y: -1760,
@@ -35,11 +38,38 @@ export const PhysicsConfig = {
     // Platform drop-through
     PLATFORM_DROP_GRACE_PERIOD: 200,
 
-    // Dodge/Dash - Brawlhalla style
-    DODGE_DISTANCE: 210,
-    DODGE_DURATION: 180,
-    DODGE_COOLDOWN: 800,
+    // Dodges are invincible: a spot dodge on the ground or in the air, or an 8-way dodge in the air
     SPOT_DODGE_DURATION: 300,
+    AIR_DODGE_DURATION: 200,
+    AIR_DODGE_DISTANCE: 210,
+    // Share of the vertical speed kept when a directional air dodge ends
+    AIR_DODGE_END_SPEED: 0.3,
+    DODGE_COOLDOWN: 1000,
+    AIR_DODGE_COOLDOWN: 2700,
+    // Landing after an air dodge: the dodge is back this long after it ended, unless it was gravity cancelled
+    LANDED_AIR_DODGE_COOLDOWN: 1250,
+
+    // Dash: dodge + direction on the ground. Not invincible and no dodge cooldown;
+    // a jump, attack or spot dodge cancels it
+    DASH_SPEED: 1500,
+    DASH_DURATION: 150,
+    DASH_REPEAT_DELAY: 130,
+    // Jumping out of a dash: low and fast, coasting until it slows to about the top air drift speed
+    DASH_JUMP_FORCE: -750,
+    DASH_JUMP_SPEED: 1300,
+    DASH_JUMP_AIR_FRICTION: 0.985,
+    DASH_MOMENTUM_MIN_SPEED: 520,
+
+    // Chase dodge: a directional dodge within the attack that hit or CHASE_DODGE_WINDOW after it.
+    // Cancels the attack's end, costs no cooldown (at most MAX_AIR_CHASE_DODGES before landing),
+    // is invincible only at first, and an attack cancels it
+    CHASE_DODGE_WINDOW: 200,
+    CHASE_DODGE_DURATION: 250,
+    CHASE_DODGE_INVINCIBLE: 150,
+    CHASE_DODGE_SPEED: 1000,
+    MAX_AIR_CHASE_DODGES: 2,
+    // Share of the chase dodge's speed an attack out of it keeps
+    CHASE_ATTACK_SPEED_KEPT: 0.5,
 
     // Run mechanics
     RUN_SPEED_MULT: 2.25,
@@ -100,6 +130,8 @@ export const PhysicsConfig = {
 
     // Movement thresholds
     HIGH_SPEED_THRESHOLD_MULT: 1.2,
+    // Wall slip: after this many air jumps, wall jumps and recoveries without landing, hitting or
+    // being hit, walls no longer hold the fighter or give back its jumps
     MAX_AIR_ACTIONS: 9,
 
     // Platform mechanics

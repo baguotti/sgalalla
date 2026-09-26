@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 
 /** The stage's visuals. Collision lives in shared/StageData.ts. */
 export interface StageResult {
-    background: Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite;
+    /** The painting; null for a stage drawn in layers. */
+    background: Phaser.GameObjects.Image | null;
     platformTextures: Phaser.GameObjects.Image[];
 }
 
@@ -14,14 +15,13 @@ const PLATFORM_TEXTURES: Record<string, { main: string; side: string; top: strin
 const DEFAULT_PLATFORMS = { main: 'platform_main', side: 'platform_side', top: 'platform_top' };
 
 /**
- * Draws the standard Sgalalla stage: the background painting and the platform
- * textures laid over the collision layout.
+ * Draws the standard Sgalalla stage: the background painting (unless the stage
+ * is drawn in layers) and the platform textures laid over the collision layout.
  */
-export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'adria_bg'): StageResult {
+export function createStage(scene: Phaser.Scene, backgroundTexture: string = 'adria_bg', painting = true): StageResult {
     // The painting is scaled to twice the screen width, and scrolls slightly slower than the stage
-    const background = scene.add.image(scene.scale.width / 2, scene.scale.height / 2 + 150, backgroundTexture);
-    background.setScale((scene.scale.width / background.width) * 2).setScrollFactor(0.9);
-    background.setDepth(-100);
+    const background = painting ? scene.add.image(scene.scale.width / 2, scene.scale.height / 2 + 150, backgroundTexture) : null;
+    background?.setScale((scene.scale.width / background.width) * 2).setScrollFactor(0.9).setDepth(-100);
 
     const textures = PLATFORM_TEXTURES[backgroundTexture] ?? DEFAULT_PLATFORMS;
 

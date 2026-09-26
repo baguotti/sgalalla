@@ -3,8 +3,12 @@ import { AtmospherePipeline, type AtmosphereFrame } from './AtmospherePipeline';
 import { LitPipeline, MAX_LIGHTS } from './LitPipeline';
 import { FLASH_COLORS, type FlashKind, type LightDef, type LightLayer, type Look } from './Look';
 
-/** Which lit shader an object uses: the sky only sees lights that reach it and gets no rim. */
-export type LitGroup = 'sky' | 'stage' | 'fighter';
+/**
+ * Which lit shader an object uses. The sky only sees lights that reach it and
+ * gets no rim; scenery (a layered stage's island and clouds) is lit like the
+ * sky, but lights outline it, and lights behind it outline its silhouette.
+ */
+export type LitGroup = 'sky' | 'scenery' | 'stage' | 'fighter';
 
 /** Anything with a texture that can take a pipeline: images, sprites, tile sprites. */
 export type LitObject = Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Pipeline;
@@ -12,12 +16,13 @@ export type LitObject = Phaser.GameObjects.GameObject & Phaser.GameObjects.Compo
 /** Stage lights at most, leaving room for flashes. */
 export const MAX_STAGE_LIGHTS = MAX_LIGHTS - 2;
 
-const GROUPS: readonly LitGroup[] = ['sky', 'stage', 'fighter'];
-const PIPELINE_KEYS: Record<LitGroup, string> = { sky: 'LitSky', stage: 'LitStage', fighter: 'LitFighter' };
+const GROUPS: readonly LitGroup[] = ['sky', 'scenery', 'stage', 'fighter'];
+const PIPELINE_KEYS: Record<LitGroup, string> = { sky: 'LitSky', scenery: 'LitScenery', stage: 'LitStage', fighter: 'LitFighter' };
 const ATMOSPHERE_KEY = 'Atmosphere';
 /** Colour of each group's ambient light: dusk blues and violets. */
 const AMBIENT_TINTS: Record<LitGroup, readonly number[]> = {
     sky: [0.8, 0.72, 0.95],
+    scenery: [0.8, 0.72, 0.95],
     stage: [0.72, 0.74, 1],
     fighter: [0.82, 0.82, 1],
 };
@@ -28,8 +33,23 @@ const HALO_SIZE = 0.6;
 const ORB_TEXTURE = 'light_orb';
 const HALO_TEXTURE = 'light_halo';
 const TEXTURE_SIZE = 256;
-/** Depth of a light's orb and glow per layer: in front of the sky painting (-100), the platforms (0) or the fighters (10). */
-const LAYER_DEPTHS: Record<LightLayer, number> = { back: -50, stage: 5, front: 50 };
+/** Where a light's orb and glow are drawn, and how fast they scroll with the camera. */
+export interface LightPlacement {
+    depth: number;
+    scroll: number;
+}
+
+/** In front of the background (-100 and below), the platforms (0) or the fighters (10), scrolling with the stage. */
+const PLACEMENTS: Record<string, LightPlacement> = {
+    back: { depth: -50, scroll: 1 },
+    stage: { depth: 5, scroll: 1 },
+    front: { depth: 50, scroll: 1 },
+};
+
+/** The standard layers; anything else falls back to behind the stage. */
+export function standardPlacement(layer: LightLayer): LightPlacement {
+    return PLACEMENTS[layer] ?? PLACEMENTS.back;
+}
 
 interface Light {
     def: LightDef;
@@ -71,8 +91,12 @@ export class Lighting {
     private readonly groups: Record<LitGroup, GroupLights>;
     private readonly atmosphere: AtmospherePipeline;
     private readonly frame: AtmosphereFrame;
+    /** Depth of each light handed to the scenery shader this frame, in its order. */
+    private readonly sceneryDepths = new Float32Array(MAX_LIGHTS);
     private enabled = true;
     private timeMs = 0;
+    /** Where each layer puts a light; a layered stage adds its `behind:` layers. */
+    placement: (layer: LightLayer) => LightPlacement = standardPlacement;
 
     /** Lighting needs WebGL with shader derivatives, which nearly every browser has. */
     static isSupported(scene: Phaser.Scene): boolean {
@@ -94,10 +118,11 @@ export class Lighting {
         }
         this.pipelines = {
             sky: manager.get(PIPELINE_KEYS.sky) as LitPipeline,
+            scenery: manager.get(PIPELINE_KEYS.scenery) as LitPipeline,
             stage: manager.get(PIPELINE_KEYS.stage) as LitPipeline,
             fighter: manager.get(PIPELINE_KEYS.fighter) as LitPipeline,
         };
-        this.groups = { sky: groupLights(), stage: groupLights(), fighter: groupLights() };
+        this.groups = { sky: groupLights(), scenery: groupLights(), stage: groupLights(), fighter: groupLights() };
 
         this.frame = { look, sunX: 0, sunY: 0, sunReach: SUN_REACH, rayColor: [0, 0, 0], worldBottom: 0, worldHeight: 1 };
         if (!manager.postPipelineClasses.has(ATMOSPHERE_KEY)) manager.addPostPipeline(ATMOSPHERE_KEY, AtmospherePipeline);
@@ -115,6 +140,15 @@ export class Lighting {
         return this.enabled;
     }
 
+    /** Objects drawn lit, and flashes lighting the scene right now: for the Studio Lab's stats. */
+    get litCount(): number {
+        return this.lit.size;
+    }
+
+    get flashCount(): number {
+        return this.lights.filter(light => light.lifeMs > 0).length;
+    }
+
     /** The stage's lights, in the order they were added. */
     get stageLights(): LightDef[] {
         return this.lights.filter(light => light.lifeMs === 0).map(light => light.def);
@@ -126,6 +160,11 @@ export class Lighting {
         // Nothing lights a platform's underside through it, as with fighters' feet
         if (group === 'stage') this.pipelines.stage.setFloorContact(object, 1);
         if (this.enabled) object.setPipeline(PIPELINE_KEYS[group]);
+    }
+
+    /** How strongly lights outline a scenery object. */
+    setRim(object: LitObject, rim: number): void {
+        this.pipelines.scenery.setObjectRim(object, rim);
     }
 
     /** A fighter standing on the floor gets no rim on its soles. */
@@ -239,9 +278,11 @@ export class Lighting {
         if (!orb || !halo) return;
         const visible = this.enabled && def.visible;
         const brightness = light.intensity * this.strength(def);
-        const depth = LAYER_DEPTHS[def.layer];
+        const { depth, scroll } = this.placement(def.layer);
         if (orb.depth !== depth) orb.setDepth(depth);
         if (halo.depth !== depth) halo.setDepth(depth);
+        orb.setScrollFactor(scroll);
+        halo.setScrollFactor(scroll);
         orb.setPosition(def.x, def.y)
             .setTint(def.color)
             .setScale(def.orb)
@@ -273,18 +314,22 @@ export class Lighting {
             if (strength <= 0) continue;
 
             // Where Phaser would draw an object at the light
-            const x = camera.x + originX + (def.x - camera.scrollX - originX) * zoom;
-            const y = camera.y + originY + (def.y - camera.scrollY - originY) * zoom;
+            const placement = this.placement(def.layer);
+            const x = camera.x + originX + (def.x - camera.scrollX * placement.scroll - originX) * zoom;
+            const y = camera.y + originY + (def.y - camera.scrollY * placement.scroll - originY) * zoom;
             const radius = def.radius * zoom;
             const r = ((def.color >> 16) & 0xff) / 255 * strength;
             const g = ((def.color >> 8) & 0xff) / 255 * strength;
             const b = (def.color & 0xff) / 255 * strength;
 
             for (const group of GROUPS) {
-                const fill = group === 'sky' ? def.sky : def.fill;
-                const rim = group === 'fighter' ? def.rim * look.rimStrength : group === 'stage' ? def.rim * look.stageRim : 0;
+                const fill = group === 'sky' || group === 'scenery' ? def.sky : def.fill;
+                const rim = group === 'fighter' ? def.rim * look.rimStrength
+                    : group === 'stage' ? def.rim * look.stageRim
+                    : group === 'scenery' ? def.rim : 0;
                 const lights = this.groups[group];
                 if (lights.count === MAX_LIGHTS || (fill <= 0 && rim <= 0)) continue;
+                if (group === 'scenery') this.sceneryDepths[lights.count] = placement.depth;
                 const k = lights.count * 4;
                 lights.positions[k] = x;
                 lights.positions[k + 1] = y;
@@ -312,10 +357,22 @@ export class Lighting {
         for (const group of GROUPS) {
             const lights = this.groups[group];
             const tint = AMBIENT_TINTS[group];
-            const level = group === 'sky' ? look.skyAmbient : group === 'stage' ? look.stageAmbient : look.fighterAmbient;
+            const level = group === 'sky' || group === 'scenery' ? look.skyAmbient : group === 'stage' ? look.stageAmbient : look.fighterAmbient;
             for (let c = 0; c < 3; c++) lights.ambient[c] = tint[c] * level;
             const rimWidth = group === 'sky' ? 0 : look.rimWidth;
             this.pipelines[group].setLights(lights.ambient, lights.count, lights.positions, lights.colors, rimWidth);
+        }
+
+        // Lights drawn behind a scenery object light its silhouette, not its face
+        const scenery = this.groups.scenery;
+        for (const [object, group] of this.lit) {
+            if (group !== 'scenery') continue;
+            const depth = (object as LitObject & Phaser.GameObjects.Components.Depth).depth;
+            let mask = 0;
+            for (let k = 0; k < scenery.count; k++) {
+                if (this.sceneryDepths[k] < depth) mask |= 1 << k;
+            }
+            this.pipelines.scenery.setBehind(object, mask);
         }
 
         frame.worldBottom = camera.worldView.bottom;
