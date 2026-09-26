@@ -72,7 +72,7 @@ export class MainMenuScene extends Phaser.Scene {
         }
 
         // Version Text
-        this.add.text(this.scale.width - 20, this.scale.height - 20, 'v3.0.0', {
+        this.add.text(this.scale.width - 20, this.scale.height - 20, 'v3.0.1e', {
             fontSize: '18px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(1, 1);        // Menu Items
         // The last item sits 40 px above the bottom
