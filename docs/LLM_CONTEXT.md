@@ -7,7 +7,7 @@ Super Smash Fioi: a 2 to 4 player platform fighter in the style of Brawlhalla, b
 
 ## Branches
 - `main`: the official release (v3.0.x), live at http://138.68.126.112. The campaign is hidden from its menu.
-- `experimental-branch`: work in progress (v3.0.xe): the release plus the campaign, the lighting experiment and the Studio Lab.
+- `experimental-branch`: work in progress (v3.0.xe): the release plus the campaign, the lighting experiment and the Studio Lab. Live at http://138.68.126.112:8080 with its own game server on port 9209 (the client picks 9209 when the page is on port 8080).
 - Old branches are archived as `archive/*` tags.
 
 ## Architecture
@@ -56,6 +56,7 @@ Rooms of 2 to 4 players, the match start (seed and input delay), and a relay for
 ## Commands
 - `npm run dev` (Vite, port 5175), `npm run server` (game server, port 9208), `npm run build`, `npm test`.
 - Deploying the release, from `main`: `ssh-add ~/.ssh/id_rsa` once, then `./deploy_server.sh` and `./deploy_client.sh`, always together.
+- Deploying the experimental version, from `experimental-branch` with everything committed: `./deploy_experimental.sh` (site on 8080 and its game server, PM2 `geckos-experimental`; the release is untouched).
 - Packing a character's sprites into its atlas: `node scripts/pack-character.cjs <character> <folder of sprites>`.
 - Londra's layers from the full-size artwork: `python3 scripts/londra-layers.py "../assets/Stages/Londra/Layers"` (Pillow, numpy, cwebp).
 

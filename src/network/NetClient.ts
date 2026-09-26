@@ -3,7 +3,10 @@ import { NetEvent, PROTOCOL_VERSION } from '../../shared/NetProtocol';
 
 type NetEventName = typeof NetEvent[keyof typeof NetEvent];
 
+/** The release's game server; the experimental site (port 8080 on the droplet) has its own on 9209. */
 const SERVER_PORT = 9208;
+const EXPERIMENTAL_SITE_PORT = '8080';
+const EXPERIMENTAL_SERVER_PORT = 9209;
 const PING_INTERVAL_MS = 500;
 const SERVER_EVENTS = [NetEvent.REJECTED, NetEvent.ROOM, NetEvent.START, NetEvent.PLAYER_LEFT];
 
@@ -31,7 +34,7 @@ export class NetClient {
     connect(): Promise<void> {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('Connection timed out')), 8000);
-            const channel = geckos({ url: serverUrl(), port: SERVER_PORT });
+            const channel = geckos({ url: serverUrl(), port: serverPort() });
             this.channel = channel;
 
             channel.onConnect(error => {
@@ -110,6 +113,10 @@ export class NetClient {
         if (delay > 0) setTimeout(deliver, delay);
         else deliver();
     }
+}
+
+function serverPort(): number {
+    return window.location.port === EXPERIMENTAL_SITE_PORT ? EXPERIMENTAL_SERVER_PORT : SERVER_PORT;
 }
 
 /** The server is on the host the page came from; the packaged app uses the production server. */

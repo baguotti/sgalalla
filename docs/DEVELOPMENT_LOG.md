@@ -734,3 +734,8 @@ Part 2
 ------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-09-26] v3.0.2e - Brawlhalla movement, layered Londra, Studio Lab panels (branch `experimental-branch`)
 - **[Release]** The experimental version is v3.0.2e: the first pass of Brawlhalla movement (dash and dash jump, 8-way air dodges, chase dodge, gravity cancel, fast fall, wall rules, real hitstun), Londra drawn in layers with an engine sky, and the Studio Lab's LIGHTS, CAMERA and STAGE panels with lights behind layers, per-setting resets and frame statistics. Protocol version 5. Entries above.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-26] Experimental version on the droplet (branch `experimental-branch`)
+- **[Deploy]** `deploy_experimental.sh` (was `deploy_campaign.sh`) builds `experimental-branch`, publishes it at http://138.68.126.112:8080 in place of the old campaign build, and runs its own game server on port 9209 (PM2 `geckos-experimental`, from a separate clone), next to the release's on 9208. It refuses to run from another branch or with uncommitted changes.
+- **[Change]** The client connects to game server 9209 when the page is served on port 8080, else 9208.
