@@ -4,7 +4,6 @@
  */
 
 import { PhysicsConfig } from './PhysicsConfig.js';
-import type { SimStage } from './StageData.js';
 
 // ─── Attack Phase / Type constants ───
 export const ATTACK_PHASE_NONE = 0;
@@ -21,10 +20,7 @@ export const ATTACK_TYPE_HEAVY = 2;
 export type PhysicsEvent =
     | { type: 'sfx'; key: string; volume: number }
     | { type: 'consume'; input: 'jump' | 'dodge' }
-    | { type: 'dodge_start'; isSpot: boolean; isGrounded: boolean }
-    | { type: 'dodge_end' }
-    | { type: 'recovery_end' }
-    | { type: 'landing' };
+    | { type: 'dodge_start'; isGrounded: boolean };
 
 // ─── SimBody ───
 
@@ -48,7 +44,6 @@ export interface SimBody {
     // Jump
     jumpsRemaining: number;
     airActionCounter: number;
-    jumpHoldTime: number;
     wasJumpHeld: boolean;
     isFastFalling: boolean;
 
@@ -56,7 +51,6 @@ export interface SimBody {
     isWallSliding: boolean;
     wallDirection: number;       // -1 = left, 1 = right, 0 = none
     isTouchingWall: boolean;
-    wallTouchesExhausted: boolean;
     lastWallTouchTimer: number;  // ms
     lastWallDirection: number;
 
@@ -83,7 +77,6 @@ export interface SimBody {
     isAttacking: boolean;
     isHitStunned: boolean;
     isCharging: boolean;
-    isThrowCharging: boolean;
     attackPhase: number;       // ATTACK_PHASE_* constants
     attackType: number;        // ATTACK_TYPE_* constants
     shouldStallInAir: boolean;
@@ -94,9 +87,6 @@ export interface SimBody {
     // Facing
     facingDirection: number;   // -1 or 1
 
-    // Game state
-    damagePercent: number;
-    lives: number;
 }
 
 // ─── SimInput ───
@@ -106,28 +96,13 @@ export interface SimInput {
     moveRight: boolean;
     moveDown: boolean;
     moveUp: boolean;
-    jumpBuffered: boolean;   // client: inputBuffer.has('jump'); server: raw jump
+    /** A jump or dodge press is waiting in the fighter's input buffer. */
+    jumpBuffered: boolean;
     jumpHeld: boolean;
-    dodgeBuffered: boolean;  // client: inputBuffer.has('dodge'); server: raw dodge
+    dodgeBuffered: boolean;
     aimUp: boolean;
     aimDown: boolean;
-    recoveryRequested: boolean; // client: up+heavy in air triggers recovery
 }
-
-// ─── Constants ───
-
-export const NULL_INPUT: SimInput = {
-    moveLeft: false,
-    moveRight: false,
-    moveDown: false,
-    moveUp: false,
-    jumpBuffered: false,
-    jumpHeld: false,
-    dodgeBuffered: false,
-    aimUp: false,
-    aimDown: false,
-    recoveryRequested: false,
-};
 
 // ─── Factory ───
 
@@ -144,14 +119,12 @@ export function createBody(x: number, y: number, facingDirection: number): SimBo
 
         jumpsRemaining: PhysicsConfig.MAX_JUMPS,
         airActionCounter: 0,
-        jumpHoldTime: 0,
         wasJumpHeld: false,
         isFastFalling: false,
 
         isWallSliding: false,
         wallDirection: 0,
         isTouchingWall: false,
-        wallTouchesExhausted: false,
         lastWallTouchTimer: 0,
         lastWallDirection: 0,
 
@@ -174,87 +147,13 @@ export function createBody(x: number, y: number, facingDirection: number): SimBo
         isAttacking: false,
         isHitStunned: false,
         isCharging: false,
-        isThrowCharging: false,
         attackPhase: ATTACK_PHASE_NONE,
         attackType: ATTACK_TYPE_NONE,
         shouldStallInAir: false,
 
         isRunning: false,
         facingDirection,
-        damagePercent: 0,
-        lives: 3,
     };
-}
-
-/**
- * Copy all properties from src SimBody to dst SimBody without heap allocation.
- * Used for zero-allocation rollback state rewinding.
- */
-export function copyBody(dst: SimBody, src: SimBody): void {
-    dst.x = src.x;
-    dst.y = src.y;
-    dst.vx = src.vx;
-    dst.vy = src.vy;
-    dst.width = src.width;
-    dst.height = src.height;
-    dst.ax = src.ax;
-    dst.ay = src.ay;
-
-    dst.isGrounded = src.isGrounded;
-    dst.wasGroundedLastFrame = src.wasGroundedLastFrame;
-
-    dst.jumpsRemaining = src.jumpsRemaining;
-    dst.airActionCounter = src.airActionCounter;
-    dst.jumpHoldTime = src.jumpHoldTime;
-    dst.wasJumpHeld = src.wasJumpHeld;
-    dst.isFastFalling = src.isFastFalling;
-
-    dst.isWallSliding = src.isWallSliding;
-    dst.wallDirection = src.wallDirection;
-    dst.isTouchingWall = src.isTouchingWall;
-    dst.wallTouchesExhausted = src.wallTouchesExhausted;
-    dst.lastWallTouchTimer = src.lastWallTouchTimer;
-    dst.lastWallDirection = src.lastWallDirection;
-
-    dst.isDodging = src.isDodging;
-    dst.isSpotDodging = src.isSpotDodging;
-    dst.dodgeTimer = src.dodgeTimer;
-    dst.dodgeCooldownTimer = src.dodgeCooldownTimer;
-    dst.dodgeDirection = src.dodgeDirection;
-    dst.isInvincible = src.isInvincible;
-
-    dst.droppingThroughPlatformIdx = src.droppingThroughPlatformIdx;
-    dst.droppingThroughY = src.droppingThroughY;
-    dst.dropGraceTimer = src.dropGraceTimer;
-    dst.currentPlatformIdx = src.currentPlatformIdx;
-
-    dst.isRecovering = src.isRecovering;
-    dst.recoveryAvailable = src.recoveryAvailable;
-    dst.recoveryTimer = src.recoveryTimer;
-
-    dst.isAttacking = src.isAttacking;
-    dst.isHitStunned = src.isHitStunned;
-    dst.isCharging = src.isCharging;
-    dst.isThrowCharging = src.isThrowCharging;
-    dst.attackPhase = src.attackPhase;
-    dst.attackType = src.attackType;
-    dst.shouldStallInAir = src.shouldStallInAir;
-
-    dst.isRunning = src.isRunning;
-    dst.facingDirection = src.facingDirection;
-    dst.damagePercent = src.damagePercent;
-    dst.lives = src.lives;
-}
-
-/**
- * Clone a SimBody. If dst is provided, reuses dst to prevent GC allocation.
- */
-export function cloneBody(src: SimBody, dst?: SimBody): SimBody {
-    if (!dst) {
-        dst = createBody(src.x, src.y, src.facingDirection);
-    }
-    copyBody(dst, src);
-    return dst;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -262,18 +161,14 @@ export function cloneBody(src: SimBody, dst?: SimBody): SimBody {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Runs one physics tick.
- * @param body   - Mutable physics body (modified in place)
- * @param input  - Input state for this frame
- * @param dt     - Delta time in SECONDS (e.g. 1/60)
- * @returns Array of events for the client to process (SFX, state changes)
+ * Runs one physics step on `body` (in place), `dt` in seconds, and appends
+ * what happened (sounds, consumed presses, dodge starts) to `events`.
  */
-export function stepPhysics(body: SimBody, input: SimInput, dt: number): PhysicsEvent[] {
-    const events: PhysicsEvent[] = [];
+export function stepPhysics(body: SimBody, input: SimInput, dt: number, events: PhysicsEvent[]): void {
     const dtMs = dt * 1000;
 
     // ── Timers ──
-    updateTimers(body, dtMs, events);
+    updateTimers(body, dtMs);
 
     // ── Drop-through grace timer ──
     if (body.dropGraceTimer > 0) {
@@ -293,25 +188,20 @@ export function stepPhysics(body: SimBody, input: SimInput, dt: number): Physics
     // ── Mechanics ──
     handleWallMechanics(body, input);
     handleHorizontalMovement(body, input);
-    handleJump(body, input, dtMs, events);
+    handleJump(body, input, events);
     handleFastFall(body, input);
     handleDodgeInput(body, input, events);
 
     // ── Physics integration ──
-    applyPhysics(body, dt, events);
-
-    // NOTE: isGrounded is NOT reset here — it's still the previous frame's value.
-    // applyPhysics sets body.isGrounded = false at the end.
-    // Collision checks (called separately) will set it back to true if landing.
-
-    return events;
+    // Ends with isGrounded false: the platform collisions that follow set it again on landing
+    applyPhysics(body, dt);
 }
 
 // ═══════════════════════════════════════════════════════════════
 //  TIMER UPDATE
 // ═══════════════════════════════════════════════════════════════
 
-function updateTimers(body: SimBody, dtMs: number, events: PhysicsEvent[]): void {
+function updateTimers(body: SimBody, dtMs: number): void {
     if (body.lastWallTouchTimer > 0) {
         body.lastWallTouchTimer -= dtMs;
     }
@@ -323,11 +213,11 @@ function updateTimers(body: SimBody, dtMs: number, events: PhysicsEvent[]): void
     if (body.dodgeTimer > 0) {
         body.dodgeTimer -= dtMs;
         if (body.dodgeTimer <= 0) {
-            endDodge(body, events);
+            endDodge(body);
         }
     }
 
-    // Recovery timer is handled in applyPhysics
+    // The recovery timer runs in applyPhysics
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -344,7 +234,7 @@ function handleWallMechanics(body: SimBody, input: SimInput): void {
         const pushingWall = (body.wallDirection === -1 && input.moveLeft) ||
             (body.wallDirection === 1 && input.moveRight);
 
-        if (pushingWall && body.vy > 0 && !body.wallTouchesExhausted) {
+        if (pushingWall && body.vy > 0) {
             body.isWallSliding = true;
             body.isFastFalling = false;
 
@@ -401,7 +291,7 @@ function handleHorizontalMovement(body: SimBody, input: SimInput): void {
 //  JUMP
 // ═══════════════════════════════════════════════════════════════
 
-function handleJump(body: SimBody, input: SimInput, dtMs: number, events: PhysicsEvent[]): void {
+function handleJump(body: SimBody, input: SimInput, events: PhysicsEvent[]): void {
     if (body.isDodging) return;
 
     // Block during heavy attacks
@@ -414,13 +304,6 @@ function handleJump(body: SimBody, input: SimInput, dtMs: number, events: Physic
         events.push({ type: 'consume', input: 'jump' });
         handlePlatformDrop(body);
         return;
-    }
-
-    // Jump Hold tracking
-    if (input.jumpHeld) {
-        body.jumpHoldTime += dtMs;
-    } else {
-        body.jumpHoldTime = 0;
     }
 
     // New Jump (first frame of press, not held from previous)
@@ -440,24 +323,12 @@ function handlePlatformDrop(body: SimBody): void {
     if (body.currentPlatformIdx === -1) return;
 
     body.droppingThroughPlatformIdx = body.currentPlatformIdx;
-    // Store the platform's center Y for same-height detection
-    // (will be set by caller based on stage data — see note below)
-    // For now, store from the current position context
+    // The simulation fills in droppingThroughY from the stage while colliding
     body.dropGraceTimer = PhysicsConfig.PLATFORM_DROP_GRACE_PERIOD;
     body.isGrounded = false;
     body.currentPlatformIdx = -1;
     body.y += PhysicsConfig.PLATFORM_DROP_NUDGE_Y;
     body.vy = PhysicsConfig.PLATFORM_DROP_PUSH_Y;
-}
-
-/**
- * Set the droppingThroughY from stage data.
- * Called externally after handlePlatformDrop if needed.
- */
-export function setDropThroughY(body: SimBody, stage: SimStage): void {
-    if (body.droppingThroughPlatformIdx >= 0 && body.droppingThroughPlatformIdx < stage.platforms.length) {
-        body.droppingThroughY = stage.platforms[body.droppingThroughPlatformIdx].y;
-    }
 }
 
 function performJump(body: SimBody, events: PhysicsEvent[]): void {
@@ -543,7 +414,7 @@ function startDodge(body: SimBody, input: SimInput, events: PhysicsEvent[]): voi
             body.vy *= PhysicsConfig.SPOT_DODGE_AERIAL_Y_DAMP;
         }
 
-        events.push({ type: 'dodge_start', isSpot: true, isGrounded: body.isGrounded });
+        events.push({ type: 'dodge_start', isGrounded: body.isGrounded });
     } else {
         // DIRECTIONAL DODGE
         body.isSpotDodging = false;
@@ -565,23 +436,22 @@ function startDodge(body: SimBody, input: SimInput, events: PhysicsEvent[]): voi
         }
 
         events.push({ type: 'sfx', key: 'sfx_dash', volume: 0.5 });
-        events.push({ type: 'dodge_start', isSpot: false, isGrounded: body.isGrounded });
+        events.push({ type: 'dodge_start', isGrounded: body.isGrounded });
     }
 }
 
-function endDodge(body: SimBody, events: PhysicsEvent[]): void {
+function endDodge(body: SimBody): void {
     body.isDodging = false;
     body.isInvincible = false;
     body.dodgeCooldownTimer = PhysicsConfig.DODGE_COOLDOWN;
     body.isSpotDodging = false;
-    events.push({ type: 'dodge_end' });
 }
 
 // ═══════════════════════════════════════════════════════════════
 //  PHYSICS INTEGRATION (applyPhysics)
 // ═══════════════════════════════════════════════════════════════
 
-function applyPhysics(body: SimBody, dt: number, events: PhysicsEvent[]): void {
+function applyPhysics(body: SimBody, dt: number): void {
     // ── Acceleration → Velocity ──
 
     let maxSpeedCheck = PhysicsConfig.MAX_SPEED;
@@ -604,7 +474,7 @@ function applyPhysics(body: SimBody, dt: number, events: PhysicsEvent[]): void {
     body.vy += body.ay * dt;
 
     // ── Friction ──
-    // NOTE: body.isGrounded here is the PREVIOUS frame's value (matches PlayerPhysics behavior)
+    // isGrounded is still the previous step's value here
 
     let friction: number = body.isGrounded ? PhysicsConfig.FRICTION : PhysicsConfig.AIR_FRICTION;
 
@@ -616,7 +486,7 @@ function applyPhysics(body: SimBody, dt: number, events: PhysicsEvent[]): void {
     }
 
     // Charge friction
-    if (body.isCharging || body.isThrowCharging) {
+    if (body.isCharging) {
         friction = PhysicsConfig.CHARGE_FRICTION;
         if (!body.isGrounded) {
             body.vy *= PhysicsConfig.CHARGE_GRAVITY_CANCEL;
@@ -643,7 +513,7 @@ function applyPhysics(body: SimBody, dt: number, events: PhysicsEvent[]): void {
         friction = 1.0;
     }
 
-    // Apply friction TWICE (matches PlayerPhysics.ts lines 185+187 — tuned around this)
+    // Friction is applied twice per step: every speed in PhysicsConfig is tuned around it
     body.vx *= friction;
     body.vx *= friction;
 
@@ -672,7 +542,6 @@ function applyPhysics(body: SimBody, dt: number, events: PhysicsEvent[]): void {
         body.recoveryTimer -= dt * 1000;
         if (body.recoveryTimer <= 0) {
             body.isRecovering = false;
-            events.push({ type: 'recovery_end' });
         }
     }
 
@@ -681,20 +550,18 @@ function applyPhysics(body: SimBody, dt: number, events: PhysicsEvent[]): void {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  COLLISION: SINGLE PLATFORM (per-element, for client wrapper)
+//  COLLISION: PLATFORMS
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Check collision against a single platform.
- * Uses center-origin coordinates for the platform.
- * Called by the client wrapper (per-platform iteration) and by checkPlatformCollisions.
+ * Lands the body on one platform (centre-origin coordinates) if it's falling
+ * onto it; a landing sound goes to `events`.
  */
 export function checkSinglePlatformCollision(
     body: SimBody, platIdx: number,
     platCx: number, platCy: number, platW: number, platH: number,
-    isSoft: boolean
-): PhysicsEvent[] {
-    const events: PhysicsEvent[] = [];
+    isSoft: boolean, events: PhysicsEvent[],
+): void {
     const halfW = body.width / 2;
     const halfH = body.height / 2;
 
@@ -711,21 +578,17 @@ export function checkSinglePlatformCollision(
     if (bodyRight <= platLeft || bodyLeft >= platRight ||
         bodyBottom <= platTop || bodyTop >= platCy + platH / 2) {
         if (body.currentPlatformIdx === platIdx) body.currentPlatformIdx = -1;
-        return events;
+        return;
     }
 
     // Soft platform logic
-    if (isSoft) {
-        if (body.dropGraceTimer > 0) {
-            if (body.droppingThroughPlatformIdx === platIdx) return events;
-            if (!isNaN(body.droppingThroughY) && Math.abs(platCy - body.droppingThroughY) < 5) return events;
-        }
-        if (body.vy < 0) return events;
-        if (bodyBottom > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) return events;
-    } else {
-        if (body.vy < 0) return events;
-        if (bodyBottom > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) return events;
+    // Soft platforms let a fighter who just dropped through keep falling, including through any at the same height
+    if (isSoft && body.dropGraceTimer > 0) {
+        if (body.droppingThroughPlatformIdx === platIdx) return;
+        if (!isNaN(body.droppingThroughY) && Math.abs(platCy - body.droppingThroughY) < 5) return;
     }
+    if (body.vy < 0) return;
+    if (bodyBottom > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) return;
 
     // Landing
     if (body.vy >= 0) {
@@ -736,42 +599,22 @@ export function checkSinglePlatformCollision(
         body.isGrounded = true;
         body.isFastFalling = false;
 
-        if (body.isRecovering) {
-            body.isRecovering = false;
-            events.push({ type: 'recovery_end' });
-        }
-
+        body.isRecovering = false;
         body.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
         body.recoveryAvailable = true;
         body.droppingThroughPlatformIdx = -1;
         body.droppingThroughY = NaN;
         body.airActionCounter = 0;
-        body.wallTouchesExhausted = false;
         body.currentPlatformIdx = isSoft ? platIdx : -1;
 
         if (!wasGrounded) {
             events.push({ type: 'sfx', key: 'sfx_landing', volume: 0.8 });
-            events.push({ type: 'landing' });
         }
     }
-
-    return events;
-}
-
-/**
- * Check all platform collisions (convenience for server).
- */
-export function checkPlatformCollisions(body: SimBody, stage: SimStage): PhysicsEvent[] {
-    const events: PhysicsEvent[] = [];
-    for (let i = 0; i < stage.platforms.length; i++) {
-        const p = stage.platforms[i];
-        events.push(...checkSinglePlatformCollision(body, i, p.x, p.y, p.w, p.h, p.isSoft));
-    }
-    return events;
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  COLLISION: WALLS (per-element + bulk)
+//  COLLISION: WALLS
 // ═══════════════════════════════════════════════════════════════
 
 /** Reset wall state before iterating walls. */
@@ -817,41 +660,13 @@ export function checkSingleWallCollision(
     }
 }
 
-/** Check all wall collisions (convenience for server). */
-export function checkWallCollisions(body: SimBody, stage: SimStage): void {
-    resetWallState(body);
-    for (const w of stage.walls) {
-        checkSingleWallCollision(body, w.x, w.y, w.w, w.h);
-    }
-}
-
 // ═══════════════════════════════════════════════════════════════
-//  BLAST ZONE
+//  RECOVERY
 // ═══════════════════════════════════════════════════════════════
 
-export function checkBlastZone(body: SimBody, stage: SimStage): boolean {
-    const bz = stage.blastZones;
-    return body.x < bz.left || body.x > bz.right ||
-        body.y < bz.top || body.y > bz.bottom;
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  STANDALONE ACTIONS (called externally)
-// ═══════════════════════════════════════════════════════════════
-
-/** Perform a jump (for external callers like FSM states). */
-export function doJump(body: SimBody): PhysicsEvent[] {
-    const events: PhysicsEvent[] = [];
-    performJump(body, events);
-    return events;
-}
-
-/**
- * Start a recovery move. Sets velocity and state.
- * Visual effects (ghost sprite) are handled by the client.
- */
-export function startRecovery(body: SimBody): PhysicsEvent[] {
-    if (!body.recoveryAvailable) return [];
+/** Starts the recovery move if it's available: false if it isn't. */
+export function startRecovery(body: SimBody, events: PhysicsEvent[]): boolean {
+    if (!body.recoveryAvailable) return false;
 
     body.isRecovering = true;
     body.recoveryAvailable = false;
@@ -863,9 +678,8 @@ export function startRecovery(body: SimBody): PhysicsEvent[] {
     body.isWallSliding = false;
     body.isFastFalling = false;
 
-    return [
-        { type: 'sfx', key: 'sfx_jump_2', volume: 0.6 },
-    ];
+    events.push({ type: 'sfx', key: 'sfx_jump_2', volume: 0.6 });
+    return true;
 }
 
 // ═══════════════════════════════════════════════════════════════

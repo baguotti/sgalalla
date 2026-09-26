@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { DEFAULT_GHOST_STYLE, ghostStyle, type GhostStyle } from '../effects/GhostStyle';
 import { Lighting, MAX_STAGE_LIGHTS, type LitObject } from './Lighting';
+import type { GameSceneData } from '../scenes/GameScene';
 import {
     DEFAULT_LOOK, LAB_LIGHTS, LIGHT_LAYERS, LIGHT_RANGES, LOOK_RANGES, LOOK_SECTIONS, NEW_LAMP,
     type LightDef, type LightLayer, type Look,
@@ -12,7 +13,7 @@ import {
  * the panel, where the look and the lights are tuned, and rings on screen to
  * drag the lights. Settings are kept in the browser between visits.
  */
-export const LIGHT_LAB_SCENE_DATA = {
+export const LIGHT_LAB_SCENE_DATA: GameSceneData = {
     mode: 'training',
     lab: true,
     selectedMap: 'londra_bg',

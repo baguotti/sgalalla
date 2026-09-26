@@ -28,7 +28,6 @@ export class PlayerHudSlot {
     private bigDamageText: Phaser.GameObjects.Text;
     private percentText: Phaser.GameObjects.Text;
     private nameText: Phaser.GameObjects.Text;
-    // private stocksText: Phaser.GameObjects.Text; // Removed
     private heartContainer: Phaser.GameObjects.Container;
     private portraitContainer: Phaser.GameObjects.Container;
     private scene: Phaser.Scene;
@@ -88,10 +87,8 @@ export class PlayerHudSlot {
         const damageY = -15;
 
         // --- 1. Name Tag (Background Layer - Behind Diamond) ---
-        // Moved significantly left to tuck start behind diamond
-        // User requested +30px, then +35px, then +20px more.
-        // Start was -50. -50 + 30 = -20. -20 + 35 = +15. +15 + 20 = +35.
-        const nameX = portraitOffset + 38; // +3px more right (Total +38)
+        // Starts tucked behind the diamond
+        const nameX = portraitOffset + 38;
         const nameY = 35; // -5px up (was 40)
         const nameW = 180;
         const nameH = 24;
@@ -159,14 +156,13 @@ export class PlayerHudSlot {
             texture = character.toLowerCase(); // Texture key is 'fok', 'sgu'
             frame = `00_${character.toLowerCase()}_icon`;
         } else {
-            // Fallback for legacy/other characters
+            // Characters without an icon frame
             texture = character;
             frame = `${character}_Idle_000.png`;
         }
 
         const portrait = scene.add.sprite(0, 0, texture, frame);
 
-        // User requested -5% smaller (1.35 -> 1.28)
         const targetSize = diamondSize * 1.15;
         const scale = targetSize / (portrait.width || 64);
 
@@ -194,9 +190,9 @@ export class PlayerHudSlot {
         // --- 4. Big Damage % ---
         // Bigger Font (60px), Lower Aligned, Hard Shadow
         this.bigDamageText = scene.add.text(damageX, damageY, '0', {
-            fontSize: '60px', // Bigger
+            fontSize: '60px',
             fontFamily: '"Pixeloid Sans"',
-            fontStyle: 'bold', // Removed italic
+            fontStyle: 'bold',
             color: '#ffffff',
             stroke: '#000000',
             strokeThickness: 6
@@ -219,9 +215,7 @@ export class PlayerHudSlot {
 
 
         // --- 5. Stocks (Under Name Tag) ---
-        // Visual Hearts logic
-        // We'll manage hearts in update() to ensure they match live stock count
-        // Create a container for hearts to easily clear/rebuild
+        // One heart per life, rebuilt in update() when the count changes
         this.heartContainer = scene.add.container(nameX - 15, nameY + 25);
         this.container.add(this.heartContainer);
 
@@ -281,8 +275,6 @@ export class PlayerHudSlot {
         // Get player color for hearts
 
 
-        // Limit visual hearts to prevent overflow? (e.g. max 5)
-        // For now, draw all.
         for (let i = 0; i < stocks; i++) {
             const heart = this.scene.add.text(i * spacing, 0, '♥', {
                 fontSize: '20px',
@@ -344,8 +336,6 @@ export class MatchHUD {
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
-
-        // Debug display removed (Moved to DebugOverlay)
     }
 
     private ignoredCameras: Phaser.Cameras.Scene2D.Camera[] = [];
@@ -439,14 +429,6 @@ export class MatchHUD {
         });
     }
 
-
-    removePlayer(playerId: number): void {
-        const slot = this.slots.get(playerId);
-        if (slot) {
-            slot.destroy();
-            this.slots.delete(playerId);
-        }
-    }
 
     public setVisible(visible: boolean): void {
         this.slots.forEach(slot => slot.setVisible(visible));

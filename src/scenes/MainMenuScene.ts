@@ -56,9 +56,8 @@ export class MainMenuScene extends Phaser.Scene {
             }
         }
 
-        // CRITICAL: Clear menu items from previous runs
+        // The scene object survives restarts: drop the previous run's menu items
         this.menuTexts = [];
-        // ... (rest of create)
 
         // Visuals
         this.add.rectangle(0, 0, width, height, 0x000000).setOrigin(0);
@@ -66,32 +65,28 @@ export class MainMenuScene extends Phaser.Scene {
         // Video Background
         if (this.cache.video.has('title_card_video')) {
             const video = this.add.video(width / 2, height / 2, 'title_card_video');
-            // User requested scale 1.5 (likely to zoom in and crop, or fill specific aspect ratio)
+            // Slightly zoomed so the video fills the screen
             video.setMute(true); // Ensure autoplay works if the video has an audio track
             video.setScale(1.505).play(true); // true = loop
         }
 
-        // Version Text
-        this.add.text(this.scale.width - 20, this.scale.height - 20, 'v3.0.1e', {
+        // The version from package.json; the experimental "3.0.1-e" shows as v3.0.1e
+        this.add.text(this.scale.width - 20, this.scale.height - 20, `v${__APP_VERSION__.replace('-', '')}`, {
             fontSize: '18px', fontFamily: '"Pixeloid Sans"', color: '#888888'
-        }).setOrigin(1, 1);        // Menu Items
-        // The last item sits 40 px above the bottom
+        }).setOrigin(1, 1);
+
+        // Menu items; the last sits 40 px above the bottom
         const startY = height - 40 - (this.menuOptions.length - 1) * 55;
         this.menuOptions.forEach((opt, index) => {
             const text = this.add.text(width / 2, startY + (index * 55), opt.label, {
                 fontSize: '40px', fontFamily: '"Pixeloid Sans"', color: '#888888'
             }).setOrigin(0.5);
-
-
-
             this.menuTexts.push(text);
         });
 
         this.updateSelection();
 
-
-
-        // Input Safety (Prevent ghost clicks)
+        // Ignore input for half a second, so a press from the previous screen doesn't carry over
         this.canInput = false;
         this.prevGamepadA.clear();
         this.lastGamepadInputTime = Date.now(); // Reset debounce
@@ -127,7 +122,6 @@ export class MainMenuScene extends Phaser.Scene {
         } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
             this.changeSelection(1);
         } else if (Phaser.Input.Keyboard.JustDown(this.startKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-            // Sound removed per user request
             this.selectOption('KEYBOARD');
         }
 
@@ -190,8 +184,7 @@ export class MainMenuScene extends Phaser.Scene {
             this.prevGamepadA.set(pad.index, !!aPressed);
 
             if (aPressed && !wasPressed) {
-                // Sound removed per user request
-                this.selectOption('GAMEPAD', pad.index);
+                    this.selectOption('GAMEPAD', pad.index);
                 this.lastGamepadInputTime = now;
             }
         }

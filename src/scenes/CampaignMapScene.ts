@@ -239,11 +239,8 @@ export class CampaignMapScene extends Phaser.Scene {
             });
         }
 
-        // Set player starting position
-        // Start player on the most recently defeated island, unless returning from defeat/training where currentLevel wasn't advanced
-        // Actually, just always start on Math.max(0, currentLevel - 1) so player has to manually move right to the new challenge.
-        // Wait, if they just started a new save, currentLevel is 0.
-        // If they just beat level 0, currentLevel is 1. We want to spawn on 0.
+        // Start on the island asked for, or else the last one beaten (the first, on a new save):
+        // the player walks right to the next challenge themselves
         if (this.targetIslandIndex !== undefined) {
             this.currentIslandIndex = this.targetIslandIndex;
         } else {

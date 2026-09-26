@@ -8,7 +8,7 @@ import { SIM_STEP_MS } from './FixedStepClock.js';
 import { changeState, consumeBuffered, isBuffered, type FighterState, type GhostHitbox } from './FighterState.js';
 import { pushPhysicsSounds, type MatchEvent } from './MatchEvents.js';
 import { PhysicsConfig } from './PhysicsConfig.js';
-import { startRecovery } from './PhysicsSimulation.js';
+import { startRecovery, type PhysicsEvent } from './PhysicsSimulation.js';
 
 /** Hurtbox, also used for blast zones: narrower and shorter than the physics body. */
 export const HURTBOX_WIDTH = 46;
@@ -36,6 +36,8 @@ export const KNOCKBACK_DIRECTIONS: Readonly<Record<number, readonly [number, num
 };
 
 export const RECOVERY_KNOCKBACK_ANGLE = 80;
+
+const recoveryEvents: PhysicsEvent[] = [];
 
 // ─── Per-step update ───
 
@@ -192,10 +194,10 @@ export function handleCombatInput(f: FighterState, events: MatchEvent[]): void {
         // Up or neutral heavy in the air is the recovery move
         if ((direction === AttackDirection.UP || direction === AttackDirection.NEUTRAL) && isAerial) {
             c.hitTargets = 0;
-            const recovery = startRecovery(b);
-            if (recovery.length > 0) {
+            recoveryEvents.length = 0;
+            if (startRecovery(b, recoveryEvents)) {
                 changeState(f, 'Recovery');
-                pushPhysicsSounds(events, f.id, recovery);
+                pushPhysicsSounds(events, f.id, recoveryEvents);
             }
             return;
         }
@@ -546,7 +548,6 @@ function applyHit(attacker: FighterState, target: FighterState, events: MatchEve
     changeState(target, 'HitStun');
 
     tb.airActionCounter = 0;
-    tb.wallTouchesExhausted = false;
 
     events.push({ type: 'hit', attacker: attacker.id, target: target.id, attackKey: c.attack?.key ?? null });
 }

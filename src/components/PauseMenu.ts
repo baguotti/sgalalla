@@ -312,10 +312,6 @@ export class PauseMenu {
         this.hideControlsMenu();
     }
 
-    isVisible(): boolean {
-        return this.visible;
-    }
-
     update(_delta: number): void {
         if (!this.visible) return;
         this.handleInput();

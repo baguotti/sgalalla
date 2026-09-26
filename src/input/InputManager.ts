@@ -356,10 +356,6 @@ export class InputManager {
         return this.gamepadInput.isConnected();
     }
 
-    getGamepadId(): string | null {
-        return this.gamepadInput.getGamepadId();
-    }
-
     destroy(): void {
         this.gamepadInput.destroy();
     }
