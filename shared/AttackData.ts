@@ -31,14 +31,16 @@ export interface AttackData {
     type: AttackType;
     direction: AttackDirection;
     isAerial: boolean;
+    /** Signatures (heavy side, up, neutral) and the ground pound take their damage from PhysicsConfig instead. */
     damage: number;
     /** Knockback every hit gives, and how much more per point of the target's damage. */
-    baseKnockback?: number;
-    knockbackGrowth?: number;
+    baseKnockback: number;
+    knockbackGrowth: number;
     knockbackAngle: number; // Angle in degrees (0 = right, 90 = up)
     startupDuration: number;
     activeDuration: number;
     recoveryDuration: number;
+    /** The hitbox, centred this far from the fighter's centre (x forward). Signatures hit where their ghost is instead. */
     hitboxWidth: number;
     hitboxHeight: number;
     hitboxOffsetX: number;
@@ -60,9 +62,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 50,
+        hitboxWidth: 81,
         hitboxHeight: 40,
-        hitboxOffsetX: 35,
+        hitboxOffsetX: 55,
         hitboxOffsetY: 0,
     },
     'light_side_grounded': {
@@ -76,9 +78,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 60,
+        hitboxWidth: 81,
         hitboxHeight: 35,
-        hitboxOffsetX: 40,
+        hitboxOffsetX: 60,
         hitboxOffsetY: 0,
     },
     'light_down_grounded': {
@@ -125,9 +127,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 50,
+        hitboxWidth: 81,
         hitboxHeight: 40,
-        hitboxOffsetX: 35,
+        hitboxOffsetX: 55,
         hitboxOffsetY: 0,
     },
 
@@ -143,9 +145,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 50,
+        hitboxWidth: 81,
         hitboxHeight: 40,
-        hitboxOffsetX: 30,
+        hitboxOffsetX: 50,
         hitboxOffsetY: 0,
         shouldStallInAir: true,
     },
@@ -160,9 +162,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 55,
+        hitboxWidth: 81,
         hitboxHeight: 40,
-        hitboxOffsetX: 40,
+        hitboxOffsetX: 60,
         hitboxOffsetY: 0,
     },
     'light_down_aerial': {
@@ -192,9 +194,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
         activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
         recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 55, // Cloned from Side Air
+        hitboxWidth: 81,
         hitboxHeight: 40,
-        hitboxOffsetX: 40,
+        hitboxOffsetX: 60,
         hitboxOffsetY: 0,
     },
 
@@ -242,10 +244,10 @@ export const AttackRegistry: Record<string, AttackData> = {
         startupDuration: PhysicsConfig.HEAVY_STARTUP_MS + 30,
         activeDuration: PhysicsConfig.HEAVY_ACTIVE_MS,
         recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_MS + 80,
-        hitboxWidth: 120,
-        hitboxHeight: 60,
-        hitboxOffsetX: 40,
-        hitboxOffsetY: 25,
+        hitboxWidth: 127,
+        hitboxHeight: 30,
+        hitboxOffsetX: 0,
+        hitboxOffsetY: 92,
     },
 
     'heavy_up_grounded': {
@@ -302,17 +304,17 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.HEAVY,
         direction: AttackDirection.DOWN,
         isAerial: true,
-        damage: PhysicsConfig.GROUND_POUND_DAMAGE,
+        damage: 8,
         baseKnockback: 160,
         knockbackGrowth: 4,
         knockbackAngle: 270,
         startupDuration: PhysicsConfig.GROUND_POUND_STARTUP,
         activeDuration: 500,
         recoveryDuration: 150,
-        hitboxWidth: 100,
-        hitboxHeight: 90,
+        hitboxWidth: 127,
+        hitboxHeight: 30,
         hitboxOffsetX: 0,
-        hitboxOffsetY: 40,
+        hitboxOffsetY: 92,
     },
     'heavy_up_aerial': {
         type: AttackType.HEAVY,

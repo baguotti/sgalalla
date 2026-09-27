@@ -9,7 +9,7 @@
 
 import { countDown, SIM_STEP_MS } from './FixedStepClock.js';
 import { AttackPhase, AttackRegistry, AttackType } from './AttackData.js';
-import { HURTBOX_HEIGHT, HURTBOX_WIDTH, cancelAttackForChaseDodge, checkHit, handleCombatInput, updateCombat } from './Combat.js';
+import { cancelAttackForChaseDodge, checkHit, handleCombatInput, updateCombat } from './Combat.js';
 import type { FighterInput } from './FighterInput.js';
 import {
     FIGHTER_STATES, changeState, consumeBuffered, createFighter, holdInputBuffer, isBuffered, isInPlay, updateInputBuffer, updateState,
@@ -31,14 +31,12 @@ const STEP_S = SIM_STEP_MS / 1000;
 /** States in which a fighter cannot start attacks. */
 const COMBAT_BLOCKED_STATES: ReadonlySet<FighterStateName> = new Set(['HitStun', 'Taunt', 'Defeat']);
 
-/** A KO'd fighter sits out 2 s, then drops in above the stage centre. */
-const RESPAWN_DELAY_STEPS = 120;
+/** A KO'd fighter sits out RESPAWN_DELAY_STEPS (PhysicsConfig), then drops in above the stage centre. */
 const RESPAWN_X = 960;
 const RESPAWN_Y = 200;
 /** Random horizontal offset, so fighters respawning together don't stack. */
 const RESPAWN_SPREAD = 50;
-/** After a respawn, hits are ignored for 1 s and blast zones for 1.5 s. */
-const RESPAWN_INVULNERABILITY_MS = 1000;
+/** After a respawn, hits are ignored for RESPAWN_INVULNERABILITY_MS (PhysicsConfig) and blast zones for 1.5 s. */
 const KO_IMMUNITY_STEPS = 90;
 
 export interface MatchState {
@@ -282,10 +280,11 @@ function checkBlastZones(match: MatchState, fighters: readonly FighterState[], e
         if (f.koImmunitySteps > 0) continue;
 
         const b = f.body;
-        if (b.x - HURTBOX_WIDTH / 2 < zone.left || b.x + HURTBOX_WIDTH / 2 > zone.right ||
-            b.y - HURTBOX_HEIGHT / 2 < zone.top || b.y + HURTBOX_HEIGHT / 2 > zone.bottom) {
+        const halfW = PhysicsConfig.HURTBOX_WIDTH / 2;
+        const halfH = PhysicsConfig.HURTBOX_HEIGHT / 2;
+        if (b.x - halfW < zone.left || b.x + halfW > zone.right || b.y - halfH < zone.top || b.y + halfH > zone.bottom) {
             f.lives--;
-            if (f.lives > 0) f.respawnSteps = RESPAWN_DELAY_STEPS;
+            if (f.lives > 0) f.respawnSteps = PhysicsConfig.RESPAWN_DELAY_STEPS;
             else eliminated = true;
             events.push({ type: 'ko', fighter: f.id, x: b.x, y: b.y });
         }
@@ -313,7 +312,7 @@ function respawn(match: MatchState, f: FighterState): void {
     f.body.isGrounded = true;
     f.body.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
     f.isInvulnerable = true;
-    f.invulnerabilityTimer = RESPAWN_INVULNERABILITY_MS;
+    f.invulnerabilityTimer = PhysicsConfig.RESPAWN_INVULNERABILITY_MS;
     f.koImmunitySteps = KO_IMMUNITY_STEPS;
 }
 

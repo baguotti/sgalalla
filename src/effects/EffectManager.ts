@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { effects } from '../config/EffectConfig';
 
 /** Depths: dust, rings and afterimages just behind the fighters (10), sparks in front of them. */
 const BEHIND_FIGHTERS = 9;
@@ -51,14 +52,14 @@ export class EffectManager {
 
     /** A burst where a hit landed, sized by its damage; heavier hits add a faint ring. */
     public spawnHitSpark(x: number, y: number, damage: number): void {
-        const size = Phaser.Math.Clamp(0.3 + damage * 0.03, 0.35, 0.95);
+        const size = Phaser.Math.Clamp(0.3 + damage * 0.03, 0.35, 0.95) * effects.SPARK_SIZE;
         const warmth = Phaser.Math.Clamp((damage - 4) / 14, 0, 1);
         const tint = Phaser.Display.Color.GetColor(255, Math.round(250 - 40 * warmth), Math.round(235 - 90 * warmth));
         this.flash(SPARK, x, y, {
             depth: IN_FRONT, tint, alpha: 0.9, blend: Phaser.BlendModes.ADD,
             from: size * 0.6, to: size * 1.1, angle: Phaser.Math.Between(0, 45), duration: 110,
         });
-        if (damage >= 8) {
+        if (damage >= effects.SPARK_RING_DAMAGE) {
             this.flash(RING, x, y, {
                 depth: IN_FRONT, tint, alpha: 0.35, blend: Phaser.BlendModes.ADD,
                 from: size * 0.5, to: size * 1.6, duration: 180,
@@ -71,7 +72,7 @@ export class EffectManager {
         const puffs = direction === 0 ? [-1, 1] : [-direction];
         for (const side of puffs) {
             this.flash(PUFF, x + side * 14, y - 6, {
-                depth: BEHIND_FIGHTERS, tint: 0xe8ddd0, alpha: 0.28 * strength,
+                depth: BEHIND_FIGHTERS, tint: 0xe8ddd0, alpha: 0.28 * strength * effects.DUST_OPACITY,
                 from: 0.25, to: 0.25 + 0.35 * strength, duration: 280, drift: { x: side * 26 * strength, y: -10 },
                 squash: 0.55,
             });
@@ -81,7 +82,7 @@ export class EffectManager {
     /** A thin flattened ring under the feet on an air jump. */
     public spawnJumpRing(x: number, y: number): void {
         this.flash(RING, x, y, {
-            depth: BEHIND_FIGHTERS, tint: 0xffffff, alpha: 0.4,
+            depth: BEHIND_FIGHTERS, tint: 0xffffff, alpha: 0.4 * effects.JUMP_RING_OPACITY,
             from: 0.35, to: 0.8, duration: 220, squash: 0.3,
         });
     }
@@ -99,7 +100,7 @@ export class EffectManager {
             .setFlipX(source.flipX)
             .setDepth(BEHIND_FIGHTERS)
             .setTint(0xd6e6ff)
-            .setAlpha(0.2);
+            .setAlpha(0.2 * effects.AFTERIMAGE_OPACITY);
         this.hideFromUi(image);
         this.scene.tweens.add({
             targets: image,

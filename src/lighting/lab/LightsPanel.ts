@@ -17,7 +17,7 @@ const GHOST_RANGES = { opacity: [0, 1, 0.01], glow: [0, 4, 0.05] } as const;
 export class LightsPanel {
     selected: LightDef | null = null;
     private readonly ctx: LabContext;
-    private readonly box: LabPanelBox;
+    readonly box: LabPanelBox;
     private readonly lightList = document.createElement('select');
     private readonly lightEditor = element('div');
     private readonly lookEditor = element('div');

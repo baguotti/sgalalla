@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
 import { MenuInput } from '../input/MenuInput';
-import { LIGHT_LAB_SCENE_DATA } from '../lighting/LightLab';
+import { labSceneData } from '../lab/StudioLab';
 
 export class MainMenuScene extends Phaser.Scene {
     private menuInput!: MenuInput;
@@ -143,7 +143,7 @@ export class MainMenuScene extends Phaser.Scene {
         }
 
         if (mode === 'lab') {
-            this.scene.start('GameScene', LIGHT_LAB_SCENE_DATA);
+            this.scene.start('GameScene', labSceneData());
             return;
         }
 

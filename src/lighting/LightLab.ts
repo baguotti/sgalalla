@@ -10,17 +10,17 @@ import { DEFAULT_LOOK, elementBehind, LAB_LIGHTS, LIGHT_LAYERS, NEW_LAMP, type L
 import { CameraPanel } from './lab/CameraPanel';
 import { applyRims, StageViewToggle, type LabContext } from './lab/LabContext';
 import { LabStats } from './lab/LabStats';
-import { colorToHex } from './lab/LabUi';
+import { colorToHex, type LabPanelBox } from './lab/LabUi';
 import { LightsPanel } from './lab/LightsPanel';
 import { StagePanel } from './lab/StagePanel';
 
 /**
- * The Studio Lab (main menu), a test environment for the lighting look: Fok
- * and a Fok dummy on Londra at dusk, drawn in layers (sky, clouds, island).
- * Three panels tune it: LIGHTS, CAMERA (post-processing) and STAGE (the
- * layers and the sky), with frame statistics top left. G switches the lights
- * on and off, H hides the panels; rings on screen drag the lights and a square
- * drags the selected layer. Settings are kept in the browser between visits.
+ * The Studio Lab's LOOK mode (see StudioLab): the lighting look on Fok and a
+ * Fok dummy on Londra at dusk, drawn in layers (sky, clouds, island). Three
+ * panels tune it: LIGHTS, CAMERA (post-processing) and STAGE (the layers and
+ * the sky), with frame statistics top left. G switches the lights on and off;
+ * rings on screen drag the lights and a square drags the selected layer.
+ * Settings are kept in the browser between visits.
  */
 export const LIGHT_LAB_SCENE_DATA: GameSceneData = {
     mode: 'training',
@@ -52,8 +52,18 @@ export interface LabScene {
     statsLeftOf(): number;
 }
 
+/** The LOOK mode's lighting, and its panels and handles shown or hidden. */
+export interface LookLab {
+    lighting: Lighting;
+    setShown(shown: boolean): void;
+    /** The panels' columns in the windowed view. */
+    columns: { left: LabPanelBox[]; right: LabPanelBox[] };
+    /** Windowed, the statistics move to a strip above the game. */
+    setWindowed(windowed: boolean): void;
+}
+
 /** Lights the lab and adds its panels, statistics, handles and keys. Null where lighting isn't supported. */
-export function startLightLab(scene: Phaser.Scene, parts: LabScene): Lighting | null {
+export function startLightLab(scene: Phaser.Scene, parts: LabScene): LookLab | null {
     if (!Lighting.isSupported(scene)) {
         console.warn('[Light lab] Lighting needs WebGL with OES_standard_derivatives');
         return null;
@@ -107,24 +117,26 @@ export function startLightLab(scene: Phaser.Scene, parts: LabScene): Lighting | 
     scene.events.on('postupdate', onPostUpdate);
 
     const toggleLights = () => lighting.setEnabled(!lighting.isEnabled);
-    const togglePanels = () => {
-        panelsShown = !panelsShown;
-        for (const panel of panels) panel.setVisible(panelsShown);
-    };
     const keyboard = scene.input.keyboard;
     keyboard?.on('keydown-G', toggleLights);
-    keyboard?.on('keydown-H', togglePanels);
 
     scene.events.once('shutdown', () => {
         keyboard?.off('keydown-G', toggleLights);
-        keyboard?.off('keydown-H', togglePanels);
         scene.events.off('postupdate', onPostUpdate);
         stats.destroy();
         handles.destroy();
         elementHandle?.destroy();
         for (const panel of panels) panel.destroy();
     });
-    return lighting;
+    return {
+        lighting,
+        columns: { left: [lightsPanel.box], right: [...(stagePanel ? [stagePanel.box] : []), cameraPanel.box] },
+        setWindowed: windowed => stats.setWindowed(windowed),
+        setShown: shown => {
+            panelsShown = shown;
+            for (const panel of panels) panel.setVisible(shown);
+        },
+    };
 }
 
 /** Lights behind an element sit at its depth and scroll with it. */

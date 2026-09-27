@@ -4,6 +4,9 @@
  * Every slider and colour has a ↺ button that puts its default back.
  */
 
+/** A docked column's width (windowed view), panels included. */
+export const DOCK_WIDTH = 344;
+
 const STYLESHEET = `
 .lab-panel { position: fixed; z-index: 1000; width: 330px; max-height: calc(100vh - 16px); display: flex; flex-direction: column;
     box-sizing: border-box; border-radius: 6px; background: rgba(10, 10, 10, 0.7); border: 1px solid rgba(51, 51, 51, 0.8);
@@ -12,7 +15,7 @@ const STYLESHEET = `
 .lab-panel .title { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; cursor: move;
     color: #8bef8b; letter-spacing: 0.06em; user-select: none; border-bottom: 1px solid rgba(51, 51, 51, 0.8); }
 .lab-panel.folded .title { border-bottom: none; }
-.lab-panel.folded .body { display: none; }
+.lab-panel.folded .body, .lab-panel.folded .footer { display: none; }
 .lab-panel .body { overflow-y: auto; overflow-x: hidden; padding: 4px 10px 8px; }
 .lab-panel .hint { color: #9e9e9e; font-size: 10px; line-height: 1.4; margin: 2px 0; }
 .lab-panel details { border-top: 1px solid rgba(51, 51, 51, 0.8); padding: 3px 0; }
@@ -30,20 +33,33 @@ const STYLESHEET = `
 .lab-panel label.check { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
 .lab-panel .stop { border-top: 1px solid rgba(51, 51, 51, 0.8); padding-top: 3px; margin-top: 3px; }
 .lab-panel .footer { display: flex; gap: 6px; padding: 6px 10px; border-top: 1px solid rgba(51, 51, 51, 0.8); }
+.lab-dock { position: fixed; top: 0; bottom: 0; z-index: 1000; width: ${DOCK_WIDTH}px; box-sizing: border-box; padding: 8px 7px;
+    overflow-y: auto; display: flex; flex-direction: column; gap: 6px; background: #0b0b0d; scrollbar-width: thin; }
+.lab-dock.left { left: 0; border-right: 1px solid #222; }
+.lab-dock.right { right: 0; border-left: 1px solid #222; }
+.lab-panel.docked { position: relative; top: auto !important; left: auto !important; right: auto !important; width: 100%; max-height: none; flex: none; }
+.lab-panel.docked .title { cursor: pointer; }
+.lab-panel.docked .body { overflow: visible; }
 `;
 
 let styleAdded = false;
 
 /**
  * A floating panel: drag its title bar to move it, click the title to fold it.
- * `left` or `right` places it (px from that edge), `top` from the top.
+ * `left` or `right` places it (px from that edge), `top` from the top, and
+ * `folded` starts it folded. Where it's been moved and whether it's folded are
+ * kept in the browser, by title.
  */
 export class LabPanelBox {
     readonly root = document.createElement('div');
     readonly body = document.createElement('div');
     readonly footer = document.createElement('div');
+    private readonly titleText: HTMLElement;
 
-    constructor(title: string, place: { top: number; left?: number; right?: number }) {
+    private readonly storageKey: string;
+    private readonly setFoldedLook: (folded: boolean) => void;
+
+    constructor(title: string, place: { top: number; left?: number; right?: number; folded?: boolean }) {
         if (!styleAdded) {
             document.head.append(element('style', STYLESHEET));
             styleAdded = true;
@@ -54,18 +70,81 @@ export class LabPanelBox {
         else this.root.style.right = `${place.right ?? 8}px`;
         this.body.className = 'body';
         this.footer.className = 'footer';
+        this.storageKey = `sgalalla.labPanel.${title}`;
 
         const bar = element('div');
         bar.className = 'title';
         const fold = element('span', '–');
-        bar.append(element('span', title), fold);
+        this.titleText = element('span', title);
+        bar.append(this.titleText, fold);
+        const setFolded = this.setFoldedLook = (folded: boolean) => {
+            this.root.classList.toggle('folded', folded);
+            fold.textContent = folded ? '+' : '–';
+        };
         this.makeMovable(bar, () => {
-            this.root.classList.toggle('folded');
-            fold.textContent = this.root.classList.contains('folded') ? '+' : '–';
+            setFolded(!this.root.classList.contains('folded'));
+            this.remember();
         });
+
+        const saved = this.recall();
+        setFolded(saved?.folded ?? place.folded ?? false);
+        if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') {
+            this.root.style.right = '';
+            this.root.style.left = `${Math.max(0, Math.min(window.innerWidth - 60, saved.left))}px`;
+            this.root.style.top = `${Math.max(0, Math.min(window.innerHeight - 30, saved.top))}px`;
+        }
 
         this.root.append(bar, this.body, this.footer);
         document.body.append(this.root);
+
+        // Typing in a text or number box doesn't reach the game's keys (Phaser listens on the window)
+        for (const type of ['keydown', 'keyup'] as const) {
+            this.root.addEventListener(type, event => {
+                const target = event.target as HTMLElement;
+                if (target.matches('input[type=number], input[type=text], input[type=search], textarea')) event.stopPropagation();
+            });
+        }
+    }
+
+    get isFolded(): boolean {
+        return this.root.classList.contains('folded');
+    }
+
+    setFolded(folded: boolean): void {
+        if (folded === this.isFolded) return;
+        this.setFoldedLook(folded);
+        this.remember();
+    }
+
+    /** Position (once moved) and fold, in the browser. */
+    private remember(): void {
+        const moved = this.root.style.left !== '';
+        try {
+            localStorage.setItem(this.storageKey, JSON.stringify({
+                folded: this.root.classList.contains('folded'),
+                ...(moved ? { left: parseFloat(this.root.style.left), top: parseFloat(this.root.style.top) } : {}),
+            }));
+        } catch {
+            // Browser storage unavailable: the layout lasts until the page reloads
+        }
+    }
+
+    private recall(): { folded?: boolean; left?: number; top?: number } | null {
+        try {
+            return JSON.parse(localStorage.getItem(this.storageKey) ?? 'null');
+        } catch {
+            return null;
+        }
+    }
+
+    /** Into a column of the windowed view, or back to floating where it was (null). */
+    dock(column: HTMLElement | null): void {
+        this.root.classList.toggle('docked', column !== null);
+        (column ?? document.body).append(this.root);
+    }
+
+    setTitle(title: string): void {
+        this.titleText.textContent = title;
     }
 
     setVisible(visible: boolean): void {
@@ -87,6 +166,8 @@ export class LabPanelBox {
             let moved = false;
             bar.setPointerCapture(down.pointerId);
             const onMove = (move: PointerEvent) => {
+                // Docked panels stay in their column
+                if (this.root.classList.contains('docked')) return;
                 const dx = move.clientX - down.clientX;
                 const dy = move.clientY - down.clientY;
                 if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
@@ -98,7 +179,8 @@ export class LabPanelBox {
             const onUp = () => {
                 bar.removeEventListener('pointermove', onMove);
                 bar.removeEventListener('pointerup', onUp);
-                if (!moved) onClick();
+                if (moved) this.remember();
+                else onClick();
             };
             bar.addEventListener('pointermove', onMove);
             bar.addEventListener('pointerup', onUp);

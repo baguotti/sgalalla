@@ -29,7 +29,7 @@ export class StagePanel {
     selectedElement: StageElementId | null;
     private readonly ctx: LabContext;
     private readonly layers: LondraLayers;
-    private readonly box: LabPanelBox;
+    readonly box: LabPanelBox;
     private readonly defaults = defaultStageStyle();
     private readonly elementList = document.createElement('select');
     private readonly elementEditor = element('div');

@@ -5,10 +5,8 @@
 
 import type { AttackDirection, AttackPhase } from './AttackData.js';
 import { emptyInput, type FighterInput } from './FighterInput.js';
+import { PhysicsConfig } from './PhysicsConfig.js';
 import { createBody, endDash, type SimBody } from './PhysicsSimulation.js';
-
-/** Presses stay usable for this many steps. */
-const INPUT_BUFFER_STEPS = 6;
 
 export const FIGHTER_STATES = [
     'Idle', 'Run', 'Jump', 'Fall', 'WallSlide', 'Attack', 'Charging', 'HitStun',
@@ -166,7 +164,7 @@ export function updateInputBuffer(f: FighterState): void {
 
     for (const action of ['jump', 'lightAttack', 'heavyAttack', 'dodge'] as const) {
         const presses = buffer[action];
-        while (presses.length > 0 && step - presses[0] > INPUT_BUFFER_STEPS) presses.shift();
+        while (presses.length > 0 && step - presses[0] > PhysicsConfig.INPUT_BUFFER_STEPS) presses.shift();
     }
 }
 

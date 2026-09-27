@@ -6,8 +6,9 @@ import { AudioManager } from '../managers/AudioManager';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 import { PlayerAI } from './player/PlayerAI';
 import { ghostStyle } from '../effects/GhostStyle';
+import { effects } from '../config/EffectConfig';
 import { AttackDirection, AttackRegistry, AttackType } from '../../shared/AttackData';
-import { GHOST_FADE_MS, GHOST_TRAVEL_MS, HURTBOX_HEIGHT, HURTBOX_WIDTH, currentDamage } from '../../shared/Combat';
+import { currentDamage } from '../../shared/Combat';
 import { emptyInput, type FighterInput } from '../../shared/FighterInput';
 import { isInPlay, type FighterState, type GhostHitbox } from '../../shared/FighterState';
 import { SIM_STEP_MS } from '../../shared/FixedStepClock';
@@ -28,12 +29,8 @@ export interface PlayerConfig {
 }
 
 const DAMAGE_FLASH_MS = 150;
-/** Most a fighter trembles in hit-stop, in pixels. */
-const HITSTOP_SHAKE_MAX = 4;
 /** Landing this fast (px/s) raises the most dust. */
 const HARD_LANDING_SPEED = 1600;
-/** Time between afterimages while dashing. */
-const AFTERIMAGE_EVERY_MS = 35;
 
 /**
  * A fighter on screen and the input that drives it. The match simulation owns
@@ -109,7 +106,7 @@ export class Player extends Phaser.GameObjects.Container {
         this.nameTag.setVisible(false);
         this.add(this.nameTag);
 
-        this.hurtboxRect = scene.add.rectangle(0, 0, HURTBOX_WIDTH, HURTBOX_HEIGHT);
+        this.hurtboxRect = scene.add.rectangle(0, 0, PhysicsConfig.HURTBOX_WIDTH, PhysicsConfig.HURTBOX_HEIGHT);
         this.hurtboxRect.setStrokeStyle(2, 0x00ff00);
         this.hurtboxRect.setFillStyle(0x00ff00, 0.2);
         this.hurtboxRect.setVisible(false);
@@ -193,7 +190,10 @@ export class Player extends Phaser.GameObjects.Container {
             if (this.damageFlashMs <= 0) this.sprite.clearTint();
         }
 
-        if (this.showDebug) this.drawHitbox(f, inPlay);
+        if (this.showDebug) {
+            this.hurtboxRect.setSize(PhysicsConfig.HURTBOX_WIDTH, PhysicsConfig.HURTBOX_HEIGHT);
+            this.drawHitbox(f, inPlay);
+        }
     }
 
     /** Holds an animation (cutscenes, victory) until cleared with null. */
@@ -360,19 +360,19 @@ export class Player extends Phaser.GameObjects.Container {
     private updateMotionEffects(f: FighterState, inPlay: boolean, deltaMs: number): void {
         const b = f.body;
         if (inPlay) {
-            const effects = this.effects();
+            const fx = this.effects();
             const feet = b.y + b.height / 2;
             if (b.isGrounded && !this.wasGrounded) {
-                effects.spawnDust(b.x, feet, Phaser.Math.Clamp(this.lastVy / HARD_LANDING_SPEED, 0.3, 1), 0);
+                fx.spawnDust(b.x, feet, Phaser.Math.Clamp(this.lastVy / HARD_LANDING_SPEED, 0.3, 1), 0);
             }
-            if (f.state === 'Dash' && this.lastState !== 'Dash') effects.spawnDust(b.x, feet, 0.7, b.dodgeDirection);
-            if (!b.isGrounded && b.jumpsRemaining < this.lastJumps) effects.spawnJumpRing(b.x, feet);
+            if (f.state === 'Dash' && this.lastState !== 'Dash') fx.spawnDust(b.x, feet, 0.7, b.dodgeDirection);
+            if (!b.isGrounded && b.jumpsRemaining < this.lastJumps) fx.spawnJumpRing(b.x, feet);
 
             if (f.state === 'Dash' || b.isChaseDodging) {
                 this.afterimageMs -= deltaMs;
                 if (this.afterimageMs <= 0) {
-                    effects.spawnAfterimage(this.sprite, this.x + this.sprite.x, this.y + this.sprite.y);
-                    this.afterimageMs = AFTERIMAGE_EVERY_MS;
+                    fx.spawnAfterimage(this.sprite, this.x + this.sprite.x, this.y + this.sprite.y);
+                    this.afterimageMs = effects.AFTERIMAGE_EVERY_MS;
                 }
             } else {
                 this.afterimageMs = 0;
@@ -388,7 +388,7 @@ export class Player extends Phaser.GameObjects.Container {
     private updateHitstop(f: FighterState): void {
         if (f.hitstopSteps > 0) {
             this.sprite.anims.timeScale = 0;
-            if (f.isHitStunned) this.shakeSprite(Math.min(HITSTOP_SHAKE_MAX, 1 + f.hitstopSteps * 0.4));
+            if (f.isHitStunned) this.shakeSprite(Math.min(effects.HITSTOP_TREMBLE, 1 + f.hitstopSteps * 0.4));
             this.inHitstop = true;
         } else if (this.inHitstop) {
             this.inHitstop = false;
@@ -420,14 +420,14 @@ export class Player extends Phaser.GameObjects.Container {
         this.scene.tweens.add({
             targets: sprite,
             ...(ghost.vertical ? { y: ghost.startY - ghost.travel } : { x: ghost.startX + ghost.travel * ghost.facing }),
-            duration: GHOST_TRAVEL_MS,
+            duration: PhysicsConfig.GHOST_TRAVEL_MS,
             ease: 'Cubic.easeOut',
         });
         this.scene.tweens.add({
             targets: sprite,
             alpha: 0,
-            delay: ghost.lifetime - GHOST_FADE_MS,
-            duration: GHOST_FADE_MS,
+            delay: ghost.lifetime - PhysicsConfig.GHOST_FADE_MS,
+            duration: PhysicsConfig.GHOST_FADE_MS,
             onUpdate: () => setGhostBlur(blurFx, sprite),
             onComplete: () => this.effects().releaseGhost(sprite),
         });
@@ -558,7 +558,7 @@ function isGroundPoundCharge(f: FighterState): boolean {
 
 /** Signature ghosts start this far in front of the fighter. */
 function ghostOffset(character: string): number {
-    return character === 'nock' ? 35 : 25;
+    return character === 'nock' ? PhysicsConfig.NOCK_GHOST_OFFSET : PhysicsConfig.GHOST_OFFSET;
 }
 
 /** Ghosts blur as they fade. */

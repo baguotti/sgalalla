@@ -37,6 +37,9 @@ export const PhysicsConfig = {
     // A recovery used again before landing (or touching a wall) costs an air jump and has this share of the push
     EXHAUSTED_RECOVERY_FORCE: 0.6,
 
+    // Input: a press is remembered this many steps, so one that comes a little early still counts
+    INPUT_BUFFER_STEPS: 6,
+
     // Platform drop-through
     PLATFORM_DROP_GRACE_PERIOD: 200,
     // Holding down this many steps on a soft platform drops through it (a down attack comes out first)
@@ -88,8 +91,9 @@ export const PhysicsConfig = {
     // Stun lasts past HIT_STUN_DURATION while the fighter still flies faster than this across or upward, up to MAX_HIT_STUN
     STUN_FLYING_SPEED: 1300,
     MAX_HIT_STUN: 1500,
-    // A downward hit on a fighter standing on the floor pops it up with this share of the knockback
+    // A downward hit on a fighter standing on the floor pops it up with this share of the knockback, lifted this many px
     GROUNDED_SPIKE_BOUNCE: 0.3,
+    GROUNDED_SPIKE_LIFT: 10,
     // A stunned fighter hitting a floor or wall faster than this bounces off, keeping BOUNCE_KEEP of its speed
     BOUNCE_SPEED: 600,
     BOUNCE_KEEP: 0.8,
@@ -99,9 +103,16 @@ export const PhysicsConfig = {
     HITSTOP_PER_DAMAGE: 0.3,
     HITSTOP_MAX_STEPS: 9,
 
-    // Player dimensions
+    // Player dimensions (the body, for collisions; a new match picks them up)
     PLAYER_WIDTH: 120,
     PLAYER_HEIGHT: 184,
+    // Hurtbox: what attacks hit and blast zones test, narrower and shorter than the body
+    HURTBOX_WIDTH: 46,
+    HURTBOX_HEIGHT: 174,
+
+    // Respawn: steps out of play after a KO, then invulnerable this long
+    RESPAWN_DELAY_STEPS: 120,
+    RESPAWN_INVULNERABILITY_MS: 1000,
 
     // Attack phases
     LIGHT_STARTUP_MS: 50,
@@ -111,12 +122,42 @@ export const PhysicsConfig = {
     HEAVY_ACTIVE_MS: 300,
     HEAVY_RECOVERY_MS: 200,
 
-    // Ground pound
+    // Attack moves without their own: the run attack slides this much faster than the slide,
+    // and comes out above this share of MAX_SPEED; every attack ends with a short cooldown
+    RUN_ATTACK_SPEED_MULT: 1.2,
+    RUN_ATTACK_MIN_SPEED: 0.8,
+    ATTACK_END_COOLDOWN: 100,
+    // Fok's charged moves: extra cooldown at full charge, less for a shorter charge
+    FOK_CHARGE_COOLDOWN: 600,
+
+    // Ground pound: hangs this long, then falls at MAX_FALL_SPEED times FALL_MULT.
+    // Damage and knockback grow with the charge; landing keeps this share of the speed
     GROUND_POUND_STARTUP: 100,
-    GROUND_POUND_DAMAGE: 8,
+    GROUND_POUND_FALL_MULT: 1.5,
+    GROUND_POUND_MIN_DAMAGE: 4,
+    GROUND_POUND_MAX_DAMAGE: 12,
+    GROUND_POUND_KNOCKBACK_BONUS: 0.8,
+    GROUND_POUND_GROWTH_BONUS: 0.5,
+    GROUND_POUND_LANDING_SPEED_KEPT: 0.5,
 
     // Chargeable heavy attacks
     CHARGE_MAX_TIME: 1500,
+
+    // Signature ghosts (heavy side, up and neutral): thrown from in front of the fighter (NOCK's
+    // further out), a side ghost a little further forward, an up ghost a little higher. It travels
+    // TRAVEL px (more with charge) over TRAVEL_MS, lives LIFETIME ms (more with charge) plus the fade,
+    // and the hitbox follows it: a square of the 256 px ghost frame times HITBOX_SCALE
+    GHOST_OFFSET: 25,
+    NOCK_GHOST_OFFSET: 35,
+    GHOST_FORWARD: 15,
+    GHOST_LIFT: 15,
+    GHOST_TRAVEL: 110,
+    GHOST_TRAVEL_PER_CHARGE: 35,
+    GHOST_TRAVEL_MS: 300,
+    GHOST_LIFETIME: 100,
+    GHOST_LIFETIME_PER_CHARGE: 600,
+    GHOST_FADE_MS: 200,
+    GHOST_HITBOX_SCALE: 0.65,
 
     // Wall mechanics
     WALL_SLIDE_SPEED: 400,
@@ -135,18 +176,19 @@ export const PhysicsConfig = {
     HITSTUN_FRICTION: 0.95,
     SHORT_HOP_VELOCITY_DAMP: 0.5,
 
-    // Combat hitbox overrides
-    UP_SIG_HITBOX_WIDTH: 147,
-    UP_SIG_HITBOX_HEIGHT: 34,
-    SIDE_LIGHT_HITBOX_WIDTH: 81,
-    SIDE_LIGHT_OFFSET_EXTRA: 20,
-    GHOST_HITBOX_SCALE: 0.65,
+    // The recovery move's hit: a square round the fighter
     RECOVERY_HITBOX_SIZE: 60,
     RECOVERY_DAMAGE: 8,
+    RECOVERY_BASE_KNOCKBACK: 250,
+    RECOVERY_KNOCKBACK_GROWTH: 8,
+    RECOVERY_KNOCKBACK_ANGLE: 80,
 
-    // Side Sig damage scaling
+    // Signature damage grows from MIN to MAX with the charge; a charged side signature also knocks
+    // back harder, up to these shares more at full charge
     SIDE_SIG_MIN_DAMAGE: 6,
     SIDE_SIG_MAX_DAMAGE: 20,
+    SIDE_SIG_KNOCKBACK_BONUS: 0.5,
+    SIDE_SIG_GROWTH_BONUS: 0.3,
 
     // Movement thresholds
     HIGH_SPEED_THRESHOLD_MULT: 1.2,

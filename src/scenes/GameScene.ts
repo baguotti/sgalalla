@@ -6,7 +6,7 @@ import { MenuInput } from '../input/MenuInput';
 import { DebugOverlay } from '../components/DebugOverlay';
 import { InputDebugOverlay } from '../components/InputDebugOverlay';
 import { TouchController } from '../components/TouchController';
-import { PauseMenu } from '../components/PauseMenu';
+import { PauseMenu, type LabMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
 import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
@@ -15,8 +15,11 @@ import { freeLondraLayers, loadLondraLayers, LondraLayers } from '../stages/Lond
 import { createStage as createSharedStage } from '../stages/StageFactory';
 import { ContactShadows, DEFAULT_SHADOW_DARKNESS } from '../effects/ContactShadows';
 import { EffectManager } from '../effects/EffectManager';
+import { effects } from '../config/EffectConfig';
 import type { Lighting } from '../lighting/Lighting';
-import { startLightLab } from '../lighting/LightLab';
+import { labFighters, labSceneData, saveLabFighters, startStudioLab, type StudioLab } from '../lab/StudioLab';
+import type { FeelLab } from '../lab/FeelLab';
+import { resetTuning } from '../lab/Tuning';
 import { AnimationHelpers } from '../managers/AnimationHelpers';
 import { AudioManager } from '../managers/AudioManager';
 import { MatchRecorder } from '../debug/MatchRecorder';
@@ -69,13 +72,6 @@ const GAMEPAD_START = 9;
 /** The Studio Lab's whole-stage view: centre and zoom showing every platform with room round them for lights. */
 const STAGE_VIEW = { x: 900, y: 620, zoom: 0.62 };
 
-/** Camera kick on hard hits: knockback (px/s) it starts at, knockback per pixel of kick, most pixels, share left each step. */
-const CAMERA_KICK_FROM = 1200;
-const CAMERA_KICK_PER_PIXEL = 300;
-const CAMERA_KICK_MAX = 10;
-const CAMERA_KICK_DECAY = 0.75;
-/** A KO zooms the camera in by this factor for a moment. */
-const KO_ZOOM_PUNCH = 1.04;
 
 export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private debugOverlay!: DebugOverlay;
@@ -115,6 +111,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     /** The Studio Lab lights the scene; drawing only, the match doesn't see it. */
     private isLab = false;
     private lighting: Lighting | null = null;
+    /** The Studio Lab's FEEL mode, and its slow motion, freeze and frame step. */
+    private feelLab: FeelLab | null = null;
+    private studioLab: StudioLab | null = null;
+    private readonly labTime = { scale: 1, frozen: false, steps: 0 };
     /** The lab can hold the camera on the whole stage instead of following the fighters. */
     private stageView = false;
     /** The camera's centre before any kick, eased towards the fighters; null until the first camera move. */
@@ -183,6 +183,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     init(data: GameSceneData): void {
         this.mode = data.mode || 'versus';
         this.isLab = data.lab === true;
+        // Only the Lab plays with tuned settings: every other match, online above all, uses the defaults
+        if (!this.isLab) resetTuning();
 
         this.currentStageBackground = isStageKey(data.selectedMap) ? data.selectedMap : 'adria_bg';
 
@@ -395,7 +397,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.cameraCentre = null;
             this.cameraKick.x = this.cameraKick.y = 0;
             if (this.isLab) {
-                this.lighting = startLightLab(this, {
+                const scene = this;
+                const lab = startStudioLab(this, {
                     uiCamera: this.uiCamera,
                     sky: this.backgroundImage ? [this.backgroundImage] : [],
                     layers: this.londraLayers,
@@ -403,7 +406,19 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     fighters: this.players.map(p => p.spriteObject),
                     setStageView: on => this.stageView = on,
                     statsLeftOf: () => this.debugOverlay?.panelRight ?? 0,
+                }, {
+                    get match() { return scene.match; },
+                    get players() { return scene.players; },
+                    uiCamera: this.uiCamera,
+                    restartMatch: () => this.restartMatch(),
+                    setTime: (scale, frozen) => this.setLabTime(scale, frozen),
+                    stepFrame: () => { this.labTime.steps++; },
+                    setHitboxes: on => this.players.forEach(p => p.setDebug(on)),
+                    isPaused: () => this.isPaused,
                 });
+                this.lighting = lab.lighting;
+                this.feelLab = lab.feel;
+                this.studioLab = lab;
             }
 
             // Create debug overlay
@@ -445,7 +460,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.inputDebugOverlay.setCameraIgnore(this.cameras.main);
 
             // Create pause menu
-            this.pauseMenu = new PauseMenu(this);
+            this.pauseMenu = new PauseMenu(this, this.studioLab ? this.labMenu(this.studioLab) : undefined);
             this.cameras.main.ignore(this.pauseMenu.getElements());
 
             // Create F1 controls overlay
@@ -671,7 +686,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         let steps = 0;
         if (!this.isCutscene) {
             // Online: raw frame time, since Phaser clamps its smoothed delta while the window is unfocused
-            const due = this.simClock.advance(this.online ? this.game.loop.rawDelta : delta);
+            const due = this.labTime.frozen ? this.takeLabSteps()
+                : this.simClock.advance((this.online ? this.game.loop.rawDelta : delta) * this.labTime.scale);
             // A step spent waiting for the opponent is dropped, not caught up later
             while (steps < due && !this.isGameOver && this.stepSimulation()) steps++;
         }
@@ -774,6 +790,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     }
 
     private playEvent(event: MatchEvent): void {
+        this.feelLab?.onEvent(event);
         const audio = AudioManager.getInstance();
         switch (event.type) {
             case 'sound':
@@ -805,13 +822,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const { attacker, target, attackKey } = hit;
         this.players[attacker].playHitSound(attackKey);
         if (attackKey && AttackRegistry[attackKey].type === AttackType.HEAVY) {
-            this.cameras.main.shake(100, 0.005);
+            this.cameras.main.shake(effects.HEAVY_SHAKE_MS, effects.HEAVY_SHAKE);
         }
         this.effectManager.spawnHitSpark(hit.x, hit.y, hit.damage);
 
         // Hard hits nudge the camera the way the target flies
         const knockback = Math.hypot(hit.knockbackX, hit.knockbackY);
-        const kick = Phaser.Math.Clamp((knockback - CAMERA_KICK_FROM) / CAMERA_KICK_PER_PIXEL, 0, CAMERA_KICK_MAX);
+        const kick = Phaser.Math.Clamp((knockback - effects.CAMERA_KICK_FROM) / effects.CAMERA_KICK_PER_PIXEL, 0, effects.CAMERA_KICK_MAX);
         if (kick > 0) {
             this.cameraKick.x += (hit.knockbackX / knockback) * kick;
             this.cameraKick.y += (hit.knockbackY / knockback) * kick;
@@ -829,8 +846,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     /** A fighter left the stage: impact, crowd, and the campaign's reactions. */
     private onKnockOut(index: number, x: number, y: number): void {
         // A short, punchy shake and a slight zoom in, which the camera eases back out of
-        this.cameras.main.shake(220, 0.012);
-        this.cameras.main.zoom *= KO_ZOOM_PUNCH;
+        this.cameras.main.shake(effects.KO_SHAKE_MS, effects.KO_SHAKE);
+        this.cameras.main.zoom *= effects.KO_ZOOM_PUNCH;
         const impactX = Phaser.Math.Clamp(x, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
         const impactY = Phaser.Math.Clamp(y, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
         this.lighting?.flash('ko', impactX, impactY);
@@ -914,20 +931,45 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         centre.x = Phaser.Math.Linear(centre.x, x, 0.2);
         centre.y = Phaser.Math.Linear(centre.y, y, 0.2);
         this.cameras.main.centerOn(centre.x + this.cameraKick.x, centre.y + this.cameraKick.y);
-        this.cameraKick.x *= CAMERA_KICK_DECAY;
-        this.cameraKick.y *= CAMERA_KICK_DECAY;
+        this.cameraKick.x *= effects.CAMERA_KICK_DECAY;
+        this.cameraKick.y *= effects.CAMERA_KICK_DECAY;
     }
 
 
 
     private togglePause(): void {
         this.isPaused = !this.isPaused;
+        this.studioLab?.setSuspended(this.isPaused);
         if (this.isPaused) {
             AudioManager.getInstance().playSFX('ui_player_found', { volume: 0.6 });
             this.pauseMenu.show();
         } else {
             this.pauseMenu.hide();
+            // Characters picked in the Lab's menu: a new match with them
+            if (this.isLab && this.labFightersChanged()) this.time.delayedCall(10, () => this.scene.restart(labSceneData()));
         }
+    }
+
+    /** The Lab's pause menu: mode, view, and the player's and dummy's characters. */
+    private labMenu(lab: StudioLab): LabMenu {
+        return {
+            mode: () => lab.mode,
+            toggleMode: () => lab.setMode(lab.mode === 'look' ? 'feel' : 'look'),
+            windowed: () => lab.windowed,
+            toggleWindowed: () => lab.setWindowed(!lab.windowed),
+            character: who => labFighters()[who],
+            cycleCharacter: (who, step) => {
+                const fighters = labFighters();
+                const i = ALL_CHARACTERS.indexOf(fighters[who]);
+                fighters[who] = ALL_CHARACTERS[(i + step + ALL_CHARACTERS.length) % ALL_CHARACTERS.length];
+                saveLabFighters(fighters);
+            },
+        };
+    }
+
+    private labFightersChanged(): boolean {
+        const picked = labFighters();
+        return this.playerData[0]?.character !== picked.player || this.playerData[1]?.character !== picked.dummy;
     }
 
     private restartMatch(): void {
@@ -987,12 +1029,33 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.input.keyboard?.resetKeys();
     }
 
+    /** The Lab's game speed and freeze: the simulation, animations, tweens and timers all follow. */
+    private setLabTime(scale: number, frozen: boolean): void {
+        this.labTime.scale = scale;
+        this.labTime.frozen = frozen;
+        this.labTime.steps = 0;
+        const rate = frozen ? 0 : scale;
+        this.anims.globalTimeScale = rate;
+        this.tweens.timeScale = rate;
+        this.time.timeScale = rate;
+    }
+
+    /** Frozen in the Lab: the steps asked for with "next step". */
+    private takeLabSteps(): number {
+        const steps = this.labTime.steps;
+        this.labTime.steps = 0;
+        return steps;
+    }
+
     /** Scene shutdown (leaving the match): everything create() set up. */
     shutdown(): void {
         this.online?.client.close();
         this.online = null;
         this.lighting?.destroy();
         this.lighting = null;
+        this.feelLab = null;
+        this.studioLab = null;
+        this.setLabTime(1, false);
         this.contactShadows?.destroy();
         this.contactShadows = null;
 

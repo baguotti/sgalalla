@@ -8,7 +8,7 @@ const SECTIONS = ['BLOOM AND RAYS', 'CAMERA', 'CRT'];
 /** The camera's post-processing: bloom, sun rays, mist, grading, lens effects, CRT. */
 export class CameraPanel {
     private readonly ctx: LabContext;
-    private readonly box: LabPanelBox;
+    readonly box: LabPanelBox;
     private readonly editor = element('div');
 
     constructor(ctx: LabContext, place: { top: number; left?: number; right?: number }) {

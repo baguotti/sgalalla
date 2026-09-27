@@ -1,10 +1,26 @@
 import Phaser from 'phaser';
 import type { Lighting } from '../Lighting';
+import { DOCK_WIDTH } from './LabUi';
 
 /**
  * The Studio Lab's frame statistics, drawn on the canvas in the debug panel's
- * style, top left, beside the FPS panel when that's shown.
+ * style, top left, beside the FPS panel when that's shown. In the windowed
+ * view they leave the canvas for a PERFORMANCE strip above the game.
  */
+
+/** The band the windowed view keeps above the game for the PERFORMANCE strip. */
+export const PERFORMANCE_BAND = 64;
+
+const STRIP_STYLE = `
+.lab-perf { position: fixed; top: 8px; left: ${DOCK_WIDTH + 8}px; right: ${DOCK_WIDTH + 8}px; z-index: 1000; box-sizing: border-box;
+    height: ${PERFORMANCE_BAND - 16}px; display: flex; align-items: center; gap: 14px; padding: 0 12px; overflow: hidden;
+    border-radius: 6px; background: rgba(10, 10, 10, 0.85); border: 1px solid rgba(51, 51, 51, 0.8); font: 12px/1.35 "Pixeloid Sans", monospace; }
+.lab-perf .heading { color: #8bef8b; letter-spacing: 0.06em; flex: none; }
+.lab-perf .cells { display: flex; flex-wrap: wrap; column-gap: 16px; row-gap: 1px; min-width: 0; }
+.lab-perf .cell { white-space: nowrap; }
+.lab-perf .cell span { color: #9e9e9e; margin-right: 6px; }
+`;
+let stripStyleAdded = false;
 
 const PANEL_Y = 8;
 const GAP = 8;
@@ -30,6 +46,9 @@ export class LabStats {
     private readonly leftOf: () => number;
     private textureMb = 0;
     private updates = 0;
+    /** The windowed view's strip, while it's on. */
+    private strip: { root: HTMLElement; cells: HTMLElement[] } | null = null;
+    private visible = true;
 
     /** `leftOf` gives the right edge of whatever sits to the left (the FPS panel), 0 for none. */
     constructor(scene: Phaser.Scene, lighting: Lighting, hideFrom: Phaser.Cameras.Scene2D.Camera, leftOf: () => number) {
@@ -49,11 +68,50 @@ export class LabStats {
     }
 
     setVisible(visible: boolean): void {
-        this.panel.setVisible(visible);
-        for (const text of [...this.labels, ...this.values]) text.setVisible(visible);
+        this.visible = visible;
+        const onCanvas = visible && !this.strip;
+        this.panel.setVisible(onCanvas);
+        for (const text of [...this.labels, ...this.values]) text.setVisible(onCanvas);
+        if (this.strip) this.strip.root.style.display = visible ? '' : 'none';
+    }
+
+    /** Windowed: the statistics in a strip above the game instead of on the canvas. */
+    setWindowed(windowed: boolean): void {
+        if (windowed === (this.strip !== null)) return;
+        if (windowed) {
+            if (!stripStyleAdded) {
+                const style = document.createElement('style');
+                style.textContent = STRIP_STYLE;
+                document.head.append(style);
+                stripStyleAdded = true;
+            }
+            const root = document.createElement('div');
+            root.className = 'lab-perf';
+            const heading = document.createElement('div');
+            heading.className = 'heading';
+            heading.textContent = 'PERFORMANCE';
+            const row = document.createElement('div');
+            row.className = 'cells';
+            const cells = this.labels.map(() => {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                row.append(cell);
+                return cell;
+            });
+            root.append(heading, row);
+            document.body.append(root);
+            this.strip = { root, cells };
+        } else {
+            this.strip?.root.remove();
+            this.strip = null;
+        }
+        this.setVisible(this.visible);
+        this.update();
     }
 
     destroy(): void {
+        this.strip?.root.remove();
+        this.strip = null;
         this.refresh.remove();
         this.timing.destroy();
         this.panel.destroy();
@@ -80,6 +138,17 @@ export class LabStats {
             [`${lighting.stageLights.length} stage  ${lighting.flashCount} flashes`, '#e0e0e0'],
             [`${this.textureMb.toFixed(0)} MB textures`, this.textureMb < 300 ? GOOD : this.textureMb < 600 ? WARN : BAD],
         ];
+
+        if (this.strip) {
+            lines.forEach(([text, color], i) => {
+                const cell = this.strip!.cells[i];
+                const label = document.createElement('span');
+                label.textContent = this.labels[i].text;
+                cell.replaceChildren(label, text);
+                cell.style.color = color;
+            });
+            return;
+        }
 
         const x = (this.leftOf() || 0) + GAP;
         const labelWidth = Math.max(...this.labels.map(label => label.width));

@@ -11,9 +11,29 @@ const MenuOption = {
     RESTART: 4,
     LOBBY: 7,
     MAP: 9,
-    EXIT: 5
+    EXIT: 5,
+    /** A Studio Lab setting: confirm or left/right changes it. */
+    LAB_SETTING: 10,
 } as const;
 type MenuOption = typeof MenuOption[keyof typeof MenuOption];
+
+/** What the Studio Lab's pause menu changes. */
+export interface LabMenu {
+    mode(): 'look' | 'feel';
+    toggleMode(): void;
+    windowed(): boolean;
+    toggleWindowed(): void;
+    /** The character picked for the player or the dummy; a change applies when the menu closes. */
+    character(who: 'player' | 'dummy'): string;
+    cycleCharacter(who: 'player' | 'dummy', step: number): void;
+}
+
+interface MenuEntry {
+    label: string | (() => string);
+    value: MenuOption;
+    /** LAB_SETTING: changes the setting one way or the other. */
+    adjust?: (step: number) => void;
+}
 
 export class PauseMenu {
     private scene: Phaser.Scene;
@@ -28,15 +48,18 @@ export class PauseMenu {
 
     private visible: boolean = false;
 
-    private menuOptions: Array<{ label: string, value: MenuOption }> = [];
+    private menuOptions: MenuEntry[] = [];
+    private readonly lab: LabMenu | null;
 
     private readonly menuInput: MenuInput;
 
     private hintText!: Phaser.GameObjects.Text;
     private controlsContainer!: Phaser.GameObjects.Container;
 
-    constructor(scene: Phaser.Scene) {
+    /** With `lab`, the Studio Lab's menu: its mode, view and characters. */
+    constructor(scene: Phaser.Scene, lab?: LabMenu) {
         this.scene = scene;
+        this.lab = lab ?? null;
         this.createMenu();
         this.createControlsPage();
         this.menuInput = new MenuInput(scene);
@@ -62,7 +85,20 @@ export class PauseMenu {
             { label: 'IMPOSTAZIONI', value: MenuOption.SETTINGS }
         ];
 
-        if (mode === 'campaign') {
+        const lab = this.lab;
+        if (lab) {
+            this.menuOptions = [
+                { label: 'RESUME', value: MenuOption.RESUME },
+                { label: () => `MODE:  ${lab.mode() === 'feel' ? 'FEEL' : 'LOOK'}`, value: MenuOption.LAB_SETTING, adjust: () => lab.toggleMode() },
+                { label: () => `VIEW:  ${lab.windowed() ? 'WINDOWED' : 'FULL SCREEN'}`, value: MenuOption.LAB_SETTING, adjust: () => lab.toggleWindowed() },
+                { label: () => `PLAYER:  < ${lab.character('player').toUpperCase()} >`, value: MenuOption.LAB_SETTING, adjust: step => lab.cycleCharacter('player', step) },
+                { label: () => `DUMMY:  < ${lab.character('dummy').toUpperCase()} >`, value: MenuOption.LAB_SETTING, adjust: step => lab.cycleCharacter('dummy', step) },
+                { label: 'RESTART MATCH', value: MenuOption.RESTART },
+                { label: 'CONTROLS', value: MenuOption.CONTROLS },
+                { label: 'SETTINGS', value: MenuOption.SETTINGS },
+                { label: 'EXIT TO MENU', value: MenuOption.EXIT },
+            ];
+        } else if (mode === 'campaign') {
             this.menuOptions.push({ label: 'RITORNA ALLA MAPPA', value: MenuOption.MAP });
         } else {
             this.menuOptions.push({ label: 'SPAWN CPU', value: MenuOption.SPAWN_DUMMY });
@@ -70,7 +106,7 @@ export class PauseMenu {
             this.menuOptions.push({ label: 'TORNA ALLA LOBBY', value: MenuOption.LOBBY });
         }
 
-        this.menuOptions.push({ label: 'TORNA AL MENU', value: MenuOption.EXIT });
+        if (!lab) this.menuOptions.push({ label: 'TORNA AL MENU', value: MenuOption.EXIT });
 
         // Title
         this.titleText = this.scene.add.text(centerX, 120, 'PAUSED', {
@@ -89,7 +125,7 @@ export class PauseMenu {
         const spacing = 50;
 
         this.menuOptions.forEach((option, index) => {
-            const itemText = this.scene.add.text(centerX, startY + (index * spacing), option.label, {
+            const itemText = this.scene.add.text(centerX, startY + (index * spacing), labelOf(option), {
                 fontSize: '32px',
                 color: '#ffffff',
                 fontFamily: '"Pixeloid Sans"'
@@ -301,9 +337,10 @@ export class PauseMenu {
         this.titleText.setText('PAUSED');
         this.titleText.setPosition(centerX, centerY - 250);
         this.titleText.setVisible(true);
-        this.hintText.setText('[ESC / START to Resume]');
+        this.hintText.setText(this.lab ? '[LEFT / RIGHT to change · ESC / START to resume · characters change on resume]' : '[ESC / START to Resume]');
         this.hintText.setVisible(true);
         this.controlsContainer.setVisible(false);
+        this.refreshLabels();
         this.mainMenuItems.forEach(item => item.setVisible(true));
         this.updateSelection();
     }
@@ -341,6 +378,10 @@ export class PauseMenu {
                     const step = action === 'up' ? -1 : 1;
                     this.mainSelectedIndex = (this.mainSelectedIndex + step + this.menuOptions.length) % this.menuOptions.length;
                     this.updateSelection();
+                } else if ((action === 'left' || action === 'right') && this.menuOptions[this.mainSelectedIndex].adjust) {
+                    this.scene.sound.play('ui_move_cursor', { volume: 0.5 });
+                    this.menuOptions[this.mainSelectedIndex].adjust!(action === 'left' ? -1 : 1);
+                    this.refreshLabels();
                 } else if (action === 'confirm') {
                     this.selectOption();
                     return;
@@ -374,8 +415,18 @@ export class PauseMenu {
 
     private selectOption(): void {
         this.scene.sound.play('ui_confirm', { volume: 0.5 });
-        const option = this.menuOptions[this.mainSelectedIndex].value;
-        this.executeOption(option);
+        const entry = this.menuOptions[this.mainSelectedIndex];
+        if (entry.adjust) {
+            entry.adjust(1);
+            this.refreshLabels();
+            return;
+        }
+        this.executeOption(entry.value);
+    }
+
+    /** Lab settings show their current value. */
+    private refreshLabels(): void {
+        this.menuOptions.forEach((option, index) => this.mainMenuItems[index]?.setText(labelOf(option)));
     }
 
     private executeOption(option: MenuOption): void {
@@ -408,6 +459,10 @@ export class PauseMenu {
         }
     }
 
+    get isOpen(): boolean {
+        return this.visible;
+    }
+
     getElements(): Phaser.GameObjects.GameObject[] {
         return [this.overlay, this.titleText, this.hintText, this.controlsContainer, ...this.mainMenuItems];
     }
@@ -415,4 +470,8 @@ export class PauseMenu {
     destroy(): void {
         this.getElements().forEach(e => e.destroy());
     }
+}
+
+function labelOf(entry: MenuEntry): string {
+    return typeof entry.label === 'function' ? entry.label() : entry.label;
 }
