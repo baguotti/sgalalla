@@ -2,7 +2,7 @@ import type { NetClient } from './NetClient';
 import { packInput, type FighterInput } from '../../shared/FighterInput';
 import type { MatchState } from '../../shared/GameSim';
 import type { MatchEvent } from '../../shared/MatchEvents';
-import type { MatchStart } from '../../shared/NetProtocol';
+import type { MatchStart, PlayerLeft } from '../../shared/NetProtocol';
 import { RollbackSession } from '../../shared/Rollback';
 
 /**
@@ -33,6 +33,20 @@ export class OnlineMatch {
         const { seed, slot, characters, inputDelay } = this.start;
         this.session = new RollbackSession(seed, slot, characters.length, inputDelay, match);
         this.desyncReported = false;
+    }
+
+    /** A player left: their fighter leaves the match, the same frame on every machine. */
+    playerLeft(left: PlayerLeft): void {
+        this.session?.playerLeft(left.slot, left.lastFrame, left.first, left.inputs);
+    }
+
+    /** How many of the other players are still in the match. */
+    get othersPlaying(): number {
+        const s = this.session;
+        if (!s) return 0;
+        let count = 0;
+        for (let slot = 0; slot < s.players; slot++) if (slot !== s.slot && s.isPlaying(slot)) count++;
+        return count;
     }
 
     /** The match as simulated so far. A rollback can replace the object. */

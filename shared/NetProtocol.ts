@@ -8,10 +8,12 @@
  */
 
 /** Bump whenever two builds can no longer play each other. */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 8;
 
 export const MIN_PLAYERS = 2;
-export const MAX_PLAYERS = 4;
+export const MAX_PLAYERS = 5;
+/** People watching a match, besides its players. */
+export const MAX_SPECTATORS = 4;
 
 export const NetEvent = {
     /** client → server `{ version }` */
@@ -28,8 +30,18 @@ export const NetEvent = {
     START: 'start',
     /** client → server: vote for a rematch */
     REMATCH: 'rematch',
-    /** server → the others `{ slot }`: a player left the match */
+    /** server → the players still in the match, a PlayerLeft: someone left, and the match goes on without them */
     PLAYER_LEFT: 'player_left',
+    /** server → someone who joined while a match runs: a WatchStart; they watch it */
+    WATCH: 'watch',
+    /** server → spectators: WatchInputs, the players' inputs in batches, from the match's start */
+    WATCH_INPUTS: 'watch_inputs',
+    /** server → spectators `{ reason }`: the match they watched is over for good (its players all left) */
+    WATCH_END: 'watch_end',
+    /** client (spectating) → server `{ character, book }`: book a place in the next match, or cancel it */
+    SEAT: 'seat',
+    /** server → players `{ count }`: how many people are watching */
+    SPECTATORS: 'spectators',
     /** client → server `{ t }`, echoed back unchanged as PONG */
     PING: 'ping',
     PONG: 'pong',
@@ -47,6 +59,27 @@ export interface RoomState {
     you: number;
     /** In joining order; a player's index becomes their slot in the match. */
     players: RoomPlayer[];
+}
+
+/** A player left mid-match: the last frame the server has their inputs for, and those final inputs from `first`. */
+export interface PlayerLeft {
+    slot: number;
+    lastFrame: number;
+    first: number;
+    inputs: number[];
+}
+
+/** Watching a match: its start (no slot of our own) and the players who already left. */
+export interface WatchStart {
+    seed: number;
+    inputDelay: number;
+    characters: string[];
+    left: { slot: number; lastFrame: number }[];
+}
+
+/** Players' inputs for spectators: for each batch, inputs of `slot` from frame `first`. */
+export interface WatchInputs {
+    batches: { slot: number; first: number; inputs: number[] }[];
 }
 
 export interface MatchStart {

@@ -27,7 +27,10 @@ precision mediump float;
 #endif
 `;
 
-// Quarter size: rgb = what blooms, a = how much sky light starts a ray here
+/** Bloom levels below the half-size one: 1/4 down to 1/64 of the screen. */
+const BLOOM_LEVELS = 5;
+
+// Half size: rgb = what blooms, a = how much sky light starts a ray here
 const PREFILTER_SHADER = `
 #define SHADER_NAME SGALALLA_ATMOSPHERE_PREFILTER_FS
 ${PRECISION}
@@ -42,12 +45,17 @@ varying vec2 outTexCoord;
 
 void main ()
 {
-    // Average of the 4x4 pixels this one covers
-    vec3 c = texture2D(uMainSampler, outTexCoord + uTexel * vec2(-1.0, -1.0)).rgb;
-    c += texture2D(uMainSampler, outTexCoord + uTexel * vec2(1.0, -1.0)).rgb;
-    c += texture2D(uMainSampler, outTexCoord + uTexel * vec2(-1.0, 1.0)).rgb;
-    c += texture2D(uMainSampler, outTexCoord + uTexel * vec2(1.0, 1.0)).rgb;
-    c *= 0.25;
+    // Average of the 4x4 pixels round this one, each weighted down by its brightness
+    // (Karis average), so a lone bright pixel can't make the bloom flicker as things move
+    vec3 s0 = texture2D(uMainSampler, outTexCoord + uTexel * vec2(-1.0, -1.0)).rgb;
+    vec3 s1 = texture2D(uMainSampler, outTexCoord + uTexel * vec2(1.0, -1.0)).rgb;
+    vec3 s2 = texture2D(uMainSampler, outTexCoord + uTexel * vec2(-1.0, 1.0)).rgb;
+    vec3 s3 = texture2D(uMainSampler, outTexCoord + uTexel * vec2(1.0, 1.0)).rgb;
+    float w0 = 1.0 / (1.0 + max(s0.r, max(s0.g, s0.b)));
+    float w1 = 1.0 / (1.0 + max(s1.r, max(s1.g, s1.b)));
+    float w2 = 1.0 / (1.0 + max(s2.r, max(s2.g, s2.b)));
+    float w3 = 1.0 / (1.0 + max(s3.r, max(s3.g, s3.b)));
+    vec3 c = (s0 * w0 + s1 * w1 + s2 * w2 + s3 * w3) / (w0 + w1 + w2 + w3);
 
     float brightness = max(c.r, max(c.g, c.b));
 
@@ -65,7 +73,58 @@ void main ()
 }
 `;
 
-// 9-tap gaussian from 5 bilinear samples along uDirection
+// Halves the picture: 13 samples over the 4x4 source pixels round each one, which
+// shrinks without the blockiness of a plain average (as in Call of Duty's bloom)
+const DOWNSAMPLE_SHADER = `
+#define SHADER_NAME SGALALLA_ATMOSPHERE_DOWNSAMPLE_FS
+${PRECISION}
+uniform sampler2D uMainSampler;
+uniform vec2 uTexel;
+
+varying vec2 outTexCoord;
+
+vec3 at (float x, float y)
+{
+    return texture2D(uMainSampler, outTexCoord + uTexel * vec2(x, y)).rgb;
+}
+
+void main ()
+{
+    vec3 c = at(0.0, 0.0) * 0.125;
+    c += (at(-2.0, 2.0) + at(2.0, 2.0) + at(-2.0, -2.0) + at(2.0, -2.0)) * 0.03125;
+    c += (at(0.0, 2.0) + at(-2.0, 0.0) + at(2.0, 0.0) + at(0.0, -2.0)) * 0.0625;
+    c += (at(-1.0, 1.0) + at(1.0, 1.0) + at(-1.0, -1.0) + at(1.0, -1.0)) * 0.125;
+    gl_FragColor = vec4(c, 1.0);
+}
+`;
+
+// Doubles a smaller level back up with a 3x3 tent filter and adds this level's own
+// light: repeated up the chain, the glow spreads wide and fades out smoothly
+const UPSAMPLE_SHADER = `
+#define SHADER_NAME SGALALLA_ATMOSPHERE_UPSAMPLE_FS
+${PRECISION}
+uniform sampler2D uMainSampler;
+uniform sampler2D uLevel;
+uniform vec2 uTexel;
+uniform float uWider;
+
+varying vec2 outTexCoord;
+
+vec3 at (float x, float y)
+{
+    return texture2D(uMainSampler, outTexCoord + uTexel * vec2(x, y)).rgb;
+}
+
+void main ()
+{
+    vec3 wide = at(0.0, 0.0) * 4.0;
+    wide += (at(0.0, 1.0) + at(-1.0, 0.0) + at(1.0, 0.0) + at(0.0, -1.0)) * 2.0;
+    wide += at(-1.0, 1.0) + at(1.0, 1.0) + at(-1.0, -1.0) + at(1.0, -1.0);
+    gl_FragColor = vec4(texture2D(uLevel, outTexCoord).rgb + wide * (uWider / 16.0), 1.0);
+}
+`;
+
+// 9-tap gaussian from 5 bilinear samples along uDirection (tilt-shift)
 const BLUR_SHADER = `
 #define SHADER_NAME SGALALLA_ATMOSPHERE_BLUR_FS
 ${PRECISION}
@@ -214,8 +273,13 @@ void main ()
 /**
  * The main camera's post-processing: bloom on the bright parts, sun rays that
  * fighters and platforms block, mist, and a camera look (grading, vignette,
- * grain, colour fringes, tilt-shift, CRT). Everything blurred runs at a quarter of
- * the width and height; the tilt-shift passes only run while it's on.
+ * grain, colour fringes, tilt-shift, CRT).
+ *
+ * Bloom: the bright parts at half size, halved again level by level down to
+ * 1/64, then doubled back up, each level adding its own light: a soft glow
+ * near bright things and a wide one round them, fading out smoothly. Spread
+ * sets how much the wider levels count. Rays and tilt-shift run at a quarter
+ * of the size; tilt-shift only while it's on.
  */
 export class AtmospherePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipeline {
     /** Set each frame by Lighting; without it the camera's picture passes through. */
@@ -229,9 +293,17 @@ export class AtmospherePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPi
                 { name: 'blur', fragShader: BLUR_SHADER },
                 { name: 'rays', fragShader: RAYS_SHADER },
                 { name: 'composite', fragShader: COMPOSITE_SHADER },
+                { name: 'downsample', fragShader: DOWNSAMPLE_SHADER },
+                { name: 'upsample', fragShader: UPSAMPLE_SHADER },
             ],
-            // The camera draws into the first, at full size
-            renderTarget: [{ scale: 1 }, { scale: 0.25 }, { scale: 0.25 }, { scale: 0.25 }, { scale: 0.25 }],
+            // The camera draws into the first, at full size; then rays, tilt-shift and its work
+            // space at a quarter; the bloom's half-size level; its smaller levels going down;
+            // and for the way back up, the finished half-size bloom and the sizes in between
+            renderTarget: [
+                { scale: 1 }, { scale: 0.25 }, { scale: 0.25 }, { scale: 0.25 }, { scale: 0.5 },
+                ...bloomScales().map(scale => ({ scale })),
+                { scale: 0.5 }, ...bloomScales().slice(0, -1).map(scale => ({ scale })),
+            ],
         });
     }
 
@@ -243,7 +315,7 @@ export class AtmospherePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPi
         }
 
         const look = frame.look;
-        const [, bright, work, bloom, blurred] = this.renderTargets;
+        const [, rayTarget, work, blurred, bright] = this.renderTargets;
         const [prefilter, blur, rays, composite] = this.shaders;
         const aspect = target.width / target.height;
 
@@ -253,7 +325,7 @@ export class AtmospherePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPi
         this.set1f('uSunReach', frame.sunReach, prefilter);
         this.set1f('uAspect', aspect, prefilter);
         this.bindAndDraw(target, bright, true, true, prefilter);
-        this.blurTwice(bright, work, bloom, look.bloomSpread);
+        const { bloom, strength } = this.bloomChain(bright, look.bloomSpread);
 
         // The whole picture blurred, for tilt-shift
         if (look.tiltShift > 0) {
@@ -265,14 +337,14 @@ export class AtmospherePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPi
         this.set2f('uSun', frame.sunX, frame.sunY, rays);
         this.set1f('uLength', look.rayLength, rays);
         this.set1f('uFade', look.rayFade, rays);
-        this.bindAndDraw(bright, work, true, true, rays);
+        this.bindAndDraw(bright, rayTarget, true, true, rays);
 
         const [r, g, b] = frame.rayColor;
         const warmth = look.temperature * 0.1;
         this.set1i('uBloom', 1, composite);
         this.set1i('uRays', 2, composite);
         this.set1i('uBlurred', 3, composite);
-        this.set1f('uBloomStrength', look.bloomStrength, composite);
+        this.set1f('uBloomStrength', look.bloomStrength * strength, composite);
         this.set3f('uRayColor', r, g, b, composite);
         this.set1f('uAspect', aspect, composite);
         this.set2f('uWorldY', frame.worldBottom, frame.worldHeight, composite);
@@ -289,7 +361,7 @@ export class AtmospherePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPi
         this.set3f('uCrt', look.crt, look.crtLineSize, look.crtMask, composite);
 
         this.bindTexture(bloom.texture, 1);
-        this.bindTexture(work.texture, 2);
+        this.bindTexture(rayTarget.texture, 2);
         this.bindTexture(blurred.texture, 3);
         this.bindAndDraw(target, undefined, false, false, composite);
 
@@ -299,6 +371,46 @@ export class AtmospherePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPi
             gl.bindTexture(gl.TEXTURE_2D, null);
         }
         gl.activeTexture(gl.TEXTURE0);
+    }
+
+    /**
+     * The bloom: `bright` halved level by level, then each level doubled back up
+     * onto the next one out. Returns the result (half size) and what to multiply
+     * it by so the Lab's strength means the same at any spread.
+     */
+    private bloomChain(bright: Phaser.Renderer.WebGL.RenderTarget, spread: number): { bloom: Phaser.Renderer.WebGL.RenderTarget; strength: number } {
+        const down = this.renderTargets.slice(5, 5 + BLOOM_LEVELS);
+        // up[0] is the finished bloom at half size; up[i + 1] is down[i]'s size
+        const up = this.renderTargets.slice(5 + BLOOM_LEVELS, 5 + 2 * BLOOM_LEVELS);
+        const downsample = this.shaders[4];
+        const upsample = this.shaders[5];
+        // How much each wider level counts against the one above it
+        const wider = 0.35 + 0.2 * spread;
+
+        let source = bright;
+        for (const level of down) {
+            this.set2f('uTexel', 1 / source.width, 1 / source.height, downsample);
+            this.bindAndDraw(source, level, true, true, downsample);
+            source = level;
+        }
+
+        // Back up: the smallest level onto the next, and so on up to half size
+        this.set1i('uLevel', 1, upsample);
+        this.set1f('uWider', wider, upsample);
+        let smaller = down[BLOOM_LEVELS - 1];
+        for (let i = BLOOM_LEVELS - 2; i >= -1; i--) {
+            const level = i >= 0 ? down[i] : bright;
+            const into = up[i + 1];
+            this.set2f('uTexel', 1 / smaller.width, 1 / smaller.height, upsample);
+            this.bindTexture(level.texture, 1);
+            this.bindAndDraw(smaller, into, true, true, upsample);
+            smaller = into;
+        }
+
+        // Every level adds light: divide by what they add up to, so it stays as bright as before
+        let total = 0;
+        for (let i = 0; i <= BLOOM_LEVELS; i++) total += wider ** i;
+        return { bloom: smaller, strength: 1 / total };
     }
 
     /** Blurs `source` into `into`, across then down, twice; `work` holds the passes in between. */
@@ -312,4 +424,9 @@ export class AtmospherePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPi
             this.bindAndDraw(work, into, true, true, blur);
         }
     }
+}
+
+/** The bloom's levels below half size: a quarter, an eighth… */
+function bloomScales(): number[] {
+    return Array.from({ length: BLOOM_LEVELS }, (_, i) => 0.25 / 2 ** i);
 }

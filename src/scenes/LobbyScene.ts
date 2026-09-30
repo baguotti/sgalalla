@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
 import { SMASH_COLORS } from '../ui/PlayerHUD';
-import { charConfigs } from '../config/CharacterConfig';
+import { cardPositions, PlayerCard, type CardState } from '../ui/PlayerCard';
 import { MenuInput, type MenuAction } from '../input/MenuInput';
 import { STAGES, STAGE_KEYS, loadStagePreviews, previewKey } from '../stages/StageBackgrounds';
 
@@ -30,11 +30,10 @@ export class LobbyScene extends Phaser.Scene {
     private initialGamepadIndex: number | null = null;
 
     // UI Elements
-    private slotContainers: Phaser.GameObjects.Container[] = [];
+    private cards: PlayerCard[] = [];
 
     // Character Data
     private characters: CharacterType[] = ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'] as any;
-    private charLabels: string[] = ['Fok', 'Sgu', 'Sga', 'Pe', 'Nock', 'Greg'];
 
     // Input
     private menuInput!: MenuInput;
@@ -76,7 +75,7 @@ export class LobbyScene extends Phaser.Scene {
 
 
     create(): void {
-        this.slotContainers = []; // CRITICAL: Reset container references on scene restart
+        this.cards = []; // The scene object survives restarts: drop the previous visit's cards
 
         const { width, height } = this.scale;
 
@@ -198,134 +197,12 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private createSlotUI(): void {
-        const { width } = this.scale;
-        const count = this.slots.length;
-
-        // Dynamic Card Dimensions and Spacing
-        let cardWidth = 180;
-        let cardHeight = 300;
-        let spacing = 200;
-
-        // Up to 6 cards fit across 1920 px at these spacings
-        if (count > 4) {
-            spacing = count <= 2 ? 300 : 220;
-        } else {
-            spacing = count <= 2 ? 260 : 200;
-        }
-
-        const totalWidth = (count - 1) * spacing;
-        const startX = width / 2 - totalWidth / 2;
         const centerY = this.scale.height / 2 + 20;
-
-        // Ensure idle animations exist
-        this.ensureIdleAnimations();
-
-        for (let i = 0; i < count; i++) {
-            const cx = startX + (i * spacing);
-            const container = this.add.container(cx, centerY);
-
-            // Player color for this slot
-            let playerColor = SMASH_COLORS[i % SMASH_COLORS.length];
-            if (this.mode === 'campaign') playerColor = 0xFFFFFF; // Campaign uses white for P1
-            const colorHex = '#' + playerColor.toString(16).padStart(6, '0');
-
-            // Gradient Background with Mask
-            const gradient = this.add.graphics();
-            gradient.fillGradientStyle(playerColor, playerColor, 0x000000, 0x000000, 0.2, 0.2, 0.2, 0.2);
-            gradient.fillRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
-
-            const maskGraphics = this.make.graphics({});
-            maskGraphics.fillStyle(0xffffff);
-            const absX = cx; // Container is at cx, centerY. Local 0,0 is center.
-            const absY = centerY;
-            maskGraphics.fillRoundedRect(absX - cardWidth / 2, absY - cardHeight / 2, cardWidth, cardHeight, 16);
-            gradient.setMask(maskGraphics.createGeometryMask());
-            container.add(gradient);
-
-            // Shadow (Circle under feet)
-            const shadow = this.add.ellipse(0, -45 + 55, 80, 20, 0x000000, 0.5);
-            shadow.setVisible(false); // Hidden by default
-            container.add(shadow);
-
-            // Rounded Card Background
-            const card = this.add.graphics();
-            card.lineStyle(3, playerColor);
-            card.fillStyle(0x000000, 0.4);
-            card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-            card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-
-            // Player Label ("P1", "P2", etc.) at top of card
-            const pLabel = this.add.text(0, 75, `P${i + 1}`, {
-                fontSize: '20px',
-                fontStyle: 'bold',
-                fontFamily: '"Pixeloid Sans"',
-                color: colorHex
-            }).setOrigin(0.5);
-
-            // State Text (Join / Select / Ready) - Moved to y=-45 to overlay sprite
-            const stateText = this.add.text(0, -45, 'Premi un tasto\nper entrare', {
-                fontSize: '22px',
-                color: '#888888',
-                fontFamily: '"Pixeloid Sans"',
-                align: 'center'
-            }).setOrigin(0.5);
-
-            // Character Name (below label)
-            const charText = this.add.text(0, 105, '', {
-                fontSize: '22px',
-                color: '#ffffff',
-                fontFamily: '"Pixeloid Sans"',
-                fontStyle: 'bold'
-            }).setOrigin(0.5);
-
-            // Selection Arrows (centered on card Y midpoint, equidistant from borders)
-            const leftArrow = this.add.text(-70, 0, '◀', {
-                fontSize: '28px',
-                fontFamily: '"Pixeloid Sans"',
-                color: colorHex
-            }).setOrigin(0.5).setVisible(false);
-
-            const rightArrow = this.add.text(70, 0, '▶', {
-                fontSize: '28px',
-                fontFamily: '"Pixeloid Sans"',
-                color: colorHex
-            }).setOrigin(0.5).setVisible(false);
-
-            // Character Sprite (idle animation, centered above label area)
-            const charSprite = this.add.sprite(0, -45, 'fok', 'fok_idle_000');
-            charSprite.setScale(1);
-            charSprite.setVisible(false);
-
-            container.add([card, pLabel, charText, leftArrow, rightArrow, charSprite, stateText]);
-            container.setData('card', card);
-            container.setData('stateText', stateText);
-            container.setData('charText', charText);
-            container.setData('arrows', [leftArrow, rightArrow]);
-            container.setData('charSprite', charSprite);
-            container.setData('playerColor', playerColor);
-            container.setData('shadow', shadow);
-
-            this.slotContainers.push(container);
-        }
-    }
-
-    private ensureIdleAnimations(): void {
-        for (const [charKey, config] of Object.entries(charConfigs)) {
-            const animKey = `${charKey}_idle`;
-            if (!this.anims.exists(animKey) && config.idle) {
-                const cfg = config.idle;
-                const frames: { key: string; frame: string }[] = [];
-                for (let f = 0; f < cfg.count; f++) {
-                    frames.push({ key: charKey, frame: `${cfg.prefix}${String(f).padStart(3, '0')}` });
-                }
-                this.anims.create({
-                    key: animKey,
-                    frames,
-                    frameRate: 10,
-                    repeat: -1
-                });
-            }
-        }
+        this.cards = cardPositions(this.scale.width, this.slots.length).map((x, i) => {
+            // Campaign uses white for P1
+            const colour = this.mode === 'campaign' ? 0xffffff : SMASH_COLORS[i % SMASH_COLORS.length];
+            return new PlayerCard(this, x, centerY, `P${i + 1}`, colour);
+        });
     }
 
     update(): void {
@@ -504,7 +381,7 @@ export class LobbyScene extends Phaser.Scene {
 
     private showMapSelection(): void {
         // Hide player cards
-        this.slotContainers.forEach(c => c.setVisible(false));
+        this.cards.forEach(c => c.setVisible(false));
 
         const { width, height } = this.scale;
         const centerY = height / 2;
@@ -576,7 +453,7 @@ export class LobbyScene extends Phaser.Scene {
             this.mapUIContainer = undefined;
         }
         // Restore player cards
-        this.slotContainers.forEach(c => c.setVisible(true));
+        this.cards.forEach(c => c.setVisible(true));
     }
 
     private changeMap(dir: number): void {
@@ -596,96 +473,19 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private updateUI(): void {
-        this.slots.forEach((slot, i) => {
-            const container = this.slotContainers[i];
-            const card = container.getData('card') as Phaser.GameObjects.Graphics;
-            const stateText = container.getData('stateText') as Phaser.GameObjects.Text;
-            const charText = container.getData('charText') as Phaser.GameObjects.Text;
-            const arrows = container.getData('arrows') as Phaser.GameObjects.Text[];
-            const charSprite = container.getData('charSprite') as Phaser.GameObjects.Sprite;
-            const playerColor = container.getData('playerColor') as number;
-            const shadow = container.getData('shadow') as Phaser.GameObjects.Ellipse;
+        this.slots.forEach((slot, i) => this.cards[i].show(this.cardState(slot, i)));
+    }
 
-            const cardWidth = 180;
-            const cardHeight = 300;
-
-            if (slot.joined) {
-                // Redraw card with player color (brighter when ready)
-                card.clear();
-                card.lineStyle(3, slot.ready ? 0x00ff00 : playerColor);
-                card.fillStyle(0x000000, 0.4);
-                card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-                card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-
-                // Show sprite & play idle
-                charSprite.setVisible(true);
-                shadow.setVisible(true);
-                const charKey = slot.character as string;
-                const idleAnim = `${charKey}_idle`;
-                if (charSprite.anims.currentAnim?.key !== idleAnim) {
-                    charSprite.setTexture(charKey);
-                    if (this.anims.exists(idleAnim)) {
-                        charSprite.play(idleAnim, true);
-                    }
-                }
-
-                if (slot.ready) {
-                    stateText.setText('PRONTO!');
-                    stateText.setColor('#00ff00');
-                    stateText.setFontSize(36);
-                    stateText.setBackgroundColor('#004400'); // Overlay style
-                    arrows.forEach(a => a.setVisible(false));
-                } else {
-                    if (this.mode === 'training' && i === 1 && this.selectionPhase === 'P1') {
-                        stateText.setText('In attesa...');
-                        stateText.setColor('#888888');
-                        stateText.setFontSize(20);
-                        stateText.setBackgroundColor(''); // Clear bg
-                        arrows.forEach(a => a.setVisible(false));
-                    } else if (this.mode === 'training' && i === 1 && this.selectionPhase === 'CPU') {
-                        stateText.setText('SCEGLI IL CPU');
-                        stateText.setColor('#ffff00');
-                        stateText.setFontSize(20);
-                        stateText.setBackgroundColor('');
-                        arrows.forEach(a => a.setVisible(true));
-                    } else {
-                        stateText.setText('');
-                        stateText.setBackgroundColor('');
-                        arrows.forEach(a => a.setVisible(true));
-                    }
-                }
-
-                const charIdx = this.characters.indexOf(slot.character);
-                charText.setText(this.charLabels[charIdx]);
-                charText.setVisible(true);
-
-                if (slot.isTrainingDummy) {
-                    if (slot.ready) {
-                        stateText.setText('PRONTO!');
-                    } else if (this.selectionPhase === 'CPU') {
-                        stateText.setText('SCEGLI IL CPU');
-                    } else {
-                        stateText.setText('MANICHINO');
-                    }
-                }
-
-            } else {
-                // Empty slot
-                card.clear();
-                card.lineStyle(2, 0x333333);
-                card.fillStyle(0x000000, 0.2);
-                card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-                card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-
-                stateText.setText('Premi\nper entrare');
-                stateText.setColor('#555555');
-                stateText.setFontSize(20);
-                stateText.setBackgroundColor('');
-                charText.setVisible(false);
-                charSprite.setVisible(false);
-                shadow.setVisible(false);
-                arrows.forEach(a => a.setVisible(false));
-            }
-        });
+    /** What slot `i`'s card shows: the empty prompt, or the fighter with where its player is in choosing. */
+    private cardState(slot: PlayerSelection, i: number): CardState {
+        if (!slot.joined) return { kind: 'empty', text: 'Premi\nper entrare' };
+        const fighter = { kind: 'fighter' as const, character: slot.character, ready: slot.ready };
+        if (slot.ready) return { ...fighter, choosing: false };
+        const cpuSlot = this.mode === 'training' && i === 1;
+        if (cpuSlot && this.selectionPhase === 'CPU') return { ...fighter, choosing: true, text: 'SCEGLI IL CPU' };
+        if (cpuSlot && this.selectionPhase === 'P1') {
+            return { ...fighter, choosing: false, text: slot.isTrainingDummy ? 'MANICHINO' : 'In attesa...', textColour: '#888888' };
+        }
+        return { ...fighter, choosing: true };
     }
 }

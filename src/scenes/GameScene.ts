@@ -32,7 +32,8 @@ import { isInPlay, type FighterSetup } from '../../shared/FighterState';
 import { FixedStepClock } from '../../shared/FixedStepClock';
 import { addFighter, createMatch, stepMatch, type MatchState } from '../../shared/GameSim';
 import type { MatchEvent } from '../../shared/MatchEvents';
-import { NetEvent, type MatchStart } from '../../shared/NetProtocol';
+import { NetEvent, type MatchStart, type PlayerLeft, type WatchInputs, type WatchStart } from '../../shared/NetProtocol';
+import { SpectatorMatch } from '../network/SpectatorMatch';
 import { STAGE_LAYOUT, type SimRect } from '../../shared/StageData';
 
 import { CampaignFlow } from './CampaignFlow';
@@ -53,7 +54,7 @@ export interface PlayerSlot {
 
 /** What GameScene is started with. */
 export interface GameSceneData {
-    mode?: 'versus' | 'training' | 'campaign' | 'online';
+    mode?: 'versus' | 'training' | 'campaign' | 'online' | 'spectate';
     playerData?: PlayerSlot[];
     selectedMap?: string;
     /** Campaign: a practice rematch against an island's opponent. */
@@ -63,6 +64,8 @@ export interface GameSceneData {
     /** The Studio Lab. */
     lab?: boolean;
     online?: { client: NetClient; start: MatchStart };
+    /** Watching an online match. */
+    watch?: { client: NetClient; watch: WatchStart; early?: WatchInputs['batches'] };
 }
 
 /** Standard gamepad button indices. */
@@ -108,6 +111,14 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private recorder: MatchRecorder | null = null;
     /** Online matches: the opponent's inputs come from the network. */
     private online: OnlineMatch | null = null;
+    /** Watching an online match instead of playing: the players' inputs come from the server. */
+    private spectator: SpectatorMatch | null = null;
+    /** Watching: the fighter picked for the next match, and whether a seat is booked. */
+    private seat = { character: 0, booked: false };
+    private liveBadge: Phaser.GameObjects.Text | null = null;
+    private seatText: Phaser.GameObjects.Text | null = null;
+    /** Playing online: how many are watching. */
+    private watchersText: Phaser.GameObjects.Text | null = null;
     /** The Studio Lab lights the scene; drawing only, the match doesn't see it. */
     private isLab = false;
     private lighting: Lighting | null = null;
@@ -174,7 +185,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     public effectManager!: EffectManager;
 
-    private mode: 'versus' | 'training' | 'campaign' | 'online' = 'versus';
+    private mode: 'versus' | 'training' | 'campaign' | 'online' | 'spectate' = 'versus';
     /** Campaign mode: the opponent, the cutscenes and where the fight leads. */
     private campaign: CampaignFlow | null = null;
 
@@ -189,7 +200,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.currentStageBackground = isStageKey(data.selectedMap) ? data.selectedMap : 'adria_bg';
 
         this.online = null;
-        if (this.mode === 'online') {
+        this.spectator = null;
+        if (this.mode === 'spectate') {
+            const { client, watch, early } = data.watch!;
+            this.spectator = new SpectatorMatch(client, watch, early);
+            // Every fighter is played by someone else
+            this.playerData = watch.characters.map((character, playerId) => ({
+                playerId, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character, isRemote: true,
+            }));
+        } else if (this.mode === 'online') {
             const { client, start } = data.online!;
             this.online = new OnlineMatch(client, start);
             // Our slot plays with keyboard or the first gamepad; the others play remotely
@@ -512,14 +531,23 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 const client = this.online.client;
                 client.on(NetEvent.START, (start: MatchStart) => {
                     if (!this.online) return;
+                    // A rematch with fewer players (someone left): the scene starts over with the new line-up
+                    if (start.characters.join() !== this.online.start.characters.join()) {
+                        this.online = null;
+                        this.scene.restart({ mode: 'online', online: { client, start } });
+                        return;
+                    }
                     this.online.start = start;
                     this.restartMatch();
                 });
-                client.on(NetEvent.PLAYER_LEFT, () => this.endOnline("UN GIOCATORE SE N'È ANDATO"));
+                client.on(NetEvent.PLAYER_LEFT, (left: PlayerLeft) => this.onPlayerLeft(left));
+                client.on(NetEvent.SPECTATORS, (data: { count: number }) => this.showWatchers(data.count));
                 client.onDisconnect(() => this.endOnline('CONNESSIONE PERSA'));
                 // Network stats on screen by default (Q toggles)
                 this.debugVisible = true;
             }
+
+            if (this.spectator) this.setUpWatching(this.spectator);
 
             this.events.on('resume', this.onResume, this);
         } catch (e) {
@@ -600,6 +628,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.players.forEach(p => p.render(this.match, delta));
             // The opponent may still be simulating the last frames with our inputs
             this.online?.flush();
+            // Online, ESC leaves at any point after the end; watching, the next match starts on its own
+            if ((this.online || this.spectator) && Phaser.Input.Keyboard.JustDown(this.pauseKey)) {
+                this.returnToLobby();
+                return;
+            }
+            if (this.spectator) {
+                this.updateSeat();
+                return;
+            }
 
             // The menu appears 2 s after the end
             if (!this.isGameOverMenuReady) return;
@@ -628,8 +665,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const pauseKeyPressed = Phaser.Input.Keyboard.JustDown(this.pauseKey);
         const gamepadPausePressed = this.padPresses.justPressed(GAMEPAD_START);
 
-        if ((pauseKeyPressed || gamepadPausePressed) && this.online) {
-            // An online match can't pause for both players: ESC leaves it
+        if ((pauseKeyPressed || gamepadPausePressed) && (this.online || this.spectator)) {
+            // An online match can't pause for everyone: ESC leaves it
             this.returnToLobby();
             return;
         }
@@ -684,7 +721,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
 
         let steps = 0;
-        if (!this.isCutscene) {
+        if (this.spectator) {
+            this.updateSeat();
+            steps = this.watchSteps(delta);
+        } else if (!this.isCutscene) {
             // Online: raw frame time, since Phaser clamps its smoothed delta while the window is unfocused
             const due = this.labTime.frozen ? this.takeLabSteps()
                 : this.simClock.advance((this.online ? this.game.loop.rawDelta : delta) * this.labTime.scale);
@@ -722,9 +762,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     fighter.body.recoveryAvailable,
                     attackInfo,
                     this.players[0].isGamepadConnected(),
-                    this.online ? Math.round(this.online.client.rtt) : 0
+                    this.online ? Math.round(this.online.client.rtt) : this.spectator ? Math.round(this.spectator.client.rtt) : 0
                 );
-                this.debugOverlay.setNetworkStats(this.online?.stats() ?? null);
+                this.debugOverlay.setNetworkStats(this.online?.stats() ?? this.spectator?.stats() ?? null);
                 this.debugOverlay.setVisible(true);
             } else {
                 this.debugOverlay.setVisible(false);
@@ -777,14 +817,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     /** The lobby slot this machine's player uses: P1 locally, our slot online. */
     private localPlayerId(): number {
-        return this.online?.slot ?? 0;
+        return this.spectator ? -1 : this.online?.slot ?? 0;
     }
 
     /** Starts a fresh match with the current fighters. */
     private startMatch(): void {
-        const seed = this.online?.start.seed ?? Math.floor(Math.random() * 0x100000000);
+        const seed = this.online?.start.seed ?? this.spectator?.watch.seed ?? Math.floor(Math.random() * 0x100000000);
         this.match = createMatch(this.fighterSetups, seed);
         this.online?.begin(this.match);
+        this.spectator?.begin(this.match);
         // Online frames can be simulated more than once, so only local matches are recorded
         this.recorder = this.isRecording && !this.online ? new MatchRecorder(this.fighterSetups, seed) : null;
     }
@@ -1051,6 +1092,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     shutdown(): void {
         this.online?.client.close();
         this.online = null;
+        this.spectator?.client.close();
+        this.spectator = null;
+        this.liveBadge = this.seatText = this.watchersText = null;
         this.lighting?.destroy();
         this.lighting = null;
         this.feelLab = null;
@@ -1121,6 +1165,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.winnerTextVisual.setDepth(1001);
         this.cameras.main.ignore(this.winnerTextVisual); // Only UI camera sees it
 
+        // Watching: no rematch menu, the next match comes by itself
+        if (this.spectator) {
+            this.time.delayedCall(2500, () => this.showCenterText('IN ATTESA DELLA PROSSIMA PARTITA...'));
+            return;
+        }
         this.time.delayedCall(2000, () => this.showGameOverMenu());
     }
 
@@ -1169,20 +1218,43 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         });
     }
 
-    /** Online: our rematch vote; the server starts the rematch once both players voted. */
+    /** Online: someone left. Their fighter leaves the match on every machine at the same frame; the rest play on. */
+    private onPlayerLeft(left: PlayerLeft): void {
+        if (!this.online) return;
+        this.online.playerLeft(left);
+        const character = this.online.start.characters[left.slot] ?? '';
+        this.notify(`${character.toUpperCase()} (P${left.slot + 1}) HA LASCIATO LA PARTITA`);
+    }
+
+    /** A line across the top of the screen that fades after a few seconds. */
+    private notify(text: string): void {
+        const label = this.add.text(this.scale.width / 2, 110, text, {
+            fontSize: '32px', fontFamily: '"Pixeloid Sans"', color: '#ffdd66', stroke: '#000000', strokeThickness: 6,
+            backgroundColor: '#000000aa', padding: { x: 18, y: 8 },
+        }).setOrigin(0.5).setDepth(1002);
+        this.cameras.main.ignore(label);
+        this.tweens.add({ targets: label, alpha: 0, delay: 3500, duration: 800, onComplete: () => label.destroy() });
+    }
+
+    /** Online: our rematch vote; the server starts the rematch once everyone still here voted. */
     private voteRematch(): void {
         this.online?.client.send(NetEvent.REMATCH);
         this.isGameOverMenuReady = false;
         this.gameOverMenuTexts.forEach(t => t.destroy());
         this.gameOverMenuTexts = [];
-        this.showCenterText(this.players.length > 2 ? 'IN ATTESA DEGLI ALTRI GIOCATORI...' : "IN ATTESA DELL'AVVERSARIO...");
+        // Alone, a spectator who books a seat can still join the rematch
+        const others = this.online?.othersPlaying ?? 1;
+        this.showCenterText(others === 0 ? 'IN ATTESA DI UN ALTRO GIOCATORE...\nESC PER USCIRE'
+            : others > 1 ? 'IN ATTESA DEGLI ALTRI GIOCATORI...' : "IN ATTESA DELL'AVVERSARIO...");
     }
 
     /** The online match can't go on: say why, then go back to the menu. */
     private endOnline(reason: string): void {
-        if (!this.online) return;
-        this.online.client.close();
+        const client = this.online?.client ?? this.spectator?.client;
+        if (!client) return;
+        client.close();
         this.online = null;
+        this.spectator = null;
         this.isGameOver = true;
         this.isGameOverMenuReady = false;
         this.gameOverMenuTexts.forEach(t => t.destroy());
@@ -1205,10 +1277,104 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.cameras.main.ignore(this.winnerTextVisual);
     }
 
+    // ─── Watching ───
+
+    /** A spectator's screen: the live badge, the seat booking line, and what the server says next. */
+    private setUpWatching(spectator: SpectatorMatch): void {
+        const { width } = this.scale;
+        const style = { fontFamily: '"Pixeloid Sans"', stroke: '#000000', strokeThickness: 6 };
+        this.liveBadge = this.add.text(width / 2, 40, '● IN DIRETTA · SPETTATORE', { ...style, fontSize: '28px', color: '#ff5a5a' }).setOrigin(0.5, 0).setDepth(1002);
+        this.tweens.add({ targets: this.liveBadge, alpha: 0.55, duration: 900, yoyo: true, repeat: -1 });
+        // Under the badge, clear of the players' portraits along the bottom
+        this.seatText = this.add.text(width / 2, 84, '', { ...style, fontSize: '22px', color: '#8ab4f8' }).setOrigin(0.5, 0).setDepth(1002);
+        this.cameras.main.ignore([this.liveBadge, this.seatText]);
+        this.seat = { character: Math.max(0, ALL_CHARACTERS.indexOf('fok')), booked: false };
+        this.showSeat();
+
+        const client = spectator.client;
+        // A booked seat came through: play the new match
+        client.on(NetEvent.START, (start: MatchStart) => {
+            this.spectator = null;
+            this.scene.restart({ mode: 'online', online: { client, start } });
+        });
+        // A new match to watch (a rematch)
+        client.on(NetEvent.WATCH, (watch: WatchStart) => {
+            this.spectator = null;
+            // The new match's inputs start coming at once: keep them for it
+            const early: WatchInputs['batches'] = [];
+            client.on(NetEvent.WATCH_INPUTS, (message: WatchInputs) => early.push(...message.batches));
+            this.scene.restart({ mode: 'spectate', watch: { client, watch, early } });
+        });
+        client.on(NetEvent.WATCH_END, (data: { reason?: string }) => this.endOnline(data?.reason ?? 'LA PARTITA È FINITA'));
+        client.on(NetEvent.PLAYER_LEFT, (left: PlayerLeft) => {
+            spectator.playerLeft(left);
+            this.notify(`${(spectator.watch.characters[left.slot] ?? '').toUpperCase()} (P${left.slot + 1}) HA LASCIATO LA PARTITA`);
+        });
+        client.onDisconnect(() => this.endOnline('CONNESSIONE PERSA'));
+    }
+
+    /** Watching: the steps to play this frame (fast-forwarding when behind); returns how many the camera should follow. */
+    private watchSteps(delta: number): number {
+        const spectator = this.spectator!;
+        const due = this.simClock.advance(this.game.loop.rawDelta || delta);
+        const catchingUp = spectator.catchingUp;
+        const steps = spectator.stepsNow(due);
+        let done = 0;
+        for (let i = 0; i < steps && !this.isGameOver; i++) {
+            this.stepEvents.length = 0;
+            if (!spectator.step(this.stepEvents)) break;
+            this.match = spectator.match;
+            // Fast-forwarding skips the sounds and effects of what it rushes through
+            if (!catchingUp) for (const event of this.stepEvents) this.playEvent(event);
+            if (this.match.isOver) this.onMatchOver();
+            done++;
+        }
+        return catchingUp ? Math.min(done, 1) : done;
+    }
+
+    /** Watching: left and right pick a fighter, confirm books a seat in the next match (or cancels it). */
+    private updateSeat(): void {
+        for (const { action } of this.gameOverInput.poll()) {
+            if (action === 'left' || action === 'right') {
+                if (this.seat.booked) continue;
+                const count = ALL_CHARACTERS.length;
+                this.seat.character = (this.seat.character + (action === 'left' ? count - 1 : 1)) % count;
+                AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.4 });
+            } else if (action === 'confirm') {
+                this.seat.booked = !this.seat.booked;
+                this.spectator?.client.send(NetEvent.SEAT, { character: ALL_CHARACTERS[this.seat.character], book: this.seat.booked });
+                AudioManager.getInstance().playSFX(this.seat.booked ? 'ui_confirm' : 'ui_back', { volume: 0.5 });
+            } else {
+                continue;
+            }
+            this.showSeat();
+        }
+    }
+
+    private showSeat(): void {
+        const name = ALL_CHARACTERS[this.seat.character]?.toUpperCase() ?? '';
+        this.seatText?.setText(this.seat.booked
+            ? `POSTO PRENOTATO CON ${name} PER LA PROSSIMA PARTITA   ·   INVIO: ANNULLA   ·   ESC: ESCI`
+            : `GIOCA LA PROSSIMA:  ◀ ${name} ▶   INVIO: PRENOTA   ·   ESC: ESCI`);
+    }
+
+    /** Playing online: how many are watching, top right. */
+    private showWatchers(count: number): void {
+        if (!this.watchersText) {
+            this.watchersText = this.add.text(this.scale.width - 30, 30, '', {
+                fontFamily: '"Pixeloid Sans"', fontSize: '22px', color: '#ff8a8a', stroke: '#000000', strokeThickness: 5,
+            }).setOrigin(1, 0).setDepth(1002);
+            this.cameras.main.ignore(this.watchersText);
+        }
+        this.watchersText.setText(count > 0 ? `● ${count} ${count === 1 ? 'SPETTATORE' : 'SPETTATORI'}` : '');
+    }
+
     private returnToLobby(): void {
-        if (this.online) {
-            this.online.client.close();
+        const client = this.online?.client ?? this.spectator?.client;
+        if (client) {
+            client.close();
             this.online = null;
+            this.spectator = null;
             this.scene.start('OnlineLobbyScene');
             return;
         }

@@ -1,5 +1,5 @@
 /**
- * Rollback for an online match of 2 to 4 players.
+ * Rollback for an online match of 2 to 5 players.
  *
  * Each player simulates right away with their own input and a guess of every
  * other player's: that player's last known input, minus new presses. When a
@@ -14,10 +14,15 @@
  *
  * Every packet repeats the inputs some other player hasn't acknowledged, and
  * carries a checksum of a confirmed frame every CHECKSUM_INTERVAL frames.
+ *
+ * A player who leaves stops counting: the server says the last frame it has
+ * their inputs for and sends those final inputs, and from the frame after,
+ * every copy of the match retires their fighter (GameSim.retireFighter), so
+ * the others play on in sync.
  */
 
 import { PRESS_BITS, unpackInput, type FighterInput } from './FighterInput.js';
-import { matchChecksum, stepMatch, type MatchState } from './GameSim.js';
+import { matchChecksum, retireFighter, stepMatch, type MatchState } from './GameSim.js';
 import type { MatchEvent } from './MatchEvents.js';
 import { MAX_INPUTS_PER_PACKET, decodeInputPacket, encodeInputPacket } from './NetProtocol.js';
 
@@ -69,6 +74,8 @@ export class RollbackSession {
     private readonly played = new Map<number, Set<string>>();
     /** Earliest simulated frame with a wrong guess, or -1. */
     private firstWrongGuess = -1;
+    /** By slot: the last frame a player who left played, or Infinity while they're in. */
+    private readonly leftAfter: number[];
 
     private readonly localChecksums = new Map<number, number>();
     private readonly remoteChecksums: Map<number, number>[];
@@ -106,6 +113,36 @@ export class RollbackSession {
         this.received = each(() => 0);
         this.firstSeq = each(() => -1);
         this.highestSeq = each(() => -1);
+        this.leftAfter = each(() => Infinity);
+    }
+
+    /**
+     * Player `slot` left after `lastFrame`: their inputs up to it (from `first`,
+     * as the server had them) complete ours, and from the next frame on their
+     * fighter is retired. Frames already simulated past it are simulated again.
+     */
+    playerLeft(slot: number, lastFrame: number, first: number, inputs: readonly number[]): void {
+        if (slot === this.slot || slot < 0 || slot >= this.players || this.leftAfter[slot] !== Infinity) return;
+        const theirs = this.inputs[slot];
+        inputs.forEach((mask, i) => {
+            const frame = first + i;
+            if (frame < this.inputDelay || frame > lastFrame || theirs[frame] !== undefined) return;
+            theirs[frame] = mask;
+            if (frame < this.frame && this.used[slot][frame] !== mask) this.markWrong(frame);
+        });
+        while (theirs[this.next[slot]] !== undefined && this.next[slot] <= lastFrame) this.next[slot]++;
+        this.leftAfter[slot] = Math.max(lastFrame, this.inputDelay - 1);
+        // Frames simulated with their fighter still in play are simulated again without it
+        if (this.frame > this.leftAfter[slot] + 1) this.markWrong(this.leftAfter[slot] + 1);
+    }
+
+    /** Whether player `slot` is still in the match. */
+    isPlaying(slot: number): boolean {
+        return this.leftAfter[slot] === Infinity;
+    }
+
+    private markWrong(frame: number): void {
+        if (this.firstWrongGuess < 0 || frame < this.firstWrongGuess) this.firstWrongGuess = frame;
     }
 
     /**
@@ -137,8 +174,9 @@ export class RollbackSession {
 
     /** Our inputs that someone hasn't acknowledged, plus sync information for everyone. */
     buildPacket(): Uint8Array {
-        const first = Math.min(...this.others().map(s => this.theyNeed[s]));
         const ours = this.inputs[this.slot];
+        const others = this.others();
+        const first = others.length > 0 ? Math.min(...others.map(s => this.theyNeed[s])) : ours.length;
         const count = Math.min(Math.max(ours.length - first, 0), MAX_INPUTS_PER_PACKET);
         return encodeInputPacket({
             match: this.matchId,
@@ -157,7 +195,7 @@ export class RollbackSession {
         const packet = decodeInputPacket(bytes);
         if (!packet || packet.match !== this.matchId || packet.ackNext.length !== this.players) return;
         const s = packet.slot;
-        if (s === this.slot || s >= this.players) return;
+        if (s === this.slot || s >= this.players || !this.isPlaying(s)) return;
 
         this.received[s]++;
         if (this.firstSeq[s] < 0 || packet.seq < this.firstSeq[s]) this.firstSeq[s] = packet.seq;
@@ -173,9 +211,7 @@ export class RollbackSession {
             const frame = packet.first + i;
             if (frame < this.inputDelay || theirs[frame] !== undefined) return;
             theirs[frame] = mask;
-            if (frame < this.frame && this.used[s][frame] !== mask && (this.firstWrongGuess < 0 || frame < this.firstWrongGuess)) {
-                this.firstWrongGuess = frame;
-            }
+            if (frame < this.frame && this.used[s][frame] !== mask) this.markWrong(frame);
         });
         while (theirs[this.next[s]] !== undefined) this.next[s]++;
 
@@ -206,7 +242,10 @@ export class RollbackSession {
         const hasInputs = f >= this.inputDelay;
         const frameInputs: FighterInput[] = [];
         for (let s = 0; s < this.players; s++) {
-            const mask = !hasInputs ? 0 : this.inputs[s][f] ?? this.guess(s);
+            // Gone: their fighter leaves the match at the frame after their last
+            const gone = f > this.leftAfter[s];
+            if (gone) retireFighter(this.match, s);
+            const mask = !hasInputs || gone ? 0 : this.inputs[s][f] ?? this.guess(s);
             this.used[s][f] = mask;
             frameInputs.push(unpackInput(mask));
         }
@@ -270,14 +309,15 @@ export class RollbackSession {
         return frame === this.frame ? this.match : this.saved.get(frame);
     }
 
-    /** First frame for which some other player's input is still missing. */
+    /** First frame for which some other player's input is still missing (Infinity once everyone else left). */
     private earliestMissing(): number {
         return Math.min(...this.others().map(s => this.next[s]));
     }
 
+    /** The other players still in the match. */
     private others(): number[] {
         const slots: number[] = [];
-        for (let s = 0; s < this.players; s++) if (s !== this.slot) slots.push(s);
+        for (let s = 0; s < this.players; s++) if (s !== this.slot && this.isPlaying(s)) slots.push(s);
         return slots;
     }
 

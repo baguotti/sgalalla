@@ -290,13 +290,29 @@ function checkBlastZones(match: MatchState, fighters: readonly FighterState[], e
         }
     }
 
-    if (eliminated) {
-        const survivors = match.fighters.filter(f => f.lives > 0);
-        if (survivors.length <= 1) {
-            match.isOver = true;
-            match.winnerId = survivors.length === 1 ? survivors[0].id : -1;
-        }
+    if (eliminated) endIfOneLeft(match);
+}
+
+/** At most one fighter has lives left: the match is over. */
+function endIfOneLeft(match: MatchState): void {
+    const survivors = match.fighters.filter(f => f.lives > 0);
+    if (survivors.length <= 1) {
+        match.isOver = true;
+        match.winnerId = survivors.length === 1 ? survivors[0].id : -1;
     }
+}
+
+/**
+ * Online: a player left, so their fighter leaves the match, out of play for
+ * good; the match ends if one fighter is left. Every machine calls it at the
+ * same frame. Calling it again changes nothing.
+ */
+export function retireFighter(match: MatchState, id: number): void {
+    const f = match.fighters[id];
+    if (!f || f.lives === 0) return;
+    f.lives = 0;
+    f.respawnSteps = 0;
+    if (!match.isOver) endIfOneLeft(match);
 }
 
 /** Puts a KO'd fighter back in play with a clean slate, keeping lives and facing. */

@@ -777,3 +777,57 @@ Part 2
 ### [2026-09-27] v3.0.4e - Studio Lab FEEL mode, windowed view, Lab menu (branch `experimental-branch`)
 - **[Feat]** Windowed view: the Lab's frame statistics leave the canvas for a **PERFORMANCE** strip in a band above the game, between the columns (full screen keeps them top left in the frame).
 - **[V]** `v3.0.4-e`: the FEEL mode, the windowed view and the Lab's pause menu (entries above). No simulation rule changes: protocol version 6.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-28] CORSA: an Outrun-style car mini-game (branch `experimental-branch`)
+- **[Feat]** **CORSA** in the main menu: cruising an endless coastal highway in Fok's car. Pseudo-3D road built from segments, with bends, hills, four lanes, rumble strips and haze into the distance; palm rows, bend signs, rocks, bushes and billboards whizzing by; a banded 16-bit sky with blocky clouds and two mountain ranges sliding with the bends. All drawn on a 480x270 canvas scaled up 4x with hard pixels.
+- **[Feel]** Acceleration that fades through the gears (top speed 293 km/h in about 6 s), steering that eases in and turns more with speed, bends pulling the car outwards (easy and medium ones flat out, hard ones need a lift), grass drag, crashes into roadside things, bumps into slower traffic (30 placeholder cars). Car lean and bounce, dust off the road, screen shake on crashes and rough ground, speed lines flat out, and a synthesised engine that climbs through five gears plus wind noise.
+- **[Feat]** HUD: time, distance, speed with a segmented rev bar. Keyboard (Up/W/J, Down/S/K, Left/Right/A/D), gamepad (analogue RT/LT, A, X, stick or D-pad). ESC or Start pauses: RIPRENDI, RICOMINCIA, TORNA AL MENU.
+- **[Arch]** `src/minigames/racing/`: the track and race rules are plain data stepped at 60 Hz with a seeded generator, so a multiplayer race can share them later. Scenery, traffic and backdrop are placeholder blocks; `scripts/racing-car.py` makes the temp car (`public/assets/racing/car_temp.png`, 112x82 game pixels).
+- **[Clean]** The old hidden racing prototype (`RoadEngine.ts`) is replaced.
+- **[S]** Verified: typecheck, 50 tests (new: same seed same race, top speed, grass drag), build. In the browser: 20 s flat out without crashes, traffic, pause menu and back to the main menu, 60 fps, no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-28] CORSA: smoother, calmer, more precise driving (branch `experimental-branch`)
+- **[Fix]** **No more flicker**: frames are drawn part of the way between the 60 Hz steps (`FixedStepClock.stepShare`), so 120 Hz screens get smooth motion instead of each step shown twice; the screen shake, car bounce and rough-ground knocks follow smooth curves instead of random numbers each frame; speed lines are streaks that glide outwards and fade; the sky slides per step, not per frame; rumble strips and grass bands alternate more slowly and more subtly.
+- **[Fix]** **Crisp car pixels**: the car is no longer rotated (rotating pixel art shears it); it shifts a pixel or two with its sideways speed.
+- **[Change]** **A touch slower**: top speed down by a fifth (260 km/h on the dial), reached in about 7 s (half speed in 1.9 s).
+- **[Feel]** **Driving model**: sideways momentum and tyre grip (less on the grass), steering that eases in and recentres faster, quick at low speed and calmer flat out, analogue-precise; bends push the car out by speed. Glancing a roadside thing bounces the car off with a speed loss; only square hits stop it. Rear-ending traffic slows the car to its speed and nudges it aside.
+- **[Feat]** **Slipstream** (SCIA): tucked in behind a car it builds up to 10% more top speed. **Near misses** (SFIORATO! +250) for squeezing past a car closer than a lane apart. **Score** (PUNTI) for distance at speed plus near misses.
+- **[Fix]** **Bends you can see coming**: bends ease in over as long as they last, sharp bends stay off big hills (none hides behind a crest), warning arrows start 45 segments before medium and hard bends, and the haze is lighter with a longer draw distance.
+- **[S]** Verified: typecheck, 51 tests (new: near miss close vs a lane over), build. In the browser: 30 s of driving with slipstream building, score counting, no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-28] CORSA: full resolution, faster, and driving that takes skill (branch `experimental-branch`)
+- **[Change]** Drawn at **1920x1080** instead of 480x270 scaled up, ready for higher-res "fake pixel art" like the fighting game's; the temp car is rebuilt at 448x327 (`scripts/racing-car.py`, CAR_WIDTH 448). Distant placeholder palms no longer flicker between one and two pixels.
+- **[Change]** Fewer palms (a pair every 6 segments instead of 4, and a sparser outer row). Top speed up by about 14% (280 km/h on the dial).
+- **[Feel]** **Driving that takes planning**: heavier steering flat out; bends pull harder, and past the tyres' grip the car slides, losing steering bite, washing out wide and scrubbing speed (with tyre smoke); braking at speed eats grip, so braking in the bend runs wide; turning always costs a little speed. Easy bends go flat out, medium ones need a lift (held at most about 86% of top speed), hard ones need braking before them (about 73%). Harsher grass, costlier glancing hits, near-stops on square hits, costlier rear-ending, palms and signs a little closer to the road.
+- **[Feat]** Traffic (42 cars) signals with a flashing indicator, then changes lane when there's room. The race keeps its own random-number state, so a multiplayer race would still match.
+- **[Measured]** 90 s on the course without traffic: flat out 47.4 km with 18 trips onto the grass, 5 glancing hits and 3 crashes; lifting for medium bends and braking for hard ones at the limit 50.9 km, clean.
+- **[S]** Verified: typecheck, 52 tests (new: a hard bend flat out washes off the road, lifting stays on), build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-30] Online: lobby like BOTTE IN LOCALE, 5 players, matches that survive a player leaving (branch `experimental-branch`)
+- **[Feat]** **Online lobby redesigned** like the offline one: the same player cards (now shared, `src/ui/PlayerCard.ts`), each slot's fighter animating on it, arrows while choosing, green PRONTO! when ready, "P2 · TU" on your own card, "Sceglie..." on others still picking, "In attesa di giocatori" on empty slots, and the pulsing blue instructions.
+- **[Feat]** **5 players online** (`MAX_PLAYERS` 5). Measured: a rollback session costs each machine about 0.12 ms a frame on average (worst 2.4 ms) against a 16.7 ms budget; each player sends about 6 KB/s and receives about 23 KB/s.
+- **[Feat]** **A player leaving no longer ends the match**: the server keeps a copy of every input it relays; when a player leaves it sends the others (PLAYER_LEFT) the last frame it has from them and their final inputs, every copy of the match retires their fighter the frame after (`GameSim.retireFighter`, applied inside the rollback timeline so it stays in sync), and a notice shows on screen ("PE (P2) HA LASCIATO LA PARTITA"). Rematches start with whoever is left, in new slots (the scene rebuilds for the new line-up); a player left alone goes back to the lobby.
+- **[Feat]** **Leaving is noticed fast**: closing or leaving the page closes the connection straight away (server notices in about 0.1 s); a player silent for 10 s mid-match (crash, dropped connection) counts as gone. `GET /rooms` on the game server shows rooms and seats.
+- **[Protocol]** Version 7.
+- **[S]** Verified: typecheck (client and server), 54 tests (new: 5 players in sync at 120 ms with loss; a player quitting mid-match, the other four retire their fighter at the same frame and play on in sync), build. Live on the local server: three players in the new lobby, one closed their tab mid-match, the other two got the notice and played on in sync; with two players, the one left won the match.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-28] Studio Lab: better bloom (branch `experimental-branch`)
+- **[Change]** The camera's bloom (`AtmospherePipeline`) is a downsample/upsample chain instead of two blurs at a quarter size: the bright parts at half size (with a Karis average so a lone bright pixel can't make it flicker), halved level by level to 1/64 with a 13-tap filter, then doubled back up with a tent filter, each level adding its light. A soft glow near bright things and a wide one round them, fading out smoothly. Threshold and strength work as before; spread sets how much the wider levels count, and the result is normalised so strength means the same at any spread. Tested by hand.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-30] Online: spectator mode (branch `experimental-branch`)
+- **[Feat]** **Watching a match**: someone who joins BOTTE IN REMOTO while a match is on watches it (up to 4 spectators). The server sends them the match's start and then every player's inputs in batches from frame 0 (every 50 ms); their copy of the match (`shared/Spectate.ts`) simulates a frame only once it has every input for it, so there's no guessing and no rollback wobble. Joining late, it fast-forwards silently to the live action, then stays about 6 steps (0.1 s) behind. Players who leave are retired at the same frame as for the players.
+- **[Feat]** Spectator screen: a pulsing "● IN DIRETTA · SPETTATORE" badge, the match's sounds and effects, "IN ATTESA DELLA PROSSIMA PARTITA..." after the end, ESC back to the lobby. Players see how many are watching (top right).
+- **[Feat]** **Taking a seat**: while watching, left and right pick a fighter and confirm books a place in the next match; rematches seat booked spectators (up to 5 players), the others watch the new match from its start. A player left alone after the others quit can wait for a spectator to book and play again.
+- **[Protocol]** Version 8: WATCH, WATCH_INPUTS, WATCH_END, SEAT, SPECTATORS.
+- **[S]** Verified: typecheck (client and server), 55 tests (new: a spectator fed shuffled batches of the relayed inputs matches the players' confirmed match frame for frame, a player quitting included), build. Live on the local server with three tabs: two players, a spectator joining mid-match caught up from frame 0 in moments and matched the player's checksums frame for frame; it booked Pe, the match ended the same way for everyone, both players voted for a rematch, and the spectator joined it as P3, in sync.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-30] v3.0.5e - Online: 5 players, leaving mid-match, spectators; bloom; CORSA (hidden) (branch `experimental-branch`)
+- **[Change]** CORSA is hidden from the main menu until it's ready; its code stays (`RacingScene`, `src/minigames/racing/`).
+- **[V]** `v3.0.5-e`: the entries above since v3.0.4e. Protocol version 8.

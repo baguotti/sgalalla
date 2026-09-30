@@ -10,6 +10,8 @@ import { createMatch, matchChecksum, stepMatch } from '../shared/GameSim.ts';
 import { unpackInput } from '../shared/FighterInput.ts';
 import type { MatchEvent } from '../shared/MatchEvents.ts';
 import { MAX_ROLLBACK, RollbackSession } from '../shared/Rollback.ts';
+import { decodeInputPacket } from '../shared/NetProtocol.ts';
+import { SpectatorSession } from '../shared/Spectate.ts';
 
 const FRAME_MS = 1000 / 60;
 const FIGHTERS = [
@@ -17,6 +19,7 @@ const FIGHTERS = [
     { character: 'sgu', x: 1400, y: 300 },
     { character: 'pe', x: 800, y: 200 },
     { character: 'nock', x: 1120, y: 200 },
+    { character: 'greg', x: 960, y: 150 },
 ];
 
 /** Seeded generator for reproducible network conditions and inputs. */
@@ -56,6 +59,8 @@ interface Conditions {
     /** Tick at which each player starts, like start messages arriving at different times. */
     startTicks?: number[];
     ticks: number;
+    /** A player who quits at a tick: the relay server then sends the others their last frame and inputs. */
+    leave?: { slot: number; tick: number };
 }
 
 interface Peer {
@@ -66,7 +71,13 @@ interface Peer {
     events: MatchEvent[];
 }
 
-function play(c: Conditions, tamper?: (peers: Peer[], tick: number) => void): Peer[] {
+/** What the relay server saw: every player's inputs, by slot then frame, and who left after which frame. */
+interface Relay {
+    inputs: number[][];
+    left: { slot: number; lastFrame: number }[];
+}
+
+function play(c: Conditions, tamper?: (peers: Peer[], tick: number) => void): Peer[] & { relay: Relay } {
     const fighters = FIGHTERS.slice(0, c.players);
     const peers: Peer[] = fighters.map((_, slot) => {
         const peer: Peer = {
@@ -80,13 +91,36 @@ function play(c: Conditions, tamper?: (peers: Peer[], tick: number) => void): Pe
     });
     const net = random(7);
     const inFlight: { at: number; to: number; bytes: Uint8Array }[] = [];
+    // The relay server sees every packet (all traffic goes through it)
+    const relay: Relay = { inputs: fighters.map(() => []), left: [] };
+    const relayed = c.leave ? relay.inputs[c.leave.slot] : [];
+    const leaves: { at: number; to: number }[] = [];
 
     for (let tick = 0; tick < c.ticks; tick++) {
         const now = tick * FRAME_MS;
+        if (c.leave && tick === c.leave.tick) {
+            for (let to = 0; to < peers.length; to++) if (to !== c.leave.slot) leaves.push({ at: now + c.latencyMs, to });
+        }
+        if (c.leave && tick === c.leave.tick) {
+            let last = c.inputDelay - 1;
+            while (relayed[last + 1] !== undefined) last++;
+            relay.left.push({ slot: c.leave.slot, lastFrame: last });
+        }
+        for (let i = leaves.length - 1; i >= 0; i--) {
+            if (leaves[i].at > now) continue;
+            let last = c.inputDelay - 1;
+            while (relayed[last + 1] !== undefined) last++;
+            const first = Math.max(c.inputDelay, last - 599);
+            peers[leaves[i].to].session.playerLeft(c.leave!.slot, last, first, relayed.slice(first, last + 1));
+            leaves.splice(i, 1);
+        }
         peers.forEach((peer, slot) => {
             if (tick < (c.startTicks?.[slot] ?? 0)) return;
+            if (c.leave && slot === c.leave.slot && tick >= c.leave.tick) return;
             peer.session.step(peer.sample, peer.events);
             const bytes = peer.session.buildPacket();
+            const packet = decodeInputPacket(bytes)!;
+            packet.inputs.forEach((mask, i) => relay.inputs[slot][packet.first + i] ??= mask);
             for (let to = 0; to < peers.length; to++) {
                 if (to === slot || net() < c.loss) continue;
                 inFlight.push({ at: now + c.latencyMs + (net() * 2 - 1) * c.jitterMs, to, bytes });
@@ -100,7 +134,44 @@ function play(c: Conditions, tamper?: (peers: Peer[], tick: number) => void): Pe
         }
         tamper?.(peers, tick);
     }
-    return peers;
+    return Object.assign(peers, { relay });
+}
+
+/**
+ * A spectator fed what the relay server saw, in batches in a shuffled order
+ * (reliable messages can arrive out of order): every frame it simulates must
+ * match the players' confirmed state for that frame.
+ */
+function watch(peers: Peer[] & { relay: Relay }, inputDelay: number): SpectatorSession {
+    const { relay } = peers;
+    const spectator = new SpectatorSession(relay.inputs.length, inputDelay, createMatch(FIGHTERS.slice(0, relay.inputs.length), 1234));
+    const seen = new Map<number, number>();
+    spectator.onFrame = (frame, state) => seen.set(frame, matchChecksum(state));
+    const batches: { slot: number; first: number; inputs: number[] }[] = [];
+    relay.inputs.forEach((inputs, slot) => {
+        for (let first = inputDelay; first < inputs.length; first += 97) batches.push({ slot, first, inputs: inputs.slice(first, first + 97) });
+    });
+    const order = random(11);
+    batches.sort(() => order() - 0.5);
+    for (const batch of batches) {
+        spectator.addInputs(batch.slot, batch.first, batch.inputs);
+        while (spectator.step([])) { /* as far as the inputs allow */ }
+    }
+    for (const { slot, lastFrame } of relay.left) spectator.playerLeft(slot, lastFrame);
+    while (spectator.step([])) { /* the rest */ }
+
+    let compared = 0;
+    for (const peer of peers) {
+        if (!peer.confirmed.size) continue;
+        for (const [frame, checksum] of peer.confirmed) {
+            const theirs = seen.get(frame);
+            if (theirs === undefined) continue;
+            assert.equal(theirs, checksum, `the spectator differs from player ${peer.session.slot} at frame ${frame}`);
+            compared++;
+        }
+    }
+    assert.ok(compared > 1000, `compared ${compared} frames`);
+    return spectator;
 }
 
 /** Every frame confirmed by two players has the same state for both. */
@@ -156,6 +227,31 @@ test('three players agree through 30% loss, waiting when too far ahead', () => {
     const peers = play({ players: 3, latencyMs: 30, jitterMs: 20, loss: 0.3, inputDelay: 2, ticks: 1800 });
     assertInSync(peers);
     assert.ok(peers[0].session.frame > 900, `advanced ${peers[0].session.frame} frames`);
+});
+
+test('five players agree at 120 ms ping with jitter and 3% loss', () => {
+    const peers = play({ players: 5, latencyMs: 60, jitterMs: 15, loss: 0.03, inputDelay: 3, startTicks: [0, 3, 5, 8, 11], ticks: 3600 });
+    assertInSync(peers);
+    assert.ok(peers.every(p => p.session.frame > 3300), 'nobody fell far behind');
+});
+
+test('a player quitting mid-match: the others retire their fighter at the same frame and play on in sync', () => {
+    const peers = play({ players: 5, latencyMs: 50, jitterMs: 10, loss: 0.05, inputDelay: 2, ticks: 2400, leave: { slot: 2, tick: 900 } });
+    const stayed = peers.filter((_, slot) => slot !== 2);
+    assertInSync(stayed);
+    for (const { session } of stayed) {
+        assert.equal(session.isPlaying(2), false);
+        assert.equal(session.match.fighters[2].lives, 0, 'the fighter left the match');
+        assert.ok(session.frame > 2000, `carried on to frame ${session.frame}`);
+    }
+});
+
+test('a spectator fed the relayed inputs sees exactly the players\' match, a player quitting included', () => {
+    const peers = play({ players: 4, latencyMs: 50, jitterMs: 10, loss: 0.05, inputDelay: 2, ticks: 2400, leave: { slot: 1, tick: 1000 } });
+    const spectator = watch(peers, 2);
+    assert.equal(spectator.isPlaying(1), false);
+    assert.equal(spectator.match.fighters[1].lives, 0);
+    assert.ok(spectator.frame > 2000, `watched ${spectator.frame} frames`);
 });
 
 test('a player who falls out of sync is caught by the checksums', () => {

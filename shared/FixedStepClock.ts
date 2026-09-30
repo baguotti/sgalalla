@@ -70,6 +70,15 @@ export class FixedStepClock {
         return steps;
     }
 
+    /**
+     * How far the clock is into the next step, 0 to 1: drawing can place things
+     * that much of the way from the last step towards the next, so motion stays
+     * smooth on screens faster than 60 Hz.
+     */
+    get stepShare(): number {
+        return Math.max(0, Math.min(1, this.accumulatorMs / SIM_STEP_MS));
+    }
+
     private learnRefreshInterval(elapsedMs: number): void {
         if (elapsedMs < MIN_FRAME_MS || elapsedMs > MAX_FRAME_MS) return;
         this.averageFrameMs += (elapsedMs - this.averageFrameMs) * 0.1;
