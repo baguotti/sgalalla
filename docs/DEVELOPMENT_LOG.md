@@ -831,3 +831,33 @@ Part 2
 ### [2026-09-30] v3.0.5e - Online: 5 players, leaving mid-match, spectators; bloom; CORSA (hidden) (branch `experimental-branch`)
 - **[Change]** CORSA is hidden from the main menu until it's ready; its code stays (`RacingScene`, `src/minigames/racing/`).
 - **[V]** `v3.0.5-e`: the entries above since v3.0.4e. Protocol version 8.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-30] DERAPATE: donut mini-game prototype (branch `experimental-branch`)
+- **[Feat]** **DERAPATE** in the main menu, a first prototype in plain blocks (no sound): a car doing donuts in the middle of a junction, seen from a fixed isometric camera, after Riccardo's sketch and the Audi reference frames. Roads crossing, zebra crossings on the four arms, pavements, corner buildings; the car leaves tyre marks, and a faint ring shows the loop it's on.
+- **[Gameplay]** The throttle (Up/W/J/Space, RT/A) widens and speeds up the donut, letting go tightens it, the brake (Down/S/K, LT/X) tightens it hard. The drift has to be balanced with left/right (or the stick): it tips further by itself, wobbles, and the throttle swings the tail out; past the edge the car spins out (-150, speed lost). People cross on the zebra crossings: red ones cost 300 points, most of the speed and the combo; green ones give +50 and a burst of speed. Points grow with the donut's width and speed, 1.5x while the balance is clean, and wide loops build a combo up to x3. Measured over a minute: tight and safe 70, flat out through the crowd 480, wide but tightening when a red walker is crossing 1,720. R restarts, ESC back to the menu.
+- **[Arch]** `src/minigames/donut/DonutSim.ts` (plain data, 60 Hz, its own seeded random numbers), `DonutRenderer.ts` (isometric blocks), `src/scenes/DonutScene.ts`. `tests/donut.test.ts`: the throttle sizes the donut, unbalanced it spins out and balanced it holds, and both kinds of pedestrian do what they should.
+- **[S]** Verified: typecheck, 58 tests, build; in the browser, driving with throttle and balance, people crossing and being hit, no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-30] DERAPATE: more forgiving balance (branch `experimental-branch`)
+- **[Change]** The drift tips over far more slowly (TIP 1.1 → 0.35), wobbles less (1.6 → 0.8), the throttle pushes the tail out less (0.9 → 0.35), counter-steering is gentler so it's hard to overcorrect (4.2 → 3), and the swing settles sooner (damping 2.2 → 4). Left alone, the car now spins out after about 11 s instead of 3.
+- **[Feat]** A grace moment at the edge: past it, the car spins out only after staying there 0.35 s, and the needle flashes red, so a quick correction saves it.
+- **[S]** 58 tests, build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-30] DERAPATE: the Audi reference as the car (branch `experimental-branch`)
+- **[Art]** The car is the Audi reference render until the real sprites come: `scripts/donut-car.py` keys out the grey background of the 45 frames (background joined to the frame's edge only, so the car's grey parts stay), crops each round the car and packs them into `public/assets/donut/car_temp.png` (9x5 frames of 243 px). The frame is picked from the car's heading (frame 6 faces the camera, 8° per frame), checked against a heading arrow; drawn at 1.6x, in scale with the people, between those behind and in front of it.
+- **[Feel]** Locked into the donut: the nose now points about 70° into the circle (the tail swinging round the centre) instead of 55°, rocked by the balance; the throttle, eased in and out, swings the tail out a further 17°. Tyre smoke pours from the rear wheels, lightly all the time, billowing under throttle and in spin-outs.
+- **[S]** 58 tests, build; checked in the browser.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-30] DERAPATE: back to the block car (branch `experimental-branch`)
+- **[Revert]** The Audi reference didn't suit the game: it spins round a point on its own circle, so as a sprite the car did its donuts round a moving point rather than widening from the junction's centre. Tried a pivot model to match it (the car spinning tightly round a pivot that the throttle moves outwards); it felt worse, so the car is the red block car again, circling the centre with the throttle widening the donut, as before the sprites.
+- **[Change]** The block car is drawn 1.75x (the Audi sprite's size next to the people), with wider tyre marks; the hit distance follows it (1.7 → 2.8 m) and a red walker now costs 500, so driving through the crowd doesn't pay (a minute of bots: careful 803, reckless 203).
+- **[Note]** `scripts/donut-car.py` and `public/assets/donut/` are still there but nothing loads them.
+- **[S]** 58 tests, build; checked in the browser.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-09-30] v3.0.6e (branch `experimental-branch`)
+- **[Release]** DERAPATE, the donut mini-game prototype (main menu), with the block car. Version 3.0.6-e.

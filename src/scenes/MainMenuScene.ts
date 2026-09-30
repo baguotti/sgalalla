@@ -13,6 +13,7 @@ export class MainMenuScene extends Phaser.Scene {
         { label: 'BOTTE IN LOCALE', mode: 'versus' },
         { label: 'BOTTE IN REMOTO', mode: 'online' },
         // CORSA (RacingScene) is hidden until it's ready: { label: 'CORSA', mode: 'racing' },
+        { label: 'DERAPATE', mode: 'donut' },
         { label: 'STUDIO LAB', mode: 'lab' },
         { label: 'IMPOSTAZIONI', mode: 'settings' }
     ];
@@ -140,6 +141,11 @@ export class MainMenuScene extends Phaser.Scene {
 
         if (mode === 'settings') {
             this.scene.start('SettingsScene');
+            return;
+        }
+
+        if (mode === 'donut') {
+            this.scene.start('DonutScene');
             return;
         }
 
