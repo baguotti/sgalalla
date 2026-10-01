@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import { button, buttons, choice, element, hint, LabPanelBox, section } from '../../lighting/lab/LabUi';
-import { addFeelStyles, pasteDialog, tuneRow, type TuneRow } from '../../lab/FeelUi';
+import { addFeelStyles, pasteDialog, toggleRow, tuneRow, type TuneRow } from '../../lab/FeelUi';
 import type { Setting } from '../../lab/FeelCatalog';
 import { WindowedView } from '../../lab/StudioLab';
-import { DONUT, createDonut, inSweetSpot, type DonutState } from './DonutSim';
+import { DONUT, createDonut, type DonutState } from './DonutSim';
 import {
-    BALANCE_GROUPS, DRIVING_GROUPS, LOOK_GROUPS, WORLD_GROUPS, allDonutSettings, applyDonutChanges, changeCount, donutChanges,
+    DRIVING_GROUPS, GREEN_GROUPS, LOOK_GROUPS, STEERING_GROUPS, WORLD_GROUPS, allDonutSettings, applyDonutChanges, changeCount, donutChanges,
     resetDonutTuning, setSetting, settingDefault, settingValue, type DonutGroup,
 } from './DonutTuning';
 
@@ -13,7 +13,7 @@ import {
  * The DERAPATE Lab (L in the game): every setting of the mini-game live, in
  * the Studio Lab's style. Windowed (the default), the game sits in the middle
  * with the panels docked either side; full screen, they float over it.
- * DRIVING, BALANCE and PEOPLE AND ROAD hold the rules, CAR AND CAMERA the
+ * DRIVING, GREEN AND HEAT, STEERING and PEOPLE AND ROAD hold the rules, CAR AND CAMERA the
  * drawing, the camera and the shakes, TEST the tools: restart, freeze, frame
  * step, slow motion, test shakes, live readouts, the car's live values and a
  * find box. Changes are kept in this browser and used whenever DERAPATE runs
@@ -24,8 +24,8 @@ import {
 /** What the Lab needs from the game. */
 export interface DonutLabHost {
     readonly state: DonutState;
-    /** Spin-outs and people hit since the last restart. */
-    readonly stats: { spins: number; walkers: number; boosters: number };
+    /** Testacodas, overheats and people hit since the last restart. */
+    readonly stats: { spins: number; overheats: number; walkers: number; boosters: number };
     restart(): void;
     /** Sim speed (1 = normal) and freeze; frozen, stepFrame runs one step. */
     setTime(scale: number, frozen: boolean): void;
@@ -80,10 +80,11 @@ export class DonutLab {
 
         const changed = (redraw: boolean) => this.changed(redraw);
         const driving = new GroupPanel('DRIVING', DRIVING_GROUPS, changed, { top: 8, right: 8 });
-        const balance = new GroupPanel('BALANCE', BALANCE_GROUPS, changed, { top: 8, right: 8 + PANEL_STEP });
+        const green = new GroupPanel('GREEN AND HEAT', GREEN_GROUPS, changed, { top: 8, right: 8 + PANEL_STEP });
         const world = new GroupPanel('PEOPLE AND ROAD', WORLD_GROUPS, changed, { top: 8, right: 8 + 2 * PANEL_STEP, folded: true });
         const look = new GroupPanel('CAR AND CAMERA', LOOK_GROUPS, changed, { top: 8, left: 8 + PANEL_STEP, folded: true });
-        this.panels = [driving, balance, world, look];
+        const steering = new GroupPanel('STEERING', STEERING_GROUPS, changed, { top: 8, left: 8 + 2 * PANEL_STEP });
+        this.panels = [driving, green, steering, world, look];
         this.test = new TestPanel(host, {
             copy,
             paste: () => this.paste(),
@@ -95,7 +96,7 @@ export class DonutLab {
             rows: () => this.panels.flatMap(panel => panel.rows),
         }, { top: 8, left: 8 });
 
-        this.view = new WindowedView(scene, [{ left: [this.test.box, look.box], right: [driving.box, balance.box, world.box] }], () => undefined, 0);
+        this.view = new WindowedView(scene, [{ left: [this.test.box, steering.box, look.box], right: [driving.box, green.box, world.box] }], () => undefined, 0);
         this.windowed = loadString(WINDOWED_KEY) !== 'false';
 
         this.bar = element('div');
@@ -200,7 +201,10 @@ class GroupPanel {
         this.groups = groups;
         this.box = new LabPanelBox(title, place);
         groups.forEach((group, i) => {
-            const rows = group.settings.map(setting => tuneRow(asSetting(setting.label, setting.unit, setting.hint, setting.key), setting.range,
+            const rows = group.settings.map(setting => setting.unit === 'switch'
+                ? toggleRow(setting.label, () => settingValue(setting) !== 0, on => setSetting(setting, on ? 1 : 0), settingDefault(setting) !== 0,
+                    () => changed(false))
+                : tuneRow(asSetting(setting.label, setting.unit, setting.hint, setting.key), setting.range,
                 () => settingValue(setting),
                 value => {
                     setSetting(setting, value);
@@ -263,7 +267,7 @@ class TestPanel {
         // The car's live values: set them (best while frozen) to put the car somewhere
         const state = () => this.host.state;
         const fresh = createDonut(1);
-        const live = (label: string, key: 'radius' | 'speed' | 'revs' | 'slip', range: readonly [number, number, number]) =>
+        const live = (label: string, key: 'radius' | 'speed' | 'revs' | 'heat' | 'slip', range: readonly [number, number, number]) =>
             tuneRow(asSetting(label, '', undefined, key), range, () => state()[key], value => { state()[key] = value; }, fresh[key], () => undefined);
         this.liveRows = [
             tuneRow(asSetting('Angle round', '°', 'Where round the donut the car is (degrees).', 'angle'), [0, 360, 1],
@@ -271,7 +275,8 @@ class TestPanel {
             live('Radius', 'radius', [0.5, 30, 0.1]),
             live('Speed', 'speed', [0, 50, 0.5]),
             live('Revs', 'revs', [0, 1, 0.01]),
-            live('Balance', 'slip', [-1.5, 1.5, 0.01]),
+            live('Heat', 'heat', [0, 1, 0.01]),
+            live('Balance', 'slip', [-1, 1, 0.01]),
         ];
         const liveSection = section('THE CAR NOW', false,
             hint('The car\'s live values: freeze (F) and drag them to put it where you want, then step or unfreeze.'),
@@ -330,16 +335,15 @@ class TestPanel {
         if (this.frames++ % 6 !== 0) return;
         const s = this.host.state;
         const stats = this.host.stats;
-        const revsWhere = s.revs > DONUT.REV_RED ? 'RED LINE' : inSweetSpot(s) ? 'sweet spot' : '';
         const lines = [
             `<b>Speed</b>   ${(s.speed * 3.6).toFixed(0)} km/h  (${s.speed.toFixed(1)} m/s)`,
             `<b>Radius</b>  ${s.radius.toFixed(2)} m`,
-            `<b>Pedal</b>   ${s.pedal.toFixed(2)}   <b>Revs</b> ${s.revs.toFixed(2)} ${revsWhere}`,
-            `<b>Balance</b> ${s.slip.toFixed(2)}  moving ${s.slipSpeed.toFixed(2)}/s`,
-            `<b>Kick</b>    ${s.kick.toFixed(2)}   <b>Limiter</b> ${s.limiter.toFixed(1)} s`,
+            `<b>Revs</b>    ${s.revs.toFixed(2)}  ${s.locked ? 'IN THE GREEN' : 'white'}`,
+            `<b>Heat</b>    ${Math.round(s.heat * 100)}%   <b>Pedal up</b> ${s.lifted.toFixed(1)} s`,
+            `<b>Balance</b> ${s.slip.toFixed(2)}${Math.abs(s.slip) < DONUT.CLEAN ? '  clean' : ''}${s.overEdge > 0 ? `  AT THE EDGE ${s.overEdge.toFixed(2)} s` : ''}`,
             `<b>Combo</b>   ×${s.combo.toFixed(2)}   <b>Score</b> ${Math.floor(s.score)}`,
-            `<b>Spins</b>   ${stats.spins}   <b>Red hit</b> ${stats.walkers}   <b>Green</b> ${stats.boosters}`,
-            `<b>Time</b>    ${(s.steps / 60).toFixed(1)} s${s.spinning > 0 ? '   SPINNING' : ''}`,
+            `<b>Testacodas</b> ${stats.spins}   <b>Overheats</b> ${stats.overheats}   <b>Red hit</b> ${stats.walkers}   <b>Green</b> ${stats.boosters}`,
+            `<b>Time</b>    ${(s.steps / 60).toFixed(1)} s${s.spinning > 0 ? '   TESTACODA' : ''}${s.stalled ? '   STALLED' : ''}`,
         ];
         this.readout.innerHTML = lines.join('\n');
         const active = document.activeElement;

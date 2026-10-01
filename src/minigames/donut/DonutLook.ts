@@ -5,7 +5,7 @@
  */
 export const LOOK = {
     /** Pixels per metre (the camera's zoom), and where the junction's centre is on screen. */
-    SCALE: 40,
+    SCALE: 30,
     CENTRE_X: 960,
     CENTRE_Y: 530,
 
@@ -14,10 +14,24 @@ export const LOOK = {
     /** How far the nose points into the circle (degrees from straight ahead; 90 is at the centre). */
     NOSE_IN: 70,
     /** How much the balance swings the nose (degrees at the edge), and the revs swing the tail out (at full revs). */
-    SLIP_SWING: 34,
+    SLIP_SWING: 50,
     REV_SWING: 11,
-    /** How fast the car whirls in a spin-out (degrees a second). */
+    /** How fast the car whirls in a testacoda (degrees a second). */
     SPIN_TURN: 630,
+
+    /**
+     * The revs shown on the car, each tint's opacity over the black car (0 to 1):
+     * white (at the top of the white), green, orange (heating), red (about to
+     * overheat), the dull red of a stall, and the flash of white on reaching the green; and how fast it
+     * flashes red before overheating (flashes a second).
+     */
+    TINT_WHITE: 0,
+    TINT_GREEN: 0,
+    TINT_HOT: 0.35,
+    TINT_RED: 0.37,
+    TINT_STALL: 0,
+    GREEN_FLASH: 0,
+    HOT_FLASH: 7.5,
 
     /** The tyre marks: width (px), how dark the newest are, how many steps they last. */
     MARK_WIDTH: 6,

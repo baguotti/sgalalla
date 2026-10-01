@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { LOOK } from './DonutLook';
-import { DONUT, JUNCTION, pedestrianPosition, type DonutState, type Pedestrian } from './DonutSim';
+import { DONUT, JUNCTION, pedestrianPosition, whiteShare, type DonutState, type Pedestrian } from './DonutSim';
 
 /**
  * Draws DERAPATE from a fixed isometric camera, all in plain blocks until the
@@ -25,8 +25,13 @@ const COLOURS = {
     marks: 0x16161a,
     ring: 0xffffff,
     building: [0xcdbfa6, 0xbfae92, 0xd6c9b3],
-    car: 0xc23b30,
-    cabin: 0x2c3140,
+    /** The car is black, tinted by the revs (see carBodyColour). */
+    car: 0x18181c,
+    cabin: 0x3a4150,
+    tintWhite: 0xf2efe6,
+    tintGreen: 0x4cff8a,
+    tintHot: 0xffa040,
+    tintRed: 0xff3a2e,
     walker: 0xd9534f,
     booster: 0x3fbf7f,
     shadow: 0x000000,
@@ -103,7 +108,7 @@ export class DonutRenderer {
 
         // The car and the people, farthest first
         const things: { depth: number; draw: () => void }[] = [
-            { depth: view.x + view.y, draw: () => drawCar(g, view.x, view.y, view.heading) },
+            { depth: view.x + view.y, draw: () => drawCar(g, view.x, view.y, view.heading, this.bodyColour(view.state)) },
             ...view.state.pedestrians.map(p => {
                 const at = pedestrianPosition(p);
                 return { depth: at.x + at.y, draw: () => drawPedestrian(g, p, at.x, at.y) };
@@ -111,6 +116,38 @@ export class DonutRenderer {
         ];
         things.sort((a, b) => a.depth - b.depth);
         for (const thing of things) thing.draw();
+    }
+
+    /** When the car last reached the green (for the flash), and whether it's in it now. */
+    private greenSince = -1;
+    private wasLocked = false;
+
+    /**
+     * The rev bar on the car itself: black at rest, a white tint growing
+     * through the white; reaching the green, a bright flash, then green, turning
+     * orange as the engine heats and flashing red, faster and faster, before
+     * it overheats; a dull throbbing red while stalled. (The steering shows
+     * only on the STERZO bar, not on the car.)
+     */
+    private bodyColour(state: DonutState): number {
+        const t = state.steps / 60;
+        if (state.locked && !this.wasLocked) this.greenSince = t;
+        this.wasLocked = state.locked;
+        const flash = (perSecond: number) => 0.5 + 0.5 * Math.sin(t * perSecond * Math.PI * 2);
+        const red = COLOURS.tintRed;
+        // Stalled after overheating: a dull red, slowly throbbing, as it coasts home
+        if (state.stalled) return mix(COLOURS.car, red, LOOK.TINT_STALL * (0.5 + 0.5 * flash(1.5)));
+        if (!state.locked) return mix(COLOURS.car, COLOURS.tintWhite, LOOK.TINT_WHITE * whiteShare(state));
+        // Just reached the green: a bright flash fading into the green
+        const green = mix(COLOURS.car, COLOURS.tintGreen, LOOK.TINT_GREEN);
+        const sinceGreen = t - this.greenSince;
+        if (sinceGreen < 0.35) return mix(mix(green, 0xffffff, LOOK.GREEN_FLASH), green, sinceGreen / 0.35);
+        if (state.heat < 0.5) return mix(COLOURS.car, COLOURS.tintGreen, LOOK.TINT_GREEN * (0.85 + 0.15 * flash(1.5)));
+        const orange = mix(COLOURS.car, COLOURS.tintHot, LOOK.TINT_HOT);
+        if (state.heat < 0.75) return mix(green, orange, (state.heat - 0.5) / 0.25);
+        // About to overheat: red flashes, quicker the hotter it gets
+        const hot = (state.heat - 0.75) / 0.25;
+        return mix(orange, mix(COLOURS.car, red, LOOK.TINT_RED), flash(LOOK.HOT_FLASH * (0.5 + hot)));
     }
 
     destroy(): void {
@@ -209,12 +246,12 @@ function turnedBox(g: Phaser.GameObjects.Graphics, colour: number, x: number, y:
     g.fillStyle(colour).fillPoints(corners.map(p => iso(p.x, p.y, z2)), true);
 }
 
-function drawCar(g: Phaser.GameObjects.Graphics, x: number, y: number, heading: number): void {
+function drawCar(g: Phaser.GameObjects.Graphics, x: number, y: number, heading: number, body: number): void {
     // Shadow, body, cabin set back, and headlights on the nose so the heading reads
     const k = LOOK.CAR_SIZE;
     const shadow = iso(x, y);
     g.fillStyle(COLOURS.shadow, 0.28).fillEllipse(shadow.x, shadow.y, 5.2 * k * isoX(), 5.2 * k * isoY());
-    turnedBox(g, COLOURS.car, x, y, heading, 4.4 * k, 1.9 * k, 0.25 * k, 1.0 * k);
+    turnedBox(g, body, x, y, heading, 4.4 * k, 1.9 * k, 0.25 * k, 1.0 * k);
     turnedBox(g, COLOURS.cabin, x, y, heading, 2.1 * k, 1.65 * k, 1.0 * k, 1.55 * k, -0.35 * k);
     const c = Math.cos(heading);
     const s = Math.sin(heading);
@@ -240,6 +277,13 @@ function drawPedestrian(g: Phaser.GameObjects.Graphics, p: Pedestrian, x: number
     box(g, 0xf2d3b3, x - 0.22, y - 0.22, x + 0.22, y + 0.22, 1.4, 1.8);
 }
 
+/** From colour `a` to `b`, `amount` 0 to 1. */
+function mix(a: number, b: number, amount: number): number {
+    const t = Math.max(0, Math.min(1, amount));
+    const channel = (shift: number) => Math.round(((a >> shift) & 255) * (1 - t) + ((b >> shift) & 255) * t);
+    return (channel(16) << 16) | (channel(8) << 8) | channel(0);
+}
+
 function shade(colour: number, amount: number): number {
     const r = Math.round(((colour >> 16) & 255) * amount);
     const gr = Math.round(((colour >> 8) & 255) * amount);
@@ -248,13 +292,13 @@ function shade(colour: number, amount: number): number {
 }
 
 /**
- * The drawn heading: along the circle, nose swung in by the drift; the balance
- * (`slip`, between steps) swings it, so every stab and lift of the pedal shows
- * at once; wheelspin swings the tail out a little more; a spin-out spins it.
+ * The drawn heading: along the circle with the nose swung into it, the
+ * balance rocking it and the revs swinging the tail out a little more,
+ * whirling round in a testacoda.
  */
-export function carHeading(state: DonutState, angle: number, slip = state.slip): number {
+export function carHeading(state: DonutState, angle: number): number {
     const degrees = Math.PI / 180;
-    const drift = (LOOK.NOSE_IN + slip * LOOK.SLIP_SWING + state.revs * LOOK.REV_SWING) * degrees;
+    const drift = (LOOK.NOSE_IN + state.slip * LOOK.SLIP_SWING + state.revs * LOOK.REV_SWING) * degrees;
     const spin = state.spinning > 0 ? (DONUT.SPIN_SECONDS - state.spinning) * LOOK.SPIN_TURN * degrees : 0;
     return angle + Math.PI / 2 + drift + spin;
 }

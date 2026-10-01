@@ -1,103 +1,225 @@
 /**
- * DERAPATE's rules: the throttle sizes the donut, each stab of the pedal kicks
- * the tail out and each lift brings it back, the drift has to be balanced or
- * the car spins out, blipping in rhythm beats holding flat out, and the two
- * kinds of people crossing do what they should when hit.
+ * DERAPATE's rules (pedal only, for now): the white part of the rev bar fills
+ * steadily with the pedal and empties without it, the donut's width follows
+ * the speed, the green holds the speed but heats the engine until it
+ * overheats (back to the start, testacoda on the spot), and the two kinds of
+ * people crossing do what they should when hit.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DONUT, PEDESTRIANS, carPosition, createDonut, inSweetSpot, stepDonut, type DonutEvent, type DonutState } from '../src/minigames/donut/DonutSim.ts';
+import { DONUT, PEDESTRIANS, carPosition, createDonut, stepDonut, type DonutEvent, type DonutInput } from '../src/minigames/donut/DonutSim.ts';
 
-/** Counter-steers against the slip like a steady driver. */
-const balance = (s: DonutState) => Math.max(-1, Math.min(1, s.slip * 2.2 + s.slipSpeed * 0.6));
-
-test('holding the throttle widens the donut and speeds it up; letting go tightens it', () => {
-    const s = createDonut(1);
+const steps = (s: ReturnType<typeof createDonut>, n: number, input: DonutInput, events: DonutEvent[] = []) => {
+    for (let i = 0; i < n; i++) stepDonut(s, input, events);
+    return events;
+};
+/** Steps from standing to the green with the pedal down, and a little more to settle at top speed. */
+const toGreen = () => Math.ceil((DONUT.GREEN_AT / DONUT.REV_UP) * 60);
+const intoGreen = () => toGreen() + 20;
+const fresh = (seed: number) => {
+    const s = createDonut(seed);
     s.nextSpawn = Infinity;
-    for (let i = 0; i < 300; i++) stepDonut(s, { throttle: 1, brake: 0, steer: balance(s) });
-    assert.equal(s.radius, DONUT.RADIUS_MAX);
-    assert.ok(s.speed > DONUT.SPEED_MAX * 0.95, `speed ${s.speed}`);
-    for (let i = 0; i < 600; i++) stepDonut(s, { throttle: 0, brake: 0, steer: balance(s) });
-    assert.ok(s.radius < DONUT.RADIUS_MIN + 0.01, `tightened to ${s.radius}`);
+    return s;
+};
+
+test('without the pedal the car stands still', () => {
+    const s = fresh(1);
+    const start = carPosition(s);
+    steps(s, 300, { throttle: 0 });
+    const end = carPosition(s);
+    assert.equal(s.speed, 0);
+    assert.ok(Math.hypot(end.x - start.x, end.y - start.y) < 1e-9, 'it hasn\'t moved');
 });
 
-test('left alone the drift tips over and the car spins out; balanced, it holds', () => {
-    const alone = createDonut(2);
+test('the pedal fills the white steadily, about 1.5 s to the green; the donut widens with the speed', () => {
+    const s = fresh(2);
+    assert.ok(Math.abs(toGreen() / 60 - 1.5) < 0.05, `${(toGreen() / 60).toFixed(2)} s to the green`);
+    const half = Math.floor(toGreen() / 2);
+    steps(s, half, { throttle: 1 });
+    assert.ok(Math.abs(s.revs - (DONUT.REV_UP * half) / 60) < 0.01, `half way: revs ${s.revs.toFixed(2)}`);
+    assert.ok(!s.locked);
+    const halfRadius = s.radius;
+    const events = steps(s, toGreen() - half + 1, { throttle: 1 });
+    assert.ok(s.locked && events.some(e => e.type === 'lock'), 'in the green after 3 s');
+    assert.ok(s.radius > halfRadius + 2, `wider at speed: ${halfRadius.toFixed(1)} → ${s.radius.toFixed(1)} m`);
+});
+
+test('letting go in the white empties the bar and the car rolls to a stop', () => {
+    const s = fresh(3);
+    steps(s, Math.floor(toGreen() * 0.8), { throttle: 1 });
+    assert.ok(!s.locked && s.speed > 10, `speed ${s.speed.toFixed(1)}`);
+    steps(s, 150, { throttle: 0 });
+    assert.equal(s.revs, 0);
+    assert.ok(s.speed < 0.05, `stopped (${s.speed.toFixed(2)})`);
+    assert.ok(s.radius < DONUT.RADIUS_MIN + 0.1, `tight again (${s.radius.toFixed(2)})`);
+});
+
+test('in the green the speed holds; held about 3 s the engine overheats and stalls: the car coasts back to the middle', () => {
+    const s = fresh(4);
+    steps(s, intoGreen(), { throttle: 1 });
+    assert.ok(s.locked);
     const events: DonutEvent[] = [];
-    for (let i = 0; i < 1800 && !events.some(e => e.type === 'spin'); i++) stepDonut(alone, { throttle: 0.5, brake: 0, steer: 0 }, events);
-    assert.ok(events.some(e => e.type === 'spin'), 'spun out within 30 s');
-
-    const held = createDonut(2);
-    const heldEvents: DonutEvent[] = [];
-    for (let i = 0; i < 3600; i++) stepDonut(held, { throttle: i % 240 < 150 ? 1 : 0, brake: 0, steer: balance(held) }, heldEvents);
-    assert.ok(!heldEvents.some(e => e.type === 'spin'), 'a minute without a spin-out');
+    let held = 0;
+    let before = 0;
+    while (!events.some(e => e.type === 'overheat') && held < 600) {
+        before = s.score;
+        stepDonut(s, { throttle: 1, steer: Math.abs(s.slip) > 0.25 ? Math.sign(s.slip) : 0 }, events);
+        held++;
+        if (held > 30 && !events.some(e => e.type === 'overheat')) assert.ok(Math.abs(s.speed - DONUT.SPEED_MAX) < 0.01, `speed held in the green (${s.speed.toFixed(2)})`);
+    }
+    // (it reached the green about 20 steps before)
+    assert.ok(Math.abs((held + 20) / 60 - DONUT.OVERHEAT_SECONDS) < 0.1, `overheated ${((held + 20) / 60).toFixed(2)} s into the green`);
+    assert.ok(Math.abs(s.score - (before - DONUT.OVERHEAT_PENALTY)) < 5, `lost the penalty (${before.toFixed(0)} → ${s.score.toFixed(0)})`);
+    assert.ok(s.stalled && s.spinning === 0 && !s.locked, 'stalled, no testacoda');
+    // Coasting home smoothly, the pedal dead: no jumps
+    let radius = s.radius;
+    for (let i = 0; i < 60 * 3 && s.stalled; i++) {
+        stepDonut(s, { throttle: 1 });
+        assert.ok(s.radius <= radius + 1e-9 && radius - s.radius < 0.2, 'tightening smoothly');
+        radius = s.radius;
+    }
+    assert.ok(!s.stalled, 'ready again within 3 s');
+    assert.ok(s.radius < DONUT.RADIUS_MIN + 1.5, `back near the middle (${s.radius.toFixed(1)} m)`);
+    steps(s, 30, { throttle: 1 });
+    assert.ok(s.revs > 0 && s.speed > 0, 'building up again');
 });
 
-test('the pedal pushes the tail out gradually, harder at speed; lifting stops the push', () => {
-    const run = (speed: number, liftAt: number) => {
-        const s = createDonut(4);
-        s.nextSpawn = Infinity;
-        s.speed = speed;
-        s.revs = 0.6;
-        const slips: number[] = [];
-        for (let i = 0; i < 90; i++) {
-            stepDonut(s, { throttle: i < liftAt ? 1 : 0, brake: 0, steer: 0 });
-            slips.push(s.slip);
-        }
-        return slips;
-    };
-    const fast = run(DONUT.SPEED_MAX, 90);
-    const slow = run(DONUT.SPEED_MIN, 90);
-    const lifted = run(DONUT.SPEED_MAX, 30);
-    assert.ok(fast[14] < 0.3, `not all at once: ${fast[14].toFixed(2)} after a quarter second`);
-    assert.ok(fast[59] > 0.6, `held for a second at top speed, the tail goes well out (${fast[59].toFixed(2)})`);
-    assert.ok(slow[29] < fast[29] * 0.8, `slower, a gentler push (${slow[29].toFixed(2)} vs ${fast[29].toFixed(2)})`);
-    assert.ok(lifted[89] < fast[89] - 0.3, `lifting stops it going further (${lifted[89].toFixed(2)} vs held ${fast[89].toFixed(2)})`);
+test('off the pedal the donut starts tightening at once, even in the green', () => {
+    const s = fresh(12);
+    steps(s, intoGreen() + 30, { throttle: 1, steer: 0 });
+    assert.ok(s.locked);
+    const wide = s.radius;
+    steps(s, 12, { throttle: 0 });
+    assert.ok(s.locked, 'still in the green (a short lift)');
+    assert.ok(s.radius < wide - 0.4, `tightening: ${wide.toFixed(1)} → ${s.radius.toFixed(1)} m`);
 });
 
-test('blipping in rhythm keeps the revs in the sweet spot and beats holding flat out, which spins', () => {
-    const drive = (pedal: (i: number) => number, steer: (s: DonutState) => number) => {
-        const s = createDonut(5);
-        s.nextSpawn = Infinity;
-        let spins = 0;
-        let sweet = 0;
-        for (let i = 0; i < 3600; i++) {
-            for (const e of stepDonut(s, { throttle: pedal(i), brake: 0, steer: steer(s) })) if (e.type === 'spin') spins++;
-            if (inSweetSpot(s)) sweet++;
-        }
-        return { spins, sweet: sweet / 3600, score: s.score };
-    };
-    const blips = (i: number) => (i % 30 < 18 ? 1 : 0);
-    const rhythm = drive(blips, balance);
-    const flat = drive(() => 1, balance);
-    assert.equal(rhythm.spins, 0, 'blipping, balanced, holds a minute');
-    assert.ok(rhythm.sweet > 0.8, `in the sweet spot ${Math.round(rhythm.sweet * 100)}% of the time`);
-    assert.ok(flat.spins > 0, 'flat out, the limiter spins it even balanced');
-    assert.ok(rhythm.score > flat.score * 2, `blipping ${Math.round(rhythm.score)} vs flat out ${Math.round(flat.score)}`);
-    assert.ok(drive(blips, () => 0).spins > 0, 'blipping without steering spins');
+test('in the green a short lift cools the engine and keeps the green; a long one drops back into the white', () => {
+    const s = fresh(5);
+    steps(s, intoGreen(), { throttle: 1 });
+    steps(s, 90, { throttle: 1 });
+    const hot = s.heat;
+    steps(s, 24, { throttle: 0 });
+    assert.ok(s.locked, 'a 0.4 s lift keeps the green');
+    assert.ok(s.heat < hot - 0.3, `cooled from ${hot.toFixed(2)} to ${s.heat.toFixed(2)}`);
+    // Pressing in a rhythm (1 s down, 0.4 s up) never overheats
+    const events: DonutEvent[] = [];
+    for (let i = 0; i < 60 * 60; i++) stepDonut(s, { throttle: i % 84 < 60 ? 1 : 0 }, events);
+    assert.ok(s.locked && !events.some(e => e.type === 'overheat'), 'a minute in the green');
+    const unlocked = steps(s, 40, { throttle: 0 });
+    assert.ok(!s.locked && unlocked.some(e => e.type === 'unlock'), 'a long lift leaves the green');
 });
 
-test('hitting a red walker costs points and speed; a green one gives a boost', () => {
+test('hitting a red walker costs points and knocks you out of the green; a green one gives a boost', () => {
     for (const kind of ['walker', 'booster'] as const) {
-        const s = createDonut(3);
+        const s = fresh(6);
+        steps(s, intoGreen(), { throttle: 1 });
+        assert.ok(s.locked);
         s.score = 1000;
-        s.speed = 12;
-        s.nextSpawn = Infinity;
         // Someone standing in the middle of the north crossing, and the car right there
         s.pedestrians.push({ id: 1, kind, crossing: 0, along: 0, direction: 1, speed: 0, hit: false, hitTimer: 0 });
-        const events: DonutEvent[] = [];
         s.radius = 10;
+        s.slip = 0;
         s.angle = -Math.PI / 2;
         assert.ok(Math.abs(carPosition(s).y + 10) < 0.01, 'the car is on the crossing');
-        stepDonut(s, { throttle: 0, brake: 0, steer: 0 }, events);
+        const events = steps(s, 1, { throttle: 1 });
         const hit = events.find(e => e.type === 'hit');
         assert.ok(hit && hit.type === 'hit' && hit.kind === kind, `${kind} was hit`);
         if (kind === 'walker') {
-            assert.equal(s.score < 1000 - PEDESTRIANS.HIT_PENALTY + 50, true);
-            assert.ok(s.speed < 12 * PEDESTRIANS.HIT_SPEED_KEPT + 0.5, `slowed to ${s.speed}`);
+            assert.ok(s.score <= 1000 - PEDESTRIANS.HIT_PENALTY + 50, `score ${s.score}`);
+            assert.ok(!s.locked && s.revs < DONUT.GREEN_AT * PEDESTRIANS.HIT_REVS_KEPT + 0.01, `revs ${s.revs.toFixed(2)}`);
         } else {
             assert.ok(s.score >= 1000 + PEDESTRIANS.BOOST_POINTS, `score ${s.score}`);
-            assert.ok(s.speed > 12, `boosted to ${s.speed}`);
+            assert.ok(s.locked, 'still in the green');
         }
     }
+});
+
+test('at most one person on each crossing', () => {
+    const s = createDonut(7);
+    let most = 0;
+    for (let i = 0; i < 60 * 120; i++) {
+        stepDonut(s, { throttle: i % 300 < 200 ? 1 : 0 });
+        for (let c = 0; c < 4; c++) most = Math.max(most, s.pedestrians.filter(p => !p.hit && p.crossing === c).length);
+    }
+    assert.equal(most, 1);
+});
+
+test('the steering: forgiving, keeping it clean scores a little more; left alone in the green it ends in a testacoda', () => {
+    const drive = (steer: (s: ReturnType<typeof createDonut>) => number) => {
+        const s = fresh(8);
+        const events: DonutEvent[] = [];
+        let clean = 0;
+        for (let i = 0; i < 3600; i++) {
+            stepDonut(s, { throttle: i % 84 < 60 ? 1 : 0, steer: steer(s) }, events);
+            if (Math.abs(s.slip) < DONUT.CLEAN) clean++;
+            assert.ok(Math.abs(s.slip) <= 1, 'the balance stops at the edges');
+        }
+        return { clean: clean / 3600, score: s.score, spins: events.filter(e => e.type === 'spin').length };
+    };
+    const alone = drive(() => 0);
+    const tapping = drive(s => (Math.abs(s.slip) > 0.25 ? Math.sign(s.slip) : 0));
+    const late = drive(s => {
+        const seen = ((s as unknown as { seen?: number[] }).seen ??= []);
+        seen.push(s.slip);
+        const then = seen.length > 18 ? seen[seen.length - 18] : 0;
+        return Math.abs(then) > 0.6 ? Math.sign(then) : 0;
+    });
+    assert.ok(alone.spins > 0, `left alone: ${alone.spins} testacoda in a minute`);
+    assert.equal(tapping.spins, 0, 'steering a little: none');
+    assert.ok(late.spins <= 1, `steering late and lazily: ${late.spins}`);
+    assert.ok(tapping.clean > 0.9 && tapping.clean > alone.clean + 0.2, `clean ${Math.round(alone.clean * 100)}% alone, ${Math.round(tapping.clean * 100)}% steering`);
+    assert.ok(tapping.score > alone.score, `${Math.round(alone.score)} → ${Math.round(tapping.score)}`);
+});
+
+test('at the edge in the white nothing happens; in the green, a moment there is a testacoda on the spot', () => {
+    const white = fresh(10);
+    const whiteEvents: DonutEvent[] = [];
+    for (let i = 0; i < 60; i++) {
+        white.slip = 1;
+        stepDonut(white, { throttle: 1 }, whiteEvents);
+    }
+    assert.ok(!white.locked && !whiteEvents.some(e => e.type === 'spin'), 'a second at the edge in the white: nothing');
+    const green = fresh(11);
+    steps(green, intoGreen(), { throttle: 1 });
+    assert.ok(green.locked);
+    const events: DonutEvent[] = [];
+    let n = 0;
+    // Settle at full width first (steering a little so the balance stays clear of the edge)
+    for (let i = 0; i < 150; i++) stepDonut(green, { throttle: i % 84 < 60 ? 1 : 0, steer: Math.abs(green.slip) > 0.25 ? Math.sign(green.slip) : 0 });
+    const wide = green.radius;
+    while (!events.some(e => e.type === 'spin') && n < 120) {
+        green.slip = 1;
+        green.slipSpeed = 0;
+        stepDonut(green, { throttle: 1 }, events);
+        n++;
+    }
+    assert.ok(Math.abs(n / 60 - DONUT.EDGE_GRACE) < 0.05, `testacoda after ${(n / 60).toFixed(2)} s at the edge`);
+    assert.ok(green.spinning > 0 && green.speed === 0 && !green.locked, 'spinning, stopped, out of the green');
+    const at = green.radius;
+    assert.ok(Math.abs(at - wide) < 0.5, `where it was (${wide.toFixed(1)} → ${at.toFixed(1)} m)`);
+    steps(green, Math.ceil(DONUT.SPIN_SECONDS * 60) - 1, { throttle: 1 });
+    assert.ok(green.spinning > 0 && green.radius === at, 'spinning on the spot');
+    steps(green, 2, { throttle: 1 });
+    assert.equal(green.spinning, 0);
+});
+
+test('standing still the balance settles back to the middle', () => {
+    const s = fresh(9);
+    s.slip = 0.8;
+    steps(s, 180, { throttle: 0, steer: 0 });
+    assert.ok(Math.abs(s.slip) < 0.05, `balance ${s.slip.toFixed(3)}`);
+});
+
+test('the steering reacts quicker the faster the car goes', () => {
+    const response = (share: number) => {
+        const s = fresh(13);
+        s.revs = DONUT.GREEN_AT * share * 0.99;
+        s.speed = DONUT.SPEED_MAX * share * 0.99;
+        s.radius = 8;
+        s.gust = 0;
+        stepDonut(s, { throttle: 0.001, steer: 1 });
+        return -s.slipSpeed;
+    };
+    assert.ok(response(1) > response(0.5) * 1.4 && response(0.5) > response(0.1), `${response(0.1).toFixed(3)} < ${response(0.5).toFixed(3)} < ${response(1).toFixed(3)}`);
 });

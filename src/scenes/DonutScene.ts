@@ -4,23 +4,26 @@ import { DonutLab, loadDonutTuning } from '../minigames/donut/DonutLab';
 import { LOOK } from '../minigames/donut/DonutLook';
 import { DonutRenderer, carHeading, iso } from '../minigames/donut/DonutRenderer';
 import {
-    DONUT, carPosition, inSweetSpot, createDonut, stepDonut,
+    DONUT, carPosition, createDonut, drawnRadius, stepDonut,
     type DonutEvent, type DonutInput, type DonutState,
 } from '../minigames/donut/DonutSim';
 import { FixedStepClock } from '../../shared/FixedStepClock';
 
 /**
  * DERAPATE (main menu), a prototype: a car doing donuts in the middle of a
- * junction, seen from a fixed isometric camera, all in plain blocks. The
- * throttle (Up / W / J / Space, gamepad RT or A) widens and speeds up the
- * donut, letting go tightens it, the brake (Down / S / K, LT or X) tightens it
- * hard; left and right (A / D, the stick) keep the drift balanced. People
+ * junction, seen from a fixed isometric camera, all in plain blocks. Only the
+ * pedal for now (Up / W / J / Space, gamepad RT or A): held, the revs climb
+ * through the white and the donut gets faster and wider; let go, the car rolls
+ * to a stop. In the green the speed holds while the pedal stays down, but the
+ * engine heats up: hold too long and it overheats (back to the start, a
+ * testacoda on the spot). People
  * crossing: red ones cost points and speed, green ones give a boost (each
  * with its own camera shake). R starts again, ESC goes back to the menu, L
  * opens the DERAPATE Lab (every setting live). No sound yet. The HUD has its
  * own camera, so shakes and zooms move only the junction.
  */
 
+const TRIGGER_DEAD_ZONE = 0.1;
 const STICK_DEAD_ZONE = 0.15;
 const FONT = '"Pixeloid Sans"';
 const LAB_OPEN_KEY = 'sgalalla.donutLabOpen';
@@ -30,7 +33,7 @@ export class DonutScene extends Phaser.Scene {
     private view!: DonutRenderer;
     private readonly clock = new FixedStepClock();
     private readonly stepEvents: DonutEvent[] = [];
-    private previous = { angle: 0, radius: 0, slip: 0 };
+    private previous = { angle: 0, radius: 0 };
     /** The throttle key last frame: a fresh stab at speed can shake the camera (LOOK.STAB_SHAKE). */
     private throttleWas = 0;
     private keys!: Record<string, Phaser.Input.Keyboard.Key>;
@@ -40,13 +43,14 @@ export class DonutScene extends Phaser.Scene {
     private lab: DonutLab | null = null;
     /** The Lab's game speed and freeze, and the steps asked for while frozen. */
     private readonly labTime = { scale: 1, frozen: false, steps: 0 };
-    private readonly stats = { spins: 0, walkers: 0, boosters: 0 };
+    private readonly stats = { spins: 0, overheats: 0, walkers: 0, boosters: 0 };
 
     private scoreText!: Phaser.GameObjects.Text;
     private comboText!: Phaser.GameObjects.Text;
     private speedText!: Phaser.GameObjects.Text;
     private balance!: Phaser.GameObjects.Graphics;
     private revLabel!: Phaser.GameObjects.Text;
+    private steerLabel!: Phaser.GameObjects.Text;
     private spinText!: Phaser.GameObjects.Text;
 
     constructor() {
@@ -72,9 +76,10 @@ export class DonutScene extends Phaser.Scene {
         this.spinText = this.add.text(width / 2, height * 0.3, '', { ...style, fontSize: '64px', color: '#ff5a4a' }).setOrigin(0.5);
         this.balance = this.add.graphics();
         this.revLabel = this.add.text(0, 0, 'GIRI', { ...style, fontSize: '22px', strokeThickness: 5 }).setOrigin(1, 0.5);
+        this.steerLabel = this.add.text(0, 0, 'STERZO', { ...style, fontSize: '20px', strokeThickness: 5 }).setOrigin(1, 0.5);
         this.throttleWas = 0;
         this.add.text(width / 2, height - 22,
-            'ACCELERA: ↑ / W / J / SPAZIO     FRENA: ↓ / S / K     BILANCIA: ← →     R: RICOMINCIA     L: LAB     ESC: MENU',
+            'ACCELERA: ↑ / W / J / SPAZIO     BILANCIA: ← →     R: RICOMINCIA     L: LAB     ESC: MENU',
             { ...style, fontSize: '18px', color: '#e8e2cf', strokeThickness: 4 }).setOrigin(0.5, 1);
 
         // Everything made after the junction is the HUD, on its own camera
@@ -86,7 +91,7 @@ export class DonutScene extends Phaser.Scene {
         const K = Phaser.Input.Keyboard.KeyCodes;
         const keyboard = this.input.keyboard!;
         this.keys = Object.fromEntries(Object.entries({
-            up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D,
+            up: K.UP, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D,
             j: K.J, k: K.K, space: K.SPACE, r: K.R, esc: K.ESC, l: K.L, f: K.F, n: K.N, h: K.H,
         }).map(([name, code]) => [name, keyboard.addKey(code)]));
         this.stepEvents.length = 0;
@@ -103,10 +108,10 @@ export class DonutScene extends Phaser.Scene {
     /** A fresh start: new car, no rubber, counts back to zero (the Lab stays open). */
     private newRun(): void {
         this.state = createDonut(Math.floor(Math.random() * 1e9));
-        this.previous = { angle: this.state.angle, radius: this.state.radius, slip: this.state.slip };
+        this.previous = { angle: this.state.angle, radius: this.state.radius };
         this.view.clearMarks();
         this.throttleWas = 0;
-        this.stats.spins = this.stats.walkers = this.stats.boosters = 0;
+        this.stats.spins = this.stats.overheats = this.stats.walkers = this.stats.boosters = 0;
     }
 
     private openLab(): void {
@@ -190,7 +195,7 @@ export class DonutScene extends Phaser.Scene {
             steps = this.clock.advance(delta * this.labTime.scale);
         }
         for (let i = 0; i < steps; i++) {
-            this.previous = { angle: this.state.angle, radius: this.state.radius, slip: this.state.slip };
+            this.previous = { angle: this.state.angle, radius: this.state.radius };
             this.stepEvents.length = 0;
             stepDonut(this.state, input, this.stepEvents);
             for (const event of this.stepEvents) this.onEvent(event);
@@ -206,25 +211,29 @@ export class DonutScene extends Phaser.Scene {
     private readInput(): DonutInput {
         const k = this.keys;
         let throttle = k.up.isDown || k.w.isDown || k.j.isDown || k.space.isDown ? 1 : 0;
-        let brake = k.down.isDown || k.s.isDown || k.k.isDown ? 1 : 0;
         let steer = (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0);
         for (const pad of navigator.getGamepads()) {
             if (!pad) continue;
-            throttle = Math.max(throttle, pad.buttons[7]?.value ?? 0, pad.buttons[getConfirmButtonIndex(pad)]?.pressed ? 1 : 0);
-            brake = Math.max(brake, pad.buttons[6]?.value ?? 0, pad.buttons[2]?.pressed ? 1 : 0);
+            // A resting trigger can read a little above 0: below the dead zone it's off
+            const trigger = pad.buttons[7]?.value ?? 0;
+            throttle = Math.max(throttle, trigger > TRIGGER_DEAD_ZONE ? trigger : 0, pad.buttons[getConfirmButtonIndex(pad)]?.pressed ? 1 : 0);
             const stick = pad.axes[0] ?? 0;
             if (Math.abs(stick) > STICK_DEAD_ZONE) steer = Math.sign(stick) * (Math.abs(stick) - STICK_DEAD_ZONE) / (1 - STICK_DEAD_ZONE);
             if (pad.buttons[14]?.pressed) steer = -1;
             if (pad.buttons[15]?.pressed) steer = 1;
         }
-        return { throttle, brake, steer };
+        return { throttle, steer };
     }
 
     private onEvent(event: DonutEvent): void {
-        if (event.type === 'spin') {
-            this.stats.spins++;
-            this.spinText.setText(`TESTACODA!  -${DONUT.SPIN_PENALTY}`).setAlpha(1);
-            this.tweens.add({ targets: this.spinText, alpha: 0, delay: 900, duration: 500 });
+        if (event.type === 'overheat' || event.type === 'spin') {
+            if (event.type === 'spin') this.stats.spins++;
+            else this.stats.overheats++;
+            this.shake('hit');
+            this.spinText.setText(event.type === 'overheat'
+                ? `MOTORE FUSO!  -${DONUT.OVERHEAT_PENALTY}`
+                : `TESTACODA!  -${DONUT.SPIN_PENALTY}`).setAlpha(1);
+            this.tweens.add({ targets: this.spinText, alpha: 0, delay: 1100, duration: 500 });
         } else if (event.type === 'hit') {
             const at = iso(event.x, event.y, 2.2);
             const good = event.points > 0;
@@ -247,10 +256,11 @@ export class DonutScene extends Phaser.Scene {
         if (delta < -Math.PI) delta += Math.PI * 2;
         const angle = this.previous.angle + delta * share;
         const radius = this.previous.radius + (s.radius - this.previous.radius) * share;
-        const slip = this.previous.slip + (s.slip - this.previous.slip) * share;
-        const x = DONUT.CENTRE_X + Math.cos(angle) * radius;
-        const y = DONUT.CENTRE_Y + Math.sin(angle) * radius;
-        this.view.draw({ state: s, x, y, radius, heading: carHeading(s, angle, slip) });
+        // The balance pushes the car out of its circle (or in): losing control
+        const r = drawnRadius(radius, s.slip);
+        const x = DONUT.CENTRE_X + Math.cos(angle) * r;
+        const y = DONUT.CENTRE_Y + Math.sin(angle) * r;
+        this.view.draw({ state: s, x, y, radius, heading: carHeading(s, angle) });
     }
 
     private updateHud(): void {
@@ -259,34 +269,48 @@ export class DonutScene extends Phaser.Scene {
         this.comboText.setText(s.combo > 1 ? `COMBO  x${s.combo.toFixed(2)}` : '');
         this.speedText.setText(`${Math.round(s.speed * 3.6)} KM/H   RAGGIO ${s.radius.toFixed(1)} M`);
 
-        // Balance: a bar with the clean band in the middle and the needle where the drift is
+        // The rev bar: the white (accelerating) and the green; in the green the fill is the engine's heat
         const { width, height } = this.scale;
-        const barWidth = 640;
+        const barWidth = 720;
         const x = width / 2 - barWidth / 2;
-        const y = height - 90;
-        const g = this.balance.clear();
-        g.fillStyle(0x000000, 0.55).fillRect(x - 6, y - 6, barWidth + 12, 36);
-        g.fillStyle(0x7a2020).fillRect(x, y, barWidth, 24);
-        g.fillStyle(0xb58a2a).fillRect(x + barWidth * 0.1, y, barWidth * 0.8, 24);
-        const clean = DONUT.CLEAN;
-        g.fillStyle(0x3f9a4f).fillRect(x + barWidth * (0.5 - clean / 2), y, barWidth * clean, 24);
-        const needle = x + barWidth * (0.5 + Math.max(-1, Math.min(1, s.slip)) / 2);
-        // Red while spinning, and flashing red past the edge: correct now or spin out
-        const warning = s.overEdge > 0 && Math.floor(s.steps / 4) % 2 === 0;
-        g.fillStyle(s.spinning > 0 || warning ? 0xff5a4a : 0xffffff).fillRect(needle - 4, y - 8, 8, 40);
-
-        // Revs: a bar above, grey up to the sweet spot, green in it (points x2), red past the red line
-        const ry = y - 54;
+        const y = height - 92;
         const at = (revs: number) => x + barWidth * revs;
-        g.fillStyle(0x000000, 0.55).fillRect(x - 6, ry - 6, barWidth + 12, 28);
-        g.fillStyle(0x4a4a50).fillRect(x, ry, barWidth, 16);
-        g.fillStyle(0x2f6b3a).fillRect(at(DONUT.SWEET_LOW), ry, at(DONUT.REV_RED) - at(DONUT.SWEET_LOW), 16);
-        g.fillStyle(0x7a2020).fillRect(at(DONUT.REV_RED), ry, at(1) - at(DONUT.REV_RED), 16);
-        const sweet = inSweetSpot(s);
-        const limiter = s.revs > DONUT.REV_RED && Math.floor(s.steps / 3) % 2 === 0;
-        g.fillStyle(limiter ? 0xff5a4a : sweet ? 0x6dff9e : 0xe8e2cf).fillRect(x, ry + 4, barWidth * s.revs, 8);
-        this.revLabel.setPosition(x - 16, ry + 8).setColor(sweet ? '#6dff9e' : s.revs > DONUT.REV_RED ? '#ff5a4a' : '#e8e2cf')
-            .setText(sweet ? 'GIRI  x2' : 'GIRI');
+        const g = this.balance.clear();
+        g.fillStyle(0x000000, 0.55).fillRect(x - 6, y - 6, barWidth + 12, 40);
+        g.fillStyle(0x4a4a50).fillRect(x, y, barWidth, 28);
+        g.fillStyle(0x2f6b3a).fillRect(at(DONUT.GREEN_AT), y, at(1) - at(DONUT.GREEN_AT), 28);
+        // White up to the green, then the heat: green, turning orange and flashing red near overheating
+        g.fillStyle(0xe8e2cf).fillRect(x, y + 6, at(Math.min(s.revs, DONUT.GREEN_AT)) - x, 16);
+        if (s.locked) {
+            const hot = s.heat > 0.75 && Math.floor(s.steps / 4) % 2 === 0;
+            const colour = hot ? 0xff5a4a : s.heat > 0.5 ? 0xffa040 : 0x6dff9e;
+            g.fillStyle(colour).fillRect(at(DONUT.GREEN_AT), y + 6, at(s.revs) - at(DONUT.GREEN_AT), 16);
+            g.lineStyle(3, colour).strokeRect(at(DONUT.GREEN_AT) - 2, y - 2, at(1) - at(DONUT.GREEN_AT) + 4, 32);
+        }
+        const label = s.stalled ? 'MOTORE FUSO' : s.spinning > 0 ? 'TESTACODA' : s.locked ? (s.heat > 0.75 ? 'MOTORE CALDO!' : 'IN VERDE  x2') : 'GIRI';
+        const labelColour = s.stalled || s.spinning > 0 || (s.locked && s.heat > 0.75) ? '#ff5a4a' : s.locked ? '#6dff9e' : '#e8e2cf';
+        this.revLabel.setPosition(x - 16, y + 14).setColor(labelColour).setText(label);
+
+        // The balance (steering), above: green in the middle (clean), yellow, orange, red at the edges.
+        // In the white the edges are safe and the colours are dimmed; in the green they're bright.
+        const bw = 440;
+        const bh = 16;
+        const bx = width / 2 - bw / 2;
+        const by = y - 40;
+        const live = s.locked ? 1 : 0.45;
+        g.fillStyle(0x000000, 0.6).fillRect(bx - 5, by - 5, bw + 10, bh + 10);
+        const zones: [number, number][] = [[1, 0xd03a30], [0.8, 0xe08030], [0.6, 0xe0c040], [DONUT.CLEAN, 0x4cd86a]];
+        for (const [reach, colour] of zones) {
+            g.fillStyle(colour, live).fillRect(bx + bw * (0.5 - reach / 2), by, bw * reach, bh);
+        }
+        g.fillStyle(0xffffff, 0.5).fillRect(bx + bw / 2 - 1, by, 2, bh);
+        const reach = Math.abs(s.slip);
+        const zone = zones.slice().reverse().find(([r]) => reach <= r) ?? zones[0];
+        const needle = bx + bw * (0.5 + s.slip / 2);
+        const danger = s.overEdge > 0 && Math.floor(s.steps / 4) % 2 === 0;
+        g.fillStyle(0x000000).fillRect(needle - 5, by - 8, 10, bh + 16);
+        g.fillStyle(danger ? 0xff3a2e : s.locked ? zone[1] : 0xffffff).fillRect(needle - 3, by - 6, 6, bh + 12);
+        this.steerLabel.setPosition(bx - 16, by + bh / 2).setColor(s.locked && reach > 0.8 ? '#ff5a4a' : '#e8e2cf');
     }
 }
 

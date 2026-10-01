@@ -34,56 +34,56 @@ function group(title: string, table: TableName, rows: Row[], redraw = false): Do
     return { title, settings: rows.map(([key, label, unit, range, hint]) => ({ table, key, label, unit, range, hint, redraw })) };
 }
 
-/** The DRIVING panel. */
+/** The DRIVING panel: the white part of the bar, speed and size. */
 export const DRIVING_GROUPS: DonutGroup[] = [
-    group('PEDAL AND REVS', 'DONUT', [
-        ['PEDAL_TIME', 'Pedal travel', 's', [0.02, 0.5, 0.01], 'Seconds for the pedal to go all the way down or up.'],
-        ['REV_UP', 'Revs climb', '/s', [0.2, 8, 0.1], 'How quickly the revs climb towards the pedal.'],
-        ['REV_DOWN', 'Revs fall', '/s', [0.2, 6, 0.1], 'How quickly they fall with the pedal up.'],
-        ['REV_BRAKE', 'Brake drops revs', '/s', [0, 10, 0.1], 'Extra fall while braking.'],
-        ['REV_RED', 'Red line', 'share', [0.3, 1, 0.01], 'Revs past this add no speed or width, only push the tail out.'],
-        ['SWEET_LOW', 'Sweet spot from', 'share', [0, 1, 0.01], 'Revs between this and the red line score more.'],
-        ['SWEET_BONUS', 'Sweet spot points ×', 'times', [1, 5, 0.1]],
+    group('THE WHITE (ACCELERATING)', 'DONUT', [
+        ['REV_UP', 'Revs climb', '/s', [0.02, 2, 0.01], 'Share of the bar a second with the pedal down: 0.6 is about 1.5 s to the green.'],
+        ['REV_DOWN', 'Revs fall', '/s', [0.02, 3, 0.01], 'Share of the bar a second with the pedal up.'],
+        ['GREEN_AT', 'Green starts at', 'share', [0.3, 0.99, 0.01], 'The white is the bar below this.'],
     ]),
     group('SPEED AND SIZE', 'DONUT', [
-        ['SPEED_MIN', 'Slowest', 'm/s', [0, 30, 0.5], 'Speed with the revs at nothing.'],
-        ['SPEED_MAX', 'Fastest', 'm/s', [1, 50, 0.5], 'Speed at the red line.'],
-        ['SPEED_FOLLOW', 'Speed follows revs', '/s', [0.2, 12, 0.1], 'How quickly the speed catches up with the revs.'],
-        ['BRAKE', 'Brake', 'm/s²', [0, 40, 0.5]],
-        ['RADIUS_MIN', 'Tightest donut', 'm', [0.5, 20, 0.1], 'Radius with the revs at nothing.'],
-        ['RADIUS_MAX', 'Widest donut', 'm', [1, 30, 0.1], 'Radius at the red line.'],
-        ['GROW', 'Widening', 'm/s', [0.1, 25, 0.1], 'How fast the donut widens towards the revs\' size.'],
+        ['SPEED_MAX', 'Top speed', 'm/s', [1, 50, 0.5], 'Speed at the top of the white and in the green.'],
+        ['SPEED_FOLLOW', 'Speed follows revs', '/s', [0.5, 20, 0.1], 'How quickly the speed catches up with the revs.'],
+        ['RADIUS_MIN', 'Tightest donut', 'm', [0.5, 20, 0.1], 'Radius standing still.'],
+        ['RADIUS_MAX', 'Widest donut', 'm', [1, 30, 0.1], 'Radius at top speed.'],
+        ['GROW', 'Widening', 'm/s', [0.1, 25, 0.1], 'How fast the donut widens with the speed.'],
+        ['RETURN', 'Back to the middle', 'm/s', [0, 15, 0.1], 'Off the pedal the donut tightens at least this fast, even in the green.'],
         ['SHRINK', 'Tightening', 'm/s', [0.1, 25, 0.1], 'How fast it tightens back.'],
-        ['BRAKE_SHRINK', 'Brake tightening', 'm/s', [0, 25, 0.1]],
         ['CENTRE_X', 'Donut centre X', 'm', [-15, 15, 0.1], 'Where on the junction the donut circles round (across, down-right on screen).'],
         ['CENTRE_Y', 'Donut centre Y', 'm', [-15, 15, 0.1], 'The other way (down-left on screen).'],
     ]),
 ];
 
-/** The BALANCE panel. */
-export const BALANCE_GROUPS: DonutGroup[] = [
-    group('THE PEDAL ON THE TAIL', 'DONUT', [
-        ['KICK', 'Stab kick', '', [0, 10, 0.1], 'How hard a stab of the pedal pushes the tail out (at top speed).'],
-        ['KICK_TIME', 'Kick lasts', 's', [0.05, 2, 0.01], 'The kick pushes over about this long: longer is a slower rise.'],
-        ['BITE_SPREAD', 'Kick varies', 'share', [0, 1, 0.01], 'How differently each stab bites, either way.'],
-        ['THROTTLE_PUSH', 'Revs push', '', [0, 4, 0.05], 'Steady push on the tail from the revs, at speed.'],
-        ['SNAP', 'Lift pull-back', '', [0, 10, 0.1], 'Lifting pulls the tail back, more the further out it is.'],
-        ['SNAP_FROM', 'Pull-back from', 'share', [0, 1, 0.01], 'Lifting only pulls it back once it\'s past this.'],
-        ['OVERREV_PUSH', 'Limiter push', '', [0, 8, 0.1], 'Push on the tail at the limiter, once fully built up.'],
-        ['LIMITER_BUILD', 'Limiter builds over', 's', [0.1, 10, 0.1], 'Seconds at the limiter for its push to build up fully.'],
+/** The STEERING panel. */
+export const STEERING_GROUPS: DonutGroup[] = [
+    group('BALANCE', 'DONUT', [
+        ['DRIFT', 'Drift', '', [0, 4, 0.05], 'How much the balance wanders by itself while moving.'],
+        ['GREEN_DRIFT', 'Drift in the green ×', 'times', [0, 6, 0.1]],
+        ['STEER', 'Steering', '', [0, 30, 0.1], 'Push of left/right on the balance, at top speed.'],
+        ['STEER_SLOW', 'Steering when slow', 'share', [0, 1, 0.01], 'Share of the steering standing still: it grows with the speed.'],
+        ['DAMPING', 'Settling', '', [0, 10, 0.1], 'How quickly a swing settles.'],
+        ['CENTRING', 'Pull to the middle', '', [0, 5, 0.05], 'A gentle pull back to the middle (forgiving).'],
+        ['CLEAN', 'Clean band', 'share', [0, 1, 0.01], 'Inside this band points count a little more.'],
+        ['CLEAN_BONUS', 'Clean points ×', 'times', [1, 3, 0.05]],
+        ['EDGE', 'Edge from', 'share', [0.5, 1, 0.01], 'In the green, the balance past this counts as at the edge.'],
+        ['EDGE_GRACE', 'Edge grace', 's', [0, 3, 0.05], 'In the green, at the edge this long is a testacoda.'],
+        ['SPIN_PENALTY', 'Testacoda costs', 'pts', [0, 3000, 10]],
+        ['SPIN_SECONDS', 'Testacoda lasts', 's', [0.2, 5, 0.1], 'Spinning on the spot this long.'],
+        ['SPIN_REVS_KEPT', 'Revs kept after', 'share', [0, 1, 0.01], 'Share of the white kept after a testacoda.'],
+        ['SLIP_SHIFT', 'Balance moves the car', 'm', [0, 5, 0.1], 'The balance pushes the car out of (or into) its circle by up to this much.'],
     ]),
-    group('STICK ON A FINGER', 'DONUT', [
-        ['TIP', 'Tips over', '', [0, 2, 0.01], 'How much the drift tips further by itself.'],
-        ['WOBBLE', 'Random wobble', '', [0, 3, 0.01], 'Random gusts on the balance (more at the limiter).'],
-        ['STEER', 'Counter-steer', '', [0, 10, 0.1], 'Push of left/right at full lock.'],
-        ['DAMPING', 'Settling', '', [0, 10, 0.1], 'How quickly the swing settles.'],
-        ['SPIN_GRACE', 'Edge grace', 's', [0, 2, 0.01], 'Past the edge, the car spins out only after this long.'],
-        ['CLEAN', 'Clean band', 'share', [0, 1, 0.01], 'Inside this band the drift is clean and scores ×1.5.'],
+];
+
+/** The GREEN AND HEAT panel. */
+export const GREEN_GROUPS: DonutGroup[] = [
+    group('THE GREEN', 'DONUT', [
+        ['OVERHEAT_SECONDS', 'Overheats after', 's', [0.5, 15, 0.1], 'Seconds of pedal down in the green before the engine gives out.'],
+        ['COOL_SECONDS', 'Cools in', 's', [0.1, 10, 0.1], 'Seconds of pedal up to cool the engine fully.'],
+        ['LIFT_GRACE', 'Lift grace', 's', [0, 3, 0.05], 'A lift shorter than this keeps the green; longer drops back into the white.'],
+        ['GREEN_BONUS', 'Green points ×', 'times', [1, 5, 0.1]],
     ]),
-    group('SPIN-OUTS AND COMBO', 'DONUT', [
-        ['SPIN_SECONDS', 'Spin-out lasts', 's', [0.2, 5, 0.1]],
-        ['SPIN_PENALTY', 'Spin-out costs', 'pts', [0, 2000, 10]],
-        ['SPIN_SPEED_KEPT', 'Speed kept', 'share', [0, 1, 0.01], 'Share of speed and revs kept after a spin-out.'],
+    group('OVERHEATING AND COMBO', 'DONUT', [
+        ['OVERHEAT_PENALTY', 'Overheating costs', 'pts', [0, 3000, 10], 'Overheating stalls the engine: the car coasts back to the middle.'],
         ['COMBO_RADIUS', 'Combo from radius', 'm', [0, 30, 0.1], 'Only loops at least this wide build the combo.'],
         ['COMBO_STEP', 'Combo per loop', '', [0, 2, 0.05]],
         ['COMBO_MAX', 'Combo up to', '×', [1, 10, 0.25]],
@@ -95,14 +95,15 @@ export const WORLD_GROUPS: DonutGroup[] = [
     group('PEOPLE', 'PEDESTRIANS', [
         ['SPAWN_MIN', 'New person every (min)', 's', [0.1, 10, 0.1]],
         ['SPAWN_MAX', 'New person every (max)', 's', [0.1, 10, 0.1]],
+        ['PER_CROSSING', 'People per crossing', 'count', [1, 6, 1], 'At most this many on a crossing at once.'],
         ['BOOSTER_SHARE', 'Green share', 'share', [0, 1, 0.01], 'Share of people that give a boost.'],
         ['WALK_SPEED', 'Red walk speed', 'm/s', [0, 6, 0.1]],
         ['JOG_SPEED', 'Green jog speed', 'm/s', [0, 6, 0.1]],
         ['HIT_DISTANCE', 'Hit distance', 'm', [0.5, 6, 0.1], 'Car and person closer than this collide.'],
         ['HIT_PENALTY', 'Red costs', 'pts', [0, 3000, 10]],
-        ['HIT_SPEED_KEPT', 'Red: speed kept', 'share', [0, 1, 0.01]],
+        ['HIT_REVS_KEPT', 'Red: revs kept', 'share', [0, 1, 0.01], 'A red hit knocks you out of the green and keeps this share of the revs.'],
         ['BOOST_POINTS', 'Green gives', 'pts', [0, 1000, 5]],
-        ['BOOST_SPEED', 'Green boost', 'm/s', [0, 20, 0.1]],
+        ['BOOST_REVS', 'Green boost', 'share', [0, 0.5, 0.01], 'Extra revs (share of the bar) from a green person.'],
     ]),
     group('JUNCTION', 'JUNCTION', [
         ['ROAD_HALF_WIDTH', 'Road half width', 'm', [3, 15, 0.1]],
@@ -116,13 +117,22 @@ export const LOOK_GROUPS: DonutGroup[] = [
     group('CAR', 'LOOK', [
         ['CAR_SIZE', 'Car size ×', 'times', [0.5, 4, 0.05], 'Drawn this much bigger than life.'],
         ['NOSE_IN', 'Nose into the circle', '°', [0, 150, 1], '0 points along the circle, 90 at the centre.'],
-        ['SLIP_SWING', 'Balance swing', '°', [0, 90, 1], 'How far the balance swings the nose, at the edge.'],
+        ['SLIP_SWING', 'Balance swing', '°', [0, 90, 1], 'How far the balance rocks the nose, at the edge.'],
         ['REV_SWING', 'Revs swing', '°', [0, 60, 1], 'Extra tail out at full revs.'],
-        ['SPIN_TURN', 'Spin-out whirl', '°/s', [0, 1500, 10]],
+        ['SPIN_TURN', 'Testacoda whirl', '°/s', [0, 1500, 10]],
         ['MARK_WIDTH', 'Tyre mark width', 'px', [1, 20, 1]],
         ['MARK_DARKNESS', 'Tyre mark darkness', 'share', [0, 1, 0.01]],
         ['MARK_TRAIL', 'Tyre marks last', 'steps', [10, 3000, 10]],
         ['RING', 'Donut ring', 'share', [0, 1, 0.01], 'Opacity of the faint ring where the donut runs.'],
+    ]),
+    group('CAR TINTS (THE REVS ON THE CAR)', 'LOOK', [
+        ['TINT_WHITE', 'White tint', 'share', [0, 1, 0.01], 'Opacity of the white over the black car, at the top of the white.'],
+        ['TINT_GREEN', 'Green tint', 'share', [0, 1, 0.01], 'Opacity of the green, in the green.'],
+        ['TINT_HOT', 'Orange tint', 'share', [0, 1, 0.01], 'Opacity of the orange as the engine heats.'],
+        ['TINT_RED', 'Red tint', 'share', [0, 1, 0.01], 'Opacity of the red flashes just before overheating.'],
+        ['TINT_STALL', 'Stall tint', 'share', [0, 1, 0.01], 'Opacity of the dull red while stalled.'],
+        ['GREEN_FLASH', 'Green arrival flash', 'share', [0, 1, 0.01], 'How white the car flashes on reaching the green.'],
+        ['HOT_FLASH', 'Overheat flashing', '/s', [0, 20, 0.5], 'Red flashes a second just before overheating (faster as it gets hotter).'],
     ]),
     group('CAMERA', 'LOOK', [
         ['SCALE', 'Zoom', 'px/m', [10, 100, 1], 'Pixels per metre of ground.'],
@@ -141,7 +151,7 @@ export const LOOK_GROUPS: DonutGroup[] = [
     ]),
 ];
 
-export const ALL_GROUPS: DonutGroup[] = [...DRIVING_GROUPS, ...BALANCE_GROUPS, ...WORLD_GROUPS, ...LOOK_GROUPS];
+export const ALL_GROUPS: DonutGroup[] = [...DRIVING_GROUPS, ...GREEN_GROUPS, ...STEERING_GROUPS, ...WORLD_GROUPS, ...LOOK_GROUPS];
 
 /** What differs from the defaults, by table: what's saved and what "Copy changes" gives. */
 export type DonutChanges = Partial<Record<TableName, Record<string, number>>>;

@@ -890,3 +890,87 @@ Part 2
 ------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-10-01] v3.0.7e (branch `experimental-branch`)
 - **[Release]** DERAPATE: a pedal you blip (revs, sweet spot, limiter), slower balance rise, hit and boost shakes, nose further into the circle, and the DERAPATE Lab (L). Version 3.0.7-e.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: the speed lock, no brakes, no testacoda, fewer people (branch `experimental-branch`)
+- **[Feat]** The speed lock: reaching the green revs locks them there. Locked, the pedal moves the revs only 15% as much and its kick is a quarter, and they can't leave the green (no red line); steering bites twice as hard while the drift tips over 6.5x more, wobbles 7x more and settles less: livelier and harder. A red hit ends it (and losing the balance, see below); the revs drop back into the white to be built up again. The GIRI bar gets an outline round the green and reads `BLOCCATO x2`.
+- **[Change]** Below the green (white revs) it's more forgiving: the pedal's push on the tail ×0.7, steering ×1.3.
+- **[Change]** Testacoda is off by default (`SPIN_OUTS`, a checkbox in the Lab under BALANCE → SPIN-OUTS AND COMBO): the balance stops at 1.15 instead. With it off, staying past the edge for the grace time ends the lock and keeps 60% of the speed (switch in SPEED LOCK).
+- **[Change]** No brakes: only the pedal and steering (keys and gamepad).
+- **[Change]** Letting go slows the car gently: revs fall at 0.5/s (was 1.5), speed follows them down at 1/s (was 3), the donut tightens at 2 m/s (was 4).
+- **[Change]** Far fewer people: one every 2.5–5 s (was 0.9–2.2), and at most one on each crossing (`PER_CROSSING`).
+- **[Lab]** New SPEED LOCK panel (the lock and the white zone); on/off settings are checkboxes; the readout shows the lock.
+- **[Balance]** One minute of test drivers holding the pedal (1.2 s on, 0.4 off): attentive players stay locked the whole time; a sloppy one loses the lock about 5 times a minute; nobody steering loses it constantly.
+- **[S]** 68 tests (new: the lock, the gentle slow-down, losing the balance with testacoda off, one person per crossing), build; checked in the browser.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: no pedal, no movement (branch `experimental-branch`)
+- **[Change]** The slowest speed is now 0 (was 4 m/s): without the pedal the car stands still (and starts at the tightest radius, so it doesn't slide in). Standing still nothing pushes the tail about and the balance settles back to the middle. A spin-out whirls on the spot.
+- **[Note]** Locked in the green, the revs can't fall out of it, so letting go keeps the car moving until a red hit or losing the balance ends the lock.
+- **[S]** 69 tests (new: no pedal, no movement), build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: off the pedal, it stops (branch `experimental-branch`)
+- **[Fix]** The car kept going with nothing pressed: once locked in the green, the revs couldn't fall. Now, off the pedal, the revs fall as usual and the lock ends once they leave the green; revs under 0.1 (`REV_IDLE`) drive nothing, and a rolling friction (1.5 m/s², `ROLL_FRICTION`) brings it to a full stop: from top speed it rolls about 4 s and stands still. With any pedal down, the lock works as before.
+- **[Fix]** A gamepad trigger resting a little above 0 no longer counts as throttle (dead zone 0.1).
+- **[S]** 70 tests (new: off the pedal the lock ends and the car stops), build; checked in the browser (standing still at the start).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: quicker stop, heavier edges (branch `experimental-branch`)
+- **[Change]** Off the pedal the car stops in about 1.7 s from top speed (was about 4): revs fall at 1.2/s (was 0.5), speed follows at 2/s (was 1.5), rolling friction 6 m/s² (was 1.5). A blip off the pedal shorter than 0.3 s (`LOCK_LIFT_GRACE`) keeps the speed lock; longer and it starts to go.
+- **[Feel]** The balance isn't linear any more: the drag on its swing is ×0.65 in the middle of the bar (light, responsive) rising to ×2.6 at the edges (heavy, forgiving), growing with the square of the distance (`CENTRE_DRAG`, `EDGE_DRAG`, in the Lab under BALANCE). A sloppy test driver loses the lock about 2.6 times a minute (was about 5); attentive ones never.
+- **[S]** 71 tests (new: the stop within two seconds, light middle / heavy edges), build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: rethink, the pedal and the heat (branch `experimental-branch`)
+- **[Change]** The rules started again, simpler and forgiving, pedal only: steering and the balance are gone for now (they come back once this stage feels right). The rev bar is 90% white and 10% green. Pedal down, the white fills steadily (0.3 of the bar a second: about 3 s to the green); pedal up, it empties (0.6 a second) and the car rolls to a stop. The speed follows the revs and the donut's width follows the speed (tight standing still, widest at top speed).
+- **[Feat]** The green: top speed holds while the pedal stays down, but the engine heats up (the green part of the bar fills, orange then flashing red, `MOTORE CALDO!`). About 4 s of pedal overheats it: the car is sent back to the start (stopped, tightest circle) and does a testacoda on the spot (`MOTORE FUSO!`, -300 points, combo reset), then builds up again. Lifting cools the engine (1 s to cool fully); a lift shorter than 0.5 s keeps the green, longer drops back into the white. Points in the green count double.
+- **[Change]** A red hit costs 500 points and knocks you out of the green (40% of the revs kept); a green person gives 50 points and a little revs. Standing still or spinning, the car hits no one.
+- **[Lab]** Panels follow the new rules: DRIVING (the white, speed and size), GREEN AND HEAT (overheating, cooling, lift grace, testacoda, combo), PEOPLE AND ROAD, CAR AND CAMERA; readouts show revs, heat and pedal-up time; live values include the heat. The old balance, kick, limiter, lock and testacoda settings are gone with the rules they tuned.
+- **[S]** 64 tests (rewritten for the new rules), build; checked in the browser (green after 3.0 s, heat warning, overheat back to the start).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: quicker to the green, 3 s in it (branch `experimental-branch`)
+- **[Change]** The white fills twice as fast (0.6 of the bar a second, was 0.3): about 1.5 s from standing to the green.
+- **[Change]** The engine overheats after 3 s of pedal in the green (was 4). Cooling is unchanged (1 s to cool fully), so staying in the green takes a rhythm of about 1 s down, 0.4 s up.
+- **[S]** 64 tests (now following the timing settings), build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: steering back, as forgiving flair (branch `experimental-branch`)
+- **[Feat]** The balance is back, light: it drifts slowly by itself while the car moves (twice as much in the green), left/right (A/D, the stick) nudge it, a gentle pull brings it home, and it simply stops at the edges: nothing is ever lost to it (no testacoda, no leaving the green). Inside the middle band points count ×1.25. A small balance bar sits above the rev bar; the car's nose rocks with the balance (±25°).
+- **[Balance]** One minute of test drivers: left alone, the balance stays clean 56% of the time; tapping when it leaves the band keeps it clean 100% of the time and scores about 11% more.
+- **[Lab]** New STEERING panel (drift, drift in the green, steering, settling, pull to the middle, clean band and bonus); balance swing in CAR AND CAMERA; readout and live value for the balance.
+- **[S]** 66 tests (new: the balance costs nothing and rewards a little; it settles standing still), build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: the revs on the car, and a testacoda for the balance in the green (branch `experimental-branch`)
+- **[Look]** The rev bar is shown on the car itself, so you can watch the car instead of the bar: the car is black at rest and takes a white tint as the white fills; reaching the green it flashes bright, then glows green with a slow pulse, turns orange as the engine heats and flashes red, faster and faster, before overheating; it flashes red fast at the edge of the balance in the green, and in the testacoda (`LOOK.TINT`, `LOOK.HOT_FLASH` in the Lab).
+- **[Feat]** The balance can now cost you, but only in the green: staying at an edge (past 0.97) for 0.5 s there is a testacoda, back to the start like overheating (`TESTACODA!`, -300). In the white the edges stay safe. The drift grows with the speed and is 3.2x stronger in the green (was 2x). In the green the bar's ends turn red and the needle flashes red at an edge.
+- **[Balance]** One minute of test drivers: never steering, about 3 testacodas a minute; steering a little whenever it leaves the middle band, none; steering late and lazily, about one every five minutes.
+- **[S]** 67 tests (new: the edge is safe in the white and a testacoda in the green; steering avoids it), build; the tint checked in the browser (black, white, green).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: testacoda on the spot, a smooth stall, losing control shows (branch `experimental-branch`)
+- **[Change]** The testacoda is only for the steering (at an edge of the balance in the green), and it happens on the spot: the car stops and spins where it is, keeps 40% of the white's revs, and carries on from there (-300).
+- **[Change]** Overheating no longer spins the car or puts it back at the start: the engine stalls (`MOTORE FUSO!`, -300), the pedal does nothing, and the car coasts back to the middle as the revs and the speed run down and the donut tightens; once the revs are gone it can start again. The car glows a dull, throbbing red while stalled.
+- **[Change]** Off the pedal the donut starts tightening towards the middle straight away (at least 3 m/s, `RETURN`), even during a short lift in the green.
+- **[Look]** Losing control shows more: the balance rocks the car twice as far (±50°) and pushes it out of (or into) its circle by up to 1.5 m (`SLIP_SHIFT`; collisions follow it).
+- **[S]** 68 tests (new: the stall coasts home smoothly; tightening off the pedal; the testacoda stays on the spot), build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: quicker steering, tint opacities, a clearer steering bar (branch `experimental-branch`)
+- **[Feel]** The steering reacts much quicker and grows with the speed: its push is 12 at top speed (was 2.5 at any speed), 15% of that standing still (`STEER_SLOW`), with a little more settling (4, was 3). Full lock moves the balance halfway in 0.35 s at top speed (was 0.93 s), 0.5 s at half speed. The drift in the green is up to 3.8x (was 3.2x) to keep the same challenge: never steering, about 3 testacodas a minute; steering a little, none.
+- **[Lab]** Every tint on the car has its own opacity, in CAR AND CAMERA → CAR TINTS: white, green, orange, red, the stall's dull red, the flash on reaching the green, and the overheat flashing speed (replacing the single `TINT`).
+- **[Look]** The steering bar (STERZO) is bigger and colour-coded: green in the middle (clean), then yellow, orange, and red at the edges, with a centre mark and a needle outlined in black. In the white (edges safe) the colours are dimmed; in the green they're bright and the needle takes the colour of the zone it's in, flashing red at an edge.
+- **[S]** 69 tests (new: the steering reacts quicker at speed), build; the bar checked in the browser.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: the car shows only the revs and the heat (branch `experimental-branch`)
+- **[Look]** The car no longer flashes red for the steering (at the edge of the balance, or in the testacoda): its tint is only the rev bar and the engine (white, green, orange, the red flashes before overheating, the stall's dull red). The steering shows only on the STERZO bar.
+- **[S]** 69 tests, build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] v3.0.8e: the Lab settings as defaults (branch `experimental-branch`)
+- **[Tuning]** Riccardo's DERAPATE Lab settings are now the defaults: the donut widens at 2.8 m/s (was 6), overheating after 3.5 s in the green (was 3), 91% of people are green (was 30%), a wider junction (road half width 10.2 m, crossings at 12.8 m and 4.4 m wide), the camera zoomed out (30 px/m, was 40), and the car's tints: no white or green tint and no green flash, orange at 0.35, red at 0.37, no stall tint, red flashing at 7.5 a second.
+- **[Release]** DERAPATE rebuilt around the pedal and the engine's heat, forgiving steering with a testacoda only in the green, the revs shown on the car. Version 3.0.8-e.
+- **[S]** 69 tests, build.

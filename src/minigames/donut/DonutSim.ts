@@ -5,14 +5,21 @@
  * Math.random), like the other games' simulations.
  *
  * Distances are metres on the ground, the junction's centre at 0,0; angles
- * are radians. The pedal snaps down and up in a moment and the revs follow it
- * fast: revs make the car faster and the donut wider, and drop when the pedal
- * comes up. Every stab of the pedal kicks the tail out (harder the faster the
- * car goes), every lift snaps it back the other way. The drift has to be
- * balanced like a stick on a finger: it tips further by itself, and left/right
- * counter-steer; lose it and the car spins out. Blipping the pedal in rhythm
- * keeps the revs in the sweet spot, which scores double; flat out, the engine
- * hits the red line and pushes the tail out harder and harder.
+ * are radians. The steering is light: the balance drifts by itself, more the
+ * faster the car goes (and more in the green), left/right nudge it back, a
+ * gentle pull brings it home, and keeping it in the middle scores a little
+ * more. In the white it stops at the edges and nothing is lost; in the green,
+ * staying at an edge a moment too long is a testacoda on the spot. The rev
+ * bar has
+ * two parts: the white, 90% of it, and the green. Pedal down, the revs climb
+ * steadily through the white; pedal up, they fall and the car rolls to a stop.
+ * The car's speed follows the revs and the donut's width follows the speed.
+ * Off the pedal the donut heads back towards the middle at once. Reaching the
+ * green locks the speed at the top; keep the pedal down to stay there, but
+ * the engine heats up while it's down (the green fills): held about 3 s it
+ * overheats and stalls, and the car coasts back to the middle to start again.
+ * Lifting cools the engine; a lift shorter than a moment keeps the green,
+ * longer and the revs drop back into the white.
  */
 
 export const STEP_S = 1 / 60;
@@ -23,88 +30,91 @@ export const STEP_S = 1 / 60;
  * and every number below live: they're plain objects on purpose.)
  */
 export const JUNCTION = {
-    ROAD_HALF_WIDTH: 7,
-    CROSSING_AT: 10,
-    CROSSING_WIDTH: 3.2,
+    ROAD_HALF_WIDTH: 10.2,
+    CROSSING_AT: 12.8,
+    CROSSING_WIDTH: 4.4,
 };
 
 export const DONUT = {
     /** Where on the junction the donut circles round (metres from its centre). */
     CENTRE_X: 0,
     CENTRE_Y: 0,
+
+    /** Revs (0 to 1) climbing with the pedal down and falling with it up (share of the bar a second). */
+    REV_UP: 0.6,
+    REV_DOWN: 0.6,
+    /** Where the green starts: the white is the bar below it. */
+    GREEN_AT: 0.9,
+
+    /** The car's speed at the top of the white (and in the green), and how quickly it follows the revs (share a second). */
+    SPEED_MAX: 18,
+    SPEED_FOLLOW: 6,
+    /** The donut's width: tightest standing still, widest at top speed (radius, metres), and how fast it changes (m/s). */
     RADIUS_MIN: 2.6,
     RADIUS_MAX: 12,
-    /** How fast the donut widens towards the revs' size, tightens back, and tightens on the brake (metres a second). */
-    GROW: 7,
-    SHRINK: 4,
-    BRAKE_SHRINK: 5,
-    SPEED_MIN: 4,
-    SPEED_MAX: 18,
-    /** How quickly the speed follows the revs (share a second), and the brake's slowing (m/s²). */
-    SPEED_FOLLOW: 3,
-    BRAKE: 12,
+    GROW: 2.8,
+    SHRINK: 6,
 
-    /** Seconds for the pedal to go all the way down or up. */
-    PEDAL_TIME: 0.1,
-    /** Revs (0 to 1) climbing towards the pedal and falling when it's up, share a second; the brake drops them faster. */
-    REV_UP: 2.5,
-    REV_DOWN: 1.5,
-    REV_BRAKE: 3,
-    /** The red line: revs past it add no speed or width, only push the tail out. Between the sweet spot's start and it, points count double. */
-    REV_RED: 0.88,
-    SWEET_LOW: 0.55,
-    SWEET_BONUS: 2,
-    /** A stab of the pedal kicks the tail out, a lift snaps it back, more the further out it is (balance speed, full pedal travel, at top speed). */
-    KICK: 2.5,
-    /** The kick isn't instant: it pushes the tail out over about this long (seconds), so the balance has time to be caught. Lifting ends it. */
-    KICK_TIME: 0.5,
-    SNAP: 2,
-    /** Lifting only brings the tail back once it's at least this far out: below it, keeping it straight is the steering's job. */
-    SNAP_FROM: 0.6,
-    /** How much each stab's kick varies, either way (share). */
-    BITE_SPREAD: 0.35,
-    /** The push on the tail at the limiter, building up over this many seconds there: more than steering can hold. */
-    OVERREV_PUSH: 3.5,
-    LIMITER_BUILD: 4,
+    /** In the green: seconds of pedal down to overheat, seconds of pedal up to cool fully, and a lift shorter than this keeps the green. */
+    OVERHEAT_SECONDS: 3.5,
+    COOL_SECONDS: 1,
+    LIFT_GRACE: 0.5,
+    /** Points in the green count this many times. */
+    GREEN_BONUS: 2,
 
-    /** Balance (slip): -1 and 1 are the edges, past them the car spins out. */
-    TIP: 0.35,
-    /** A light random wobble (more at the limiter), and the steady push of the revs on the tail. */
-    WOBBLE: 0.3,
-    THROTTLE_PUSH: 0.6,
-    /** Counter-steering at full lock (gentle, so it's hard to overcorrect), and the damping that settles the swing. */
-    STEER: 3,
+    /** Overheating stalls the engine and costs this many points; the car coasts back to the middle. */
+    OVERHEAT_PENALTY: 300,
+    /** Off the pedal the donut tightens towards the middle at least this fast (m/s), even in the green. */
+    RETURN: 3,
+
+    /**
+     * The balance (-1 to 1): a slow random drift (stronger in the green), the
+     * steering's push, the settling, and a gentle pull back to the middle. It
+     * stops at the edges: nothing is lost there. Inside the clean band the
+     * points count a little more.
+     */
+    DRIFT: 1.8,
+    GREEN_DRIFT: 3.8,
+    /** The steering's push at top speed, and the share of it standing still (it grows with the speed). */
+    STEER: 12,
+    STEER_SLOW: 0.15,
     DAMPING: 4,
-    /** Past the edge, the car spins out only after staying there this long: a quick correction saves it. */
-    SPIN_GRACE: 0.35,
-    /** Inside this band, the drift is "clean" and scores more. */
+    CENTRING: 0.8,
     CLEAN: 0.35,
+    CLEAN_BONUS: 1.25,
+    /** In the green only: at the edge (|balance| at least EDGE) for EDGE_GRACE seconds is a testacoda, costing SPIN_PENALTY. */
+    EDGE: 0.97,
+    EDGE_GRACE: 0.5,
+    SPIN_PENALTY: 300,
+    /** The testacoda: how long it spins on the spot, and the share of the white's revs kept after it. */
+    SPIN_SECONDS: 1.6,
+    SPIN_REVS_KEPT: 0.4,
+    /** The balance pushes the car out (or in) of its circle by up to this much (metres): losing control. */
+    SLIP_SHIFT: 1.5,
+
     /** Loops at least this wide build the combo, by this much a loop, up to this much. */
     COMBO_RADIUS: 7,
     COMBO_STEP: 0.25,
     COMBO_MAX: 5,
-
-    SPIN_SECONDS: 1.6,
-    SPIN_PENALTY: 150,
-    SPIN_SPEED_KEPT: 0.3,
 };
 
 export const PEDESTRIANS = {
-    /** Seconds between new people, at random between these. */
-    SPAWN_MIN: 0.9,
-    SPAWN_MAX: 2.2,
+    /** Seconds between new people, at random between these, and at most this many on a crossing at once. */
+    SPAWN_MIN: 2.5,
+    SPAWN_MAX: 5,
+    PER_CROSSING: 1,
     /** Share of them that are type 2 (a boost when hit). */
-    BOOSTER_SHARE: 0.3,
+    BOOSTER_SHARE: 0.91,
     WALK_SPEED: 1.5,
     JOG_SPEED: 2.3,
     /** Car and person closer than this collide (metres). */
     HIT_DISTANCE: 2.8,
-    /** Type 1: points lost, and the share of speed kept. */
+    /** Type 1: points lost, and the share of the revs kept (it knocks you out of the green). */
     HIT_PENALTY: 500,
-    HIT_SPEED_KEPT: 0.4,
-    /** Type 2: points gained and extra speed (m/s). */
+    HIT_REVS_KEPT: 0.4,
+    /** Type 2: points gained and extra revs (share of the bar). */
     BOOST_POINTS: 50,
-    BOOST_SPEED: 4,
+    BOOST_REVS: 0.1,
 };
 
 export type PedestrianKind = 'walker' | 'booster';
@@ -124,43 +134,48 @@ export interface Pedestrian {
 }
 
 export interface DonutInput {
-    /** 0 to 1. */
+    /** The pedal, 0 to 1. */
     throttle: number;
-    brake: number;
-    /** -1 left to 1 right. */
-    steer: number;
+    /** -1 left to 1 right (none: 0). */
+    steer?: number;
 }
 
 export type DonutEvent =
-    | { type: 'spin' }
     | { type: 'hit'; kind: PedestrianKind; x: number; y: number; points: number }
-    | { type: 'loop' };
+    | { type: 'loop' }
+    /** Reaching the green, and leaving it (a long lift or a red hit). */
+    | { type: 'lock' }
+    | { type: 'unlock' }
+    /** Held too long in the green: back to the start, testacoda on the spot. */
+    | { type: 'overheat' }
+    /** At the edge of the balance too long in the green: the same. */
+    | { type: 'spin' };
 
 export interface DonutState {
     /** Where the car is round the centre, how far out, and how fast it goes. */
     angle: number;
     radius: number;
     speed: number;
-    /** The pedal (0 to 1, a moment behind the key) and the engine's revs (0 to 1, the red line at REV_RED). */
-    pedal: number;
+    /** The rev bar, 0 to 1: the white below GREEN_AT; in the green it shows the engine's heat. */
     revs: number;
-    /** How hard the tyres bit on this stab of the pedal (around 1). */
-    bite: number;
-    /** What's left of the stab's push on the tail (fading over KICK_TIME). */
-    kick: number;
-    /** Seconds spent bouncing off the limiter (eases off quickly once the revs drop). */
-    limiter: number;
-    /** Balance: 0 is perfectly held, ±1 the edge. */
+    /** The engine's heat in the green, 0 to 1 (1 overheats). */
+    heat: number;
+    /** In the green (the speed locked at the top). */
+    locked: boolean;
+    /** Seconds with the pedal up. */
+    lifted: number;
+    /** Seconds of testacoda left. */
+    spinning: number;
+    /** The engine stalled after overheating: coasting back to the middle, the pedal dead until the revs run out. */
+    stalled: boolean;
+    /** The balance, -1 to 1 (0 is the middle), how fast it's moving, and the slow random drift on it. */
     slip: number;
     slipSpeed: number;
-    /** A slowly wandering push on the balance. */
     gust: number;
-    /** Seconds of spin-out left. */
-    spinning: number;
-    /** Seconds spent past the edge of the balance so far. */
+    /** Seconds at the edge of the balance in the green. */
     overEdge: number;
     score: number;
-    /** Multiplier built up by clean loops, reset by a hit or a spin. */
+    /** Multiplier built up by wide loops, reset by a red hit or overheating. */
     combo: number;
     /** Angle driven since the last full loop. */
     loopProgress: number;
@@ -173,19 +188,25 @@ export interface DonutState {
 
 export function createDonut(seed = 1): DonutState {
     return {
-        angle: 0, radius: 5, speed: DONUT.SPEED_MIN, pedal: 0, revs: 0, bite: 0, kick: 0, limiter: 0, slip: 0, slipSpeed: 0, gust: 0, spinning: 0, overEdge: 0,
+        angle: 0, radius: DONUT.RADIUS_MIN, speed: 0, revs: 0, heat: 0, locked: false, lifted: 0, spinning: 0, stalled: false, slip: 0, slipSpeed: 0, gust: 0, overEdge: 0,
         score: 0, combo: 1, loopProgress: 0, pedestrians: [], nextSpawn: 1.5, nextId: 1, steps: 0, rng: (seed * 2654435761) >>> 0,
     };
 }
 
-/** Revs between the sweet spot's start and the red line: points count double. */
-export function inSweetSpot(state: DonutState): boolean {
-    return state.revs >= DONUT.SWEET_LOW && state.revs <= DONUT.REV_RED;
+/** How far along the white the revs are (1 at the green and in it). */
+export function whiteShare(state: DonutState): number {
+    return Math.min(1, state.revs / DONUT.GREEN_AT);
 }
 
 /** Where the car is on the ground. */
 export function carPosition(state: DonutState): { x: number; y: number } {
-    return { x: DONUT.CENTRE_X + Math.cos(state.angle) * state.radius, y: DONUT.CENTRE_Y + Math.sin(state.angle) * state.radius };
+    const r = drawnRadius(state.radius, state.slip);
+    return { x: DONUT.CENTRE_X + Math.cos(state.angle) * r, y: DONUT.CENTRE_Y + Math.sin(state.angle) * r };
+}
+
+/** The car's distance from the centre: its circle, pushed out or in by the balance. */
+export function drawnRadius(radius: number, slip: number): number {
+    return Math.max(0.5, radius + slip * DONUT.SLIP_SHIFT);
 }
 
 /** Where a person is on the ground. */
@@ -203,98 +224,76 @@ export function pedestrianPosition(p: Pedestrian): { x: number; y: number } {
 export function stepDonut(state: DonutState, input: DonutInput, events: DonutEvent[] = []): DonutEvent[] {
     const dt = STEP_S;
     const spinning = state.spinning > 0;
-    const throttle = spinning ? 0 : input.throttle;
-    const brake = spinning ? 0 : input.brake;
-    const steer = spinning ? 0 : input.steer;
+    // Spinning, or the engine stalled after overheating: the pedal does nothing
+    const pedal = spinning || state.stalled ? 0 : Math.max(0, Math.min(1, input.throttle));
+    state.lifted = pedal > 0 ? 0 : state.lifted + dt;
 
-    // ─── The pedal snaps down and up; the revs follow it ───
-    const pedalBefore = state.pedal;
-    const travel = dt / DONUT.PEDAL_TIME;
-    state.pedal = throttle > state.pedal ? Math.min(throttle, state.pedal + travel) : Math.max(throttle, state.pedal - travel);
-    const pressed = state.pedal - pedalBefore;
-    const revRate = state.pedal > state.revs ? DONUT.REV_UP : DONUT.REV_DOWN + DONUT.REV_BRAKE * brake;
-    state.revs += (state.pedal - state.revs) * Math.min(1, revRate * dt);
-    /** How much the revs drive the car (full at the red line), and how far past it the engine is. */
-    const drive = Math.min(1, state.revs / DONUT.REV_RED);
-    const overRev = Math.max(0, (state.revs - DONUT.REV_RED) / (1 - DONUT.REV_RED));
-    state.limiter = overRev > 0.3 ? state.limiter + dt : Math.max(0, state.limiter - 2 * dt);
+    // ─── The rev bar ───
+    if (spinning) {
+        state.spinning = Math.max(0, state.spinning - dt);
+    } else if (state.locked) {
+        if (pedal > 0) {
+            // Pedal down in the green: the engine heats up
+            state.heat += (pedal * dt) / DONUT.OVERHEAT_SECONDS;
+        } else {
+            state.heat -= dt / DONUT.COOL_SECONDS;
+            // Off the pedal too long: back into the white
+            if (state.lifted >= DONUT.LIFT_GRACE) unlock(state, events, DONUT.GREEN_AT - 0.01);
+        }
+        state.heat = Math.max(0, state.heat);
+        if (state.heat >= 1) overheat(state, events);
+    } else {
+        state.revs += pedal > 0 ? DONUT.REV_UP * pedal * dt : -DONUT.REV_DOWN * dt;
+        state.revs = Math.max(0, state.revs);
+        state.heat = Math.max(0, state.heat - dt / DONUT.COOL_SECONDS);
+        // Stalled: the car coasts back to the middle; once the revs are gone it can start again
+        if (state.stalled && state.revs === 0) state.stalled = false;
+        if (state.revs >= DONUT.GREEN_AT) {
+            state.locked = true;
+            events.push({ type: 'lock' });
+        }
+    }
+    // In the green the bar shows the heat: full is overheating
+    if (state.locked) state.revs = DONUT.GREEN_AT + (1 - DONUT.GREEN_AT) * Math.min(1, state.heat);
 
-    // ─── The revs set the donut: speed and size, quickly ───
-    const speedTarget = spinning ? DONUT.SPEED_MIN * 0.3 : DONUT.SPEED_MIN + (DONUT.SPEED_MAX - DONUT.SPEED_MIN) * drive;
-    // Above it (after a boost) it eases back down the same way
+    // ─── Speed follows the revs, the donut's width follows the speed ───
+    const speedTarget = state.spinning > 0 ? 0 : DONUT.SPEED_MAX * whiteShare(state);
     state.speed += (speedTarget - state.speed) * Math.min(1, DONUT.SPEED_FOLLOW * dt);
-    state.speed -= DONUT.BRAKE * brake * dt;
-    state.speed = Math.max(DONUT.SPEED_MIN * (spinning ? 0.3 : 1), state.speed);
-
-    const radiusTarget = DONUT.RADIUS_MIN + (DONUT.RADIUS_MAX - DONUT.RADIUS_MIN) * drive;
-    if (state.radius < radiusTarget) state.radius = Math.min(radiusTarget, state.radius + DONUT.GROW * dt);
-    else state.radius = Math.max(radiusTarget, state.radius - DONUT.SHRINK * dt);
-    state.radius -= DONUT.BRAKE_SHRINK * brake * dt;
-    state.radius = Math.max(DONUT.RADIUS_MIN, Math.min(DONUT.RADIUS_MAX, state.radius));
+    if (Math.abs(speedTarget - state.speed) < 0.01) state.speed = speedTarget;
+    // (spinning, the car stays where it is: a testacoda on the spot)
+    if (state.spinning === 0) {
+        const radiusTarget = DONUT.RADIUS_MIN + (DONUT.RADIUS_MAX - DONUT.RADIUS_MIN) * Math.min(1, state.speed / DONUT.SPEED_MAX);
+        if (pedal === 0) {
+            // Off the pedal it heads back towards the middle straight away, even in the green
+            const following = state.radius > radiusTarget ? Math.max(radiusTarget, state.radius - DONUT.SHRINK * dt) : state.radius;
+            state.radius = Math.max(DONUT.RADIUS_MIN, Math.min(following, state.radius - DONUT.RETURN * dt));
+        } else if (state.radius < radiusTarget) {
+            state.radius = Math.min(radiusTarget, state.radius + DONUT.GROW * dt);
+        } else {
+            state.radius = Math.max(radiusTarget, state.radius - DONUT.SHRINK * dt);
+        }
+    }
 
     // ─── Round and round ───
-    const turned = (state.speed / state.radius) * dt;
+    const turned = (state.speed / Math.max(0.5, state.radius)) * dt;
     state.angle = (state.angle + turned) % (Math.PI * 2);
     state.loopProgress += turned;
     if (state.loopProgress >= Math.PI * 2) {
         state.loopProgress -= Math.PI * 2;
         // Only wide loops build the combo: tight safe circles don't
-        if (!spinning && state.radius >= DONUT.COMBO_RADIUS) {
+        if (state.radius >= DONUT.COMBO_RADIUS) {
             state.combo = Math.min(DONUT.COMBO_MAX, state.combo + DONUT.COMBO_STEP);
             events.push({ type: 'loop' });
         }
     }
 
-    // ─── Balance ───
-    if (spinning) {
-        state.spinning = Math.max(0, state.spinning - dt);
-        if (state.spinning === 0) {
-            state.slip = 0;
-            state.slipSpeed = 0;
-        }
-    } else {
-        // The gust wanders slowly, harder the faster the car goes and at the limiter
-        state.gust += (random(state) * 2 - 1) * 3 * dt;
-        state.gust *= 1 - 0.6 * dt;
-        state.gust = Math.max(-1, Math.min(1, state.gust));
-        const share = state.speed / DONUT.SPEED_MAX;
-        // A stab of the pedal kicks the tail out, a lift snaps it back: harder the faster the car goes
-        const punch = 0.4 + share;
-        // (the tyres bite differently every time; the further out the tail is when the grip comes back, the harder it swings back, past the middle)
-        if (pressed > 0) {
-            if (pedalBefore === 0 || state.bite === 0) state.bite = 1 - DONUT.BITE_SPREAD + random(state) * 2 * DONUT.BITE_SPREAD;
-            state.kick += (DONUT.KICK * state.bite * pressed * punch) / DONUT.KICK_TIME;
-        } else if (pressed < 0) {
-            state.kick = 0;
-            state.slipSpeed += DONUT.SNAP * pressed * punch * Math.max(0, state.slip - DONUT.SNAP_FROM);
-        }
-        const kick = state.kick;
-        state.kick *= 1 - Math.min(1, dt / DONUT.KICK_TIME);
-        const push = state.slip * DONUT.TIP + state.gust * DONUT.WOBBLE * (0.4 + share + overRev * 2)
-            + kick + drive * DONUT.THROTTLE_PUSH * share + overRev * DONUT.OVERREV_PUSH * Math.min(1, state.limiter / DONUT.LIMITER_BUILD)
-            - steer * DONUT.STEER - state.slipSpeed * DONUT.DAMPING;
-        state.slipSpeed += push * dt;
-        state.slip += state.slipSpeed * dt;
-        // Held past the edge a moment too long: spin-out
-        state.overEdge = Math.abs(state.slip) > 1 ? state.overEdge + dt : 0;
-        if (state.overEdge >= DONUT.SPIN_GRACE) {
-            state.overEdge = 0;
-            state.spinning = DONUT.SPIN_SECONDS;
-            state.speed *= DONUT.SPIN_SPEED_KEPT;
-            state.revs *= DONUT.SPIN_SPEED_KEPT;
-            state.kick = 0;
-            state.score = Math.max(0, state.score - DONUT.SPIN_PENALTY);
-            state.combo = 1;
-            events.push({ type: 'spin' });
-        }
-    }
+    stepBalance(state, state.spinning > 0 ? 0 : input.steer ?? 0, events);
 
-    // ─── Points: wider and faster donuts score much more, clean ones and revs in the sweet spot more still ───
-    if (!spinning) {
-        const clean = Math.abs(state.slip) < DONUT.CLEAN ? 1.5 : 1;
-        const sweet = inSweetSpot(state) ? DONUT.SWEET_BONUS : 1;
+    // ─── Points: wider and faster donuts score much more, the green and a clean balance more still ───
+    if (state.spinning === 0) {
         const width = state.radius / DONUT.RADIUS_MAX;
-        state.score += state.speed * width * width * 4 * clean * sweet * state.combo * dt;
+        const clean = Math.abs(state.slip) < DONUT.CLEAN ? DONUT.CLEAN_BONUS : 1;
+        state.score += state.speed * width * width * 4 * (state.locked ? DONUT.GREEN_BONUS : 1) * clean * state.combo * dt;
     }
 
     stepPedestrians(state, events);
@@ -302,17 +301,84 @@ export function stepDonut(state: DonutState, input: DonutInput, events: DonutEve
     return events;
 }
 
-/** People step onto a crossing now and then and walk across; the car knocks into them. */
+/**
+ * The balance: drifts while the car moves (more the faster it goes), nudged by
+ * the steering, pulled gently home, stopped at the edges; in the green,
+ * staying at an edge too long is a testacoda.
+ */
+function stepBalance(state: DonutState, steer: number, events: DonutEvent[]): void {
+    const dt = STEP_S;
+    state.gust += (random(state) * 2 - 1) * 3 * dt;
+    state.gust *= 1 - 0.6 * dt;
+    state.gust = Math.max(-1, Math.min(1, state.gust));
+    const moving = Math.min(1, state.speed / DONUT.SPEED_MAX);
+    const drift = state.gust * DONUT.DRIFT * moving * (state.locked ? DONUT.GREEN_DRIFT : 1);
+    // Standing still or spinning, it settles back to the middle
+    const centring = state.spinning > 0 || moving === 0 ? DONUT.CENTRING * 4 : DONUT.CENTRING;
+    // The steering bites harder the faster the car goes
+    const steering = DONUT.STEER * (DONUT.STEER_SLOW + (1 - DONUT.STEER_SLOW) * moving);
+    state.slipSpeed += (drift - steer * steering - state.slip * centring - state.slipSpeed * DONUT.DAMPING) * dt;
+    state.slip += state.slipSpeed * dt;
+    if (Math.abs(state.slip) > 1) {
+        state.slip = Math.sign(state.slip);
+        if (state.slipSpeed * state.slip > 0) state.slipSpeed = 0;
+    }
+    state.overEdge = state.locked && Math.abs(state.slip) >= DONUT.EDGE ? state.overEdge + dt : 0;
+    if (state.overEdge >= DONUT.EDGE_GRACE) spinOut(state, events);
+}
+
+/** Out of the green: the revs back to `revs` (in the white), to be built up again. */
+function unlock(state: DonutState, events: DonutEvent[], revs: number): void {
+    if (!state.locked) return;
+    state.locked = false;
+    state.revs = Math.min(revs, DONUT.GREEN_AT - 0.01);
+    events.push({ type: 'unlock' });
+}
+
+/**
+ * The engine gives out: it stalls, the pedal does nothing and the car coasts
+ * back to the middle (the revs and the speed run down, the donut tightens),
+ * then it can start again. Points lost, combo gone.
+ */
+function overheat(state: DonutState, events: DonutEvent[]): void {
+    state.locked = false;
+    state.stalled = true;
+    state.revs = DONUT.GREEN_AT - 0.01;
+    state.heat = 0;
+    state.score = Math.max(0, state.score - DONUT.OVERHEAT_PENALTY);
+    state.combo = 1;
+    events.push({ type: 'overheat' });
+}
+
+/** Losing the balance in the green: a testacoda on the spot (the car stays where it is), most of the revs lost, points lost. */
+function spinOut(state: DonutState, events: DonutEvent[]): void {
+    state.locked = false;
+    state.revs = DONUT.GREEN_AT * DONUT.SPIN_REVS_KEPT;
+    state.heat = 0;
+    state.speed = 0;
+    state.spinning = DONUT.SPIN_SECONDS;
+    state.overEdge = 0;
+    state.score = Math.max(0, state.score - DONUT.SPIN_PENALTY);
+    state.combo = 1;
+    events.push({ type: 'spin' });
+}
+
+/** People step onto a free crossing now and then and walk across; the car knocks into them. */
 function stepPedestrians(state: DonutState, events: DonutEvent[]): void {
     state.nextSpawn -= STEP_S;
     if (state.nextSpawn <= 0) {
         state.nextSpawn = PEDESTRIANS.SPAWN_MIN + random(state) * (PEDESTRIANS.SPAWN_MAX - PEDESTRIANS.SPAWN_MIN);
-        const booster = random(state) < PEDESTRIANS.BOOSTER_SHARE;
-        const direction = random(state) < 0.5 ? -1 : 1;
-        state.pedestrians.push({
-            id: state.nextId++, kind: booster ? 'booster' : 'walker', crossing: Math.floor(random(state) * 4),
-            along: -direction, direction, speed: booster ? PEDESTRIANS.JOG_SPEED : PEDESTRIANS.WALK_SPEED, hit: false, hitTimer: 0,
-        });
+        // Only onto a crossing with room (people knocked down don't count)
+        const free = [0, 1, 2, 3].filter(c => state.pedestrians.filter(p => !p.hit && p.crossing === c).length < PEDESTRIANS.PER_CROSSING);
+        if (free.length > 0) {
+            const crossing = free[Math.floor(random(state) * free.length)];
+            const booster = random(state) < PEDESTRIANS.BOOSTER_SHARE;
+            const direction = random(state) < 0.5 ? -1 : 1;
+            state.pedestrians.push({
+                id: state.nextId++, kind: booster ? 'booster' : 'walker', crossing,
+                along: -direction, direction, speed: booster ? PEDESTRIANS.JOG_SPEED : PEDESTRIANS.WALK_SPEED, hit: false, hitTimer: 0,
+            });
+        }
     }
 
     const car = carPosition(state);
@@ -324,17 +390,19 @@ function stepPedestrians(state: DonutState, events: DonutEvent[]): void {
         }
         p.along += (p.direction * p.speed * STEP_S) / width;
         const at = pedestrianPosition(p);
-        if (state.spinning > 0 || Math.hypot(at.x - car.x, at.y - car.y) > PEDESTRIANS.HIT_DISTANCE) continue;
+        // Standing still or spinning on the spot, the car hits no one
+        if (state.spinning > 0 || state.speed < 0.5 || Math.hypot(at.x - car.x, at.y - car.y) > PEDESTRIANS.HIT_DISTANCE) continue;
         p.hit = true;
         p.hitTimer = 0.8;
         if (p.kind === 'walker') {
             state.score = Math.max(0, state.score - PEDESTRIANS.HIT_PENALTY);
-            state.speed *= PEDESTRIANS.HIT_SPEED_KEPT;
             state.combo = 1;
+            unlock(state, events, state.revs);
+            state.revs *= PEDESTRIANS.HIT_REVS_KEPT;
             events.push({ type: 'hit', kind: 'walker', x: at.x, y: at.y, points: -PEDESTRIANS.HIT_PENALTY });
         } else {
             state.score += PEDESTRIANS.BOOST_POINTS;
-            state.speed += PEDESTRIANS.BOOST_SPEED;
+            if (!state.locked) state.revs = Math.min(DONUT.GREEN_AT, state.revs + PEDESTRIANS.BOOST_REVS);
             events.push({ type: 'hit', kind: 'booster', x: at.x, y: at.y, points: PEDESTRIANS.BOOST_POINTS });
         }
     }

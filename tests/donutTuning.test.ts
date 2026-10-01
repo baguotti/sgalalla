@@ -28,7 +28,7 @@ test('every DERAPATE setting is in the Lab, once, with a sensible range', () => 
 test('changes copy out and paste back; reset puts the defaults back', () => {
     resetDonutTuning();
     assert.deepEqual(donutChanges(), {});
-    DONUT.KICK = 3.3;
+    DONUT.REV_UP = 0.45;
     LOOK.NOSE_IN = 80;
     JUNCTION.CROSSING_AT = 12;
     const copied = JSON.parse(JSON.stringify({ sgalallaDerapate: 1, ...donutChanges() }));
@@ -36,11 +36,11 @@ test('changes copy out and paste back; reset puts the defaults back', () => {
     resetDonutTuning();
     assert.equal(changeCount(), 0);
     assert.equal(applyDonutChanges(copied), 3);
-    assert.equal(DONUT.KICK, 3.3);
+    assert.equal(DONUT.REV_UP, 0.45);
     assert.equal(LOOK.NOSE_IN, 80);
     assert.equal(JUNCTION.CROSSING_AT, 12);
     // Unknown names and non-numbers are skipped
-    assert.equal(applyDonutChanges({ DONUT: { KICK: 'fast', NOPE: 1 }, OTHER: { X: 1 } }), 0);
-    assert.equal(DONUT.KICK, 2.5);
+    assert.equal(applyDonutChanges({ DONUT: { REV_UP: "fast", NOPE: 1 }, OTHER: { X: 1 } }), 0);
+    assert.equal(DONUT.REV_UP, 0.6);
     resetDonutTuning();
 });
