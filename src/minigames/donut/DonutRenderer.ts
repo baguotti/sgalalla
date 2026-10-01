@@ -1,8 +1,6 @@
 import Phaser from 'phaser';
-import {
-    CROSSING_AT, CROSSING_WIDTH, DONUT, ROAD_HALF_WIDTH, pedestrianPosition,
-    type DonutState, type Pedestrian,
-} from './DonutSim';
+import { LOOK } from './DonutLook';
+import { DONUT, JUNCTION, pedestrianPosition, type DonutState, type Pedestrian } from './DonutSim';
 
 /**
  * Draws DERAPATE from a fixed isometric camera, all in plain blocks until the
@@ -11,12 +9,9 @@ import {
  * farther ones.
  */
 
-/** Pixels per metre, and where the junction's centre is on screen. */
-const SCALE = 40;
-const CENTRE = { x: 960, y: 530 };
-/** Isometric: across the screen and down it per metre of ground. */
-const ISO_X = SCALE * 0.866;
-const ISO_Y = SCALE * 0.5;
+/** Isometric: across the screen and down it per metre of ground (the camera's scale is LOOK.SCALE). */
+const isoX = () => LOOK.SCALE * 0.866;
+const isoY = () => LOOK.SCALE * 0.5;
 /** How far the road runs out from the centre (off screen). */
 const ROAD_REACH = 70;
 
@@ -39,7 +34,7 @@ const COLOURS = {
 
 /** A point on the ground (or `z` metres above it) on screen. */
 export function iso(x: number, y: number, z = 0): { x: number; y: number } {
-    return { x: CENTRE.x + (x - y) * ISO_X, y: CENTRE.y + (x + y) * ISO_Y - z * SCALE };
+    return { x: LOOK.CENTRE_X + (x - y) * isoX(), y: LOOK.CENTRE_Y + (x + y) * isoY() - z * LOOK.SCALE };
 }
 
 /** What a frame shows: the car placed between its last two steps. */
@@ -54,10 +49,10 @@ export interface DonutView {
 
 export class DonutRenderer {
     readonly graphics: Phaser.GameObjects.Graphics;
-    /** The ground and everything fixed on it, drawn once. */
+    /** The ground and everything fixed on it, drawn once (again when the Lab moves it). */
     private readonly ground: Phaser.GameObjects.Graphics;
     /** Recent car positions: the tyre marks. */
-    private readonly marks: { x: number; y: number }[] = [];
+    private readonly marks: { x: number; y: number; strength: number }[] = [];
 
     constructor(scene: Phaser.Scene) {
         this.ground = scene.add.graphics();
@@ -65,10 +60,20 @@ export class DonutRenderer {
         this.graphics = scene.add.graphics();
     }
 
-    /** Called each step with the car's position: the tyre marks follow it. */
-    addMark(x: number, y: number): void {
-        this.marks.push({ x, y });
-        if (this.marks.length > 900) this.marks.shift();
+    /** Called each step with the car's position: the tyre marks follow it, darker the harder the wheels spin (0 to 1). */
+    addMark(x: number, y: number, strength = 1): void {
+        this.marks.push({ x, y, strength });
+        while (this.marks.length > Math.max(2, LOOK.MARK_TRAIL)) this.marks.shift();
+    }
+
+    /** The junction again, after the Lab changed its size or the camera. */
+    redrawGround(): void {
+        drawJunction(this.ground.clear());
+    }
+
+    /** A fresh start: no rubber on the road. */
+    clearMarks(): void {
+        this.marks.length = 0;
     }
 
     draw(view: DonutView): void {
@@ -81,15 +86,16 @@ export class DonutRenderer {
             if (Math.hypot(a.x - b.x, a.y - b.y) > 2) continue;
             const from = iso(a.x, a.y);
             const to = iso(b.x, b.y);
-            g.lineStyle(6, COLOURS.marks, 0.08 + 0.3 * (i / this.marks.length)).lineBetween(from.x, from.y, to.x, to.y);
+            const alpha = LOOK.MARK_DARKNESS * (0.18 + 0.82 * (i / this.marks.length)) * b.strength;
+            g.lineStyle(LOOK.MARK_WIDTH, COLOURS.marks, Math.min(1, alpha)).lineBetween(from.x, from.y, to.x, to.y);
         }
 
         // Where the donut runs now, faintly
-        g.lineStyle(2, COLOURS.ring, 0.18);
+        g.lineStyle(2, COLOURS.ring, LOOK.RING);
         g.beginPath();
         for (let i = 0; i <= 64; i++) {
             const angle = (i / 64) * Math.PI * 2;
-            const p = iso(Math.cos(angle) * view.radius, Math.sin(angle) * view.radius);
+            const p = iso(DONUT.CENTRE_X + Math.cos(angle) * view.radius, DONUT.CENTRE_Y + Math.sin(angle) * view.radius);
             if (i === 0) g.moveTo(p.x, p.y);
             else g.lineTo(p.x, p.y);
         }
@@ -116,7 +122,8 @@ export class DonutRenderer {
 // ─── The junction ───
 
 function drawJunction(g: Phaser.GameObjects.Graphics): void {
-    const H = ROAD_HALF_WIDTH;
+    const H = JUNCTION.ROAD_HALF_WIDTH;
+    const { CROSSING_AT, CROSSING_WIDTH } = JUNCTION;
     const R = ROAD_REACH;
     g.fillStyle(COLOURS.pavement).fillRect(0, 0, 1920, 1080);
     // Paving lines, so the ground reads as a surface
@@ -202,14 +209,11 @@ function turnedBox(g: Phaser.GameObjects.Graphics, colour: number, x: number, y:
     g.fillStyle(colour).fillPoints(corners.map(p => iso(p.x, p.y, z2)), true);
 }
 
-/** The car drawn bigger than life next to the people, so it reads (the size the Audi sprite had). */
-const CAR_SIZE = 1.75;
-
 function drawCar(g: Phaser.GameObjects.Graphics, x: number, y: number, heading: number): void {
     // Shadow, body, cabin set back, and headlights on the nose so the heading reads
-    const k = CAR_SIZE;
+    const k = LOOK.CAR_SIZE;
     const shadow = iso(x, y);
-    g.fillStyle(COLOURS.shadow, 0.28).fillEllipse(shadow.x, shadow.y, 5.2 * k * ISO_X, 5.2 * k * ISO_Y);
+    g.fillStyle(COLOURS.shadow, 0.28).fillEllipse(shadow.x, shadow.y, 5.2 * k * isoX(), 5.2 * k * isoY());
     turnedBox(g, COLOURS.car, x, y, heading, 4.4 * k, 1.9 * k, 0.25 * k, 1.0 * k);
     turnedBox(g, COLOURS.cabin, x, y, heading, 2.1 * k, 1.65 * k, 1.0 * k, 1.55 * k, -0.35 * k);
     const c = Math.cos(heading);
@@ -225,7 +229,7 @@ function drawCar(g: Phaser.GameObjects.Graphics, x: number, y: number, heading: 
 function drawPedestrian(g: Phaser.GameObjects.Graphics, p: Pedestrian, x: number, y: number): void {
     const colour = p.kind === 'walker' ? COLOURS.walker : COLOURS.booster;
     const at = iso(x, y);
-    g.fillStyle(COLOURS.shadow, 0.25).fillEllipse(at.x, at.y, 1.2 * ISO_X, 1.2 * ISO_Y);
+    g.fillStyle(COLOURS.shadow, 0.25).fillEllipse(at.x, at.y, 1.2 * isoX(), 1.2 * isoY());
     if (p.hit) {
         // Knocked flat, fading
         const fade = Math.max(0, p.hitTimer / 0.8);
@@ -243,9 +247,14 @@ function shade(colour: number, amount: number): number {
     return (Math.min(255, r) << 16) | (Math.min(255, gr) << 8) | Math.min(255, b);
 }
 
-/** The drawn heading: along the circle, nose swung in by the drift and the balance, spinning after a spin-out. */
-export function carHeading(state: DonutState, angle: number): number {
-    const drift = 0.95 + state.slip * 0.55;
-    const spin = state.spinning > 0 ? (DONUT.SPIN_SECONDS - state.spinning) * 11 : 0;
+/**
+ * The drawn heading: along the circle, nose swung in by the drift; the balance
+ * (`slip`, between steps) swings it, so every stab and lift of the pedal shows
+ * at once; wheelspin swings the tail out a little more; a spin-out spins it.
+ */
+export function carHeading(state: DonutState, angle: number, slip = state.slip): number {
+    const degrees = Math.PI / 180;
+    const drift = (LOOK.NOSE_IN + slip * LOOK.SLIP_SWING + state.revs * LOOK.REV_SWING) * degrees;
+    const spin = state.spinning > 0 ? (DONUT.SPIN_SECONDS - state.spinning) * LOOK.SPIN_TURN * degrees : 0;
     return angle + Math.PI / 2 + drift + spin;
 }

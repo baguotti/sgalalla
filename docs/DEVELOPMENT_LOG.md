@@ -861,3 +861,32 @@ Part 2
 ------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-09-30] v3.0.6e (branch `experimental-branch`)
 - **[Release]** DERAPATE, the donut mini-game prototype (main menu), with the block car. Version 3.0.6-e.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: a pedal you blip (branch `experimental-branch`)
+- **[Feel]** The pedal snaps down and up in 0.1 s and the engine's revs follow it fast; the revs set the speed and the donut's width (about 3x quicker than before). Each stab kicks the tail out, harder the faster the car goes (0.85 of the edge at top speed, about 0.4 slow), with the tyres biting a little differently every time; each lift brings it part of the way back. Kept moderate on purpose: stronger and tapping without steering would balance itself.
+- **[Feat]** Rev meter (GIRI) above the balance bar: revs between 0.55 and the red line (0.88) score double (`GIRI x2`); past the red line the engine bounces off the limiter, the bar flashes red and the push on the tail builds over 3 s until steering can't hold it. Blipping in rhythm (about 0.3 s on, 0.2 off) keeps the revs in the sweet spot nearly all the time; flat out spins about every 7 s even with perfect steering.
+- **[Change]** Random gusts down to a light wobble (0.8 → 0.3, more at the limiter): the chaos now comes from your pedal.
+- **[Look]** The car's body swings with every stab and lift (balance drawn between steps), wheelspin swings the tail out a little more and lays darker rubber, and a stab at speed shakes the camera slightly.
+- **[Balance]** One minute of test drivers: blipping and balancing 16,700 vs flat out 3,400; with people, careful blipping 752, careful flat out 281, blipping through the crowd 151.
+- **[S]** 60 tests (new: the kick and lift, the sweet spot vs the limiter), build; checked in the browser.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: the balance rises slower, room to rev (branch `experimental-branch`)
+- **[Feel]** A stab of the pedal no longer jolts the balance: its kick is a push that builds and fades over half a second (`KICK_TIME`), and it's gentler (KICK 4.5 → 2.5, the revs' steady push 1 → 0.6). Pedal down at speed with no steering, the balance takes 0.8 s to reach halfway instead of 0.4, so there's time to catch it and to hold the pedal long enough to get the revs up.
+- **[Change]** Lifting now mainly stops the push (the kick ends); it only pulls the tail back once it's past 0.6 (SNAP 4 → 2). A strong pull-back balanced the car by itself when tapping, which made steering optional.
+- **[Change]** The limiter's push builds over 4 s instead of 3: a moment in the red is fine, staying there isn't.
+- **[Balance]** A keyboard player who reacts 0.2 s late: holding 1.2 s / lifting 0.4 s now never spins (it spun 5.6 times a minute) and spends 44% of the time in the red; flat out still spins about every 8 s; without steering every pedal style spins. With people: careful 1,441, reckless 260.
+- **[S]** 60 tests, build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] DERAPATE: the Lab, hit shakes, nose into the circle (branch `experimental-branch`)
+- **[Feat]** The **DERAPATE Lab** (L in the game, L again closes it): every number of the mini-game live, in the Studio Lab's style and windowed by default (the game in the middle, panels docked either side; FULL SCREEN floats them). DRIVING (pedal, revs, speed, size, the donut's centre), BALANCE (kick, lift, limiter, tipping, steering, spin-outs, combo), PEOPLE AND ROAD (people, junction size), CAR AND CAMERA (car size, nose angle, swings, tyre marks, zoom, junction on screen, every shake), and TEST: restart, freeze (F), next step (N), slow motion, test shakes, live readouts, the car's live values (radius, angle, speed, revs, balance) to put it anywhere, a find box, Copy changes / Copy all / Paste / Reset all. H hides the panels. Changes are kept in this browser and used whenever DERAPATE runs here.
+- **[Feat]** Two camera shakes: a hard short jolt for a red walker (1% of the screen, 250 ms), a lighter longer rumble with a 5% zoom punch for a green boost. The pedal-stab shake is off by default (a Lab slider). The HUD has its own camera, so only the junction shakes and zooms.
+- **[Look]** The car's nose points further into the circle: 70° from straight ahead instead of 54°.
+- **[Code]** The settings are plain objects (`DONUT`, `PEDESTRIANS`, `JUNCTION`, new `LOOK` in `DonutLook.ts`); `DonutTuning.ts` lists them with ranges, keeps the defaults, applies/copies changes; `DonutLab.ts` builds the panels from `LabUi`/`FeelUi`; the Studio Lab's `WindowedView` is exported with a configurable top band. R now starts again without restarting the scene, so the Lab stays open.
+- **[S]** 62 tests (new: every setting is in the Lab, changes copy out and paste back), build; checked in the browser (windowed and full screen, shakes on the world camera only, the junction redrawn live, freeze and step, closing).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-01] v3.0.7e (branch `experimental-branch`)
+- **[Release]** DERAPATE: a pedal you blip (revs, sweet spot, limiter), slower balance rise, hit and boost shakes, nose further into the circle, and the DERAPATE Lab (L). Version 3.0.7-e.

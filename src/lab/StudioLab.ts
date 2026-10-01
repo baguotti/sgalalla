@@ -124,18 +124,23 @@ export function startStudioLab(scene: Phaser.Scene, look: LabScene, feelHost: Fe
 
 /**
  * The windowed view: the game's container narrowed to the middle of the page
- * (Phaser fits the game into it), and the panels moved into a column either side.
+ * (Phaser fits the game into it), and the panels moved into a column either
+ * side, under a band on top (`topBand` px, for the PERFORMANCE strip). The
+ * DERAPATE Lab uses it too.
  */
-class WindowedView {
+export class WindowedView {
     private readonly scene: Phaser.Scene;
     private readonly groups: { left: LabPanelBox[]; right: LabPanelBox[] }[];
     private readonly onChange: (windowed: boolean) => void;
     private readonly container: HTMLElement | null;
     private columns: { left: HTMLElement; right: HTMLElement } | null = null;
     private on = false;
+    private readonly topBand: number;
 
-    constructor(scene: Phaser.Scene, groups: { left: LabPanelBox[]; right: LabPanelBox[] }[], onChange: (windowed: boolean) => void) {
+    constructor(scene: Phaser.Scene, groups: { left: LabPanelBox[]; right: LabPanelBox[] }[], onChange: (windowed: boolean) => void,
+        topBand = PERFORMANCE_BAND) {
         this.scene = scene;
+        this.topBand = topBand;
         this.groups = groups;
         this.onChange = onChange;
         this.container = scene.game.canvas.parentElement;
@@ -180,10 +185,10 @@ class WindowedView {
             // The page's stylesheet makes the container 100% wide: the width is set outright
             style.position = this.on ? 'fixed' : '';
             // A band on top for the PERFORMANCE strip, so it never covers the game
-            style.top = this.on ? `${PERFORMANCE_BAND}px` : '';
+            style.top = this.on ? `${this.topBand}px` : '';
             style.left = this.on ? `${DOCK_WIDTH}px` : '';
             style.width = this.on ? `calc(100% - ${2 * DOCK_WIDTH}px)` : '';
-            style.height = this.on ? `calc(100% - ${PERFORMANCE_BAND}px)` : '';
+            style.height = this.on ? `calc(100% - ${this.topBand}px)` : '';
         }
         // Once now and once the next frame: a refresh during the scene's start doesn't stick
         const scale = this.scene.scale;
