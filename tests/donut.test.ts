@@ -7,7 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DONUT, PEDESTRIANS, carPosition, createDonut, stepDonut, type DonutEvent, type DonutInput } from '../src/minigames/donut/DonutSim.ts';
+import { DONUT, PEDESTRIANS, boostShape, carPosition, createDonut, stepDonut, topSpeed, type DonutEvent, type DonutInput } from '../src/minigames/donut/DonutSim.ts';
 
 const steps = (s: ReturnType<typeof createDonut>, n: number, input: DonutInput, events: DonutEvent[] = []) => {
     for (let i = 0; i < n; i++) stepDonut(s, input, events);
@@ -222,4 +222,67 @@ test('the steering reacts quicker the faster the car goes', () => {
         return -s.slipSpeed;
     };
     assert.ok(response(1) > response(0.5) * 1.4 && response(0.5) > response(0.1), `${response(0.1).toFixed(3)} < ${response(0.5).toFixed(3)} < ${response(1).toFixed(3)}`);
+});
+
+test('white people in a row build the combo and raise the top speed, with diminishing returns; a blue hit ends the run', () => {
+    const s = fresh(14);
+    const base = topSpeed(s);
+    assert.equal(base, DONUT.SPEED_MAX);
+    const gains: number[] = [];
+    for (let n = 1; n <= 40; n++) {
+        const before = topSpeed(s);
+        s.streak = n;
+        gains.push(topSpeed(s) - before);
+    }
+    assert.ok(gains.every((gain, i) => i === 0 || gain < gains[i - 1]), 'each one in a row adds a little less');
+    assert.ok(topSpeed(s) < DONUT.SPEED_MAX * (1 + DONUT.SPEED_BONUS_MAX), 'never past the cap');
+    s.streak = 5;
+    assert.ok(Math.abs(topSpeed(s) / base - 1.23) < 0.02, `5 in a row: +${Math.round((topSpeed(s) / base - 1) * 100)}%`);
+
+    const car = fresh(15);
+    steps(car, intoGreen(), { throttle: 1, steer: 0 });
+    const hit = (kind: 'walker' | 'booster') => {
+        car.slip = 0;
+        car.heat = 0;
+        car.pedestrians.push({ id: car.nextId++, kind, crossing: 0, along: 0, direction: 1, speed: 0, hit: false, hitTimer: 0 });
+        car.radius = 10;
+        car.angle = -Math.PI / 2;
+        steps(car, 1, { throttle: 1 });
+    };
+    hit('booster');
+    hit('booster');
+    hit('booster');
+    assert.equal(car.streak, 3);
+    assert.equal(car.combo, 1 + 3 * DONUT.COMBO_STEP);
+    hit('walker');
+    assert.equal(car.streak, 0);
+    assert.equal(car.combo, 1);
+    assert.equal(topSpeed(car), DONUT.SPEED_MAX);
+});
+
+test('a white person\'s burst climbs straight to its peak, holds, drops away and eases back to the speed the car should be at', () => {
+    assert.equal(boostShape(-1), 0);
+    const rise = PEDESTRIANS.BOOST_RISE;
+    const fall = PEDESTRIANS.BOOST_FALL;
+    assert.ok(Math.abs(boostShape(rise / 2) - 0.5) < 1e-9, 'a straight climb');
+    assert.ok(Math.abs(boostShape(rise) - 1) < 1e-9, 'the peak');
+    assert.ok(boostShape(rise + fall * 0.1) > 0.97, 'holds a moment at the top');
+    const middle = boostShape(rise + fall * 0.45) - boostShape(rise + fall * 0.55);
+    const end = boostShape(rise + fall * 0.85) - boostShape(rise + fall * 0.95);
+    assert.ok(middle > end * 2, 'drops fastest in the middle, eases out at the end');
+    assert.equal(boostShape(rise + fall), 0);
+
+    // On the car: in the green, a white person: past the top, then back to it
+    const car = fresh(15);
+    steps(car, intoGreen(), { throttle: 1, steer: 0 });
+    car.slip = 0;
+    car.heat = 0;
+    car.pedestrians.push({ id: 1, kind: 'booster', crossing: 0, along: 0, direction: 1, speed: 0, hit: false, hitTimer: 0 });
+    car.radius = 10;
+    car.angle = -Math.PI / 2;
+    steps(car, 1, { throttle: 1 });
+    steps(car, Math.round(rise * 60), { throttle: 1 });
+    assert.ok(car.speed > topSpeed(car) + DONUT.SPEED_MAX * PEDESTRIANS.BOOST_SPEED * 0.9, `at the peak: ${car.speed.toFixed(1)} over a top of ${topSpeed(car).toFixed(1)}`);
+    for (let i = 0; i < Math.ceil(fall * 60) + 5; i++) stepDonut(car, { throttle: 1, steer: Math.abs(car.slip) > 0.25 ? Math.sign(car.slip) : 0 });
+    assert.ok(car.boost === 0 && Math.abs(car.speed - topSpeed(car)) < 0.2, `back to the top (${car.speed.toFixed(1)} of ${topSpeed(car).toFixed(1)})`);
 });

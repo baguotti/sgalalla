@@ -32,8 +32,9 @@ const COLOURS = {
     tintGreen: 0x4cff8a,
     tintHot: 0xffa040,
     tintRed: 0xff3a2e,
-    walker: 0xd9534f,
-    booster: 0x3fbf7f,
+    /** The people: navy blue cost you, white give a boost. */
+    walker: 0x23306b,
+    booster: 0xf4f2ec,
     shadow: 0x000000,
 };
 
@@ -108,7 +109,10 @@ export class DonutRenderer {
 
         // The car and the people, farthest first
         const things: { depth: number; draw: () => void }[] = [
-            { depth: view.x + view.y, draw: () => drawCar(g, view.x, view.y, view.heading, this.bodyColour(view.state)) },
+            { depth: view.x + view.y, draw: () => {
+                drawCar(g, view.x, view.y, view.heading, this.bodyColour(view.state));
+                this.drawBackfire(g, view.x, view.y, view.heading);
+            } },
             ...view.state.pedestrians.map(p => {
                 const at = pedestrianPosition(p);
                 return { depth: at.x + at.y, draw: () => drawPedestrian(g, p, at.x, at.y) };
@@ -116,6 +120,36 @@ export class DonutRenderer {
         ];
         things.sort((a, b) => a.depth - b.depth);
         for (const thing of things) thing.draw();
+    }
+
+    /** Seconds of exhaust flame left, and how big this one is (0 to 1). */
+    private flame = 0;
+    private flameSize = 1;
+
+    /** A backfire: a burst of flame from the exhaust, `size` 0 to 1. */
+    backfire(size = 1): void {
+        this.flame = LOOK.BACKFIRE_MS / 1000;
+        this.flameSize = size;
+    }
+
+    /** Called each step: the flame burns out. */
+    tick(dt: number): void {
+        this.flame = Math.max(0, this.flame - dt);
+    }
+
+    /** Flame from the back of the car: a hot core and orange tongues that flicker and shrink as it burns out. */
+    private drawBackfire(g: Phaser.GameObjects.Graphics, x: number, y: number, heading: number): void {
+        if (this.flame <= 0 || LOOK.BACKFIRE_MS <= 0) return;
+        const k = LOOK.CAR_SIZE;
+        const life = this.flame / (LOOK.BACKFIRE_MS / 1000);
+        const size = LOOK.BACKFIRE_SIZE * this.flameSize * (0.4 + 0.6 * life);
+        const back = { x: x - Math.cos(heading) * 2.3 * k, y: y - Math.sin(heading) * 2.3 * k };
+        const flicker = 0.75 + 0.25 * Math.sin(this.flame * 90);
+        for (const [reach, radius, colour, alpha] of [[2.4, 0.55, 0xff5a1a, 0.75], [1.5, 0.45, 0xffa030, 0.9], [0.7, 0.32, 0xfff0a0, 1]] as const) {
+            const d = reach * size * flicker * k;
+            const p = iso(back.x - Math.cos(heading) * d, back.y - Math.sin(heading) * d, 0.55 * k);
+            g.fillStyle(colour, alpha * life).fillCircle(p.x, p.y, radius * size * k * LOOK.SCALE * 1.4);
+        }
     }
 
     /** When the car last reached the green (for the flash), and whether it's in it now. */

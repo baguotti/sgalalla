@@ -48,6 +48,15 @@ export const DONUT = {
 
     /** The car's speed at the top of the white (and in the green), and how quickly it follows the revs (share a second). */
     SPEED_MAX: 18,
+    /**
+     * White (boost) people hit in a row (the combo) raise that top speed, with
+     * diminishing returns so it stays in check: +SPEED_BONUS_MAX at most
+     * (approached, never reached), +63% of it after SPEED_BONUS_SCALE in a row.
+     * At 0.5 and 8: 3 in a row +15%, 5 +23%, 10 +36%. A blue hit, overheating
+     * or a testacoda ends the run of them.
+     */
+    SPEED_BONUS_MAX: 0.5,
+    SPEED_BONUS_SCALE: 8,
     SPEED_FOLLOW: 6,
     /** The donut's width: tightest standing still, widest at top speed (radius, metres), and how fast it changes (m/s). */
     RADIUS_MIN: 2.6,
@@ -92,8 +101,7 @@ export const DONUT = {
     /** The balance pushes the car out (or in) of its circle by up to this much (metres): losing control. */
     SLIP_SHIFT: 1.5,
 
-    /** Loops at least this wide build the combo, by this much a loop, up to this much. */
-    COMBO_RADIUS: 7,
+    /** The combo multiplier: each white person hit in a row adds this much to it, up to this much. */
     COMBO_STEP: 0.25,
     COMBO_MAX: 5,
 };
@@ -112,9 +120,18 @@ export const PEDESTRIANS = {
     /** Type 1: points lost, and the share of the revs kept (it knocks you out of the green). */
     HIT_PENALTY: 500,
     HIT_REVS_KEPT: 0.4,
-    /** Type 2: points gained and extra revs (share of the bar). */
+    /**
+     * Type 2: points gained, extra revs (share of the bar), and a burst of speed
+     * above the top (BOOST_SPEED of the base top speed at its peak): it climbs
+     * straight to the peak in BOOST_RISE seconds, holds a moment, drops away
+     * and eases out over BOOST_FALL seconds (a cosine), back to the speed the
+     * car should be at.
+     */
     BOOST_POINTS: 50,
     BOOST_REVS: 0.1,
+    BOOST_SPEED: 0.3,
+    BOOST_RISE: 0.25,
+    BOOST_FALL: 1.5,
 };
 
 export type PedestrianKind = 'walker' | 'booster';
@@ -164,6 +181,10 @@ export interface DonutState {
     locked: boolean;
     /** Seconds with the pedal up. */
     lifted: number;
+    /** White people hit in a row (they build the combo and raise the top speed), the burst of speed from the last one (m/s), and seconds since it (-1: none). */
+    streak: number;
+    boost: number;
+    boostTime: number;
     /** Seconds of testacoda left. */
     spinning: number;
     /** The engine stalled after overheating: coasting back to the middle, the pedal dead until the revs run out. */
@@ -188,9 +209,15 @@ export interface DonutState {
 
 export function createDonut(seed = 1): DonutState {
     return {
-        angle: 0, radius: DONUT.RADIUS_MIN, speed: 0, revs: 0, heat: 0, locked: false, lifted: 0, spinning: 0, stalled: false, slip: 0, slipSpeed: 0, gust: 0, overEdge: 0,
+        angle: 0, radius: DONUT.RADIUS_MIN, speed: 0, revs: 0, heat: 0, locked: false, lifted: 0, streak: 0, boost: 0, boostTime: -1, spinning: 0, stalled: false, slip: 0, slipSpeed: 0, gust: 0, overEdge: 0,
         score: 0, combo: 1, loopProgress: 0, pedestrians: [], nextSpawn: 1.5, nextId: 1, steps: 0, rng: (seed * 2654435761) >>> 0,
     };
+}
+
+/** The top speed now: the base, raised by the white people hit in a row (with diminishing returns). */
+export function topSpeed(state: DonutState): number {
+    const bonus = DONUT.SPEED_BONUS_MAX * (1 - Math.exp(-state.streak / Math.max(0.01, DONUT.SPEED_BONUS_SCALE)));
+    return DONUT.SPEED_MAX * (1 + bonus);
 }
 
 /** How far along the white the revs are (1 at the green and in it). */
@@ -257,9 +284,15 @@ export function stepDonut(state: DonutState, input: DonutInput, events: DonutEve
     if (state.locked) state.revs = DONUT.GREEN_AT + (1 - DONUT.GREEN_AT) * Math.min(1, state.heat);
 
     // ─── Speed follows the revs, the donut's width follows the speed ───
-    const speedTarget = state.spinning > 0 ? 0 : DONUT.SPEED_MAX * whiteShare(state);
-    state.speed += (speedTarget - state.speed) * Math.min(1, DONUT.SPEED_FOLLOW * dt);
-    if (Math.abs(speedTarget - state.speed) < 0.01) state.speed = speedTarget;
+    // The speed the car should be at follows the revs; a white person's burst rides on top of it
+    let cruise = state.speed - state.boost;
+    const speedTarget = state.spinning > 0 ? 0 : topSpeed(state) * whiteShare(state);
+    cruise += (speedTarget - cruise) * Math.min(1, DONUT.SPEED_FOLLOW * dt);
+    if (Math.abs(speedTarget - cruise) < 0.01) cruise = speedTarget;
+    if (state.boostTime >= 0) state.boostTime += dt;
+    state.boost = state.spinning > 0 ? 0 : DONUT.SPEED_MAX * PEDESTRIANS.BOOST_SPEED * boostShape(state.boostTime);
+    if (state.boost === 0) state.boostTime = -1;
+    state.speed = Math.max(0, cruise) + state.boost;
     // (spinning, the car stays where it is: a testacoda on the spot)
     if (state.spinning === 0) {
         const radiusTarget = DONUT.RADIUS_MIN + (DONUT.RADIUS_MAX - DONUT.RADIUS_MIN) * Math.min(1, state.speed / DONUT.SPEED_MAX);
@@ -280,11 +313,7 @@ export function stepDonut(state: DonutState, input: DonutInput, events: DonutEve
     state.loopProgress += turned;
     if (state.loopProgress >= Math.PI * 2) {
         state.loopProgress -= Math.PI * 2;
-        // Only wide loops build the combo: tight safe circles don't
-        if (state.radius >= DONUT.COMBO_RADIUS) {
-            state.combo = Math.min(DONUT.COMBO_MAX, state.combo + DONUT.COMBO_STEP);
-            events.push({ type: 'loop' });
-        }
+        events.push({ type: 'loop' });
     }
 
     stepBalance(state, state.spinning > 0 ? 0 : input.steer ?? 0, events);
@@ -311,7 +340,8 @@ function stepBalance(state: DonutState, steer: number, events: DonutEvent[]): vo
     state.gust += (random(state) * 2 - 1) * 3 * dt;
     state.gust *= 1 - 0.6 * dt;
     state.gust = Math.max(-1, Math.min(1, state.gust));
-    const moving = Math.min(1, state.speed / DONUT.SPEED_MAX);
+    // Past the base top speed (the combo) it keeps getting livelier, up to half as much again
+    const moving = Math.min(1.5, state.speed / DONUT.SPEED_MAX);
     const drift = state.gust * DONUT.DRIFT * moving * (state.locked ? DONUT.GREEN_DRIFT : 1);
     // Standing still or spinning, it settles back to the middle
     const centring = state.spinning > 0 || moving === 0 ? DONUT.CENTRING * 4 : DONUT.CENTRING;
@@ -325,6 +355,25 @@ function stepBalance(state: DonutState, steer: number, events: DonutEvent[]): vo
     }
     state.overEdge = state.locked && Math.abs(state.slip) >= DONUT.EDGE ? state.overEdge + dt : 0;
     if (state.overEdge >= DONUT.EDGE_GRACE) spinOut(state, events);
+}
+
+/**
+ * The burst's shape, 0 to 1, `t` seconds after hitting a white person (-1:
+ * none): straight up to the peak, then a cosine down (holding a moment at the
+ * top, dropping, easing out at the bottom).
+ */
+export function boostShape(t: number): number {
+    if (t < 0) return 0;
+    const rise = Math.max(0.01, PEDESTRIANS.BOOST_RISE);
+    if (t < rise) return t / rise;
+    const u = (t - rise) / Math.max(0.05, PEDESTRIANS.BOOST_FALL);
+    return u >= 1 ? 0 : 0.5 * (1 + Math.cos(Math.PI * u));
+}
+
+/** The run of white people ends: no combo, back to the base top speed. */
+function endStreak(state: DonutState): void {
+    state.streak = 0;
+    state.combo = 1;
 }
 
 /** Out of the green: the revs back to `revs` (in the white), to be built up again. */
@@ -346,7 +395,7 @@ function overheat(state: DonutState, events: DonutEvent[]): void {
     state.revs = DONUT.GREEN_AT - 0.01;
     state.heat = 0;
     state.score = Math.max(0, state.score - DONUT.OVERHEAT_PENALTY);
-    state.combo = 1;
+    endStreak(state);
     events.push({ type: 'overheat' });
 }
 
@@ -356,10 +405,12 @@ function spinOut(state: DonutState, events: DonutEvent[]): void {
     state.revs = DONUT.GREEN_AT * DONUT.SPIN_REVS_KEPT;
     state.heat = 0;
     state.speed = 0;
+    state.boost = 0;
+    state.boostTime = -1;
     state.spinning = DONUT.SPIN_SECONDS;
     state.overEdge = 0;
     state.score = Math.max(0, state.score - DONUT.SPIN_PENALTY);
-    state.combo = 1;
+    endStreak(state);
     events.push({ type: 'spin' });
 }
 
@@ -396,12 +447,15 @@ function stepPedestrians(state: DonutState, events: DonutEvent[]): void {
         p.hitTimer = 0.8;
         if (p.kind === 'walker') {
             state.score = Math.max(0, state.score - PEDESTRIANS.HIT_PENALTY);
-            state.combo = 1;
+            endStreak(state);
             unlock(state, events, state.revs);
             state.revs *= PEDESTRIANS.HIT_REVS_KEPT;
             events.push({ type: 'hit', kind: 'walker', x: at.x, y: at.y, points: -PEDESTRIANS.HIT_PENALTY });
         } else {
             state.score += PEDESTRIANS.BOOST_POINTS;
+            state.streak++;
+            state.combo = Math.min(DONUT.COMBO_MAX, 1 + state.streak * DONUT.COMBO_STEP);
+            state.boostTime = 0;
             if (!state.locked) state.revs = Math.min(DONUT.GREEN_AT, state.revs + PEDESTRIANS.BOOST_REVS);
             events.push({ type: 'hit', kind: 'booster', x: at.x, y: at.y, points: PEDESTRIANS.BOOST_POINTS });
         }

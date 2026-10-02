@@ -3,7 +3,7 @@ import { button, buttons, choice, element, hint, LabPanelBox, section } from '..
 import { addFeelStyles, pasteDialog, toggleRow, tuneRow, type TuneRow } from '../../lab/FeelUi';
 import type { Setting } from '../../lab/FeelCatalog';
 import { WindowedView } from '../../lab/StudioLab';
-import { DONUT, createDonut, type DonutState } from './DonutSim';
+import { DONUT, createDonut, topSpeed, type DonutState } from './DonutSim';
 import {
     DRIVING_GROUPS, GREEN_GROUPS, LOOK_GROUPS, STEERING_GROUPS, WORLD_GROUPS, allDonutSettings, applyDonutChanges, changeCount, donutChanges,
     resetDonutTuning, setSetting, settingDefault, settingValue, type DonutGroup,
@@ -336,13 +336,14 @@ class TestPanel {
         const s = this.host.state;
         const stats = this.host.stats;
         const lines = [
-            `<b>Speed</b>   ${(s.speed * 3.6).toFixed(0)} km/h  (${s.speed.toFixed(1)} m/s)`,
+            `<b>Speed</b>   ${(s.speed * 3.6).toFixed(0)} km/h  (${s.speed.toFixed(1)} m/s)  top ${(topSpeed(s) * 3.6).toFixed(0)}`,
+            `<b>In a row</b> ${s.streak}   <b>Burst</b> ${(s.boost * 3.6).toFixed(0)} km/h`,
             `<b>Radius</b>  ${s.radius.toFixed(2)} m`,
             `<b>Revs</b>    ${s.revs.toFixed(2)}  ${s.locked ? 'IN THE GREEN' : 'white'}`,
             `<b>Heat</b>    ${Math.round(s.heat * 100)}%   <b>Pedal up</b> ${s.lifted.toFixed(1)} s`,
             `<b>Balance</b> ${s.slip.toFixed(2)}${Math.abs(s.slip) < DONUT.CLEAN ? '  clean' : ''}${s.overEdge > 0 ? `  AT THE EDGE ${s.overEdge.toFixed(2)} s` : ''}`,
             `<b>Combo</b>   ×${s.combo.toFixed(2)}   <b>Score</b> ${Math.floor(s.score)}`,
-            `<b>Testacodas</b> ${stats.spins}   <b>Overheats</b> ${stats.overheats}   <b>Red hit</b> ${stats.walkers}   <b>Green</b> ${stats.boosters}`,
+            `<b>Testacodas</b> ${stats.spins}   <b>Overheats</b> ${stats.overheats}   <b>Blue hit</b> ${stats.walkers}   <b>White</b> ${stats.boosters}`,
             `<b>Time</b>    ${(s.steps / 60).toFixed(1)} s${s.spinning > 0 ? '   TESTACODA' : ''}${s.stalled ? '   STALLED' : ''}`,
         ];
         this.readout.innerHTML = lines.join('\n');

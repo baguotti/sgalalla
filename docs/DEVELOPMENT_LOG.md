@@ -985,3 +985,32 @@ Part 2
 ------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-10-02] v3.0.9e (branch `experimental-branch`)
 - **[Release]** DERAPATE on phones: touch menu, thumb controls, full screen, rotate prompt. Version 3.0.9-e.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: greens raise the top speed (branch `experimental-branch`)
+- **[Feat]** The base top speed stays 18 m/s (65 km/h). Every green person hit raises it for the rest of the run, with diminishing returns so it stays in check: top = base × (1 + 0.5 × (1 − e^(−greens/19))). One green +1.3%, a minute's worth (about 13 for a steady driver, measured) +25% (81 km/h), three minutes' +44% (93 km/h), never past +50% (97 km/h). `SPEED_BONUS_MAX`, `SPEED_BONUS_SCALE` in the Lab.
+- **[Feat]** A green also gives a burst of speed above the top: +30% of the base (about +19 km/h), fading over 1.5 s (`BOOST_SPEED`, `BOOST_SECONDS`). The HUD shows `KM/H   MAX …` and `BOOST!` during a burst.
+- **[Change]** Past the base top speed the balance keeps getting livelier (drift and steering scale up to 1.5x), so the extra speed is felt.
+- **[S]** 70 tests (new: diminishing returns, the cap, the burst and its fade), build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: the combo raises the speed, a shaped burst, white and blue people (branch `experimental-branch`)
+- **[Change]** The combo multiplier now comes from white (boost) people hit in a row: each adds ×0.25 (up to ×5); a blue hit, overheating or a testacoda ends the run (wide loops no longer build it). The run also raises the top speed past the base, with diminishing returns: top = base × (1 + 0.5 × (1 − e^(−in a row/8))): 3 in a row +15%, 5 +23%, 10 +36%, never past +50%. Back to the base when the run ends.
+- **[Feel]** The burst from a white person follows Riccardo's sketch: straight up to its peak (+30% of the base top speed) in 0.25 s, a moment held at the top, then down and easing out over 1.5 s (a cosine), back to the speed the car should be at (`BOOST_RISE`, `BOOST_FALL`). It rides on top of the cruising speed instead of being smoothed by it, so the shape shows.
+- **[Look]** The people: boost ones are white (were green), costly ones navy blue (were red); the score pop-ups match (white, and blue outlined in white). Lab labels follow.
+- **[S]** 71 tests (new: the run in a row and its end, the burst's shape and return), build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: exhaust backfires (branch `experimental-branch`)
+- **[Look]** Flame pops from the exhaust when you lift off with the revs at least 0.6 of the bar (bigger the higher they were) and when you reach the green: a hot yellow core and orange tongues behind the car, flickering and shrinking over 0.22 s. `BACKFIRE_FROM`, `BACKFIRE_SIZE`, `BACKFIRE_MS` (0 turns it off) in the Lab under CAR AND CAMERA.
+- **[S]** 71 tests, build; checked in the browser.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: Lab settings as defaults, STERZO bar hidden (branch `experimental-branch`)
+- **[Tuning]** Riccardo's Lab settings baked in: camera zoom 26 px/m (was 30), junction 470 px down the screen (was 530), backfires smaller (×0.35) and 200 ms, and the pedal-stab shake on at 0.002.
+- **[Change]** The STERZO bar is hidden (`SHOW_STEER_BAR` in DonutScene); the balance still plays and the steering still works.
+- **[S]** 71 tests, build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] v3.1.0e (branch `experimental-branch`)
+- **[Release]** DERAPATE: white boosts in a row build the combo and raise the top speed, the shaped boost burst, white and navy people, exhaust backfires, Riccardo's camera and effect settings, the STERZO bar hidden. Version 3.1.0-e.

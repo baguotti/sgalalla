@@ -6,7 +6,7 @@ import { DonutRenderer, carHeading, iso } from '../minigames/donut/DonutRenderer
 import { DonutTouch } from '../minigames/donut/DonutTouch';
 import { enterFullscreenOnPhone, isPhone } from '../input/Touch';
 import {
-    DONUT, carPosition, createDonut, drawnRadius, stepDonut,
+    DONUT, carPosition, createDonut, drawnRadius, stepDonut, topSpeed,
     type DonutEvent, type DonutInput, type DonutState,
 } from '../minigames/donut/DonutSim';
 import { FixedStepClock } from '../../shared/FixedStepClock';
@@ -29,6 +29,8 @@ const TRIGGER_DEAD_ZONE = 0.1;
 const STICK_DEAD_ZONE = 0.15;
 const FONT = '"Pixeloid Sans"';
 const LAB_OPEN_KEY = 'sgalalla.donutLabOpen';
+/** The STERZO bar above the rev bar: hidden for now. */
+const SHOW_STEER_BAR = false;
 
 export class DonutScene extends Phaser.Scene {
     private state!: DonutState;
@@ -208,6 +210,10 @@ export class DonutScene extends Phaser.Scene {
         if (LOOK.STAB_SHAKE > 0 && input.throttle > 0.5 && this.throttleWas <= 0.5 && this.state.spinning === 0 && share > LOOK.STAB_FROM) {
             this.cameras.main.shake(140, LOOK.STAB_SHAKE);
         }
+        // Lifting off at high revs: the exhaust backfires
+        if (input.throttle === 0 && this.throttleWas > 0 && this.state.revs >= LOOK.BACKFIRE_FROM && this.state.spinning === 0 && !this.state.stalled) {
+            this.view.backfire(Math.min(1, this.state.revs));
+        }
         this.throttleWas = input.throttle;
         let steps: number;
         if (this.labTime.frozen) {
@@ -220,6 +226,7 @@ export class DonutScene extends Phaser.Scene {
             this.previous = { angle: this.state.angle, radius: this.state.radius };
             this.stepEvents.length = 0;
             stepDonut(this.state, input, this.stepEvents);
+            this.view.tick(1 / 60);
             for (const event of this.stepEvents) this.onEvent(event);
             const car = carPosition(this.state);
             // Wheelspin lays darker rubber
@@ -253,6 +260,7 @@ export class DonutScene extends Phaser.Scene {
     }
 
     private onEvent(event: DonutEvent): void {
+        if (event.type === 'lock') this.view.backfire(1);
         if (event.type === 'overheat' || event.type === 'spin') {
             if (event.type === 'spin') this.stats.spins++;
             else this.stats.overheats++;
@@ -268,7 +276,7 @@ export class DonutScene extends Phaser.Scene {
             else this.stats.walkers++;
             this.shake(good ? 'boost' : 'hit');
             const label = this.add.text(at.x, at.y, `${good ? '+' : ''}${event.points}`, {
-                fontFamily: FONT, fontSize: '36px', color: good ? '#6dff9e' : '#ff5a4a', stroke: '#000000', strokeThickness: 6,
+                fontFamily: FONT, fontSize: '36px', color: good ? '#ffffff' : '#3a55c8', stroke: good ? '#000000' : '#ffffff', strokeThickness: 6,
             }).setOrigin(0.5);
             this.uiCamera.ignore(label);
             this.tweens.add({ targets: label, y: at.y - 70, alpha: 0, duration: 900, onComplete: () => label.destroy() });
@@ -294,7 +302,7 @@ export class DonutScene extends Phaser.Scene {
         const s = this.state;
         this.scoreText.setText(`PUNTI  ${Math.floor(s.score).toLocaleString('it-IT')}`);
         this.comboText.setText(s.combo > 1 ? `COMBO  x${s.combo.toFixed(2)}` : '');
-        this.speedText.setText(`${Math.round(s.speed * 3.6)} KM/H   RAGGIO ${s.radius.toFixed(1)} M`);
+        this.speedText.setText(`${Math.round(s.speed * 3.6)} KM/H   MAX ${Math.round(topSpeed(s) * 3.6)}${s.boost > 0.5 ? '  BOOST!' : ''}`);
 
         // The rev bar: the white (accelerating) and the green; in the green the fill is the engine's heat
         const { width, height } = this.scale;
@@ -320,6 +328,9 @@ export class DonutScene extends Phaser.Scene {
         const labelColour = s.stalled || s.spinning > 0 || (s.locked && s.heat > 0.75) ? '#ff5a4a' : s.locked ? '#6dff9e' : '#e8e2cf';
         this.revLabel.setPosition(x - 16, y + 14 * k).setColor(labelColour).setText(label);
 
+        // The steering bar is hidden for now (the balance still plays; SHOW_STEER_BAR brings it back)
+        this.steerLabel.setVisible(SHOW_STEER_BAR);
+        if (!SHOW_STEER_BAR) return;
         // The balance (steering), above: green in the middle (clean), yellow, orange, red at the edges.
         // In the white the edges are safe and the colours are dimmed; in the green they're bright.
         const bw = 440 * (this.touch ? 1.3 : 1);
