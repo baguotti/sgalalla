@@ -1014,3 +1014,63 @@ Part 2
 ------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-10-02] v3.1.0e (branch `experimental-branch`)
 - **[Release]** DERAPATE: white boosts in a row build the combo and raise the top speed, the shaped boost burst, white and navy people, exhaust backfires, Riccardo's camera and effect settings, the STERZO bar hidden. Version 3.1.0-e.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: a steering wheel, an upright rev bar (branch `experimental-branch`)
+- **[Art]** Riccardo's steering wheel (`public/assets/donut/wheel.png`, from `assets/Derapate/UI/wheel_000.png`) sits at the bottom of the screen, its centre below the bottom edge so only the top shows; it turns round its rim's centre with the steering (up to 90° at full lock, eased).
+- **[Change]** The rev bar stands upright beside the wheel: the white fills from the bottom, the green is the top; in the green the fill is the engine's heat (green, orange, flashing red). The label (GIRI, IN VERDE x2, MOTORE CALDO!, MOTORE FUSO, TESTACODA) sits on top of it.
+- **[Change]** The keyboard help line is gone.
+- **[Lab]** CAR AND CAMERA → HUD: WHEEL AND REV BAR: the wheel's place (across, down), size, turn at full lock and how quickly it follows; the rev bar's place, height and width.
+- **[S]** 71 tests, build; checked in the browser.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: the wheel is the balance (branch `experimental-branch`)
+- **[Change]** The steering wheel now shows the balance, as the STERZO bar did: it turns by itself as the drift pulls it (up to 90° at the edge) and you counter-steer to bring it back to straight: turned right, steer left; turned left, steer right. In the green it goes orange near the edge and flashes red at it (staying there is a testacoda).
+- **[S]** 71 tests, build; checked in the browser (left alone it drifted to 16°, a short counter-steer brought it back).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: the wheel with the driver's arm, people walking in (branch `experimental-branch`)
+- **[Art]** The steering wheel is Riccardo's new sprite with the driver's arm (`public/assets/donut/wheel_v3.webp`), turning round the rim's centre; placed lower and bigger (centre 1060 px down, ×0.85) and turning up to 60° at the edge (was 90°, so the arm doesn't swing too far).
+- **[Change]** People appear 14 m up the pavement and walk to their crossing before stepping onto it, so you see them coming (`PEDESTRIANS.APPROACH`, "People walk in from" in the Lab).
+- **[S]** 71 tests, build; checked in the browser.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: the wheel without the arm again (branch `experimental-branch`)
+- **[Art]** The steering wheel is Riccardo's `wheel_000.webp` (the wheel alone, as WebP): `public/assets/donut/wheel.webp`, replacing the version with the arm and the earlier PNG. Back to centre 1150 px down, ×0.7, 90° at the edge.
+- **[S]** 71 tests, build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: the car is Riccardo's renders (branch `experimental-branch`)
+- **[Art]** The car is drawn from Riccardo's renders of the full car (`assets/Derapate/Sprite macchina/Completo`, 90 frames turning on the spot, 4° apart). `scripts/donut-car-sprites.py` cuts every frame with the same window, scales them to 0.4 (320x230) and packs them into `public/assets/donut/car_full.webp` (10 columns, 2.3 MB, lossless) with `car_full.json`: the pivot (the car's centre on the ground, worked out from the frames: across, the middle of all of them; down, from the nose-on frame's bumper), the frame facing straight down the screen (12th, heading 45°; the frames turn the other way round as they go), and the car's length in pixels (side on, half the width over 0.6124 for the isometric squash). The game picks the frame for the car's heading, and draws it as long as the block car was (4.4 m × car size × zoom).
+- **[Look]** People and the exhaust flame nearer the camera than the car are drawn over it, the others behind; the car keeps a soft shadow. The revs' tints are a copy of the sprite filled with the tint's colour at its opacity over the car.
+- **[Lab]** CAR AND CAMERA → CAR: Car sprites (off: the old block car), Sprite size ×, Sprite down (to sit it on its shadow), Car shadow.
+- **[Note]** The separate body, wheels and wheel-mask renders aren't used yet.
+- **[S]** 71 tests, build; checked in the browser (the right frames as it goes round).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: the car in two layers, on springs (branch `experimental-branch`)
+- **[Art]** The car is drawn from Riccardo's separate renders: the wheels (`car_wheels.webp`, 0.6 MB) under the body (`car_body.webp`, 2.1 MB), which gives back the full car. `scripts/donut-car-sprites.py` now packs both with the same window and pivot (found from the full renders, `car.json`), and drops a frame identical to the one before it: the body folder's frame 59 repeats frame 58, which had shifted every later body frame by one. The full-car sheet is gone.
+- **[Feat]** A first suspension: the body rides on a damped spring over the wheels (render only, not the rules): it leans out of the turn and tilts a little with the cornering, squats back speeding up and dips forward slowing, rumbles at speed, and bounces when hitting someone or in a testacoda. Lab, CAR AND CAMERA → CAR: lean, tilt, squat, bump, rumble, bounce (springs' frequency), damping; 0 turns each off.
+- **[Note]** The Wheels-mask renders (the near-side wheels) aren't used: the wheels under the body already match the full car.
+- **[S]** 71 tests, build; checked in the browser (layers line up; the body leans up to about 9 px and 2° at full cornering).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: the body stays on its wheels (branch `experimental-branch`)
+- **[Fix]** The wheels looked off the car: the suspension slid the body sideways (up to about 9 px) and tilted it, pulling the arches off the wheels. (The layers themselves line up in every frame: checked against the full renders.) The body now only travels straight up and down over the wheels, at most 3 px (`SUSP_TRAVEL`): it sits a little lower loaded in the turn, lifts speeding up and dips slowing, rumbles at speed, bounces on hits. The sideways lean and the tilt are gone.
+- **[S]** 71 tests, build; checked in the browser (body and wheels never more than 0 px apart sideways, about 2 px up and down, no tilt).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: voxel tyre smoke (branch `experimental-branch`)
+- **[Look]** Smoke from the two rear tyres as little grey cubes (drawn like the junction's blocks: two shaded sides and a top): they kick back off the tyre, rise, grow to four times their size and fade, thickest just after they appear. More the harder the wheels spin: with the pedal down and the revs up, the most in a testacoda, a wisp coasting off the pedal or stalled, none standing still. Nearer the camera than the car they're drawn over it. Render only. Lab, CAR AND CAMERA → CAR: Tyre smoke (cubes a second, 80; 0 off), size, how long it lasts, how fast it rises, thickness.
+- **[S]** 71 tests, build; checked in the browser (a trail of rising cubes behind the car at speed).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE: tyre marks from the rear tyres, finer smoke (branch `experimental-branch`)
+- **[Fix]** The tyre marks came from the car's centre. They now come from the two rear tyres, placed from Riccardo's wheel renders: the rear axle 1.29 m behind the centre and the tyres 0.77 m either side (both times the car size; `REAR_AXLE`, `HALF_TRACK` in the Lab). The same measurements put the car's centre on the ground within a pixel of the sprite's pivot. The smoke comes from the same two tyres.
+- **[Look]** Better marks: rubber is laid on a texture over the road, a strip as wide as the tyre on the ground (0.26 m × car size, drawn in perspective, a little ragged, with a darker core), darker with the pedal down and the revs up, a trace when coasting; laps over the same place build up darker, and it fades slowly (3% a second) instead of the trail being cut off. Drawn once per step instead of redrawing the whole trail every frame. Cleared on a restart or when the Lab moves the camera or the junction.
+- **[Look]** The smoke is made of cubes about half the size, three and a half times as many (260 a second at full wheelspin, up to 800 at once), the same amount of smoke.
+- **[S]** 71 tests, build; checked in the browser (the strip starts under the near rear tyre; frames about 0.6 ms median with the smoke).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] v3.1.1e (branch `experimental-branch`)
+- **[Release]** DERAPATE: the steering wheel HUD (the balance) and the upright rev bar, people walking in, Riccardo's car renders in two layers on springs, voxel tyre smoke, tyre marks from the rear tyres. Version 3.1.1-e.

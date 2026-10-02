@@ -113,6 +113,8 @@ export const PEDESTRIANS = {
     PER_CROSSING: 1,
     /** Share of them that are type 2 (a boost when hit). */
     BOOSTER_SHARE: 0.91,
+    /** How far up the pavement people appear before walking to their crossing (metres), so you see them coming. */
+    APPROACH: 14,
     WALK_SPEED: 1.5,
     JOG_SPEED: 2.3,
     /** Car and person closer than this collide (metres). */
@@ -148,6 +150,8 @@ export interface Pedestrian {
     /** Knocked down: shown a moment longer, no longer hit. */
     hit: boolean;
     hitTimer: number;
+    /** Metres still to walk along the pavement before reaching the crossing (they come in from further up the road). */
+    approach: number;
 }
 
 export interface DonutInput {
@@ -239,7 +243,8 @@ export function drawnRadius(radius: number, slip: number): number {
 /** Where a person is on the ground. */
 export function pedestrianPosition(p: Pedestrian): { x: number; y: number } {
     const across = p.along * (JUNCTION.ROAD_HALF_WIDTH + 1);
-    const at = JUNCTION.CROSSING_AT;
+    // Still on the pavement: further out along the road, away from the centre
+    const at = JUNCTION.CROSSING_AT + (p.approach ?? 0);
     switch (p.crossing) {
         case 0: return { x: across, y: -at };
         case 1: return { x: at, y: across };
@@ -428,6 +433,7 @@ function stepPedestrians(state: DonutState, events: DonutEvent[]): void {
             state.pedestrians.push({
                 id: state.nextId++, kind: booster ? 'booster' : 'walker', crossing,
                 along: -direction, direction, speed: booster ? PEDESTRIANS.JOG_SPEED : PEDESTRIANS.WALK_SPEED, hit: false, hitTimer: 0,
+                approach: PEDESTRIANS.APPROACH,
             });
         }
     }
@@ -439,7 +445,9 @@ function stepPedestrians(state: DonutState, events: DonutEvent[]): void {
             p.hitTimer -= STEP_S;
             continue;
         }
-        p.along += (p.direction * p.speed * STEP_S) / width;
+        // Up the pavement first, then across
+        if (p.approach > 0) p.approach = Math.max(0, p.approach - p.speed * STEP_S);
+        else p.along += (p.direction * p.speed * STEP_S) / width;
         const at = pedestrianPosition(p);
         // Standing still or spinning on the spot, the car hits no one
         if (state.spinning > 0 || state.speed < 0.5 || Math.hypot(at.x - car.x, at.y - car.y) > PEDESTRIANS.HIT_DISTANCE) continue;

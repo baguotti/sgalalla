@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { getConfirmButtonIndex } from '../input/JoyConMapper';
 import { DonutLab, loadDonutTuning } from '../minigames/donut/DonutLab';
 import { LOOK } from '../minigames/donut/DonutLook';
-import { DonutRenderer, carHeading, iso } from '../minigames/donut/DonutRenderer';
+import { CAR_SHEET, DonutRenderer, carHeading, iso, type CarSheetInfo } from '../minigames/donut/DonutRenderer';
 import { DonutTouch } from '../minigames/donut/DonutTouch';
 import { enterFullscreenOnPhone, isPhone } from '../input/Touch';
 import {
@@ -29,6 +29,10 @@ const TRIGGER_DEAD_ZONE = 0.1;
 const STICK_DEAD_ZONE = 0.15;
 const FONT = '"Pixeloid Sans"';
 const LAB_OPEN_KEY = 'sgalalla.donutLabOpen';
+/** The car sheet's frame size (scripts/donut-car-sprites.py prints it; the loader needs it before the JSON is read). */
+const CAR_FRAME = { width: 320, height: 230 };
+/** The steering wheel (Riccardo's art), and the rim's centre (the turning point) as a share of the image. */
+const WHEEL = { key: 'donut_wheel', path: 'assets/donut/wheel.webp', originX: 507.5 / 1024, originY: 497.5 / 1024 };
 /** The STERZO bar above the rev bar: hidden for now. */
 const SHOW_STEER_BAR = false;
 
@@ -56,6 +60,9 @@ export class DonutScene extends Phaser.Scene {
     private speedText!: Phaser.GameObjects.Text;
     private balance!: Phaser.GameObjects.Graphics;
     private revLabel!: Phaser.GameObjects.Text;
+    private wheel!: Phaser.GameObjects.Image;
+    /** The wheel's drawn turn (radians, eased). */
+    private wheelAngle = 0;
     private steerLabel!: Phaser.GameObjects.Text;
     private spinText!: Phaser.GameObjects.Text;
 
@@ -63,11 +70,18 @@ export class DonutScene extends Phaser.Scene {
         super({ key: 'DonutScene' });
     }
 
+    preload(): void {
+        this.load.image(WHEEL.key, WHEEL.path);
+        this.load.spritesheet(CAR_SHEET.body, CAR_SHEET.bodyPath, { frameWidth: CAR_FRAME.width, frameHeight: CAR_FRAME.height });
+        this.load.spritesheet(CAR_SHEET.wheels, CAR_SHEET.wheelsPath, { frameWidth: CAR_FRAME.width, frameHeight: CAR_FRAME.height });
+        this.load.json(CAR_SHEET.json, CAR_SHEET.jsonPath);
+    }
+
     create(): void {
         // The Lab's saved changes, on this browser
         loadDonutTuning();
         this.cameras.main.setBackgroundColor('#b8b1a4').setZoom(1);
-        this.view = new DonutRenderer(this);
+        this.view = new DonutRenderer(this, this.cache.json.get(CAR_SHEET.json) as CarSheetInfo ?? null);
         this.labTime.scale = 1;
         this.labTime.frozen = false;
         this.newRun();
@@ -80,8 +94,11 @@ export class DonutScene extends Phaser.Scene {
         this.comboText = this.add.text(width - 40, 84, '', { ...style, fontSize: '28px', color: '#8ab4f8' }).setOrigin(1, 0);
         this.speedText = this.add.text(40, 84, '', { ...style, fontSize: '28px' });
         this.spinText = this.add.text(width / 2, height * 0.3, '', { ...style, fontSize: '64px', color: '#ff5a4a' }).setOrigin(0.5);
+        // The steering wheel at the bottom: only its top shows, turning with the steering
+        this.wheel = this.add.image(0, 0, WHEEL.key).setOrigin(WHEEL.originX, WHEEL.originY);
+        this.wheelAngle = 0;
         this.balance = this.add.graphics();
-        this.revLabel = this.add.text(0, 0, 'GIRI', { ...style, fontSize: '22px', strokeThickness: 5 }).setOrigin(1, 0.5);
+        this.revLabel = this.add.text(0, 0, 'GIRI', { ...style, fontSize: '22px', strokeThickness: 5 }).setOrigin(0.5, 1);
         this.steerLabel = this.add.text(0, 0, 'STERZO', { ...style, fontSize: '20px', strokeThickness: 5 }).setOrigin(1, 0.5);
         this.throttleWas = 0;
         this.touch = null;
@@ -98,10 +115,6 @@ export class DonutScene extends Phaser.Scene {
             this.comboText.setY(100);
             this.speedText.setY(100);
             this.input.once('pointerup', () => enterFullscreenOnPhone(this));
-        } else {
-            this.add.text(width / 2, height - 22,
-                'ACCELERA: ↑ / W / J / SPAZIO     BILANCIA: ← →     R: RICOMINCIA     L: LAB     ESC: MENU',
-                { ...style, fontSize: '18px', color: '#e8e2cf', strokeThickness: 4 }).setOrigin(0.5, 1);
         }
 
         // Everything made after the junction is the HUD, on its own camera
@@ -229,8 +242,10 @@ export class DonutScene extends Phaser.Scene {
             this.view.tick(1 / 60);
             for (const event of this.stepEvents) this.onEvent(event);
             const car = carPosition(this.state);
-            // Wheelspin lays darker rubber
-            if (this.state.spinning === 0) this.view.addMark(car.x, car.y, 0.35 + 0.65 * this.state.revs);
+            // Rubber under the rear tyres: dark with the pedal down, a trace coasting, none spinning or standing still
+            const st = this.state;
+            const strength = st.spinning > 0 || st.speed < 0.3 ? 0 : st.lifted === 0 ? 0.45 + 0.55 * st.revs : 0.2;
+            this.view.addMarks(car.x, car.y, carHeading(st, st.angle), strength);
         }
         this.drawFrame();
         this.updateHud();
@@ -262,8 +277,12 @@ export class DonutScene extends Phaser.Scene {
     private onEvent(event: DonutEvent): void {
         if (event.type === 'lock') this.view.backfire(1);
         if (event.type === 'overheat' || event.type === 'spin') {
-            if (event.type === 'spin') this.stats.spins++;
-            else this.stats.overheats++;
+            if (event.type === 'spin') {
+                this.stats.spins++;
+                this.view.bump(1);
+            } else {
+                this.stats.overheats++;
+            }
             this.shake('hit');
             this.spinText.setText(event.type === 'overheat'
                 ? `MOTORE FUSO!  -${DONUT.OVERHEAT_PENALTY}`
@@ -275,6 +294,7 @@ export class DonutScene extends Phaser.Scene {
             if (good) this.stats.boosters++;
             else this.stats.walkers++;
             this.shake(good ? 'boost' : 'hit');
+            this.view.bump(good ? 0.5 : 1);
             const label = this.add.text(at.x, at.y, `${good ? '+' : ''}${event.points}`, {
                 fontFamily: FONT, fontSize: '36px', color: good ? '#ffffff' : '#3a55c8', stroke: good ? '#000000' : '#ffffff', strokeThickness: 6,
             }).setOrigin(0.5);
@@ -295,7 +315,8 @@ export class DonutScene extends Phaser.Scene {
         const r = drawnRadius(radius, s.slip);
         const x = DONUT.CENTRE_X + Math.cos(angle) * r;
         const y = DONUT.CENTRE_Y + Math.sin(angle) * r;
-        this.view.draw({ state: s, x, y, radius, heading: carHeading(s, angle) });
+        const dt = this.labTime.frozen ? 0 : (this.game.loop.delta / 1000) * this.labTime.scale;
+        this.view.draw({ state: s, x, y, radius, heading: carHeading(s, angle), dt });
     }
 
     private updateHud(): void {
@@ -304,29 +325,46 @@ export class DonutScene extends Phaser.Scene {
         this.comboText.setText(s.combo > 1 ? `COMBO  x${s.combo.toFixed(2)}` : '');
         this.speedText.setText(`${Math.round(s.speed * 3.6)} KM/H   MAX ${Math.round(topSpeed(s) * 3.6)}${s.boost > 0.5 ? '  BOOST!' : ''}`);
 
-        // The rev bar: the white (accelerating) and the green; in the green the fill is the engine's heat
-        const { width, height } = this.scale;
-        // On a phone everything is drawn bigger (the screen is small), between the thumb controls
-        const k = this.touch ? 1.6 : 1;
-        const barWidth = 720;
-        const x = width / 2 - barWidth / 2;
-        const y = height - (this.touch ? 110 : 92);
-        const at = (revs: number) => x + barWidth * revs;
+        const { width } = this.scale;
         const g = this.balance.clear();
-        g.fillStyle(0x000000, 0.55).fillRect(x - 6, y - 6, barWidth + 12, 40 * k);
-        g.fillStyle(0x4a4a50).fillRect(x, y, barWidth, 28 * k);
-        g.fillStyle(0x2f6b3a).fillRect(at(DONUT.GREEN_AT), y, at(1) - at(DONUT.GREEN_AT), 28 * k);
-        // White up to the green, then the heat: green, turning orange and flashing red near overheating
-        g.fillStyle(0xe8e2cf).fillRect(x, y + 6 * k, at(Math.min(s.revs, DONUT.GREEN_AT)) - x, 16 * k);
+
+        // The steering wheel is the balance (what the STERZO bar showed): it turns by itself as the drift
+        // pulls it, and you counter-steer to bring it back to straight (the tail out one way turns it the
+        // other way: steer right when it's turned left). At full turn it's at the edge: in the green it
+        // goes orange near there and flashes red at it (a moment there is a testacoda).
+        const dt = Math.min(0.1, this.game.loop.delta / 1000);
+        const turn = (-s.slip * LOOK.WHEEL_TURN * Math.PI) / 180;
+        this.wheelAngle += (turn - this.wheelAngle) * Math.min(1, LOOK.WHEEL_EASE * dt);
+        this.wheel.setPosition(LOOK.WHEEL_X, LOOK.WHEEL_Y).setScale(LOOK.WHEEL_SCALE).setRotation(this.wheelAngle);
+        const atEdge = s.locked && s.overEdge > 0;
+        if (atEdge && Math.floor(s.steps / 4) % 2 === 0) this.wheel.setTint(0xff4a3a);
+        else if (s.locked && Math.abs(s.slip) > 0.8) this.wheel.setTint(0xffb070);
+        else this.wheel.clearTint();
+
+        // The rev bar, upright beside the wheel: the white fills from the bottom, the green on top;
+        // in the green the fill is the engine's heat, green turning orange and flashing red near overheating
+        const k = this.touch ? 1.3 : 1;
+        const barW = LOOK.REV_BAR_WIDTH * k;
+        const barH = LOOK.REV_BAR_HEIGHT;
+        const x = LOOK.REV_BAR_X - barW / 2;
+        const bottom = LOOK.REV_BAR_Y;
+        const top = bottom - barH;
+        const at = (revs: number) => bottom - barH * revs;
+        const inset = Math.max(3, barW * 0.2);
+        g.fillStyle(0x000000, 0.55).fillRect(x - 6, top - 6, barW + 12, barH + 12);
+        g.fillStyle(0x4a4a50).fillRect(x, top, barW, barH);
+        g.fillStyle(0x2f6b3a).fillRect(x, top, barW, at(DONUT.GREEN_AT) - top);
+        g.fillStyle(0xe8e2cf).fillRect(x + inset, at(Math.min(s.revs, DONUT.GREEN_AT)), barW - 2 * inset, bottom - at(Math.min(s.revs, DONUT.GREEN_AT)));
         if (s.locked) {
             const hot = s.heat > 0.75 && Math.floor(s.steps / 4) % 2 === 0;
             const colour = hot ? 0xff5a4a : s.heat > 0.5 ? 0xffa040 : 0x6dff9e;
-            g.fillStyle(colour).fillRect(at(DONUT.GREEN_AT), y + 6 * k, at(s.revs) - at(DONUT.GREEN_AT), 16 * k);
-            g.lineStyle(3, colour).strokeRect(at(DONUT.GREEN_AT) - 2, y - 2, at(1) - at(DONUT.GREEN_AT) + 4, 28 * k + 4);
+            g.fillStyle(colour).fillRect(x + inset, at(s.revs), barW - 2 * inset, at(DONUT.GREEN_AT) - at(s.revs));
+            g.lineStyle(3, colour).strokeRect(x - 2, top - 2, barW + 4, at(DONUT.GREEN_AT) - top + 4);
         }
         const label = s.stalled ? 'MOTORE FUSO' : s.spinning > 0 ? 'TESTACODA' : s.locked ? (s.heat > 0.75 ? 'MOTORE CALDO!' : 'IN VERDE  x2') : 'GIRI';
         const labelColour = s.stalled || s.spinning > 0 || (s.locked && s.heat > 0.75) ? '#ff5a4a' : s.locked ? '#6dff9e' : '#e8e2cf';
-        this.revLabel.setPosition(x - 16, y + 14 * k).setColor(labelColour).setText(label);
+        this.revLabel.setPosition(LOOK.REV_BAR_X, top - 14).setColor(labelColour).setText(label);
+        const y = this.scale.height - 92;
 
         // The steering bar is hidden for now (the balance still plays; SHOW_STEER_BAR brings it back)
         this.steerLabel.setVisible(SHOW_STEER_BAR);

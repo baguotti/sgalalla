@@ -1,0 +1,11 @@
+{
+  "frameWidth": 320,
+  "frameHeight": 230,
+  "frames": 90,
+  "columns": 10,
+  "pivotX": 159.8,
+  "pivotY": 152.6,
+  "noseDownFrame": 11,
+  "degreesPerFrame": 4.0,
+  "lengthPx": 254.4
+}

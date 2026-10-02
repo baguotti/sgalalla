@@ -36,6 +36,7 @@ const COLOURS = {
     walker: 0x23306b,
     booster: 0xf4f2ec,
     shadow: 0x000000,
+    smoke: 0xe4e4e8,
 };
 
 /** A point on the ground (or `z` metres above it) on screen. */
@@ -51,50 +52,168 @@ export interface DonutView {
     radius: number;
     /** Which way the car's nose points. */
     heading: number;
+    /** Seconds since the last frame (0 while frozen), for the suspension. */
+    dt: number;
 }
+
+/**
+ * The car's sprite sheets (scripts/donut-car-sprites.py: Riccardo's renders of the
+ * car turning on the spot), the body and the wheels as separate layers with the
+ * same frames, and what their JSON says: frame size, where the car's centre on
+ * the ground is in a frame, which frame faces straight down the screen (heading
+ * 45°), degrees per frame (the frames turn the other way round as they go), and
+ * the car's length in a frame's pixels.
+ */
+export const CAR_SHEET = {
+    body: 'donut_car_body', bodyPath: 'assets/donut/car_body.webp',
+    wheels: 'donut_car_wheels', wheelsPath: 'assets/donut/car_wheels.webp',
+    json: 'donut_car_info', jsonPath: 'assets/donut/car.json',
+};
+export interface CarSheetInfo {
+    frameWidth: number;
+    frameHeight: number;
+    frames: number;
+    pivotX: number;
+    pivotY: number;
+    noseDownFrame: number;
+    degreesPerFrame: number;
+    lengthPx: number;
+}
+/** The most smoke cubes in the air at once. */
+const SMOKE_MAX = 800;
+/** The car is drawn as long as the block car was: 4.4 m, times LOOK.CAR_SIZE. */
+const CAR_LENGTH_M = 4.4;
 
 export class DonutRenderer {
     readonly graphics: Phaser.GameObjects.Graphics;
     /** The ground and everything fixed on it, drawn once (again when the Lab moves it). */
     private readonly ground: Phaser.GameObjects.Graphics;
-    /** Recent car positions: the tyre marks. */
-    private readonly marks: { x: number; y: number; strength: number }[] = [];
+    /** The car: the wheels, the body over them (on its springs), a copy of the body filled with the revs' tint; and what's nearer the camera than the car. */
+    private readonly wheels: Phaser.GameObjects.Sprite | null = null;
+    private readonly body: Phaser.GameObjects.Sprite | null = null;
+    private readonly bodyTint: Phaser.GameObjects.Sprite | null = null;
+    /** The body's offset on its springs (screen px; only up and down), how fast it's moving, and the speed last frame. */
+    private readonly spring = { x: 0, y: 0, vx: 0, vy: 0, tilt: 0, speed: 0 };
+    /** Tyre smoke: little cubes on the ground (metres), rising, growing and fading; and the part-puff due. */
+    private readonly smoke: { x: number; y: number; z: number; vx: number; vy: number; size: number; age: number; life: number; shade: number }[] = [];
+    private smokeDue = 0;
+    private readonly front: Phaser.GameObjects.Graphics;
+    private readonly sheet: CarSheetInfo | null;
+    /**
+     * The tyre marks: rubber laid on a texture over the road, a strip under
+     * each rear tyre, built up lap after lap and fading slowly. The brush draws
+     * the new strips each step; the fader rubs the old ones out a little.
+     */
+    private readonly rubber: Phaser.GameObjects.RenderTexture;
+    private readonly brush: Phaser.GameObjects.Graphics;
+    private readonly fader: Phaser.GameObjects.Graphics;
+    private brushDirty = false;
+    private fadeDue = 0;
+    /** Where each rear tyre was at the last mark (null: start a new strip). */
+    private readonly tyres: ({ x: number; y: number } | null)[] = [null, null];
 
-    constructor(scene: Phaser.Scene) {
+    constructor(scene: Phaser.Scene, sheet: CarSheetInfo | null = null) {
         this.ground = scene.add.graphics();
         drawJunction(this.ground);
+        const { width, height } = scene.scale;
+        this.rubber = scene.add.renderTexture(0, 0, width, height).setOrigin(0, 0);
+        this.brush = new Phaser.GameObjects.Graphics(scene);
+        this.fader = new Phaser.GameObjects.Graphics(scene);
         this.graphics = scene.add.graphics();
+        this.sheet = sheet;
+        if (sheet) {
+            const originX = sheet.pivotX / sheet.frameWidth;
+            const originY = sheet.pivotY / sheet.frameHeight;
+            this.wheels = scene.add.sprite(0, 0, CAR_SHEET.wheels, 0).setOrigin(originX, originY);
+            this.body = scene.add.sprite(0, 0, CAR_SHEET.body, 0).setOrigin(originX, originY);
+            this.bodyTint = scene.add.sprite(0, 0, CAR_SHEET.body, 0).setOrigin(originX, originY);
+        }
+        this.front = scene.add.graphics();
     }
 
-    /** Called each step with the car's position: the tyre marks follow it, darker the harder the wheels spin (0 to 1). */
-    addMark(x: number, y: number, strength = 1): void {
-        this.marks.push({ x, y, strength });
-        while (this.marks.length > Math.max(2, LOOK.MARK_TRAIL)) this.marks.shift();
+    /** How much bigger than life the car is drawn: the size the rear tyres, marks and smoke follow. */
+    private carScale(): number {
+        return LOOK.CAR_SIZE * (this.sheet && LOOK.CAR_SPRITES !== 0 ? LOOK.CAR_SPRITE_SCALE : 1);
     }
 
-    /** The junction again, after the Lab changed its size or the camera. */
+    /** Where the two rear tyres touch the ground, for the car at x, y pointing along `heading`. */
+    rearTyres(x: number, y: number, heading: number): { x: number; y: number }[] {
+        const k = this.carScale();
+        const c = Math.cos(heading);
+        const s = Math.sin(heading);
+        const back = LOOK.REAR_AXLE * k;
+        return [-1, 1].map(side => ({
+            x: x - c * back - s * side * LOOK.HALF_TRACK * k,
+            y: y - s * back + c * side * LOOK.HALF_TRACK * k,
+        }));
+    }
+
+    /**
+     * Called each step with the car: a strip of rubber under each rear tyre from
+     * where it was, darker the harder the wheels spin (`strength` 0 to 1; 0 lifts
+     * the tyres off: the next mark starts a new strip).
+     */
+    addMarks(x: number, y: number, heading: number, strength: number): void {
+        const tyres = this.rearTyres(x, y, heading);
+        const width = LOOK.MARK_WIDTH * this.carScale();
+        tyres.forEach((tyre, i) => {
+            const last = this.tyres[i];
+            this.tyres[i] = strength > 0 ? tyre : null;
+            if (!last || strength <= 0) return;
+            const dx = tyre.x - last.x;
+            const dy = tyre.y - last.y;
+            const length = Math.hypot(dx, dy);
+            if (length < 1e-4 || length > 2) return;
+            // A strip as wide as the tyre on the ground, a little ragged; a darker core where it bites hardest
+            const nx = -dy / length;
+            const ny = dx / length;
+            const alpha = Math.min(1, LOOK.MARK_DARKNESS * strength * (0.8 + 0.2 * Math.random()));
+            for (const [share, a] of [[1, alpha * 0.6], [0.45, alpha * 0.55]] as const) {
+                const h = (width * share * (0.9 + 0.2 * Math.random())) / 2;
+                this.brush.fillStyle(COLOURS.marks, a).fillPoints([
+                    iso(last.x + nx * h, last.y + ny * h), iso(tyre.x + nx * h, tyre.y + ny * h),
+                    iso(tyre.x - nx * h, tyre.y - ny * h), iso(last.x - nx * h, last.y - ny * h),
+                ], true);
+            }
+            this.brushDirty = true;
+        });
+    }
+
+    /** The junction again, after the Lab changed its size or the camera (the rubber can't follow: it's cleared). */
     redrawGround(): void {
         drawJunction(this.ground.clear());
+        this.clearMarks();
     }
 
-    /** A fresh start: no rubber on the road. */
+    /** A fresh start: no rubber on the road, no smoke. */
     clearMarks(): void {
-        this.marks.length = 0;
+        this.rubber.clear();
+        this.brush.clear();
+        this.brushDirty = false;
+        this.tyres[0] = this.tyres[1] = null;
+        this.smoke.length = 0;
+    }
+
+    /** The new rubber onto the road, and every couple of seconds the old rubbed out a little. */
+    private layRubber(dt: number): void {
+        if (this.brushDirty) {
+            this.rubber.draw(this.brush);
+            this.brush.clear();
+            this.brushDirty = false;
+        }
+        this.fadeDue += dt;
+        if (this.fadeDue >= 2 && LOOK.MARK_FADE > 0) {
+            const share = 1 - Math.pow(1 - Math.min(0.99, LOOK.MARK_FADE), this.fadeDue);
+            this.fadeDue = 0;
+            const { width, height } = this.rubber;
+            this.fader.clear().fillStyle(0xffffff, share).fillRect(0, 0, width, height);
+            this.rubber.erase(this.fader);
+        }
     }
 
     draw(view: DonutView): void {
         const g = this.graphics.clear();
-
-        // Rubber on the road: the donuts so far, the oldest faintest
-        for (let i = 1; i < this.marks.length; i++) {
-            const a = this.marks[i - 1];
-            const b = this.marks[i];
-            if (Math.hypot(a.x - b.x, a.y - b.y) > 2) continue;
-            const from = iso(a.x, a.y);
-            const to = iso(b.x, b.y);
-            const alpha = LOOK.MARK_DARKNESS * (0.18 + 0.82 * (i / this.marks.length)) * b.strength;
-            g.lineStyle(LOOK.MARK_WIDTH, COLOURS.marks, Math.min(1, alpha)).lineBetween(from.x, from.y, to.x, to.y);
-        }
+        this.layRubber(Math.min(0.1, view.dt));
 
         // Where the donut runs now, faintly
         g.lineStyle(2, COLOURS.ring, LOOK.RING);
@@ -107,19 +226,159 @@ export class DonutRenderer {
         }
         g.strokePath();
 
-        // The car and the people, farthest first
-        const things: { depth: number; draw: () => void }[] = [
-            { depth: view.x + view.y, draw: () => {
-                drawCar(g, view.x, view.y, view.heading, this.bodyColour(view.state));
-                this.drawBackfire(g, view.x, view.y, view.heading);
-            } },
-            ...view.state.pedestrians.map(p => {
-                const at = pedestrianPosition(p);
-                return { depth: at.x + at.y, draw: () => drawPedestrian(g, p, at.x, at.y) };
-            }),
-        ];
-        things.sort((a, b) => a.depth - b.depth);
-        for (const thing of things) thing.draw();
+        const f = this.front.clear();
+        const tint = this.revsTint(view.state);
+        const sprites = this.sheet !== null && LOOK.CAR_SPRITES !== 0;
+        this.wheels?.setVisible(sprites);
+        this.body?.setVisible(sprites);
+        this.bodyTint?.setVisible(sprites && tint.alpha > 0.01);
+        if (!sprites || !this.sheet || !this.wheels || !this.body || !this.bodyTint) {
+            // The block car: the car and the people, farthest first
+            const things: { depth: number; draw: () => void }[] = [
+                { depth: view.x + view.y, draw: () => {
+                    drawCar(g, view.x, view.y, view.heading, mix(COLOURS.car, tint.colour, tint.alpha));
+                    this.drawBackfire(g, view.x, view.y, view.heading);
+                } },
+                ...view.state.pedestrians.map(p => {
+                    const at = pedestrianPosition(p);
+                    return { depth: at.x + at.y, draw: () => drawPedestrian(g, p, at.x, at.y) };
+                }),
+            ];
+            things.sort((a, b) => a.depth - b.depth);
+            for (const thing of things) thing.draw();
+            this.updateSmoke(view);
+            this.drawSmoke(g, g, Infinity);
+            return;
+        }
+
+        // The sprite car: its shadow, the people behind it, the car (and its tint), the people in front
+        const carDepth = view.x + view.y;
+        const shadow = iso(view.x, view.y);
+        const k = LOOK.CAR_SIZE;
+        g.fillStyle(COLOURS.shadow, LOOK.CAR_SHADOW).fillEllipse(shadow.x, shadow.y, 4.6 * k * isoX(), 4.6 * k * isoY());
+        const people = view.state.pedestrians.map(p => ({ p, at: pedestrianPosition(p) }))
+            .sort((a, b) => (a.at.x + a.at.y) - (b.at.x + b.at.y));
+        for (const { p, at } of people) drawPedestrian(at.x + at.y > carDepth ? f : g, p, at.x, at.y);
+        // The exhaust is behind the car when the rear points away from the camera
+        const rearDepth = -Math.cos(view.heading) - Math.sin(view.heading);
+        this.drawBackfire(rearDepth > 0 ? f : g, view.x, view.y, view.heading);
+        this.updateSmoke(view);
+        this.drawSmoke(g, f, carDepth);
+
+        const sheet = this.sheet;
+        const degrees = (view.heading * 180) / Math.PI;
+        const frame = ((Math.round(sheet.noseDownFrame + (45 - degrees) / sheet.degreesPerFrame) % sheet.frames) + sheet.frames) % sheet.frames;
+        const scale = ((CAR_LENGTH_M * LOOK.CAR_SIZE * LOOK.SCALE) / sheet.lengthPx) * LOOK.CAR_SPRITE_SCALE;
+        const y = shadow.y + LOOK.CAR_SPRITE_Y;
+        this.wheels.setPosition(shadow.x, y).setScale(scale).setFrame(frame);
+        // The body rides on its springs over the wheels
+        const spring = this.suspension(view);
+        const bodyX = shadow.x + spring.x;
+        const bodyY = y + spring.y;
+        this.body.setPosition(bodyX, bodyY).setScale(scale).setFrame(frame).setRotation(spring.tilt);
+        this.bodyTint.setPosition(bodyX, bodyY).setScale(scale).setFrame(frame).setRotation(spring.tilt)
+            .setTintFill(tint.colour).setAlpha(tint.alpha);
+    }
+
+    /**
+     * Tyre smoke: puffs of little cubes from the two rear tyres, more the harder
+     * the wheels spin (the pedal down and the revs up, the most in a testacoda),
+     * none standing still. Each cube drifts back off the tyre, rises, grows and
+     * fades. Render only (it doesn't touch the rules).
+     */
+    private updateSmoke(view: DonutView): void {
+        const dt = Math.min(0.05, view.dt);
+        if (dt <= 0) return;
+        const state = view.state;
+        for (const puff of this.smoke) {
+            puff.age += dt;
+            puff.x += puff.vx * dt;
+            puff.y += puff.vy * dt;
+            puff.z += LOOK.SMOKE_RISE * dt * (1 - puff.age / puff.life * 0.5);
+            puff.vx *= 1 - 1.5 * dt;
+            puff.vy *= 1 - 1.5 * dt;
+        }
+        for (let i = this.smoke.length - 1; i >= 0; i--) if (this.smoke[i].age >= this.smoke[i].life) this.smoke.splice(i, 1);
+
+        const moving = Math.min(1, state.speed / DONUT.SPEED_MAX);
+        const spinning = state.spinning > 0 ? 1.5 : 0;
+        const pedal = state.lifted === 0 ? 0.25 + 0.75 * state.revs : 0.15 * state.revs;
+        const amount = state.stalled ? 0.1 * moving : Math.max(spinning, pedal * (0.3 + 0.7 * moving));
+        if (amount <= 0 || LOOK.SMOKE <= 0) return;
+        this.smokeDue += LOOK.SMOKE * amount * dt;
+        const c = Math.cos(view.heading);
+        const s = Math.sin(view.heading);
+        const tyres = this.rearTyres(view.x, view.y, view.heading);
+        while (this.smokeDue >= 1 && this.smoke.length < SMOKE_MAX) {
+            this.smokeDue -= 1;
+            // One rear tyre or the other
+            const tyre = tyres[Math.random() < 0.5 ? 0 : 1];
+            const kick = 0.8 + Math.random() * 1.2;
+            this.smoke.push({
+                x: tyre.x + (Math.random() - 0.5) * 0.4,
+                y: tyre.y + (Math.random() - 0.5) * 0.4,
+                z: 0.1,
+                vx: -c * kick + (Math.random() - 0.5) * 0.6,
+                vy: -s * kick + (Math.random() - 0.5) * 0.6,
+                size: (0.25 + Math.random() * 0.25) * LOOK.SMOKE_SIZE,
+                age: 0,
+                life: LOOK.SMOKE_LIFE * (0.7 + Math.random() * 0.6),
+                shade: 0.85 + Math.random() * 0.15,
+            });
+        }
+        if (this.smoke.length >= SMOKE_MAX) this.smokeDue = 0;
+    }
+
+    /** The smoke cubes, farthest first: those farther than `depth` (the car) on `behind`, the rest on `front`. */
+    private drawSmoke(behind: Phaser.GameObjects.Graphics, front: Phaser.GameObjects.Graphics, depth: number): void {
+        const puffs = this.smoke.slice().sort((a, b) => (a.x + a.y) - (b.x + b.y));
+        for (const puff of puffs) {
+            const t = puff.age / puff.life;
+            const size = puff.size * (1 + 3 * t);
+            // Thickest just after it appears, then thinning out
+            const alpha = LOOK.SMOKE_OPACITY * Math.min(1, t * 8) * (1 - t) * (1 - t);
+            if (alpha < 0.01) continue;
+            voxel(puff.x + puff.y > depth ? front : behind, puff.x, puff.y, puff.z, size, shade(COLOURS.smoke, puff.shade), alpha);
+        }
+    }
+
+    /** A jolt to the suspension (a hit, a landing): the body bounces, `strength` 0 to 1. */
+    bump(strength = 1): void {
+        this.spring.vy += LOOK.SUSP_BUMP * strength * 12;
+    }
+
+    /**
+     * The body on its springs: it only travels straight up and down over the
+     * wheels (sliding or tilting it would pull the arches off them), at most
+     * LOOK.SUSP_TRAVEL px. Loaded going round, it sits lower; speeding up it
+     * lifts, slowing it dips; at speed it rumbles; bumps bounce it. A spring and
+     * a damper bring it back (LOOK.SUSP_FREQ, LOOK.SUSP_DAMP).
+     */
+    private suspension(view: DonutView): { x: number; y: number; tilt: number } {
+        const sp = this.spring;
+        const dt = Math.min(0.05, view.dt);
+        const state = view.state;
+        if (dt <= 0) return sp;
+        // Going round: how hard (1 at top speed on the widest donut)
+        const top = DONUT.SPEED_MAX * DONUT.SPEED_MAX / DONUT.RADIUS_MAX;
+        const cornering = state.spinning > 0 ? 0 : Math.min(1.5, (state.speed * state.speed) / Math.max(1, view.radius) / top);
+        // Speeding up or slowing down (1 for a second from standing to top speed)
+        const accel = Math.max(-2, Math.min(2, (state.speed - sp.speed) / dt / DONUT.SPEED_MAX));
+        sp.speed = state.speed;
+        const rumble = LOOK.SUSP_RUMBLE * Math.min(1.5, state.speed / DONUT.SPEED_MAX) * (Math.random() * 2 - 1);
+        const target = LOOK.SUSP_LEAN * cornering - LOOK.SUSP_SQUAT * accel + rumble;
+        // A damped spring towards that, kept within the travel
+        const omega = 2 * Math.PI * Math.max(0.1, LOOK.SUSP_FREQ);
+        sp.vy += (omega * omega * (target - sp.y) - 2 * LOOK.SUSP_DAMP * omega * sp.vy) * dt;
+        sp.y += sp.vy * dt;
+        const travel = Math.max(0, LOOK.SUSP_TRAVEL);
+        if (Math.abs(sp.y) > travel) {
+            sp.y = Math.sign(sp.y) * travel;
+            sp.vy *= -0.3;
+        }
+        sp.x = 0;
+        sp.tilt = 0;
+        return sp;
     }
 
     /** Seconds of exhaust flame left, and how big this one is (0 to 1). */
@@ -163,30 +422,41 @@ export class DonutRenderer {
      * it overheats; a dull throbbing red while stalled. (The steering shows
      * only on the STERZO bar, not on the car.)
      */
-    private bodyColour(state: DonutState): number {
+    private revsTint(state: DonutState): { colour: number; alpha: number } {
         const t = state.steps / 60;
         if (state.locked && !this.wasLocked) this.greenSince = t;
         this.wasLocked = state.locked;
         const flash = (perSecond: number) => 0.5 + 0.5 * Math.sin(t * perSecond * Math.PI * 2);
-        const red = COLOURS.tintRed;
+        const lerp = (a: number, b: number, u: number) => a + (b - a) * u;
         // Stalled after overheating: a dull red, slowly throbbing, as it coasts home
-        if (state.stalled) return mix(COLOURS.car, red, LOOK.TINT_STALL * (0.5 + 0.5 * flash(1.5)));
-        if (!state.locked) return mix(COLOURS.car, COLOURS.tintWhite, LOOK.TINT_WHITE * whiteShare(state));
+        if (state.stalled) return { colour: COLOURS.tintRed, alpha: LOOK.TINT_STALL * (0.5 + 0.5 * flash(1.5)) };
+        if (!state.locked) return { colour: COLOURS.tintWhite, alpha: LOOK.TINT_WHITE * whiteShare(state) };
         // Just reached the green: a bright flash fading into the green
-        const green = mix(COLOURS.car, COLOURS.tintGreen, LOOK.TINT_GREEN);
         const sinceGreen = t - this.greenSince;
-        if (sinceGreen < 0.35) return mix(mix(green, 0xffffff, LOOK.GREEN_FLASH), green, sinceGreen / 0.35);
-        if (state.heat < 0.5) return mix(COLOURS.car, COLOURS.tintGreen, LOOK.TINT_GREEN * (0.85 + 0.15 * flash(1.5)));
-        const orange = mix(COLOURS.car, COLOURS.tintHot, LOOK.TINT_HOT);
-        if (state.heat < 0.75) return mix(green, orange, (state.heat - 0.5) / 0.25);
+        if (sinceGreen < 0.35) {
+            const u = 1 - sinceGreen / 0.35;
+            return { colour: mix(COLOURS.tintGreen, 0xffffff, u), alpha: Math.max(LOOK.TINT_GREEN, LOOK.GREEN_FLASH * u) };
+        }
+        if (state.heat < 0.5) return { colour: COLOURS.tintGreen, alpha: LOOK.TINT_GREEN * (0.85 + 0.15 * flash(1.5)) };
+        if (state.heat < 0.75) {
+            const u = (state.heat - 0.5) / 0.25;
+            return { colour: mix(COLOURS.tintGreen, COLOURS.tintHot, u), alpha: lerp(LOOK.TINT_GREEN, LOOK.TINT_HOT, u) };
+        }
         // About to overheat: red flashes, quicker the hotter it gets
-        const hot = (state.heat - 0.75) / 0.25;
-        return mix(orange, mix(COLOURS.car, red, LOOK.TINT_RED), flash(LOOK.HOT_FLASH * (0.5 + hot)));
+        const u = flash(LOOK.HOT_FLASH * (0.5 + (state.heat - 0.75) / 0.25));
+        return { colour: mix(COLOURS.tintHot, COLOURS.tintRed, u), alpha: lerp(LOOK.TINT_HOT, LOOK.TINT_RED, u) };
     }
 
     destroy(): void {
         this.ground.destroy();
+        this.rubber.destroy();
+        this.brush.destroy();
+        this.fader.destroy();
         this.graphics.destroy();
+        this.front.destroy();
+        this.wheels?.destroy();
+        this.body?.destroy();
+        this.bodyTint?.destroy();
     }
 }
 
@@ -295,6 +565,15 @@ function drawCar(g: Phaser.GameObjects.Graphics, x: number, y: number, heading: 
         const p = iso(lx, ly, 0.75 * k);
         g.fillStyle(0xfff3b0).fillCircle(p.x, p.y, 3.5 * k);
     }
+}
+
+/** A cube of `size` metres centred on x, y, `z` metres up: the two sides facing the camera, then the top, at `alpha`. */
+function voxel(g: Phaser.GameObjects.Graphics, x: number, y: number, z: number, size: number, colour: number, alpha: number): void {
+    const h = size / 2;
+    const x1 = x - h, x2 = x + h, y1 = y - h, y2 = y + h, z1 = z, z2 = z + size;
+    g.fillStyle(shade(colour, 0.78), alpha).fillPoints([iso(x2, y1, z1), iso(x2, y2, z1), iso(x2, y2, z2), iso(x2, y1, z2)], true);
+    g.fillStyle(shade(colour, 0.9), alpha).fillPoints([iso(x1, y2, z1), iso(x2, y2, z1), iso(x2, y2, z2), iso(x1, y2, z2)], true);
+    g.fillStyle(colour, alpha).fillPoints([iso(x1, y1, z2), iso(x2, y1, z2), iso(x2, y2, z2), iso(x1, y2, z2)], true);
 }
 
 function drawPedestrian(g: Phaser.GameObjects.Graphics, p: Pedestrian, x: number, y: number): void {

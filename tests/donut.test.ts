@@ -117,7 +117,7 @@ test('hitting a red walker costs points and knocks you out of the green; a green
         assert.ok(s.locked);
         s.score = 1000;
         // Someone standing in the middle of the north crossing, and the car right there
-        s.pedestrians.push({ id: 1, kind, crossing: 0, along: 0, direction: 1, speed: 0, hit: false, hitTimer: 0 });
+        s.pedestrians.push({ id: 1, kind, crossing: 0, along: 0, direction: 1, speed: 0, hit: false, hitTimer: 0, approach: 0 });
         s.radius = 10;
         s.slip = 0;
         s.angle = -Math.PI / 2;
@@ -244,7 +244,7 @@ test('white people in a row build the combo and raise the top speed, with dimini
     const hit = (kind: 'walker' | 'booster') => {
         car.slip = 0;
         car.heat = 0;
-        car.pedestrians.push({ id: car.nextId++, kind, crossing: 0, along: 0, direction: 1, speed: 0, hit: false, hitTimer: 0 });
+        car.pedestrians.push({ id: car.nextId++, kind, crossing: 0, along: 0, direction: 1, speed: 0, hit: false, hitTimer: 0, approach: 0 });
         car.radius = 10;
         car.angle = -Math.PI / 2;
         steps(car, 1, { throttle: 1 });
@@ -277,7 +277,7 @@ test('a white person\'s burst climbs straight to its peak, holds, drops away and
     steps(car, intoGreen(), { throttle: 1, steer: 0 });
     car.slip = 0;
     car.heat = 0;
-    car.pedestrians.push({ id: 1, kind: 'booster', crossing: 0, along: 0, direction: 1, speed: 0, hit: false, hitTimer: 0 });
+    car.pedestrians.push({ id: 1, kind: 'booster', crossing: 0, along: 0, direction: 1, speed: 0, hit: false, hitTimer: 0, approach: 0 });
     car.radius = 10;
     car.angle = -Math.PI / 2;
     steps(car, 1, { throttle: 1 });

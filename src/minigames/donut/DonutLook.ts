@@ -11,6 +11,25 @@ export const LOOK = {
 
     /** The car drawn this much bigger than life next to the people, so it reads. */
     CAR_SIZE: 1.75,
+    /** The car as Riccardo's sprites (1) or the old blocks (0); the sprite's size on top of CAR_SIZE, how far down it sits (px), and its shadow's opacity. */
+    CAR_SPRITES: 1,
+    CAR_SPRITE_SCALE: 1,
+    CAR_SPRITE_Y: 0,
+    CAR_SHADOW: 0.3,
+    /**
+     * The suspension (the body on its springs, straight up and down over the
+     * wheels, screen px): how much lower it sits loaded at full cornering; how
+     * far it lifts speeding up (dips slowing); how hard a bump bounces it; the
+     * rumble at top speed; the most it can travel either way; the springs'
+     * bounce (times a second) and damping (0 bouncy, 1 no overshoot).
+     */
+    SUSP_LEAN: 1.5,
+    SUSP_SQUAT: 2,
+    SUSP_BUMP: 4,
+    SUSP_RUMBLE: 0.4,
+    SUSP_TRAVEL: 3,
+    SUSP_FREQ: 2.5,
+    SUSP_DAMP: 0.35,
     /** How far the nose points into the circle (degrees from straight ahead; 90 is at the centre). */
     NOSE_IN: 70,
     /** How much the balance swings the nose (degrees at the edge), and the revs swing the tail out (at full revs). */
@@ -38,10 +57,40 @@ export const LOOK = {
     BACKFIRE_SIZE: 0.35,
     BACKFIRE_MS: 200,
 
-    /** The tyre marks: width (px), how dark the newest are, how many steps they last. */
-    MARK_WIDTH: 6,
-    MARK_DARKNESS: 0.55,
-    MARK_TRAIL: 900,
+    /**
+     * The HUD: the steering wheel at the bottom (its centre's place on screen,
+     * below the bottom edge so only the top shows; its size; how far it turns
+     * with the balance at the edge, degrees; how quickly it follows, a second),
+     * and the upright rev bar (its middle across, its bottom, height and width, px).
+     */
+    WHEEL_X: 960,
+    WHEEL_Y: 1150,
+    WHEEL_SCALE: 0.7,
+    WHEEL_TURN: 90,
+    WHEEL_EASE: 12,
+    REV_BAR_X: 1350,
+    REV_BAR_Y: 1050,
+    REV_BAR_HEIGHT: 300,
+    REV_BAR_WIDTH: 34,
+
+    /** Tyre smoke (little cubes from the rear tyres): cubes a second at full wheelspin, their size, how long they last (s), how fast they rise (m/s), and how thick (opacity). */
+    SMOKE: 260,
+    SMOKE_SIZE: 0.75,
+    SMOKE_LIFE: 1.6,
+    SMOKE_RISE: 1.3,
+    SMOKE_OPACITY: 0.7,
+
+    /**
+     * The rear tyres (from Riccardo's wheel renders: metres before CAR_SIZE):
+     * how far the rear axle is behind the car's centre, and how far each tyre is
+     * from the middle. The tyre marks and the smoke come from there.
+     */
+    REAR_AXLE: 1.29,
+    HALF_TRACK: 0.77,
+    /** The tyre marks: how wide (metres before CAR_SIZE), how dark a fresh strip is, and how much fades a second (share). */
+    MARK_WIDTH: 0.26,
+    MARK_DARKNESS: 0.6,
+    MARK_FADE: 0.03,
     /** The faint ring where the donut runs now (opacity). */
     RING: 0.18,
 
