@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
 import { MenuInput } from '../input/MenuInput';
 import { labSceneData } from '../lab/StudioLab';
+import { enterFullscreenOnPhone, isPhone } from '../input/Touch';
 
 export class MainMenuScene extends Phaser.Scene {
     private menuInput!: MenuInput;
@@ -18,6 +19,7 @@ export class MainMenuScene extends Phaser.Scene {
         { label: 'IMPOSTAZIONI', mode: 'settings' }
     ];
     private menuTexts: Phaser.GameObjects.Text[] = [];
+    private itemSize = 40;
 
     constructor() {
         super({ key: 'MainMenuScene' });
@@ -72,13 +74,35 @@ export class MainMenuScene extends Phaser.Scene {
             fontSize: '18px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(1, 1);
 
-        // Menu items; the last sits 40 px above the bottom
-        const startY = height - 40 - (this.menuOptions.length - 1) * 55;
+        // Menu items; the last sits 40 px above the bottom. On a phone, bigger and further apart for thumbs
+        const phone = isPhone(this);
+        this.itemSize = phone ? 58 : 40;
+        const spacing = phone ? 70 : 55;
+        const startY = height - 40 - (this.menuOptions.length - 1) * spacing;
         this.menuOptions.forEach((opt, index) => {
-            const text = this.add.text(width / 2, startY + (index * 55), opt.label, {
-                fontSize: '40px', fontFamily: '"Pixeloid Sans"', color: '#888888'
+            const text = this.add.text(width / 2, startY + (index * spacing), opt.label, {
+                fontSize: `${this.itemSize}px`, fontFamily: '"Pixeloid Sans"', color: '#888888'
             }).setOrigin(0.5);
             this.menuTexts.push(text);
+            // Touch and mouse: a row the width of the menu, easy to hit with a thumb; tapping picks it
+            text.setInteractive({
+                hitArea: new Phaser.Geom.Rectangle(text.width / 2 - 360, -6, 720, text.height + 12),
+                hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+                useHandCursor: true,
+            });
+            text.on('pointerover', () => {
+                if (this.selectedIndex === index) return;
+                this.selectedIndex = index;
+                AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.5 });
+                this.updateSelection();
+            });
+            text.on('pointerup', () => {
+                if (!this.canInput) return;
+                this.selectedIndex = index;
+                this.updateSelection();
+                enterFullscreenOnPhone(this);
+                this.selectOption(this.sys.game.device.input.touch ? 'TOUCH' : 'KEYBOARD');
+            });
         });
 
         this.updateSelection();
@@ -119,15 +143,17 @@ export class MainMenuScene extends Phaser.Scene {
             } else {
                 text.setColor('#888888');
                 text.setAlpha(0.5);
-                text.setFontSize(40);
+                text.setFontSize(this.itemSize);
                 text.setShadow(0, 0, 'transparent', 0, false, false); // remove glow
             }
         });
     }
 
-    private selectOption(inputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD', gamepadIndex: number | null = null): void {
+    private selectOption(input: 'KEYBOARD' | 'GAMEPAD' | 'TOUCH' = 'KEYBOARD', gamepadIndex: number | null = null): void {
         AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
         const mode = this.menuOptions[this.selectedIndex].mode;
+        // Only DERAPATE has touch controls; the other modes take a keyboard or gamepad as before
+        const inputType = input === 'TOUCH' ? 'KEYBOARD' : input;
 
         if (mode === 'online') {
             this.scene.start('OnlineLobbyScene');

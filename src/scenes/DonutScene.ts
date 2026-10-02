@@ -3,6 +3,8 @@ import { getConfirmButtonIndex } from '../input/JoyConMapper';
 import { DonutLab, loadDonutTuning } from '../minigames/donut/DonutLab';
 import { LOOK } from '../minigames/donut/DonutLook';
 import { DonutRenderer, carHeading, iso } from '../minigames/donut/DonutRenderer';
+import { DonutTouch } from '../minigames/donut/DonutTouch';
+import { enterFullscreenOnPhone, isPhone } from '../input/Touch';
 import {
     DONUT, carPosition, createDonut, drawnRadius, stepDonut,
     type DonutEvent, type DonutInput, type DonutState,
@@ -41,6 +43,8 @@ export class DonutScene extends Phaser.Scene {
     private uiCamera!: Phaser.Cameras.Scene2D.Camera;
     private zoomPunch: Phaser.Tweens.Tween | null = null;
     private lab: DonutLab | null = null;
+    /** The thumb controls, on a phone. */
+    private touch: DonutTouch | null = null;
     /** The Lab's game speed and freeze, and the steps asked for while frozen. */
     private readonly labTime = { scale: 1, frozen: false, steps: 0 };
     private readonly stats = { spins: 0, overheats: 0, walkers: 0, boosters: 0 };
@@ -78,9 +82,25 @@ export class DonutScene extends Phaser.Scene {
         this.revLabel = this.add.text(0, 0, 'GIRI', { ...style, fontSize: '22px', strokeThickness: 5 }).setOrigin(1, 0.5);
         this.steerLabel = this.add.text(0, 0, 'STERZO', { ...style, fontSize: '20px', strokeThickness: 5 }).setOrigin(1, 0.5);
         this.throttleWas = 0;
-        this.add.text(width / 2, height - 22,
-            'ACCELERA: ↑ / W / J / SPAZIO     BILANCIA: ← →     R: RICOMINCIA     L: LAB     ESC: MENU',
-            { ...style, fontSize: '18px', color: '#e8e2cf', strokeThickness: 4 }).setOrigin(0.5, 1);
+        this.touch = null;
+        if (isPhone(this)) {
+            // A phone: thumb controls, bigger writing, full screen on the first tap
+            this.touch = new DonutTouch(this, {
+                restart: () => {
+                    this.newRun();
+                    this.spinText.setAlpha(0);
+                },
+                menu: () => this.scene.start('MainMenuScene'),
+            });
+            for (const text of [this.scoreText, this.comboText, this.speedText, this.revLabel, this.steerLabel]) text.setScale(1.5);
+            this.comboText.setY(100);
+            this.speedText.setY(100);
+            this.input.once('pointerup', () => enterFullscreenOnPhone(this));
+        } else {
+            this.add.text(width / 2, height - 22,
+                'ACCELERA: ↑ / W / J / SPAZIO     BILANCIA: ← →     R: RICOMINCIA     L: LAB     ESC: MENU',
+                { ...style, fontSize: '18px', color: '#e8e2cf', strokeThickness: 4 }).setOrigin(0.5, 1);
+        }
 
         // Everything made after the junction is the HUD, on its own camera
         const hud = this.children.list.filter(object => !world.includes(object));
@@ -97,6 +117,8 @@ export class DonutScene extends Phaser.Scene {
         this.stepEvents.length = 0;
         if (loadFlag(LAB_OPEN_KEY)) this.openLab();
         this.sys.events.once('shutdown', () => {
+            this.touch?.destroy();
+            this.touch = null;
             this.lab?.destroy();
             this.lab = null;
             this.zoomPunch = null;
@@ -222,6 +244,11 @@ export class DonutScene extends Phaser.Scene {
             if (pad.buttons[14]?.pressed) steer = -1;
             if (pad.buttons[15]?.pressed) steer = 1;
         }
+        // Thumbs on a phone
+        if (this.touch) {
+            throttle = Math.max(throttle, this.touch.throttle);
+            if (this.touch.steer !== 0) steer = this.touch.steer;
+        }
         return { throttle, steer };
     }
 
@@ -271,32 +298,34 @@ export class DonutScene extends Phaser.Scene {
 
         // The rev bar: the white (accelerating) and the green; in the green the fill is the engine's heat
         const { width, height } = this.scale;
+        // On a phone everything is drawn bigger (the screen is small), between the thumb controls
+        const k = this.touch ? 1.6 : 1;
         const barWidth = 720;
         const x = width / 2 - barWidth / 2;
-        const y = height - 92;
+        const y = height - (this.touch ? 110 : 92);
         const at = (revs: number) => x + barWidth * revs;
         const g = this.balance.clear();
-        g.fillStyle(0x000000, 0.55).fillRect(x - 6, y - 6, barWidth + 12, 40);
-        g.fillStyle(0x4a4a50).fillRect(x, y, barWidth, 28);
-        g.fillStyle(0x2f6b3a).fillRect(at(DONUT.GREEN_AT), y, at(1) - at(DONUT.GREEN_AT), 28);
+        g.fillStyle(0x000000, 0.55).fillRect(x - 6, y - 6, barWidth + 12, 40 * k);
+        g.fillStyle(0x4a4a50).fillRect(x, y, barWidth, 28 * k);
+        g.fillStyle(0x2f6b3a).fillRect(at(DONUT.GREEN_AT), y, at(1) - at(DONUT.GREEN_AT), 28 * k);
         // White up to the green, then the heat: green, turning orange and flashing red near overheating
-        g.fillStyle(0xe8e2cf).fillRect(x, y + 6, at(Math.min(s.revs, DONUT.GREEN_AT)) - x, 16);
+        g.fillStyle(0xe8e2cf).fillRect(x, y + 6 * k, at(Math.min(s.revs, DONUT.GREEN_AT)) - x, 16 * k);
         if (s.locked) {
             const hot = s.heat > 0.75 && Math.floor(s.steps / 4) % 2 === 0;
             const colour = hot ? 0xff5a4a : s.heat > 0.5 ? 0xffa040 : 0x6dff9e;
-            g.fillStyle(colour).fillRect(at(DONUT.GREEN_AT), y + 6, at(s.revs) - at(DONUT.GREEN_AT), 16);
-            g.lineStyle(3, colour).strokeRect(at(DONUT.GREEN_AT) - 2, y - 2, at(1) - at(DONUT.GREEN_AT) + 4, 32);
+            g.fillStyle(colour).fillRect(at(DONUT.GREEN_AT), y + 6 * k, at(s.revs) - at(DONUT.GREEN_AT), 16 * k);
+            g.lineStyle(3, colour).strokeRect(at(DONUT.GREEN_AT) - 2, y - 2, at(1) - at(DONUT.GREEN_AT) + 4, 28 * k + 4);
         }
         const label = s.stalled ? 'MOTORE FUSO' : s.spinning > 0 ? 'TESTACODA' : s.locked ? (s.heat > 0.75 ? 'MOTORE CALDO!' : 'IN VERDE  x2') : 'GIRI';
         const labelColour = s.stalled || s.spinning > 0 || (s.locked && s.heat > 0.75) ? '#ff5a4a' : s.locked ? '#6dff9e' : '#e8e2cf';
-        this.revLabel.setPosition(x - 16, y + 14).setColor(labelColour).setText(label);
+        this.revLabel.setPosition(x - 16, y + 14 * k).setColor(labelColour).setText(label);
 
         // The balance (steering), above: green in the middle (clean), yellow, orange, red at the edges.
         // In the white the edges are safe and the colours are dimmed; in the green they're bright.
-        const bw = 440;
-        const bh = 16;
+        const bw = 440 * (this.touch ? 1.3 : 1);
+        const bh = 16 * k;
         const bx = width / 2 - bw / 2;
-        const by = y - 40;
+        const by = y - 24 - bh;
         const live = s.locked ? 1 : 0.45;
         g.fillStyle(0x000000, 0.6).fillRect(bx - 5, by - 5, bw + 10, bh + 10);
         const zones: [number, number][] = [[1, 0xd03a30], [0.8, 0xe08030], [0.6, 0xe0c040], [DONUT.CLEAN, 0x4cd86a]];

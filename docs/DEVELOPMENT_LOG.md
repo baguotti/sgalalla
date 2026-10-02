@@ -974,3 +974,14 @@ Part 2
 - **[Tuning]** Riccardo's DERAPATE Lab settings are now the defaults: the donut widens at 2.8 m/s (was 6), overheating after 3.5 s in the green (was 3), 91% of people are green (was 30%), a wider junction (road half width 10.2 m, crossings at 12.8 m and 4.4 m wide), the camera zoomed out (30 px/m, was 40), and the car's tints: no white or green tint and no green flash, orange at 0.35, red at 0.37, no stall tint, red flashing at 7.5 a second.
 - **[Release]** DERAPATE rebuilt around the pedal and the engine's heat, forgiving steering with a testacoda only in the green, the revs shown on the car. Version 3.0.8-e.
 - **[S]** 69 tests, build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] DERAPATE on phones (branch `experimental-branch`)
+- **[Feat]** The main menu works by touch (and mouse): tap an entry to pick it (rows a thumb wide; bigger and further apart on a phone). Only DERAPATE has touch controls; the fighting modes still need a keyboard or gamepad.
+- **[Feat]** DERAPATE's thumb controls on a phone (`src/minigames/donut/DonutTouch.ts`): a left/right steering stick under the left thumb (put it down anywhere in the left half and slide sideways: further is harder, a small dead zone in the middle), the accelerator under the right (hold anywhere in the right half), several fingers at once, and two buttons top right (start again, back to the menu). The score, speed and the two bars are drawn bigger on a phone; the keyboard help line is hidden.
+- **[Feat]** Phones: full screen on the first tap (in the menu and in DERAPATE; `src/input/Touch.ts`), and a "RUOTA IL TELEFONO" screen while the phone is held upright (CSS, `#rotate-phone`).
+- **[S]** 69 tests, build; checked in the browser's phone view: the rotate screen upright; in landscape the menu tap reaches DERAPATE, the controls show, gas and steering together drive the car, restart works.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-02] v3.0.9e (branch `experimental-branch`)
+- **[Release]** DERAPATE on phones: touch menu, thumb controls, full screen, rotate prompt. Version 3.0.9-e.
