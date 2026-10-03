@@ -1074,3 +1074,44 @@ Part 2
 ------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-10-02] v3.1.1e (branch `experimental-branch`)
 - **[Release]** DERAPATE: the steering wheel HUD (the balance) and the upright rev bar, people walking in, Riccardo's car renders in two layers on springs, voxel tyre smoke, tyre marks from the rear tyres. Version 3.1.1-e.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-03] DERAPATE: sound (branch `experimental-branch`)
+- **[Audio]** Riccardo's recordings (`assets/Audio/SFX/Derapate`), 14 of them picked and converted to mono 44.1 kHz WAV in `public/assets/audio/derapate` (1.6 MB); the four engine loops and the hot whine crossfaded over 60 ms at their loop point so they loop without a click.
+- **[Audio]** `DonutAudio`: the engine is four loops recorded at rising revs, blended by the rev bar (each loudest at its own revs, pitched up past them, still climbing during a white burst), louder with the pedal down, bouncing at the top in the green, a hot whine rising under it as the engine nears overheating, cut out when it stalls. The tyres' screech loop grows with wheelspin under power, the balance being out and the steering, loud in a testacoda. One-shots: nitrous on a white person; a thud and a short horn on a blue one; a screech for the testacoda; the overheat when the engine gives out; exhaust pops on reaching the green and, lifting off at high revs, pops plus the turbo's blow-off. The game's music drops to 35% while driving and comes back after.
+- **[Lab]** CAR AND CAMERA → SOUND: engine, tyre screech, effects, music under the engine (on top of Settings' volumes).
+- **[S]** 71 tests, build; checked in the browser (all 14 loaded, the engine layers handing over as the revs climb).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-03] DERAPATE: green whoosh, louder screech, a deeper engine (branch `experimental-branch`)
+- **[Audio]** Reaching the green plays Riccardo's whoosh (`Boost/00000000_6474.wav` → `green.wav`) instead of the exhaust pops (the flame stays).
+- **[Audio]** The tyre screech is much louder: both screech recordings raised by about 10 dB (limited) and the screech volume at 1 (was 0.45); at speed in the green it now plays at about 0.8 (was 0.34) of a louder file.
+- **[Audio]** A deeper engine: the two high loops are gone; the engine is the low loop Riccardo liked, then a deep exhaust (`car_11_exh` → `engine_mid.wav`, crossfaded to loop) and the second engine loop only at the very top, climbing in pitch more gently (`ENGINE_PITCH` 0.35 a bar, was 0.7; at the top the loudest loop plays at 0.96 of its pitch).
+- **[S]** 71 tests, build; checked in the browser (all loaded; at the top the deep layers carry it).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-03] DERAPATE: motore caldo crackle, a proper overheat, occasional revs (branch `experimental-branch`)
+- **[Audio]** MOTORE CALDO is the straight-pipe crackle (`car_01_exh_mb_ee_smarmittata` → `engine_hot.wav`, looped): it comes in as the heat passes three quarters and climbs in pitch towards overheating (0.85 → 1.45). No longer used for the backfire pops.
+- **[Audio]** Overheating plays `Engine_overheat.mp3` (trimmed to 3.8 s, faded) and, overlapping as it fades, `Car_Down.mp3` 2.4 s in (louder, limited).
+- **[Audio]** Revs from `Revving.wav`: three revs cut out of it (`rev_1`–`rev_3`, faded, limited) play now and then on a fresh stab of the pedal after a lift: 40% of the time, at least 4 s apart.
+- **[Lab]** SOUND: motore caldo crackle, car dies after, rev on a stab (chance), revs at least apart.
+- **[S]** 71 tests, build; checked in the browser (a rev on a stab, the whoosh into the green, the crackle rising, the overheat then the car dying 2.4 s later).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-03] DERAPATE: vroom, quieter flame, a new stall, a soundtrack (branch `experimental-branch`)
+- **[Audio]** The engine dipped when accelerating: the blend handed over to a recording lower in pitch than the one before. Now it's one engine (the low loop Riccardo liked) whose pitch climbs all the way with the revs (0.75 at rest, +0.75 at the top of the white), with the deep exhaust growing under it; every fresh stab of the pedal surges it (louder, a quick jump in pitch, fading over 0.6 s) and most times (85%, at least 0.8 s apart) a rev from the revving recording rips over it. The second engine loop is gone.
+- **[Audio]** The flame's pops and blow-off are much quieter (`FLAME_VOLUME` 0.3; were 0.8 and 0.55).
+- **[Audio]** Overheating redone as one event with the stall: the engine loops cut at once, the engine winds down and dies (`Car_Down`) with the overheat's hiss over it (trimmed to 2.4 s, at half volume) while the car coasts back to the middle; a restart stops them. The delayed car-dying sound is gone.
+- **[Audio]** DERAPATE's soundtrack: Zutomayo_001 (re-encoded to 128 kbps, 3.9 MB) loops while driving, loaded in the background so the game starts at once; the game's music fades out and pauses, and comes back after. Follows Settings' music volume × `MUSIC_VOLUME` (0.7).
+- **[Lab]** SOUND: engine pitch climb, overheat hiss, flame pops, rev on a stab (volume, chance, gap), soundtrack.
+- **[S]** 71 tests, build; checked in the browser (the pitch climbing press after press with a surge on each, a rev on every stab, the whoosh into the green, the dying sounds at the stall, the game's music paused and the song playing).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-03] DERAPATE: revs on the beat, the song keeps going (branch `experimental-branch`)
+- **[Fix]** The revs came late: each clip cut from the revving recording began with 0.4–1.4 s of build-up before the actual rev. They're re-cut to start on their attack (loud within 10–30 ms, peaking at about 0.2 s), so the vroom lands on the press; and each plays pitched to the engine's revs at that moment instead of at random.
+- **[Fix]** The soundtrack stopped right after starting on Riccardo's side (it plays on here through the real flow: start screen, menu, DERAPATE). Whatever stops it (focus, full screen, the browser), it now picks up again by itself while DERAPATE is showing.
+- **[S]** 71 tests, build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-03] v3.1.2e (branch `experimental-branch`)
+- **[Release]** DERAPATE sound: engine with vroom surges and revs, tyre screech, motore caldo crackle, the overheat and the engine dying, boosts, hits, green whoosh, quiet flame pops, and the Zutomayo soundtrack. Version 3.1.2-e.

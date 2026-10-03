@@ -4,6 +4,8 @@ import { DonutLab, loadDonutTuning } from '../minigames/donut/DonutLab';
 import { LOOK } from '../minigames/donut/DonutLook';
 import { CAR_SHEET, DonutRenderer, carHeading, iso, type CarSheetInfo } from '../minigames/donut/DonutRenderer';
 import { DonutTouch } from '../minigames/donut/DonutTouch';
+import { DonutAudio, preloadDonutSounds } from '../minigames/donut/DonutAudio';
+import { AudioManager } from '../managers/AudioManager';
 import { enterFullscreenOnPhone, isPhone } from '../input/Touch';
 import {
     DONUT, carPosition, createDonut, drawnRadius, stepDonut, topSpeed,
@@ -29,6 +31,8 @@ const TRIGGER_DEAD_ZONE = 0.1;
 const STICK_DEAD_ZONE = 0.15;
 const FONT = '"Pixeloid Sans"';
 const LAB_OPEN_KEY = 'sgalalla.donutLabOpen';
+/** DERAPATE's song, loaded once the scene is up. */
+const SOUNDTRACK = { key: 'derapate_soundtrack', path: 'assets/audio/music/derapate_zutomayo_001.mp3' };
 /** The car sheet's frame size (scripts/donut-car-sprites.py prints it; the loader needs it before the JSON is read). */
 const CAR_FRAME = { width: 320, height: 230 };
 /** The steering wheel (Riccardo's art), and the rim's centre (the turning point) as a share of the image. */
@@ -49,6 +53,10 @@ export class DonutScene extends Phaser.Scene {
     private uiCamera!: Phaser.Cameras.Scene2D.Camera;
     private zoomPunch: Phaser.Tweens.Tween | null = null;
     private lab: DonutLab | null = null;
+    private audio: DonutAudio | null = null;
+    private soundtrack: Phaser.Sound.BaseSound | null = null;
+    /** The steering last read (for the tyres' screech). */
+    private lastSteer = 0;
     /** The thumb controls, on a phone. */
     private touch: DonutTouch | null = null;
     /** The Lab's game speed and freeze, and the steps asked for while frozen. */
@@ -72,6 +80,7 @@ export class DonutScene extends Phaser.Scene {
 
     preload(): void {
         this.load.image(WHEEL.key, WHEEL.path);
+        preloadDonutSounds(this);
         this.load.spritesheet(CAR_SHEET.body, CAR_SHEET.bodyPath, { frameWidth: CAR_FRAME.width, frameHeight: CAR_FRAME.height });
         this.load.spritesheet(CAR_SHEET.wheels, CAR_SHEET.wheelsPath, { frameWidth: CAR_FRAME.width, frameHeight: CAR_FRAME.height });
         this.load.json(CAR_SHEET.json, CAR_SHEET.jsonPath);
@@ -130,6 +139,9 @@ export class DonutScene extends Phaser.Scene {
             j: K.J, k: K.K, space: K.SPACE, r: K.R, esc: K.ESC, l: K.L, f: K.F, n: K.N, h: K.H,
         }).map(([name, code]) => [name, keyboard.addKey(code)]));
         this.stepEvents.length = 0;
+        // The engine and the tyres, and DERAPATE's own song instead of the game's music
+        this.audio = new DonutAudio(this);
+        this.startSoundtrack();
         if (loadFlag(LAB_OPEN_KEY)) this.openLab();
         this.sys.events.once('shutdown', () => {
             this.touch?.destroy();
@@ -138,12 +150,52 @@ export class DonutScene extends Phaser.Scene {
             this.lab = null;
             this.zoomPunch = null;
             this.view.destroy();
+            this.audio?.destroy();
+            this.audio = null;
+            // The song off, the game's music back
+            this.soundtrack?.stop();
+            this.soundtrack?.destroy();
+            this.soundtrack = null;
+            const music = this.sound.get('global_music_loop') as Phaser.Sound.WebAudioSound | null;
+            if (music) {
+                music.setVolume(AudioManager.getInstance().getMusicVolume());
+                if (music.isPaused) music.resume();
+                else if (!music.isPlaying) music.play({ loop: true });
+            }
             this.input.keyboard?.removeAllKeys();
         });
     }
 
+    /**
+     * DERAPATE's song (Zutomayo_001): the game's music fades out and pauses, the
+     * song loads in the background (so the game starts at once) and loops at
+     * the Settings' music volume times LOOK.MUSIC_VOLUME.
+     */
+    private startSoundtrack(): void {
+        const music = this.sound.get('global_music_loop');
+        if (music?.isPlaying) this.tweens.add({ targets: music, volume: 0, duration: 600, onComplete: () => music.pause() });
+        const play = () => {
+            if (!this.sys.isActive() || this.soundtrack) return;
+            this.soundtrack = this.sound.add(SOUNDTRACK.key, { loop: true, volume: 0 });
+            this.soundtrack.play();
+            this.tweens.add({ targets: this.soundtrack, volume: this.soundtrackVolume(), duration: 1200 });
+        };
+        if (this.cache.audio.exists(SOUNDTRACK.key)) {
+            play();
+            return;
+        }
+        this.load.audio(SOUNDTRACK.key, SOUNDTRACK.path);
+        this.load.once(`filecomplete-audio-${SOUNDTRACK.key}`, play);
+        this.load.start();
+    }
+
+    private soundtrackVolume(): number {
+        return AudioManager.getInstance().getMusicVolume() * LOOK.MUSIC_VOLUME;
+    }
+
     /** A fresh start: new car, no rubber, counts back to zero (the Lab stays open). */
     private newRun(): void {
+        this.audio?.reset();
         this.state = createDonut(Math.floor(Math.random() * 1e9));
         this.previous = { angle: this.state.angle, radius: this.state.radius };
         this.view.clearMarks();
@@ -219,6 +271,7 @@ export class DonutScene extends Phaser.Scene {
         }
 
         const input = this.readInput();
+        this.lastSteer = input.steer ?? 0;
         const share = this.state.speed / DONUT.SPEED_MAX;
         if (LOOK.STAB_SHAKE > 0 && input.throttle > 0.5 && this.throttleWas <= 0.5 && this.state.spinning === 0 && share > LOOK.STAB_FROM) {
             this.cameras.main.shake(140, LOOK.STAB_SHAKE);
@@ -226,6 +279,7 @@ export class DonutScene extends Phaser.Scene {
         // Lifting off at high revs: the exhaust backfires
         if (input.throttle === 0 && this.throttleWas > 0 && this.state.revs >= LOOK.BACKFIRE_FROM && this.state.spinning === 0 && !this.state.stalled) {
             this.view.backfire(Math.min(1, this.state.revs));
+            this.audio?.backfire(true);
         }
         this.throttleWas = input.throttle;
         let steps: number;
@@ -248,6 +302,15 @@ export class DonutScene extends Phaser.Scene {
             this.view.addMarks(car.x, car.y, carHeading(st, st.angle), strength);
         }
         this.drawFrame();
+        // The song follows the Lab's and Settings' volume (unless it's fading in), and keeps playing:
+        // if anything stops it while the page is showing (focus, full screen…), it picks up again
+        const song = this.soundtrack as Phaser.Sound.WebAudioSound | null;
+        if (song && !song.isPlaying && !document.hidden && !this.sound.locked) {
+            if (song.isPaused) song.resume();
+            else song.play({ loop: true, volume: this.soundtrackVolume() });
+        }
+        if (song?.isPlaying && !this.tweens.isTweening(song)) song.setVolume(this.soundtrackVolume());
+        this.audio?.update(this.state, this.labTime.frozen ? 0 : (this.game.loop.delta / 1000) * this.labTime.scale, this.lastSteer);
         this.updateHud();
         this.lab?.update();
     }
@@ -275,13 +338,18 @@ export class DonutScene extends Phaser.Scene {
     }
 
     private onEvent(event: DonutEvent): void {
-        if (event.type === 'lock') this.view.backfire(1);
+        if (event.type === 'lock') {
+            this.view.backfire(1);
+            this.audio?.play('green', 1, 0);
+        }
         if (event.type === 'overheat' || event.type === 'spin') {
             if (event.type === 'spin') {
                 this.stats.spins++;
                 this.view.bump(1);
+                this.audio?.play('screech_spin', 0.9, 150);
             } else {
                 this.stats.overheats++;
+                this.audio?.overheat();
             }
             this.shake('hit');
             this.spinText.setText(event.type === 'overheat'
@@ -294,6 +362,12 @@ export class DonutScene extends Phaser.Scene {
             if (good) this.stats.boosters++;
             else this.stats.walkers++;
             this.shake(good ? 'boost' : 'hit');
+            if (good) {
+                this.audio?.play('boost', 0.8);
+            } else {
+                this.audio?.play('thud', 1);
+                this.time.delayedCall(140, () => this.audio?.play('horn', 0.45, 150));
+            }
             this.view.bump(good ? 0.5 : 1);
             const label = this.add.text(at.x, at.y, `${good ? '+' : ''}${event.points}`, {
                 fontFamily: FONT, fontSize: '36px', color: good ? '#ffffff' : '#3a55c8', stroke: good ? '#000000' : '#ffffff', strokeThickness: 6,

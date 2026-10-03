@@ -87,6 +87,21 @@ export const LOOK = {
      */
     REAR_AXLE: 1.29,
     HALF_TRACK: 0.77,
+    /** Sound: the engine, the tyres' screech, the one-shots (boost, hits, pops…), and DERAPATE's soundtrack (shares, on top of the SFX and music volumes in Settings). */
+    ENGINE_VOLUME: 0.7,
+    /** How much the engine's pitch climbs from standing to the top of the white (0.75 at rest, plus this), and the screech. */
+    ENGINE_PITCH: 0.75,
+    SCREECH_VOLUME: 1,
+    /** MOTORE CALDO's crackle; the overheat's hiss over the engine dying; the flame's pops; the rev on a fresh stab of the pedal: how loud, how likely, and the least gap between them (s). */
+    HOT_VOLUME: 0.7,
+    HISS_VOLUME: 0.5,
+    FLAME_VOLUME: 0.3,
+    REV_VOLUME: 0.7,
+    REV_CHANCE: 0.85,
+    REV_GAP: 0.8,
+    EFFECTS_VOLUME: 0.8,
+    MUSIC_VOLUME: 0.7,
+
     /** The tyre marks: how wide (metres before CAR_SIZE), how dark a fresh strip is, and how much fades a second (share). */
     MARK_WIDTH: 0.26,
     MARK_DARKNESS: 0.6,
