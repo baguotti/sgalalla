@@ -4,22 +4,28 @@
  * a time, plain data with its own seeded random numbers (no Phaser, no
  * Math.random), like the other games' simulations.
  *
- * Distances are metres on the ground, the junction's centre at 0,0; angles
- * are radians. The steering is light: the balance drifts by itself, more the
- * faster the car goes (and more in the green), left/right nudge it back, a
- * gentle pull brings it home, and keeping it in the middle scores a little
- * more. In the white it stops at the edges and nothing is lost; in the green,
- * staying at an edge a moment too long is a testacoda on the spot. The rev
- * bar has
- * two parts: the white, 90% of it, and the green. Pedal down, the revs climb
- * steadily through the white; pedal up, they fall and the car rolls to a stop.
- * The car's speed follows the revs and the donut's width follows the speed.
- * Off the pedal the donut heads back towards the middle at once. Reaching the
- * green locks the speed at the top; keep the pedal down to stay there, but
- * the engine heats up while it's down (the green fills): held about 3 s it
- * overheats and stalls, and the car coasts back to the middle to start again.
- * Lifting cools the engine; a lift shorter than a moment keeps the green,
- * longer and the revs drop back into the white.
+ * Distances are metres on the ground, the junction's centre at 0,0; angles are
+ * radians.
+ *
+ * The rev bar has two parts: the white (90% of it) and the green. Pedal down,
+ * the revs climb steadily through the white; pedal up, they fall and the car
+ * rolls to a stop. The speed follows the revs, the donut's width follows the
+ * speed, and off the pedal the donut heads back towards the middle at once.
+ * Reaching the green locks the speed at the top: keep the pedal down to stay
+ * there, but the engine heats up while it's down (the green fills). Held about
+ * 3.5 s it overheats and stalls, and the car coasts back to the middle to start
+ * again. Lifting cools the engine; a lift shorter than a moment keeps the
+ * green, a longer one drops back into the white.
+ *
+ * The balance (the steering) drifts by itself, more the faster the car goes
+ * and more in the green; left/right nudge it back, a gentle pull brings it
+ * home, and keeping it in the middle scores a little more. In the white it
+ * stops at the edges and nothing is lost; in the green, staying at an edge a
+ * moment too long is a testacoda on the spot.
+ *
+ * People: white ones give points, a burst of speed and build the combo (which
+ * raises the top speed); blue ones cost points and knock the car out of the
+ * green.
  */
 
 export const STEP_S = 1 / 60;
@@ -49,11 +55,11 @@ export const DONUT = {
     /** The car's speed at the top of the white (and in the green), and how quickly it follows the revs (share a second). */
     SPEED_MAX: 18,
     /**
-     * White (boost) people hit in a row (the combo) raise that top speed, with
+     * White people hit in a row (the combo) raise that top speed, with
      * diminishing returns so it stays in check: +SPEED_BONUS_MAX at most
      * (approached, never reached), +63% of it after SPEED_BONUS_SCALE in a row.
      * At 0.5 and 8: 3 in a row +15%, 5 +23%, 10 +36%. A blue hit, overheating
-     * or a testacoda ends the run of them.
+     * or a testacoda ends the run.
      */
     SPEED_BONUS_MAX: 0.5,
     SPEED_BONUS_SCALE: 8,
@@ -63,6 +69,8 @@ export const DONUT = {
     RADIUS_MAX: 12,
     GROW: 2.8,
     SHRINK: 6,
+    /** Off the pedal the donut tightens towards the middle at least this fast (m/s), even in the green. */
+    RETURN: 3,
 
     /** In the green: seconds of pedal down to overheat, seconds of pedal up to cool fully, and a lift shorter than this keeps the green. */
     OVERHEAT_SECONDS: 3.5,
@@ -70,21 +78,17 @@ export const DONUT = {
     LIFT_GRACE: 0.5,
     /** Points in the green count this many times. */
     GREEN_BONUS: 2,
-
     /** Overheating stalls the engine and costs this many points; the car coasts back to the middle. */
     OVERHEAT_PENALTY: 300,
-    /** Off the pedal the donut tightens towards the middle at least this fast (m/s), even in the green. */
-    RETURN: 3,
 
     /**
      * The balance (-1 to 1): a slow random drift (stronger in the green), the
-     * steering's push, the settling, and a gentle pull back to the middle. It
-     * stops at the edges: nothing is lost there. Inside the clean band the
-     * points count a little more.
+     * steering's push (at top speed, and the share of it standing still: it
+     * grows with the speed), the settling, and a gentle pull back to the
+     * middle. Inside the clean band the points count a little more.
      */
     DRIFT: 1.8,
     GREEN_DRIFT: 3.8,
-    /** The steering's push at top speed, and the share of it standing still (it grows with the speed). */
     STEER: 12,
     STEER_SLOW: 0.15,
     DAMPING: 4,
@@ -111,7 +115,7 @@ export const PEDESTRIANS = {
     SPAWN_MIN: 2.5,
     SPAWN_MAX: 5,
     PER_CROSSING: 1,
-    /** Share of them that are type 2 (a boost when hit). */
+    /** Share of them that are white (a boost when hit); the rest are blue. */
     BOOSTER_SHARE: 0.91,
     /** How far up the pavement people appear before walking to their crossing (metres), so you see them coming. */
     APPROACH: 14,
@@ -119,11 +123,11 @@ export const PEDESTRIANS = {
     JOG_SPEED: 2.3,
     /** Car and person closer than this collide (metres). */
     HIT_DISTANCE: 2.8,
-    /** Type 1: points lost, and the share of the revs kept (it knocks you out of the green). */
+    /** Blue: points lost, and the share of the revs kept (it knocks you out of the green). */
     HIT_PENALTY: 500,
     HIT_REVS_KEPT: 0.4,
     /**
-     * Type 2: points gained, extra revs (share of the bar), and a burst of speed
+     * White: points gained, extra revs (share of the bar), and a burst of speed
      * above the top (BOOST_SPEED of the base top speed at its peak): it climbs
      * straight to the peak in BOOST_RISE seconds, holds a moment, drops away
      * and eases out over BOOST_FALL seconds (a cosine), back to the speed the
@@ -136,6 +140,7 @@ export const PEDESTRIANS = {
     BOOST_FALL: 1.5,
 };
 
+/** Blue people ('walker') cost you; white ones ('booster') give a boost. */
 export type PedestrianKind = 'walker' | 'booster';
 
 export interface Pedestrian {
@@ -163,13 +168,12 @@ export interface DonutInput {
 
 export type DonutEvent =
     | { type: 'hit'; kind: PedestrianKind; x: number; y: number; points: number }
-    | { type: 'loop' }
-    /** Reaching the green, and leaving it (a long lift or a red hit). */
+    /** Reaching the green, and leaving it (a long lift or a blue hit). */
     | { type: 'lock' }
     | { type: 'unlock' }
-    /** Held too long in the green: back to the start, testacoda on the spot. */
+    /** Held too long in the green: the engine stalls and the car coasts back to the middle. */
     | { type: 'overheat' }
-    /** At the edge of the balance too long in the green: the same. */
+    /** At the edge of the balance too long in the green: a testacoda on the spot. */
     | { type: 'spin' };
 
 export interface DonutState {
@@ -200,10 +204,8 @@ export interface DonutState {
     /** Seconds at the edge of the balance in the green. */
     overEdge: number;
     score: number;
-    /** Multiplier built up by wide loops, reset by a red hit or overheating. */
+    /** The multiplier on points, built up by white people hit in a row. */
     combo: number;
-    /** Angle driven since the last full loop. */
-    loopProgress: number;
     pedestrians: Pedestrian[];
     nextSpawn: number;
     nextId: number;
@@ -213,8 +215,10 @@ export interface DonutState {
 
 export function createDonut(seed = 1): DonutState {
     return {
-        angle: 0, radius: DONUT.RADIUS_MIN, speed: 0, revs: 0, heat: 0, locked: false, lifted: 0, streak: 0, boost: 0, boostTime: -1, spinning: 0, stalled: false, slip: 0, slipSpeed: 0, gust: 0, overEdge: 0,
-        score: 0, combo: 1, loopProgress: 0, pedestrians: [], nextSpawn: 1.5, nextId: 1, steps: 0, rng: (seed * 2654435761) >>> 0,
+        angle: 0, radius: DONUT.RADIUS_MIN, speed: 0, revs: 0, heat: 0, locked: false, lifted: 0,
+        streak: 0, boost: 0, boostTime: -1, spinning: 0, stalled: false,
+        slip: 0, slipSpeed: 0, gust: 0, overEdge: 0,
+        score: 0, combo: 1, pedestrians: [], nextSpawn: 1.5, nextId: 1, steps: 0, rng: (seed * 2654435761) >>> 0,
     };
 }
 
@@ -244,7 +248,7 @@ export function drawnRadius(radius: number, slip: number): number {
 export function pedestrianPosition(p: Pedestrian): { x: number; y: number } {
     const across = p.along * (JUNCTION.ROAD_HALF_WIDTH + 1);
     // Still on the pavement: further out along the road, away from the centre
-    const at = JUNCTION.CROSSING_AT + (p.approach ?? 0);
+    const at = JUNCTION.CROSSING_AT + p.approach;
     switch (p.crossing) {
         case 0: return { x: across, y: -at };
         case 1: return { x: at, y: across };
@@ -257,69 +261,14 @@ export function stepDonut(state: DonutState, input: DonutInput, events: DonutEve
     const dt = STEP_S;
     const spinning = state.spinning > 0;
     // Spinning, or the engine stalled after overheating: the pedal does nothing
-    const pedal = spinning || state.stalled ? 0 : Math.max(0, Math.min(1, input.throttle));
+    const pedal = spinning || state.stalled ? 0 : clamp(input.throttle, 0, 1);
     state.lifted = pedal > 0 ? 0 : state.lifted + dt;
 
-    // ─── The rev bar ───
-    if (spinning) {
-        state.spinning = Math.max(0, state.spinning - dt);
-    } else if (state.locked) {
-        if (pedal > 0) {
-            // Pedal down in the green: the engine heats up
-            state.heat += (pedal * dt) / DONUT.OVERHEAT_SECONDS;
-        } else {
-            state.heat -= dt / DONUT.COOL_SECONDS;
-            // Off the pedal too long: back into the white
-            if (state.lifted >= DONUT.LIFT_GRACE) unlock(state, events, DONUT.GREEN_AT - 0.01);
-        }
-        state.heat = Math.max(0, state.heat);
-        if (state.heat >= 1) overheat(state, events);
-    } else {
-        state.revs += pedal > 0 ? DONUT.REV_UP * pedal * dt : -DONUT.REV_DOWN * dt;
-        state.revs = Math.max(0, state.revs);
-        state.heat = Math.max(0, state.heat - dt / DONUT.COOL_SECONDS);
-        // Stalled: the car coasts back to the middle; once the revs are gone it can start again
-        if (state.stalled && state.revs === 0) state.stalled = false;
-        if (state.revs >= DONUT.GREEN_AT) {
-            state.locked = true;
-            events.push({ type: 'lock' });
-        }
-    }
-    // In the green the bar shows the heat: full is overheating
-    if (state.locked) state.revs = DONUT.GREEN_AT + (1 - DONUT.GREEN_AT) * Math.min(1, state.heat);
-
-    // ─── Speed follows the revs, the donut's width follows the speed ───
-    // The speed the car should be at follows the revs; a white person's burst rides on top of it
-    let cruise = state.speed - state.boost;
-    const speedTarget = state.spinning > 0 ? 0 : topSpeed(state) * whiteShare(state);
-    cruise += (speedTarget - cruise) * Math.min(1, DONUT.SPEED_FOLLOW * dt);
-    if (Math.abs(speedTarget - cruise) < 0.01) cruise = speedTarget;
-    if (state.boostTime >= 0) state.boostTime += dt;
-    state.boost = state.spinning > 0 ? 0 : DONUT.SPEED_MAX * PEDESTRIANS.BOOST_SPEED * boostShape(state.boostTime);
-    if (state.boost === 0) state.boostTime = -1;
-    state.speed = Math.max(0, cruise) + state.boost;
-    // (spinning, the car stays where it is: a testacoda on the spot)
-    if (state.spinning === 0) {
-        const radiusTarget = DONUT.RADIUS_MIN + (DONUT.RADIUS_MAX - DONUT.RADIUS_MIN) * Math.min(1, state.speed / DONUT.SPEED_MAX);
-        if (pedal === 0) {
-            // Off the pedal it heads back towards the middle straight away, even in the green
-            const following = state.radius > radiusTarget ? Math.max(radiusTarget, state.radius - DONUT.SHRINK * dt) : state.radius;
-            state.radius = Math.max(DONUT.RADIUS_MIN, Math.min(following, state.radius - DONUT.RETURN * dt));
-        } else if (state.radius < radiusTarget) {
-            state.radius = Math.min(radiusTarget, state.radius + DONUT.GROW * dt);
-        } else {
-            state.radius = Math.max(radiusTarget, state.radius - DONUT.SHRINK * dt);
-        }
-    }
+    stepRevs(state, pedal, spinning, events);
+    stepSpeed(state, pedal);
 
     // ─── Round and round ───
-    const turned = (state.speed / Math.max(0.5, state.radius)) * dt;
-    state.angle = (state.angle + turned) % (Math.PI * 2);
-    state.loopProgress += turned;
-    if (state.loopProgress >= Math.PI * 2) {
-        state.loopProgress -= Math.PI * 2;
-        events.push({ type: 'loop' });
-    }
+    state.angle = (state.angle + (state.speed / Math.max(0.5, state.radius)) * dt) % (Math.PI * 2);
 
     stepBalance(state, state.spinning > 0 ? 0 : input.steer ?? 0, events);
 
@@ -335,6 +284,63 @@ export function stepDonut(state: DonutState, input: DonutInput, events: DonutEve
     return events;
 }
 
+/** The rev bar: the white filling and emptying with the pedal; in the green, the engine heating and cooling. */
+function stepRevs(state: DonutState, pedal: number, spinning: boolean, events: DonutEvent[]): void {
+    const dt = STEP_S;
+    if (spinning) {
+        state.spinning = Math.max(0, state.spinning - dt);
+    } else if (state.locked) {
+        if (pedal > 0) {
+            // Pedal down in the green: the engine heats up
+            state.heat += (pedal * dt) / DONUT.OVERHEAT_SECONDS;
+        } else {
+            state.heat -= dt / DONUT.COOL_SECONDS;
+            // Off the pedal too long: back into the white
+            if (state.lifted >= DONUT.LIFT_GRACE) unlock(state, events, DONUT.GREEN_AT - 0.01);
+        }
+        state.heat = Math.max(0, state.heat);
+        if (state.heat >= 1) overheat(state, events);
+    } else {
+        state.revs = Math.max(0, state.revs + (pedal > 0 ? DONUT.REV_UP * pedal * dt : -DONUT.REV_DOWN * dt));
+        state.heat = Math.max(0, state.heat - dt / DONUT.COOL_SECONDS);
+        // Stalled: the car coasts back to the middle; once the revs are gone it can start again
+        if (state.stalled && state.revs === 0) state.stalled = false;
+        if (state.revs >= DONUT.GREEN_AT) {
+            state.locked = true;
+            events.push({ type: 'lock' });
+        }
+    }
+    // In the green the bar shows the heat: full is overheating
+    if (state.locked) state.revs = DONUT.GREEN_AT + (1 - DONUT.GREEN_AT) * Math.min(1, state.heat);
+}
+
+/** The speed follows the revs (a white person's burst riding on top), and the donut's width follows the speed. */
+function stepSpeed(state: DonutState, pedal: number): void {
+    const dt = STEP_S;
+    const spinning = state.spinning > 0;
+    let cruise = state.speed - state.boost;
+    const target = spinning ? 0 : topSpeed(state) * whiteShare(state);
+    cruise += (target - cruise) * Math.min(1, DONUT.SPEED_FOLLOW * dt);
+    if (Math.abs(target - cruise) < 0.01) cruise = target;
+    if (state.boostTime >= 0) state.boostTime += dt;
+    state.boost = spinning ? 0 : DONUT.SPEED_MAX * PEDESTRIANS.BOOST_SPEED * boostShape(state.boostTime);
+    if (state.boost === 0) state.boostTime = -1;
+    state.speed = Math.max(0, cruise) + state.boost;
+
+    // Spinning, the car stays where it is: a testacoda on the spot
+    if (spinning) return;
+    const radiusTarget = DONUT.RADIUS_MIN + (DONUT.RADIUS_MAX - DONUT.RADIUS_MIN) * Math.min(1, state.speed / DONUT.SPEED_MAX);
+    if (pedal === 0) {
+        // Off the pedal it heads back towards the middle straight away, even in the green
+        const following = state.radius > radiusTarget ? Math.max(radiusTarget, state.radius - DONUT.SHRINK * dt) : state.radius;
+        state.radius = Math.max(DONUT.RADIUS_MIN, Math.min(following, state.radius - DONUT.RETURN * dt));
+    } else if (state.radius < radiusTarget) {
+        state.radius = Math.min(radiusTarget, state.radius + DONUT.GROW * dt);
+    } else {
+        state.radius = Math.max(radiusTarget, state.radius - DONUT.SHRINK * dt);
+    }
+}
+
 /**
  * The balance: drifts while the car moves (more the faster it goes), nudged by
  * the steering, pulled gently home, stopped at the edges; in the green,
@@ -342,9 +348,7 @@ export function stepDonut(state: DonutState, input: DonutInput, events: DonutEve
  */
 function stepBalance(state: DonutState, steer: number, events: DonutEvent[]): void {
     const dt = STEP_S;
-    state.gust += (random(state) * 2 - 1) * 3 * dt;
-    state.gust *= 1 - 0.6 * dt;
-    state.gust = Math.max(-1, Math.min(1, state.gust));
+    state.gust = clamp((state.gust + (random(state) * 2 - 1) * 3 * dt) * (1 - 0.6 * dt), -1, 1);
     // Past the base top speed (the combo) it keeps getting livelier, up to half as much again
     const moving = Math.min(1.5, state.speed / DONUT.SPEED_MAX);
     const drift = state.gust * DONUT.DRIFT * moving * (state.locked ? DONUT.GREEN_DRIFT : 1);
@@ -424,52 +428,69 @@ function stepPedestrians(state: DonutState, events: DonutEvent[]): void {
     state.nextSpawn -= STEP_S;
     if (state.nextSpawn <= 0) {
         state.nextSpawn = PEDESTRIANS.SPAWN_MIN + random(state) * (PEDESTRIANS.SPAWN_MAX - PEDESTRIANS.SPAWN_MIN);
-        // Only onto a crossing with room (people knocked down don't count)
-        const free = [0, 1, 2, 3].filter(c => state.pedestrians.filter(p => !p.hit && p.crossing === c).length < PEDESTRIANS.PER_CROSSING);
-        if (free.length > 0) {
-            const crossing = free[Math.floor(random(state) * free.length)];
-            const booster = random(state) < PEDESTRIANS.BOOSTER_SHARE;
-            const direction = random(state) < 0.5 ? -1 : 1;
-            state.pedestrians.push({
-                id: state.nextId++, kind: booster ? 'booster' : 'walker', crossing,
-                along: -direction, direction, speed: booster ? PEDESTRIANS.JOG_SPEED : PEDESTRIANS.WALK_SPEED, hit: false, hitTimer: 0,
-                approach: PEDESTRIANS.APPROACH,
-            });
-        }
+        spawnPedestrian(state);
     }
 
     const car = carPosition(state);
     const width = JUNCTION.ROAD_HALF_WIDTH + 1;
+    // Everyone moves; those gone (across, or knocked down and shown) are dropped in place, keeping the order
+    let kept = 0;
     for (const p of state.pedestrians) {
         if (p.hit) {
             p.hitTimer -= STEP_S;
-            continue;
-        }
-        // Up the pavement first, then across
-        if (p.approach > 0) p.approach = Math.max(0, p.approach - p.speed * STEP_S);
-        else p.along += (p.direction * p.speed * STEP_S) / width;
-        const at = pedestrianPosition(p);
-        // Standing still or spinning on the spot, the car hits no one
-        if (state.spinning > 0 || state.speed < 0.5 || Math.hypot(at.x - car.x, at.y - car.y) > PEDESTRIANS.HIT_DISTANCE) continue;
-        p.hit = true;
-        p.hitTimer = 0.8;
-        if (p.kind === 'walker') {
-            state.score = Math.max(0, state.score - PEDESTRIANS.HIT_PENALTY);
-            endStreak(state);
-            unlock(state, events, state.revs);
-            state.revs *= PEDESTRIANS.HIT_REVS_KEPT;
-            events.push({ type: 'hit', kind: 'walker', x: at.x, y: at.y, points: -PEDESTRIANS.HIT_PENALTY });
         } else {
-            state.score += PEDESTRIANS.BOOST_POINTS;
-            state.streak++;
-            state.combo = Math.min(DONUT.COMBO_MAX, 1 + state.streak * DONUT.COMBO_STEP);
-            state.boostTime = 0;
-            if (!state.locked) state.revs = Math.min(DONUT.GREEN_AT, state.revs + PEDESTRIANS.BOOST_REVS);
-            events.push({ type: 'hit', kind: 'booster', x: at.x, y: at.y, points: PEDESTRIANS.BOOST_POINTS });
+            // Up the pavement first, then across
+            if (p.approach > 0) p.approach = Math.max(0, p.approach - p.speed * STEP_S);
+            else p.along += (p.direction * p.speed * STEP_S) / width;
+            // Standing still or spinning on the spot, the car hits no one
+            if (state.spinning === 0 && state.speed >= 0.5) {
+                const at = pedestrianPosition(p);
+                if (Math.hypot(at.x - car.x, at.y - car.y) <= PEDESTRIANS.HIT_DISTANCE) knockDown(state, p, at, events);
+            }
         }
+        if (p.hit ? p.hitTimer > 0 : Math.abs(p.along) <= 1.05) state.pedestrians[kept++] = p;
     }
-    // Gone once across, or once knocked down and shown
-    state.pedestrians = state.pedestrians.filter(p => (p.hit ? p.hitTimer > 0 : Math.abs(p.along) <= 1.05));
+    state.pedestrians.length = kept;
+}
+
+/** Someone onto a crossing with room (people knocked down don't count), white or blue, from either kerb. */
+function spawnPedestrian(state: DonutState): void {
+    const onCrossing = [0, 0, 0, 0];
+    for (const p of state.pedestrians) if (!p.hit) onCrossing[p.crossing]++;
+    const free = [0, 1, 2, 3].filter(c => onCrossing[c] < PEDESTRIANS.PER_CROSSING);
+    if (free.length === 0) return;
+    const crossing = free[Math.floor(random(state) * free.length)];
+    const booster = random(state) < PEDESTRIANS.BOOSTER_SHARE;
+    const direction = random(state) < 0.5 ? -1 : 1;
+    state.pedestrians.push({
+        id: state.nextId++, kind: booster ? 'booster' : 'walker', crossing,
+        along: -direction, direction, speed: booster ? PEDESTRIANS.JOG_SPEED : PEDESTRIANS.WALK_SPEED,
+        hit: false, hitTimer: 0, approach: PEDESTRIANS.APPROACH,
+    });
+}
+
+/** The car hits someone: blue costs points and the green, white gives points, revs, a burst and the combo. */
+function knockDown(state: DonutState, p: Pedestrian, at: { x: number; y: number }, events: DonutEvent[]): void {
+    p.hit = true;
+    p.hitTimer = 0.8;
+    if (p.kind === 'walker') {
+        state.score = Math.max(0, state.score - PEDESTRIANS.HIT_PENALTY);
+        endStreak(state);
+        unlock(state, events, state.revs);
+        state.revs *= PEDESTRIANS.HIT_REVS_KEPT;
+        events.push({ type: 'hit', kind: 'walker', x: at.x, y: at.y, points: -PEDESTRIANS.HIT_PENALTY });
+    } else {
+        state.score += PEDESTRIANS.BOOST_POINTS;
+        state.streak++;
+        state.combo = Math.min(DONUT.COMBO_MAX, 1 + state.streak * DONUT.COMBO_STEP);
+        state.boostTime = 0;
+        if (!state.locked) state.revs = Math.min(DONUT.GREEN_AT, state.revs + PEDESTRIANS.BOOST_REVS);
+        events.push({ type: 'hit', kind: 'booster', x: at.x, y: at.y, points: PEDESTRIANS.BOOST_POINTS });
+    }
+}
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
 }
 
 /** The game's next random number, 0 to 1, from its own state. */

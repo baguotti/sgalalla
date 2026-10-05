@@ -1,7 +1,8 @@
 /**
- * How DERAPATE looks, apart from the rules: the camera, the car's drawing and
- * the screen shakes. A plain object so the Lab can change it live (and plain
- * data, no Phaser, so the Lab's settings list can be tested).
+ * How DERAPATE looks and sounds, apart from the rules: the camera, the car's
+ * drawing, the smoke and the tyre marks, where the HUD sits, the sound levels
+ * and the screen shakes. A plain object so the Lab can change it live (and
+ * plain data, no Phaser, so the Lab's settings list can be tested).
  */
 export const LOOK = {
     /** Pixels per metre (the camera's zoom), and where the junction's centre is on screen. */
@@ -11,8 +12,7 @@ export const LOOK = {
 
     /** The car drawn this much bigger than life next to the people, so it reads. */
     CAR_SIZE: 1.75,
-    /** The car as Riccardo's sprites (1) or the old blocks (0); the sprite's size on top of CAR_SIZE, how far down it sits (px), and its shadow's opacity. */
-    CAR_SPRITES: 1,
+    /** The car sprite's size on top of CAR_SIZE, how far down it sits on its shadow (px), and the shadow's opacity. */
     CAR_SPRITE_SCALE: 1,
     CAR_SPRITE_Y: 0,
     CAR_SHADOW: 0.3,
@@ -109,10 +109,10 @@ export const LOOK = {
     /** The faint ring where the donut runs now (opacity). */
     RING: 0.18,
 
-    /** Hitting a red walker: a hard jolt (share of the screen, and ms). */
+    /** Hitting a blue walker (and a testacoda, an overheat): a hard jolt (share of the screen, and ms). */
     HIT_SHAKE: 0.01,
     HIT_SHAKE_MS: 250,
-    /** A green boost: a lighter, longer rumble and a quick zoom punch (extra zoom, and ms there and back). */
+    /** A white booster: a lighter, longer rumble and a quick zoom punch (extra zoom, and ms there and back). */
     BOOST_SHAKE: 0.003,
     BOOST_SHAKE_MS: 450,
     BOOST_ZOOM: 0.05,

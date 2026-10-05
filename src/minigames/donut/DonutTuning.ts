@@ -121,13 +121,12 @@ export const WORLD_GROUPS: DonutGroup[] = [
 export const LOOK_GROUPS: DonutGroup[] = [
     group('CAR', 'LOOK', [
         ['CAR_SIZE', 'Car size ×', 'times', [0.5, 4, 0.05], 'Drawn this much bigger than life.'],
-        ['CAR_SPRITES', 'Car sprites', 'switch', [0, 1, 1], 'Riccardo\'s renders; off, the old block car.'],
         ['CAR_SPRITE_SCALE', 'Sprite size ×', 'times', [0.3, 3, 0.01], 'On top of the car size.'],
         ['CAR_SPRITE_Y', 'Sprite down', 'px', [-80, 80, 1], 'Nudges the sprite up or down on its shadow, to sit it on the ground.'],
         ['CAR_SHADOW', 'Car shadow', 'share', [0, 1, 0.01]],
         ['SUSP_LEAN', 'Suspension: cornering', 'px', [0, 10, 0.1], 'How much lower the body sits, loaded, at full cornering.'],
         ['SUSP_SQUAT', 'Suspension: speeding up', 'px', [0, 10, 0.1], 'How far it lifts speeding up (dips slowing).'],
-        ['SUSP_BUMP', 'Suspension: bump', 'px', [0, 20, 0.5], 'How hard hitting someone bounces it.'],
+        ['SUSP_BUMP', 'Suspension: bump', 'px', [0, 20, 0.5], 'How hard hitting someone (or a testacoda) bounces it.'],
         ['SUSP_RUMBLE', 'Suspension: rumble', 'px', [0, 3, 0.05], 'Shaking at speed.'],
         ['SUSP_TRAVEL', 'Suspension: travel', 'px', [0, 15, 0.5], 'The most the body moves up or down over the wheels.'],
         ['SUSP_FREQ', 'Suspension: bounce', '/s', [0.2, 10, 0.1], 'The springs\' bounces a second (lower is softer).'],
@@ -190,7 +189,7 @@ export const LOOK_GROUPS: DonutGroup[] = [
         ['MUSIC_VOLUME', 'Soundtrack', 'share', [0, 1.5, 0.01], 'DERAPATE\'s song (on top of the music volume in Settings).'],
     ]),
     group('SHAKES', 'LOOK', [
-        ['HIT_SHAKE', 'Blue hit shake', 'share', [0, 0.05, 0.001], 'A hard jolt, as a share of the screen.'],
+        ['HIT_SHAKE', 'Blue hit shake', 'share', [0, 0.05, 0.001], 'A hard jolt, as a share of the screen (a testacoda and an overheat too).'],
         ['HIT_SHAKE_MS', 'Blue hit shake lasts', 'ms', [0, 1500, 10]],
         ['BOOST_SHAKE', 'Boost rumble', 'share', [0, 0.05, 0.001]],
         ['BOOST_SHAKE_MS', 'Boost rumble lasts', 'ms', [0, 1500, 10]],

@@ -16,35 +16,44 @@ import { DONUT, whiteShare, type DonutState } from './DonutSim';
  *   the balance is out;
  * - one-shots: the nitrous on a white person, a thud and a horn on a blue one,
  *   a screech for the testacoda, quiet exhaust pops and the turbo's blow-off
- *   with the flame, a whoosh on reaching the green.
+ *   with the flame, a whoosh on reaching the green;
+ * - DERAPATE's own song (Zutomayo_001) in place of the game's music, which
+ *   comes back on leaving.
  *
- * Every volume follows the game's SFX volume (Settings) and the Lab's.
+ * The loops and the revs load before DERAPATE starts; the song and the other
+ * one-shots in the background once it's running (one not in yet is skipped).
+ * Every volume follows the game's Settings and the Lab's.
  */
 
-const PATH = 'assets/audio/derapate/';
-export const DONUT_SOUNDS = [
-    'engine_1', 'engine_mid', 'engine_hot', 'screech',
-    'screech_spin', 'boost', 'green', 'blowoff', 'backfire_2', 'overheat', 'car_down', 'thud', 'horn',
-    'rev_1', 'rev_2', 'rev_3',
-] as const;
-const key = (name: string) => `donut_${name}`;
-/** The three revs cut from the revving recording. */
-const REVS = ['rev_1', 'rev_2', 'rev_3'] as const;
+type Sound = Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound | Phaser.Sound.NoAudioSound;
 
-/** Load them all (in the scene's preload). */
+const PATH = 'assets/audio/derapate/';
+/** Needed from the first press: loaded before DERAPATE starts. */
+const LOOPS = ['engine_1', 'engine_mid', 'engine_hot', 'screech'] as const;
+/** The three revs cut from the revving recording, each starting on its attack. */
+const REVS = ['rev_1', 'rev_2', 'rev_3'] as const;
+/** Loaded in the background. */
+const LATER = ['screech_spin', 'boost', 'green', 'blowoff', 'backfire_2', 'overheat', 'car_down', 'thud', 'horn'] as const;
+type DonutSound = typeof LOOPS[number] | typeof REVS[number] | typeof LATER[number];
+const SONG = { key: 'derapate_soundtrack', path: 'assets/audio/music/derapate_zutomayo_001.mp3' };
+const GAME_MUSIC = 'global_music_loop';
+const key = (name: DonutSound) => `donut_${name}`;
+
+/** Load the loops and the revs (in the scene's preload). */
 export function preloadDonutSounds(scene: Phaser.Scene): void {
-    for (const name of DONUT_SOUNDS) scene.load.audio(key(name), `${PATH}${name}.wav`);
+    for (const name of [...LOOPS, ...REVS]) scene.load.audio(key(name), `${PATH}${name}.wav`);
 }
 
 export class DonutAudio {
     private readonly scene: Phaser.Scene;
     /** The engine: Riccardo's low loop, pitched with the revs, and a deep exhaust under it that grows with them. */
-    private readonly engine: Phaser.Sound.BaseSound;
-    private readonly exhaust: Phaser.Sound.BaseSound;
-    private readonly hot: Phaser.Sound.BaseSound;
-    private readonly screech: Phaser.Sound.BaseSound;
+    private readonly engine: Loop;
+    private readonly exhaust: Loop;
+    private readonly hot: Loop;
+    private readonly screech: Loop;
+    private song: Loop | null = null;
     /** The engine dying after overheating (stopped on a restart). */
-    private dying: Phaser.Sound.BaseSound[] = [];
+    private readonly dying: Sound[] = [];
     /** The engine's revs as heard (eased), the surge of a fresh stab (1 just pressed, fading), and how much of it is running (0 stalled). */
     private revs = 0;
     private surge = 0;
@@ -56,18 +65,26 @@ export class DonutAudio {
     private lastPedal = 0;
     private liftedFor = 1;
     private revCooldown = 0;
+    private destroyed = false;
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
-        const loop = (name: string) => {
-            const sound = scene.sound.add(key(name), { loop: true, volume: 0 });
-            sound.play();
-            return sound;
-        };
-        this.engine = loop('engine_1');
-        this.exhaust = loop('engine_mid');
-        this.hot = loop('engine_hot');
-        this.screech = loop('screech');
+        this.engine = new Loop(scene, key('engine_1'));
+        this.exhaust = new Loop(scene, key('engine_mid'));
+        this.hot = new Loop(scene, key('engine_hot'));
+        this.screech = new Loop(scene, key('screech'));
+
+        // The game's music fades out; the song and the rest of the sounds load in the background, so the game starts at once
+        const music = scene.sound.get(GAME_MUSIC);
+        if (music?.isPlaying) scene.tweens.add({ targets: music, volume: 0, duration: 600, onComplete: () => music.pause() });
+        for (const name of LATER) scene.load.audio(key(name), `${PATH}${name}.wav`);
+        if (scene.cache.audio.exists(SONG.key)) {
+            this.startSong();
+        } else {
+            scene.load.audio(SONG.key, SONG.path);
+            scene.load.once(`filecomplete-audio-${SONG.key}`, () => this.startSong());
+        }
+        scene.load.start();
     }
 
     /** Every frame: the loops follow the car. `dt` in seconds (0 while frozen: everything quiet). */
@@ -92,10 +109,9 @@ export class DonutAudio {
         if (pedal === 1 && this.lastPedal === 0 && this.liftedFor > 0.15) {
             this.surge = 1;
             if (this.revCooldown === 0 && Math.random() < LOOK.REV_CHANCE) {
-                // Cut to start on its attack, so the vroom lands on the press; pitched to the engine's revs
+                // Pitched to the engine's revs
                 const rev = REVS[Math.floor(Math.random() * REVS.length)];
-                const volume = LOOK.REV_VOLUME * LOOK.EFFECTS_VOLUME;
-                if (volume > 0) AudioManager.getInstance().playSFX(key(rev), { volume, rate: 0.85 + 0.4 * Math.min(1.2, this.revs) });
+                this.play(rev, LOOK.REV_VOLUME, 0, 0.85 + 0.4 * Math.min(1.2, this.revs));
                 this.revCooldown = LOOK.REV_GAP;
             }
         }
@@ -106,26 +122,42 @@ export class DonutAudio {
         // One engine, its pitch climbing all the way with the revs (never dropping to another recording), the surge on top
         const volume = frozen ? 0 : sfx * LOOK.ENGINE_VOLUME * this.running * (0.5 + 0.35 * this.load + 0.3 * this.surge);
         const rate = 0.75 + LOOK.ENGINE_PITCH * this.revs + 0.18 * this.surge * (1 - this.revs * 0.5);
-        setLoop(this.engine, volume, Phaser.Math.Clamp(rate, 0.6, 2));
-        setLoop(this.exhaust, volume * (0.25 + 0.5 * Math.min(1, this.revs)), Phaser.Math.Clamp(0.85 + 0.3 * this.revs, 0.6, 1.5));
+        this.engine.set(volume, Phaser.Math.Clamp(rate, 0.6, 2));
+        this.exhaust.set(volume * (0.25 + 0.5 * Math.min(1, this.revs)), Phaser.Math.Clamp(0.85 + 0.3 * this.revs, 0.6, 1.5));
 
         // MOTORE CALDO: the crackle comes in as the heat passes three quarters, and climbs in pitch towards overheating
         const hot = state.locked ? Phaser.Math.Clamp((state.heat - 0.72) / 0.28, 0, 1) : 0;
         this.hotLevel = ease(this.hotLevel, hot, hot > this.hotLevel ? 12 : 5);
-        setLoop(this.hot, frozen ? 0 : sfx * LOOK.HOT_VOLUME * Math.min(1, this.hotLevel * 2.5) * this.running, 0.85 + 0.6 * this.hotLevel);
+        this.hot.set(frozen ? 0 : sfx * LOOK.HOT_VOLUME * Math.min(1, this.hotLevel * 2.5) * this.running, 0.85 + 0.6 * this.hotLevel);
 
         // The tyres: spinning under power, the balance out, a testacoda
         const moving = Math.min(1, state.speed / DONUT.SPEED_MAX);
         const spin = state.spinning > 0 ? 1 : 0;
         const grip = moving * (pedal ? 0.35 + 0.45 * state.revs : 0.1) + Math.abs(state.slip) * 0.5 * moving + Math.abs(steer) * 0.15 * moving;
         this.squeal = ease(this.squeal, Math.max(spin, Math.min(1, grip)), 8);
-        setLoop(this.screech, frozen ? 0 : sfx * LOOK.SCREECH_VOLUME * this.squeal, 0.9 + 0.2 * moving);
+        this.screech.set(frozen ? 0 : sfx * LOOK.SCREECH_VOLUME * this.squeal, 0.9 + 0.2 * moving);
+
+        this.keepSongPlaying();
     }
 
-    /** A one-shot, at the Lab's effects volume (playSFX adds the game's SFX volume and a little pitch variety). */
-    play(name: typeof DONUT_SOUNDS[number], volume = 1, pitchRange = 200): void {
-        if (volume * LOOK.EFFECTS_VOLUME <= 0) return;
-        AudioManager.getInstance().playSFX(key(name), { volume: volume * LOOK.EFFECTS_VOLUME, randomPitchRange: pitchRange });
+    /** Reaching the green: a whoosh. */
+    lock(): void {
+        this.play('green', 1, 0);
+    }
+
+    /** A testacoda: the tyres scream. */
+    spin(): void {
+        this.play('screech_spin', 0.9, 150);
+    }
+
+    /** Someone hit: the nitrous for a white one; a thud, then the driver's horn, for a blue one. */
+    hit(boost: boolean): void {
+        if (boost) {
+            this.play('boost', 0.8);
+            return;
+        }
+        this.play('thud', 1);
+        this.scene.time.delayedCall(140, () => this.play('horn', 0.45, 150));
     }
 
     /** Exhaust pops with the flame (and, lifting off, the turbo's blow-off), quietly. */
@@ -141,15 +173,11 @@ export class DonutAudio {
      */
     overheat(): void {
         this.stopDying();
-        const sfx = AudioManager.getInstance().getSFXVolume() * LOOK.EFFECTS_VOLUME;
-        if (sfx <= 0) return;
-        const down = this.scene.sound.add(key('car_down'), { volume: sfx });
-        const hiss = this.scene.sound.add(key('overheat'), { volume: sfx * LOOK.HISS_VOLUME });
-        down.play();
-        hiss.play();
-        this.dying = [down, hiss];
         this.running = 0;
         this.surge = 0;
+        const volume = AudioManager.getInstance().getSFXVolume() * LOOK.EFFECTS_VOLUME;
+        this.addDying('car_down', volume);
+        this.addDying('overheat', volume * LOOK.HISS_VOLUME);
     }
 
     /** A fresh start: no engine dying, the engine running. */
@@ -158,25 +186,98 @@ export class DonutAudio {
         this.running = 1;
     }
 
-    private stopDying(): void {
-        for (const sound of this.dying) {
-            sound.stop();
-            sound.destroy();
+    /** Everything stopped, and the game's music back. */
+    destroy(): void {
+        this.destroyed = true;
+        this.stopDying();
+        for (const loop of [this.engine, this.exhaust, this.hot, this.screech, this.song]) loop?.destroy();
+        this.song = null;
+        const music = this.scene.sound.get<Sound>(GAME_MUSIC);
+        if (music) {
+            music.setVolume(AudioManager.getInstance().getMusicVolume());
+            if (music.isPaused) music.resume();
+            else if (!music.isPlaying) music.play({ loop: true });
         }
-        this.dying = [];
     }
 
-    destroy(): void {
-        this.stopDying();
-        for (const sound of [this.engine, this.exhaust, this.hot, this.screech]) {
-            sound.stop();
-            sound.destroy();
+    /**
+     * A one-shot at the Lab's effects volume, if it's loaded (playSFX adds the
+     * game's SFX volume and `pitchRange` cents of variety; `rate` plays it faster).
+     */
+    private play(name: DonutSound, volume: number, pitchRange = 200, rate = 1): void {
+        const share = volume * LOOK.EFFECTS_VOLUME;
+        if (share <= 0 || !this.scene.cache.audio.exists(key(name))) return;
+        AudioManager.getInstance().playSFX(key(name), { volume: share, rate, randomPitchRange: pitchRange });
+    }
+
+    /** The song comes in over a second, at the Settings' music volume times the Lab's. */
+    private startSong(): void {
+        if (this.destroyed || this.song) return;
+        this.song = new Loop(this.scene, SONG.key);
+        this.scene.tweens.add({ targets: this.song.sound, volume: songVolume(), duration: 1200 });
+    }
+
+    /**
+     * The song follows the volumes (once it has faded in) and keeps playing: if
+     * anything stops it while the page is showing (focus, full screen…), it
+     * picks up again.
+     */
+    private keepSongPlaying(): void {
+        if (!this.song) return;
+        const sound = this.song.sound;
+        if (!sound.isPlaying && !document.hidden && !this.scene.sound.locked) {
+            if (sound.isPaused) sound.resume();
+            else sound.play({ loop: true, volume: songVolume() });
         }
+        if (sound.isPlaying && !this.scene.tweens.isTweening(sound)) this.song.set(songVolume(), 1);
+    }
+
+    private addDying(name: DonutSound, volume: number): void {
+        if (volume <= 0 || !this.scene.cache.audio.exists(key(name))) return;
+        const sound = this.scene.sound.add(key(name), { volume });
+        sound.play();
+        this.dying.push(sound);
+    }
+
+    private stopDying(): void {
+        for (const sound of this.dying) sound.destroy();
+        this.dying.length = 0;
     }
 }
 
-function setLoop(sound: Phaser.Sound.BaseSound, volume: number, rate: number): void {
-    const s = sound as Phaser.Sound.WebAudioSound;
-    if (typeof s.setVolume === 'function') s.setVolume(Math.max(0, volume));
-    if (typeof s.setRate === 'function') s.setRate(rate);
+function songVolume(): number {
+    return AudioManager.getInstance().getMusicVolume() * LOOK.MUSIC_VOLUME;
+}
+
+/**
+ * A looping sound, and the volume and rate it was last given: only a change
+ * (to the thousandth, too fine to hear) goes to the browser's audio, so a
+ * steady engine costs nothing.
+ */
+class Loop {
+    readonly sound: Sound;
+    private volume = -1;
+    private rate = -1;
+
+    constructor(scene: Phaser.Scene, soundKey: string) {
+        this.sound = scene.sound.add(soundKey, { loop: true, volume: 0 });
+        this.sound.play();
+    }
+
+    set(volume: number, rate: number): void {
+        const v = Math.round(Math.max(0, volume) * 1000) / 1000;
+        const r = Math.round(rate * 1000) / 1000;
+        if (v !== this.volume) {
+            this.volume = v;
+            this.sound.setVolume(v);
+        }
+        if (r !== this.rate) {
+            this.rate = r;
+            this.sound.setRate(r);
+        }
+    }
+
+    destroy(): void {
+        this.sound.destroy();
+    }
 }

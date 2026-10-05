@@ -1115,3 +1115,20 @@ Part 2
 ------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-10-03] v3.1.2e (branch `experimental-branch`)
 - **[Release]** DERAPATE sound: engine with vroom surges and revs, tyre screech, motore caldo crackle, the overheat and the engine dying, boosts, hits, green whoosh, quiet flame pops, and the Zutomayo soundtrack. Version 3.1.2-e.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-05] DERAPATE: deep clean (branch `experimental-branch`)
+- **[Refactor]** `DonutScene` split (483 → 334 lines): the HUD (texts, steering wheel, rev bar, the big message) is its own `DonutHud`; the soundtrack moved into `DonutAudio`; the Lab remembers by itself whether it was open (`donutLabWasOpen`, `close()`). One frame time per frame, the sim's events in a switch, hits read the person's kind (not the sign of the points), typed keys, the controls object reused. The hidden STERZO bar's code is gone.
+- **[Refactor]** `DonutSim` split into revs, speed, balance and people steps, people cleared in place; bit-identical to before (5 seeds × 2 minutes compared step by step).
+- **[Refactor]** `DonutRenderer`: the block car is gone (the sprites are the car, `CAR_SPRITES` removed); it loads its own sheets and cuts the frames as `car.json` says (frame size, columns: no copy in the code); `reset()` clears rubber, smoke, flame and springs on a restart; the flame times itself.
+- **[Perf]** Everything drawn every frame goes in as triangles (quads as two, shadows as fans) instead of filled paths, which Phaser cuts into triangles again every frame, leaving garbage; no throwaway point objects in the drawing; smoke cubes recycled. In the same tab, the switch to triangles took the heap churn with the smoke from about 50 to 5–8 MB per 600 frames.
+- **[Perf]** The HUD rewrites a text only when it changes (Phaser redraws and re-uploads a text even when only its colour is set: the rev bar's label was redrawn every frame); the score formatter is made once.
+- **[Perf]** `DonutAudio`: loop volume and pitch go to Web Audio only when they change (to the thousandth); the song and nine one-shots (1.1 MB) load in the background, so DERAPATE starts sooner (a sound not in yet is skipped). Named events (`lock`, `spin`, `hit`, `backfire`, `overheat`) instead of sound names in the scene.
+- **[Fix]** Phones: re-entering DERAPATE no longer adds two more touch points each time; the touch controls redraw only when a finger comes, goes or steers.
+- **[Cleanup]** Red/green → blue/white in comments, the Lab's shake button and the tests; the Lab's unused switch rows and DonutTouch's unused getter removed; LLM_CONTEXT's DERAPATE section rewritten (it still described the pedal-only prototype).
+- **[Tests]** The same seed and controls replay identically; the crowd never builds up over ten minutes.
+- **[S]** tsc, 73 tests, build. In the browser, the same scripted drive on the committed and the cleaned version: in the game's real loop (120 Hz) per frame median 1.1 → 1.0–1.1 ms, p99 2.2–2.3 → 1.9–2.0 ms, worst 2.9–3.0 → 2.5–2.8 ms, no frames dropped; stepped at 60 Hz by hand, median 2.0 → 0.7 ms, p99 2.9 → 1.9 ms. Phone view: thumb controls and the bigger HUD work, nothing piles up over restarts.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-05] v3.1.3e (branch `experimental-branch`)
+- **[Release]** DERAPATE deep clean: scene split (HUD, audio, Lab flag), lighter drawing (triangles, no per-frame garbage), HUD texts only on change, background sound loading, phone pointer fix, new tests. Version 3.1.3-e.

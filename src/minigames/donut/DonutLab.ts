@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { button, buttons, choice, element, hint, LabPanelBox, section } from '../../lighting/lab/LabUi';
-import { addFeelStyles, pasteDialog, toggleRow, tuneRow, type TuneRow } from '../../lab/FeelUi';
-import type { Setting } from '../../lab/FeelCatalog';
+import { addFeelStyles, pasteDialog, tuneRow, type TuneRow } from '../../lab/FeelUi';
+import type { Setting, Unit } from '../../lab/FeelCatalog';
 import { WindowedView } from '../../lab/StudioLab';
 import { DONUT, createDonut, topSpeed, type DonutState } from './DonutSim';
 import {
@@ -18,12 +18,14 @@ import {
  * step, slow motion, test shakes, live readouts, the car's live values and a
  * find box. Changes are kept in this browser and used whenever DERAPATE runs
  * here; Copy changes puts only what differs from the defaults on the clipboard.
+ * Left open, it opens again next time DERAPATE starts.
  * Keys while it's open: F freeze, N next step, H hide the panels.
  */
 
 /** What the Lab needs from the game. */
 export interface DonutLabHost {
-    readonly state: DonutState;
+    /** The game now (a new one after each restart). */
+    state(): DonutState;
     /** Testacodas, overheats and people hit since the last restart. */
     readonly stats: { spins: number; overheats: number; walkers: number; boosters: number };
     restart(): void;
@@ -37,6 +39,7 @@ export interface DonutLabHost {
 
 const STORAGE_KEY = 'sgalalla.donutLab';
 const WINDOWED_KEY = 'sgalalla.donutLabWindowed';
+const OPEN_KEY = 'sgalalla.donutLabOpen';
 const PANEL_STEP = 338;
 
 /** The saved changes on top of the defaults: every DERAPATE run on this browser plays with them. */
@@ -46,6 +49,11 @@ export function loadDonutTuning(): void {
     } catch {
         resetDonutTuning();
     }
+}
+
+/** Whether the Lab was open when DERAPATE was last left (it opens again). */
+export function donutLabWasOpen(): boolean {
+    return loadString(OPEN_KEY) === 'true';
 }
 
 function saveDonutTuning(): void {
@@ -115,6 +123,7 @@ export class DonutLab {
         document.body.append(this.bar);
         this.apply();
         this.updateTitles();
+        saveString(OPEN_KEY, 'true');
     }
 
     /** Once per frame, after the game stepped. */
@@ -135,6 +144,13 @@ export class DonutLab {
         this.apply();
     }
 
+    /** Closed by the player (L): it stays closed next time. */
+    close(): void {
+        saveString(OPEN_KEY, 'false');
+        this.destroy();
+    }
+
+    /** Gone with the scene (closed, or DERAPATE left with it open). */
     destroy(): void {
         window.clearTimeout(this.saveTimer);
         saveDonutTuning();
@@ -201,10 +217,7 @@ class GroupPanel {
         this.groups = groups;
         this.box = new LabPanelBox(title, place);
         groups.forEach((group, i) => {
-            const rows = group.settings.map(setting => setting.unit === 'switch'
-                ? toggleRow(setting.label, () => settingValue(setting) !== 0, on => setSetting(setting, on ? 1 : 0), settingDefault(setting) !== 0,
-                    () => changed(false))
-                : tuneRow(asSetting(setting.label, setting.unit, setting.hint, setting.key), setting.range,
+            const rows = group.settings.map(setting => tuneRow(asSetting(setting.label, setting.unit, setting.hint, setting.key), setting.range,
                 () => settingValue(setting),
                 value => {
                     setSetting(setting, value);
@@ -261,11 +274,11 @@ class TestPanel {
                 this.scale = Number(value);
                 this.host.setTime(this.scale, this.frozen);
             }),
-            buttons(button('Shake: red hit', () => host.shake('hit')), button('Shake: boost', () => host.shake('boost'))),
+            buttons(button('Shake: hit', () => host.shake('hit')), button('Shake: boost', () => host.shake('boost'))),
         );
 
         // The car's live values: set them (best while frozen) to put the car somewhere
-        const state = () => this.host.state;
+        const state = () => this.host.state();
         const fresh = createDonut(1);
         const live = (label: string, key: 'radius' | 'speed' | 'revs' | 'heat' | 'slip', range: readonly [number, number, number]) =>
             tuneRow(asSetting(label, '', undefined, key), range, () => state()[key], value => { state()[key] = value; }, fresh[key], () => undefined);
@@ -333,7 +346,7 @@ class TestPanel {
     /** Readouts a few times a second; the live values too, unless one is being dragged or typed in. */
     update(): void {
         if (this.frames++ % 6 !== 0) return;
-        const s = this.host.state;
+        const s = this.host.state();
         const stats = this.host.stats;
         const lines = [
             `<b>Speed</b>   ${(s.speed * 3.6).toFixed(0)} km/h  (${s.speed.toFixed(1)} m/s)  top ${(topSpeed(s) * 3.6).toFixed(0)}`,
@@ -352,10 +365,13 @@ class TestPanel {
     }
 }
 
-/** The shape FeelUi's rows take. */
+/**
+ * The shape FeelUi's rows take. Its units are the fighting game's; DERAPATE's
+ * own (m/s, pts…) only go in the tooltip, and its ms are plain milliseconds
+ * (FeelUi would show them as frames).
+ */
 function asSetting(label: string, unit: string, hint: string | undefined, key: string): Setting {
-    // FeelUi turns ms into frames; here ms are plain milliseconds
-    return { key, label, hint, unit: (unit === 'ms' || unit === 'steps' ? '' : unit) } as unknown as Setting;
+    return { key, label, hint, unit: (unit === 'ms' ? '' : unit) as Unit };
 }
 
 function loadString(key: string): string | null {

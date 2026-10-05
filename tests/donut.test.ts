@@ -1,9 +1,11 @@
 /**
- * DERAPATE's rules (pedal only, for now): the white part of the rev bar fills
- * steadily with the pedal and empties without it, the donut's width follows
- * the speed, the green holds the speed but heats the engine until it
- * overheats (back to the start, testacoda on the spot), and the two kinds of
- * people crossing do what they should when hit.
+ * DERAPATE's rules: the white part of the rev bar fills steadily with the
+ * pedal and empties without it, the donut's width follows the speed, the
+ * green holds the speed but heats the engine until it overheats (it stalls
+ * and coasts back to the middle), the balance is forgiving but a moment at
+ * its edge in the green is a testacoda, white people in a row raise the top
+ * speed and give a burst, blue ones cost; and the same seed and controls
+ * always play out the same.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,7 +42,7 @@ test('the pedal fills the white steadily, about 1.5 s to the green; the donut wi
     assert.ok(!s.locked);
     const halfRadius = s.radius;
     const events = steps(s, toGreen() - half + 1, { throttle: 1 });
-    assert.ok(s.locked && events.some(e => e.type === 'lock'), 'in the green after 3 s');
+    assert.ok(s.locked && events.some(e => e.type === 'lock'), 'in the green');
     assert.ok(s.radius > halfRadius + 2, `wider at speed: ${halfRadius.toFixed(1)} → ${s.radius.toFixed(1)} m`);
 });
 
@@ -110,7 +112,7 @@ test('in the green a short lift cools the engine and keeps the green; a long one
     assert.ok(!s.locked && unlocked.some(e => e.type === 'unlock'), 'a long lift leaves the green');
 });
 
-test('hitting a red walker costs points and knocks you out of the green; a green one gives a boost', () => {
+test('hitting a blue walker costs points and knocks you out of the green; a white one gives a boost', () => {
     for (const kind of ['walker', 'booster'] as const) {
         const s = fresh(6);
         steps(s, intoGreen(), { throttle: 1 });
@@ -133,6 +135,31 @@ test('hitting a red walker costs points and knocks you out of the green; a green
             assert.ok(s.locked, 'still in the green');
         }
     }
+});
+
+test('the same seed and the same controls play out exactly the same', () => {
+    const play = (seed: number) => {
+        const s = createDonut(seed);
+        const events: DonutEvent[] = [];
+        for (let i = 0; i < 60 * 120; i++) stepDonut(s, { throttle: i % 84 < 60 ? 1 : 0, steer: Math.sin(i / 40) }, events);
+        return JSON.stringify({ s, events });
+    };
+    assert.equal(play(21), play(21));
+    assert.notEqual(play(21), play(22), 'another seed, another game');
+});
+
+test('the people knocked down or across are cleared away: the crowd never builds up', () => {
+    const s = createDonut(16);
+    let most = 0;
+    let hits = 0;
+    for (let i = 0; i < 60 * 600; i++) {
+        const events: DonutEvent[] = [];
+        stepDonut(s, { throttle: i % 84 < 60 ? 1 : 0, steer: Math.abs(s.slip) > 0.25 ? Math.sign(s.slip) : 0 }, events);
+        hits += events.filter(e => e.type === 'hit').length;
+        most = Math.max(most, s.pedestrians.length);
+    }
+    assert.ok(hits > 0, 'some were hit');
+    assert.ok(most <= 8, `at most ${most} people about at once in ten minutes`);
 });
 
 test('at most one person on each crossing', () => {
@@ -159,8 +186,8 @@ test('the steering: forgiving, keeping it clean scores a little more; left alone
     };
     const alone = drive(() => 0);
     const tapping = drive(s => (Math.abs(s.slip) > 0.25 ? Math.sign(s.slip) : 0));
+    const seen: number[] = [];
     const late = drive(s => {
-        const seen = ((s as unknown as { seen?: number[] }).seen ??= []);
         seen.push(s.slip);
         const then = seen.length > 18 ? seen[seen.length - 18] : 0;
         return Math.abs(then) > 0.6 ? Math.sign(then) : 0;
