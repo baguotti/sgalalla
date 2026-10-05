@@ -1,13 +1,19 @@
 import Phaser from 'phaser';
+import { isoX, isoY, screenX, screenY, type Point } from './DonutIso';
+import { LAMPS, LIGHT, litColour, type LampDef } from './DonutLight';
+import { DonutLighting, type FlashKind } from './DonutLighting';
 import { LOOK } from './DonutLook';
 import { DONUT, JUNCTION, pedestrianPosition, whiteShare, type DonutState, type Pedestrian } from './DonutSim';
 
 /**
  * Draws DERAPATE from a fixed isometric camera: the junction (roads, zebra
- * crossings, pavements, corner blocks) once; the rubber the tyres lay on the
- * road; the car from Riccardo's renders (the wheels, and the body on its
- * springs over them, tinted by the revs); the people; the tyre smoke (little
- * cubes) and the exhaust flame. Nearer the camera is drawn over farther.
+ * crossings, pavements, corner blocks) once, into a texture; the rubber the
+ * tyres lay on the road; the car from Riccardo's renders (the wheels, and the
+ * body on its springs over them, tinted by the revs); the people and the
+ * street lamps' posts; the tyre smoke (little cubes) and the exhaust flame.
+ * Nearer the camera is drawn over farther. DonutLighting lights it: the
+ * junction, the rubber and the car per pixel, the people, posts and smoke per
+ * face (the flame, the lamps' heads and the car's tint glow on their own).
  *
  * Everything drawn every frame goes straight from numbers to the Graphics as
  * triangles (no throwaway point objects, here or in Phaser's renderer), and
@@ -47,6 +53,8 @@ const COLOURS = {
     booster: 0xf4f2ec,
     skin: 0xf2d3b3,
     shadow: 0x000000,
+    post: 0x3a3c44,
+    lampOff: 0xb9bcc4,
     smoke: 0xe4e4e8,
     flame: [0xff5a1a, 0xffa030, 0xfff0a0],
 };
@@ -95,11 +103,6 @@ export interface DonutView {
     dt: number;
 }
 
-interface Point {
-    x: number;
-    y: number;
-}
-
 /** A cube of smoke: where it is on the ground and how high (metres), its drift, size, age and life, and its faces' colours. */
 interface Puff {
     x: number;
@@ -115,25 +118,6 @@ interface Puff {
     front: number;
 }
 
-// ─── The isometric projection ───
-
-/** Across the screen and down it per metre of ground (the camera's scale is LOOK.SCALE). */
-const isoX = () => LOOK.SCALE * 0.866;
-const isoY = () => LOOK.SCALE * 0.5;
-
-/** A point on the ground (or `z` metres above it) on screen. */
-export function iso(x: number, y: number, z = 0): Point {
-    return { x: screenX(x, y), y: screenY(x, y, z) };
-}
-
-function screenX(x: number, y: number): number {
-    return LOOK.CENTRE_X + (x - y) * isoX();
-}
-
-function screenY(x: number, y: number, z = 0): number {
-    return LOOK.CENTRE_Y + (x + y) * isoY() - z * LOOK.SCALE;
-}
-
 /**
  * The drawn heading: along the circle with the nose swung into it, the
  * balance rocking it and the revs swinging the tail out a little more,
@@ -147,9 +131,12 @@ export function carHeading(state: DonutState, angle: number): number {
 }
 
 export class DonutRenderer {
+    /** The lights (null where the browser can't light: then it's drawn as it always was). */
+    readonly lighting: DonutLighting | null;
     private readonly sheet: CarSheetInfo;
-    /** The ground and everything fixed on it, drawn once (again when the Lab moves it). */
-    private readonly ground: Phaser.GameObjects.Graphics;
+    /** The ground and everything fixed on it, painted once into a texture (again when the Lab moves it) so it can be lit. */
+    private readonly ground: Phaser.GameObjects.RenderTexture;
+    private readonly groundPainter: Phaser.GameObjects.Graphics;
     /**
      * The tyre marks: rubber laid on a texture over the road, a strip under
      * each rear tyre, built up lap after lap and fading slowly. The brush draws
@@ -183,15 +170,18 @@ export class DonutRenderer {
     /** When the car last reached the green (for the flash), and whether it's in it now. */
     private greenSince = -1;
     private wasLocked = false;
+    /** The light falling on whatever's being drawn (red, green, blue), worked out per person, post and smoke cube. */
+    private readonly light = new Float32Array(3);
 
     constructor(scene: Phaser.Scene) {
         const sheet = scene.cache.json.get(CAR_SHEET.json) as CarSheetInfo;
         this.sheet = sheet;
         cutFrames(scene.textures.get(CAR_SHEET.body), sheet);
         cutFrames(scene.textures.get(CAR_SHEET.wheels), sheet);
-        this.ground = scene.add.graphics();
-        drawJunction(this.ground);
         const { width, height } = scene.scale;
+        this.ground = scene.add.renderTexture(0, 0, width, height).setOrigin(0, 0);
+        this.groundPainter = new Phaser.GameObjects.Graphics(scene);
+        this.paintGround();
         this.rubber = scene.add.renderTexture(0, 0, width, height).setOrigin(0, 0);
         this.brush = new Phaser.GameObjects.Graphics(scene);
         this.fader = new Phaser.GameObjects.Graphics(scene);
@@ -202,6 +192,11 @@ export class DonutRenderer {
         this.body = scene.add.sprite(0, 0, CAR_SHEET.body, 0).setOrigin(originX, originY);
         this.bodyTint = scene.add.sprite(0, 0, CAR_SHEET.body, 0).setOrigin(originX, originY);
         this.front = scene.add.graphics();
+        this.lighting = DonutLighting.isSupported(scene) ? new DonutLighting(scene) : null;
+        this.lighting?.add(this.ground, 'ground');
+        this.lighting?.add(this.rubber, 'ground');
+        this.lighting?.add(this.wheels, 'car', true);
+        this.lighting?.add(this.body, 'car');
     }
 
     /**
@@ -244,7 +239,7 @@ export class DonutRenderer {
 
     /** The junction again, after the Lab changed its size or the camera (the rubber can't follow: it's cleared). */
     redrawGround(): void {
-        drawJunction(this.ground.clear());
+        this.paintGround();
         this.reset();
     }
 
@@ -259,6 +254,7 @@ export class DonutRenderer {
         this.smokeDue = 0;
         this.flame = 0;
         this.spring.y = this.spring.vy = 0;
+        this.lighting?.reset();
     }
 
     /** A backfire: a burst of flame from the exhaust, `size` 0 to 1. */
@@ -272,12 +268,18 @@ export class DonutRenderer {
         this.spring.vy += LOOK.SUSP_BUMP * strength * 12;
     }
 
+    /** A burst of light where someone was hit (ground metres). */
+    flash(kind: FlashKind, x: number, y: number): void {
+        this.lighting?.flash(kind, x, y);
+    }
+
     draw(view: DonutView): void {
         const dt = Math.min(0.05, view.dt);
         const g = this.back.clear();
         const f = this.front.clear();
         this.layRubber(dt);
         this.flame = Math.max(0, this.flame - dt);
+        this.updateLights(view, dt);
 
         // Where the donut runs now, faintly
         g.lineStyle(2, COLOURS.ring, LOOK.RING).beginPath();
@@ -297,7 +299,7 @@ export class DonutRenderer {
         const groundY = screenY(view.x, view.y);
         g.fillStyle(COLOURS.shadow, LOOK.CAR_SHADOW);
         flatEllipse(g, groundX, groundY, 4.6 * k * isoX(), 4.6 * k * isoY());
-        drawPeople(view.state.pedestrians, g, f, carDepth);
+        this.drawStanding(view.state.pedestrians, g, f, carDepth);
         // The exhaust flame goes over the car when the rear points towards the camera, behind it otherwise
         const rearNearer = Math.cos(view.heading) + Math.sin(view.heading) < 0;
         this.drawFlame(rearNearer ? f : g, view.x, view.y, view.heading);
@@ -321,7 +323,9 @@ export class DonutRenderer {
     }
 
     destroy(): void {
+        this.lighting?.destroy();
         this.ground.destroy();
+        this.groundPainter.destroy();
         this.rubber.destroy();
         this.brush.destroy();
         this.fader.destroy();
@@ -417,7 +421,7 @@ export class DonutRenderer {
         if (this.smoke.length >= SMOKE_MAX) this.smokeDue = 0;
     }
 
-    /** The smoke cubes, farthest first: those farther than `depth` (the car) on `behind`, the rest on `front`. */
+    /** The smoke cubes, farthest first and lit where they are: those farther than `depth` (the car) on `behind`, the rest on `front`. */
     private drawSmoke(behind: Phaser.GameObjects.Graphics, front: Phaser.GameObjects.Graphics, depth: number): void {
         this.smoke.sort(byDepth);
         for (const puff of this.smoke) {
@@ -425,8 +429,56 @@ export class DonutRenderer {
             // Thickest just after it appears, then thinning out as it grows
             const alpha = LOOK.SMOKE_OPACITY * Math.min(1, t * 8) * (1 - t) * (1 - t);
             if (alpha < 0.01) continue;
-            voxel(puff.x + puff.y > depth ? front : behind, puff, puff.size * (1 + 3 * t), alpha);
+            this.lightAt(puff.x, puff.y);
+            voxel(puff.x + puff.y > depth ? front : behind, puff, puff.size * (1 + 3 * t), alpha, this.light);
         }
+    }
+
+    /**
+     * The lights this frame: the lamps, and the car's (head and tail lights,
+     * and the exhaust flame's while it burns), placed where the car is drawn.
+     */
+    private updateLights(view: DonutView, dt: number): void {
+        if (!this.lighting) return;
+        const back = EXHAUST_BACK * carScale();
+        const life = LOOK.BACKFIRE_MS > 0 ? this.flame / (LOOK.BACKFIRE_MS / 1000) : 0;
+        this.lighting.update({
+            x: view.x,
+            y: view.y,
+            heading: view.heading,
+            flame: this.flameSize * life * life,
+            exhaustX: view.x - Math.cos(view.heading) * back,
+            exhaustY: view.y - Math.sin(view.heading) * back,
+        }, dt);
+    }
+
+    /** The light falling at `x`, `y` on the ground, into this.light (all 1 unlit). */
+    private lightAt(x: number, y: number): void {
+        if (this.lighting) this.lighting.lightAt(x, y, this.light);
+        else this.light[0] = this.light[1] = this.light[2] = 1;
+    }
+
+    /**
+     * The people and the lamps' posts, farthest first, each lit where it stands:
+     * those farther than `depth` (the car) on `behind`, the rest on `front`.
+     */
+    private drawStanding(people: readonly Pedestrian[], behind: Phaser.GameObjects.Graphics, front: Phaser.GameObjects.Graphics, depth: number): void {
+        const placed: { x: number; y: number; person: Pedestrian | null; lamp: LampDef | null }[] = [];
+        for (const person of people) placed.push({ ...pedestrianPosition(person), person, lamp: null });
+        for (const lamp of LAMPS) if (lamp.post) placed.push({ x: lamp.x, y: lamp.y, person: null, lamp });
+        placed.sort(byDepth);
+        for (const { x, y, person, lamp } of placed) {
+            this.lightAt(x, y);
+            const g = x + y > depth ? front : behind;
+            if (person) drawPedestrian(g, person, x, y, this.light);
+            else if (lamp) drawLampPost(g, lamp, this.light);
+        }
+    }
+
+    /** The junction painted into its texture. */
+    private paintGround(): void {
+        drawJunction(this.groundPainter.clear());
+        this.ground.clear().draw(this.groundPainter);
     }
 
     /**
@@ -635,15 +687,15 @@ function box(g: Phaser.GameObjects.Graphics, colour: number, alpha: number,
     groundQuad(g, x1, y1, x2, y1, x2, y2, x1, y2, z2);
 }
 
-/** A cube of smoke: the same three faces as a box, its colours worked out when it appeared. */
-function voxel(g: Phaser.GameObjects.Graphics, puff: Puff, size: number, alpha: number): void {
+/** A cube of smoke in `light`: the same three faces as a box, their colours worked out when it appeared. */
+function voxel(g: Phaser.GameObjects.Graphics, puff: Puff, size: number, alpha: number, light: Float32Array): void {
     const h = size / 2;
     const x1 = puff.x - h, x2 = puff.x + h, y1 = puff.y - h, y2 = puff.y + h, z1 = puff.z, z2 = puff.z + size;
-    g.fillStyle(puff.right, alpha);
+    g.fillStyle(litColour(puff.right, light), alpha);
     sideX(g, x2, y1, y2, z1, z2);
-    g.fillStyle(puff.front, alpha);
+    g.fillStyle(litColour(puff.front, light), alpha);
     sideY(g, y2, x1, x2, z1, z2);
-    g.fillStyle(puff.top, alpha);
+    g.fillStyle(litColour(puff.top, light), alpha);
     groundQuad(g, x1, y1, x2, y1, x2, y2, x1, y2, z2);
 }
 
@@ -661,15 +713,9 @@ function sideY(g: Phaser.GameObjects.Graphics, y: number, x1: number, x2: number
 
 // ─── The people ───
 
-/** The people, farthest first: those farther than `depth` (the car) on `behind`, the rest on `front`. */
-function drawPeople(people: readonly Pedestrian[], behind: Phaser.GameObjects.Graphics, front: Phaser.GameObjects.Graphics, depth: number): void {
-    const placed = people.map(p => ({ p, ...pedestrianPosition(p) })).sort(byDepth);
-    for (const { p, x, y } of placed) drawPedestrian(x + y > depth ? front : behind, p, x, y);
-}
-
-/** A person: a body and a head as blocks; knocked down, flat on the road, fading. */
-function drawPedestrian(g: Phaser.GameObjects.Graphics, p: Pedestrian, x: number, y: number): void {
-    const colour = p.kind === 'walker' ? COLOURS.walker : COLOURS.booster;
+/** A person, in `light`: a body and a head as blocks; knocked down, flat on the road, fading. */
+function drawPedestrian(g: Phaser.GameObjects.Graphics, p: Pedestrian, x: number, y: number, light: Float32Array): void {
+    const colour = litColour(p.kind === 'walker' ? COLOURS.walker : COLOURS.booster, light);
     g.fillStyle(COLOURS.shadow, 0.25);
     flatEllipse(g, screenX(x, y), screenY(x, y), 1.2 * isoX(), 1.2 * isoY());
     if (p.hit) {
@@ -678,7 +724,18 @@ function drawPedestrian(g: Phaser.GameObjects.Graphics, p: Pedestrian, x: number
         return;
     }
     box(g, colour, 1, x - 0.3, y - 0.3, x + 0.3, y + 0.3, 0, 1.4);
-    box(g, COLOURS.skin, 1, x - 0.22, y - 0.22, x + 0.22, y + 0.22, 1.4, 1.8);
+    box(g, litColour(COLOURS.skin, light), 1, x - 0.22, y - 0.22, x + 0.22, y + 0.22, 1.4, 1.8);
+}
+
+/** A street lamp's post, in `light`, and its head glowing in its own colour as brightly as the lamp is on (grey when off, by day). */
+function drawLampPost(g: Phaser.GameObjects.Graphics, lamp: LampDef, light: Float32Array): void {
+    const { x, y, height } = lamp;
+    const post = litColour(COLOURS.post, light);
+    g.fillStyle(COLOURS.shadow, 0.25);
+    flatEllipse(g, screenX(x, y), screenY(x, y), 0.9 * isoX(), 0.9 * isoY());
+    box(g, post, 1, x - 0.12, y - 0.12, x + 0.12, y + 0.12, 0, height);
+    const on = Math.min(1, lamp.strength * LIGHT.LAMPS);
+    box(g, mix(litColour(COLOURS.lampOff, light), lamp.colour, on), 1, x - 0.3, y - 0.3, x + 0.3, y + 0.3, height - 0.12, height + 0.18);
 }
 
 // ─── Colours ───

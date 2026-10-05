@@ -5,7 +5,9 @@ import { DonutAudio, preloadDonutSounds } from '../minigames/donut/DonutAudio';
 import { DonutHud, preloadHud } from '../minigames/donut/DonutHud';
 import { DonutLab, donutLabWasOpen, loadDonutTuning } from '../minigames/donut/DonutLab';
 import { LOOK } from '../minigames/donut/DonutLook';
-import { DonutRenderer, carHeading, iso, preloadDonutCar } from '../minigames/donut/DonutRenderer';
+import { iso } from '../minigames/donut/DonutIso';
+import { DonutLighting } from '../minigames/donut/DonutLighting';
+import { DonutRenderer, carHeading, preloadDonutCar } from '../minigames/donut/DonutRenderer';
 import { DonutTouch } from '../minigames/donut/DonutTouch';
 import {
     DONUT, carPosition, createDonut, drawnRadius, stepDonut,
@@ -27,9 +29,10 @@ import { FixedStepClock } from '../../shared/FixedStepClock';
  * back to the menu, L opens the DERAPATE Lab (every setting live).
  *
  * The rules are DonutSim (fixed 60 Hz steps); this scene reads the controls,
- * steps the sim and hands what happened to the drawing (DonutRenderer), the
- * sounds (DonutAudio) and the HUD (DonutHud). The HUD has its own camera, so
- * shakes and zooms move only the junction.
+ * steps the sim and hands what happened to the drawing (DonutRenderer, lit at
+ * dusk by street lamps through DonutLighting), the sounds (DonutAudio) and the
+ * HUD (DonutHud). The HUD has its own camera, so shakes, zooms and the
+ * lighting's camera effects touch only the junction.
  */
 
 const TRIGGER_DEAD_ZONE = 0.1;
@@ -39,7 +42,7 @@ const FONT = '"Pixeloid Sans"';
 const K = Phaser.Input.Keyboard.KeyCodes;
 const KEYS = {
     up: K.UP, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, d: K.D, j: K.J, space: K.SPACE,
-    r: K.R, esc: K.ESC, l: K.L, f: K.F, n: K.N, h: K.H,
+    r: K.R, esc: K.ESC, l: K.L, f: K.F, n: K.N, g: K.G, tab: K.TAB,
 };
 
 export class DonutScene extends Phaser.Scene {
@@ -81,6 +84,8 @@ export class DonutScene extends Phaser.Scene {
         loadDonutTuning();
         this.cameras.main.setBackgroundColor('#b8b1a4');
         this.view = new DonutRenderer(this);
+        // The lights as the player left them (a phone can switch them off)
+        if (!DonutLighting.wanted()) this.view.lighting?.setEnabled(false);
         const world = this.children.list.slice();
 
         // Everything made after the junction is the HUD (and the thumb controls), on its own camera
@@ -88,7 +93,16 @@ export class DonutScene extends Phaser.Scene {
         this.hud = new DonutHud(this, phone);
         this.touch = null;
         if (phone) {
-            this.touch = new DonutTouch(this, { restart: () => this.newRun(), menu: () => this.scene.start('MainMenuScene') });
+            const lighting = this.view.lighting;
+            this.touch = new DonutTouch(this, {
+                restart: () => this.newRun(),
+                menu: () => this.scene.start('MainMenuScene'),
+                lights: lighting ? () => {
+                    lighting.setEnabled(!lighting.isEnabled);
+                    DonutLighting.rememberWanted(lighting.isEnabled);
+                } : null,
+                lightsOn: () => lighting?.isEnabled ?? false,
+            });
             this.input.once('pointerup', () => enterFullscreenOnPhone(this));
         }
         const hud = this.children.list.filter(object => !world.includes(object));
@@ -101,7 +115,8 @@ export class DonutScene extends Phaser.Scene {
         this.audio = new DonutAudio(this);
         this.setLabTime(1, false);
         this.newRun();
-        if (donutLabWasOpen()) this.openLab();
+        // The Lab is for a keyboard (L closes it): on a phone it doesn't come back by itself
+        if (donutLabWasOpen() && !phone) this.openLab();
         this.sys.events.once('shutdown', () => {
             this.touch?.destroy();
             this.touch = null;
@@ -155,9 +170,10 @@ export class DonutScene extends Phaser.Scene {
             else this.openLab();
         }
         if (this.lab) {
+            if (pressed(k.tab)) this.lab.toggleTab();
+            if (pressed(k.g)) this.lab.toggleLights();
             if (pressed(k.f)) this.lab.toggleFreeze();
             if (pressed(k.n)) this.lab.nextFrame();
-            if (pressed(k.h)) this.lab.toggleShown();
         }
         return false;
     }
@@ -253,8 +269,8 @@ export class DonutScene extends Phaser.Scene {
 
     /**
      * Someone hit: a white one boosts (a lighter shake with a zoom punch, the
-     * nitrous), a blue one costs (a jolt, a thud and a horn); the points float
-     * up from where it happened.
+     * nitrous), a blue one costs (a jolt, a thud and a horn); a flash of light
+     * and the points float up from where it happened.
      */
     private onHit(event: Extract<DonutEvent, { type: 'hit' }>): void {
         const boost = event.kind === 'booster';
@@ -263,6 +279,7 @@ export class DonutScene extends Phaser.Scene {
         this.shake(boost ? 'boost' : 'hit');
         this.audio.hit(boost);
         this.view.bump(boost ? 0.5 : 1);
+        this.view.flash(boost ? 'boost' : 'hit', event.x, event.y);
         const at = iso(event.x, event.y, 2.2);
         const label = this.add.text(at.x, at.y, `${event.points > 0 ? '+' : ''}${event.points}`, {
             fontFamily: FONT, fontSize: '36px', strokeThickness: 6,
@@ -306,6 +323,7 @@ export class DonutScene extends Phaser.Scene {
     }
 
     private openLab(): void {
+        if (this.lab) return;
         this.lab = new DonutLab(this, {
             state: () => this.state,
             stats: this.stats,
@@ -314,6 +332,7 @@ export class DonutScene extends Phaser.Scene {
             stepFrame: () => { this.labTime.steps++; },
             redrawGround: () => this.view.redrawGround(),
             shake: kind => this.shake(kind),
+            lighting: this.view.lighting,
         });
     }
 

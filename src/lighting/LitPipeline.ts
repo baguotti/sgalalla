@@ -35,7 +35,11 @@ void main ()
 // light's fill fading with distance, plus a rim where the silhouette's edge
 // faces a light. The edge is found from the texture's alpha, no normal maps.
 // A light behind the object doesn't light its face: it outlines the whole
-// silhouette instead, brightest nearest the light.
+// silhouette instead, brightest nearest the light. The distance can be
+// measured with the screen's axes scaled (an isometric ground: a light's pool
+// is an ellipse on screen), the rim can face a point offset from the light
+// (a lamp's head above the pool it lights), and a light can shine in a cone
+// (a headlight).
 const FRAGMENT_SHADER = `
 #define SHADER_NAME SGALALLA_LIT_FS
 #extension GL_OES_standard_derivatives : enable
@@ -62,6 +66,13 @@ uniform float uFloorContact;
 // This object's rim strength, and 1 for each light behind it
 uniform float uObjectRim;
 uniform float uBehind[MAX_LIGHTS];
+// Screen axes scaled before measuring a light's distance (1, 1: plain screen distance)
+uniform vec2 uFalloffScale;
+// Per light: where its rim light comes from, offset from its position in screen pixels (0, 0: the light itself)
+uniform vec2 uRimOffset[MAX_LIGHTS];
+// Per light: a cone it shines in, the way it points (in the scaled distance's axes) and the cosines of the
+// angles where it starts to fade and where it's gone; no direction (0, 0): it shines all round
+uniform vec4 uLightCone[MAX_LIGHTS];
 
 varying vec2 outTexCoord;
 varying float outTintEffect;
@@ -96,9 +107,16 @@ void main ()
 
         vec4 position = uLightPosition[i];
         vec2 toLight = position.xy - outScreen;
-        float dist = length(toLight);
+        float dist = length(toLight * uFalloffScale);
         float falloff = clamp(1.0 - dist / position.z, 0.0, 1.0);
         falloff *= falloff;
+
+        vec4 cone = uLightCone[i];
+        if (cone.x != 0.0 || cone.y != 0.0)
+        {
+            vec2 away = -toLight * uFalloffScale;
+            falloff *= smoothstep(cone.w, cone.z, dot(away, cone.xy) / max(length(away), 0.0001));
+        }
 
         float behind = uBehind[i];
         light += uLightColor[i].rgb * (falloff * uLightColor[i].a * (1.0 - behind));
@@ -117,7 +135,8 @@ void main ()
             else
             {
                 // Look toward the light, in texels: where the silhouette ends within the rim width, this pixel is on a lit edge
-                vec2 towardLight = (texPerPixelX * toLight.x + texPerPixelY * toLight.y) / uTexelSize;
+                vec2 toRim = toLight + uRimOffset[i];
+                vec2 towardLight = (texPerPixelX * toRim.x + texPerPixelY * toRim.y) / uTexelSize;
                 vec2 stride = towardLight * (uRimWidth / max(length(towardLight), 0.0001)) * uTexelSize;
                 covered = 0.5 * (texture2D(uMainSampler, outTexCoord + stride * 0.5).a + texture2D(uMainSampler, outTexCoord + stride).a);
             }
@@ -155,6 +174,10 @@ export class LitPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline 
 
     constructor(game: Phaser.Game) {
         super({ game, vertShader: VERTEX_SHADER, fragShader: FRAGMENT_SHADER });
+    }
+
+    onBoot(): void {
+        this.set2f('uFalloffScale', 1, 1);
     }
 
     onPreRender(): void {
@@ -209,16 +232,29 @@ export class LitPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline 
         }
     }
 
+    /** The screen's axes scaled before measuring how far a pixel is from a light (an isometric ground); 1, 1 unless set. */
+    setFalloffScale(x: number, y: number): void {
+        this.set2f('uFalloffScale', x, y);
+    }
+
     /**
      * Lights in screen space, 4 floats each: x, y, radius, rim strength and
      * red, green, blue, fill strength. The rim width is in texels, at most 4
      * (the empty padding round each frame in an atlas); 0 turns the rim off.
+     * `rimOffsets` (2 floats a light, screen pixels) moves where each light's
+     * rim comes from; without them, from the light itself. `cones` (4 floats
+     * a light: the way it points, normalised in the falloff's scaled axes, and
+     * the cosines of its inner and outer angles) make lights shine in a cone;
+     * a light with no direction shines all round.
      */
-    setLights(ambient: ArrayLike<number>, count: number, positions: Float32Array, colors: Float32Array, rimWidth: number): void {
+    setLights(ambient: ArrayLike<number>, count: number, positions: Float32Array, colors: Float32Array, rimWidth: number,
+        rimOffsets?: Float32Array, cones?: Float32Array): void {
         this.set3f('uAmbient', ambient[0], ambient[1], ambient[2]);
         this.set1f('uLightCount', count);
         this.set4fv('uLightPosition', positions);
         this.set4fv('uLightColor', colors);
         this.set1f('uRimWidth', Math.min(rimWidth, 4));
+        if (rimOffsets) this.set2fv('uRimOffset', rimOffsets);
+        if (cones) this.set4fv('uLightCone', cones);
     }
 }

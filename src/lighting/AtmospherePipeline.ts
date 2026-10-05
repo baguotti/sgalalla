@@ -1,9 +1,14 @@
 import Phaser from 'phaser';
 import type { Look } from './Look';
 
+/** The look settings the atmosphere pass reads (the fighting game's Look has them all; DERAPATE makes its own). */
+export type AtmosphereLook = Pick<Look,
+    'bloomThreshold' | 'bloomStrength' | 'bloomSpread' | 'rayLength' | 'rayFade' | 'mist' | 'aberration' | 'tiltShift' | 'tiltFocus'
+    | 'tiltBand' | 'exposure' | 'temperature' | 'saturation' | 'contrast' | 'vignette' | 'grain' | 'grainSize' | 'crt' | 'crtLineSize' | 'crtMask'>;
+
 /** What the atmosphere pass draws this frame, in the camera picture's coordinates (0 to 1, y up). */
 export interface AtmosphereFrame {
-    look: Look;
+    look: AtmosphereLook;
     sunX: number;
     sunY: number;
     /** How far round the sun the sky gives off rays, in screen heights. */
@@ -279,7 +284,7 @@ void main ()
  * 1/64, then doubled back up, each level adding its own light: a soft glow
  * near bright things and a wide one round them, fading out smoothly. Spread
  * sets how much the wider levels count. Rays and tilt-shift run at a quarter
- * of the size; tilt-shift only while it's on.
+ * of the size, each only while it's on.
  */
 export class AtmospherePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipeline {
     /** Set each frame by Lighting; without it the camera's picture passes through. */
@@ -334,12 +339,15 @@ export class AtmospherePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPi
             this.blurTwice(blurred, work, blurred, 2);
         }
 
-        this.set2f('uSun', frame.sunX, frame.sunY, rays);
-        this.set1f('uLength', look.rayLength, rays);
-        this.set1f('uFade', look.rayFade, rays);
-        this.bindAndDraw(bright, rayTarget, true, true, rays);
-
+        // No ray colour (no sun, or rays off): the composite adds nothing from the rays' target, so skip the pass
         const [r, g, b] = frame.rayColor;
+        if (r > 0 || g > 0 || b > 0) {
+            this.set2f('uSun', frame.sunX, frame.sunY, rays);
+            this.set1f('uLength', look.rayLength, rays);
+            this.set1f('uFade', look.rayFade, rays);
+            this.bindAndDraw(bright, rayTarget, true, true, rays);
+        }
+
         const warmth = look.temperature * 0.1;
         this.set1i('uBloom', 1, composite);
         this.set1i('uRays', 2, composite);

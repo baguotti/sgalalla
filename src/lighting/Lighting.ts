@@ -33,6 +33,8 @@ const HALO_SIZE = 0.6;
 const ORB_TEXTURE = 'light_orb';
 const HALO_TEXTURE = 'light_halo';
 const TEXTURE_SIZE = 256;
+/** The glow textures (see createGlowTextures): DERAPATE's lamps use them too. */
+export const GLOW_TEXTURES = { orb: ORB_TEXTURE, halo: HALO_TEXTURE, size: TEXTURE_SIZE } as const;
 /** Where a light's orb and glow are drawn, and how fast they scroll with the camera. */
 export interface LightPlacement {
     depth: number;
@@ -384,8 +386,8 @@ function groupLights(): GroupLights {
     return { ambient: new Float32Array(3), count: 0, positions: new Float32Array(MAX_LIGHTS * 4), colors: new Float32Array(MAX_LIGHTS * 4) };
 }
 
-/** White discs tinted per light: a bright orb with a hot centre, and a soft glow fading out to its edge. */
-function createGlowTextures(scene: Phaser.Scene): void {
+/** White discs tinted per light: a bright orb with a hot centre, and a soft glow fading out to its edge (once per game). */
+export function createGlowTextures(scene: Phaser.Scene): void {
     radialTexture(scene, ORB_TEXTURE, [[0, 1], [0.12, 0.95], [0.35, 0.3], [1, 0]]);
     radialTexture(scene, HALO_TEXTURE, [[0, 1], [0.25, 0.42], [0.5, 0.125], [0.75, 0.016], [1, 0]]);
 }
