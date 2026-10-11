@@ -11,7 +11,6 @@ import { CreditsScene } from './scenes/CreditsScene';
 import { SaveFileScene } from './scenes/SaveFileScene';
 import { CampaignMapScene } from './scenes/CampaignMapScene';
 import { RacingScene } from './scenes/RacingScene';
-import { DonutScene } from './scenes/DonutScene';
 import './style.css';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -28,7 +27,7 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true
   },
-  scene: [PreloadScene, MainMenuScene, LobbyScene, GameScene, OnlineLobbyScene, SettingsScene, DialogueScene, CampaignTitleScene, CreditsScene, SaveFileScene, CampaignMapScene, RacingScene, DonutScene],
+  scene: [PreloadScene, MainMenuScene, LobbyScene, GameScene, OnlineLobbyScene, SettingsScene, DialogueScene, CampaignTitleScene, CreditsScene, SaveFileScene, CampaignMapScene, RacingScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

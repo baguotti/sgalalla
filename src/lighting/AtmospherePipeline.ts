@@ -1,14 +1,9 @@
 import Phaser from 'phaser';
 import type { Look } from './Look';
 
-/** The look settings the atmosphere pass reads (the fighting game's Look has them all; DERAPATE makes its own). */
-export type AtmosphereLook = Pick<Look,
-    'bloomThreshold' | 'bloomStrength' | 'bloomSpread' | 'rayLength' | 'rayFade' | 'mist' | 'aberration' | 'tiltShift' | 'tiltFocus'
-    | 'tiltBand' | 'exposure' | 'temperature' | 'saturation' | 'contrast' | 'vignette' | 'grain' | 'grainSize' | 'crt' | 'crtLineSize' | 'crtMask'>;
-
 /** What the atmosphere pass draws this frame, in the camera picture's coordinates (0 to 1, y up). */
 export interface AtmosphereFrame {
-    look: AtmosphereLook;
+    look: Look;
     sunX: number;
     sunY: number;
     /** How far round the sun the sky gives off rays, in screen heights. */

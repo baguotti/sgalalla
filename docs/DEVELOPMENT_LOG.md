@@ -1156,3 +1156,9 @@ Part 2
 ------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-10-05] v3.1.4e (branch `experimental-branch`)
 - **[Release]** DERAPATE lighting (dusk street lamps, rim-lit car, headlight cones, flashes, camera effects), five time-of-day presets, a LUCI button on phones, and the Lab in windowed LOOK and FEEL tabs with a short FEEL list. Version 3.1.4-e.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-11] DERAPATE moves to its own project (branch `experimental-branch`)
+- **[Arch]** DERAPATE now lives in its own repository (`/Users/riccardofusetti/Documents/Coding/Derapate`, https://github.com/baguotti/derapate), self-contained with its own title scene, shaders, Lab controls, assets and tests; its entries above stay as history.
+- **[Cleanup]** Removed here: `src/minigames/donut/`, `src/scenes/DonutScene.ts`, the main menu's DERAPATE entry, `public/assets/donut/`, `public/assets/audio/derapate/`, the soundtrack, `scripts/donut-car-sprites.py` and its tests. The main menu keeps its tap and hover support.
+- **[Shared]** What only DERAPATE needed is undone: the lit shader's falloff scale, rim offsets and cones, the exported glow textures, the narrower atmosphere settings type, and the Studio Lab's exported windowed view with a top-band setting. The atmosphere pass still skips its rays pass when there are no rays.
