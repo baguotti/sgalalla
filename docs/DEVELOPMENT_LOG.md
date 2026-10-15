@@ -1162,3 +1162,8 @@ Part 2
 - **[Arch]** DERAPATE now lives in its own repository (`/Users/riccardofusetti/Documents/Coding/Derapate`, https://github.com/baguotti/derapate), self-contained with its own title scene, shaders, Lab controls, assets and tests; its entries above stay as history.
 - **[Cleanup]** Removed here: `src/minigames/donut/`, `src/scenes/DonutScene.ts`, the main menu's DERAPATE entry, `public/assets/donut/`, `public/assets/audio/derapate/`, the soundtrack, `scripts/donut-car-sprites.py` and its tests. The main menu keeps its tap and hover support.
 - **[Shared]** What only DERAPATE needed is undone: the lit shader's falloff scale, rim offsets and cones, the exported glow textures, the narrower atmosphere settings type, and the Studio Lab's exported windowed view with a top-band setting. The atmosphere pass still skips its rays pass when there are no rays.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-15] v3.1.4 (branch `main`): the release catches up
+- **[Release]** `main` takes everything from `experimental-branch` up to v3.1.4e (merged with its exact contents): the movement and feel passes, the online lobby with up to 5 players, leaving mid-match and spectators (protocol 8), the layered Londra, contact shadows, the deep cleans. DERAPATE isn't in it (it's its own project now).
+- **[Menu]** The release's menu hides CAMPAGNA and STUDIO LAB (and CORSA, as before): ALLENAMENTO, BOTTE IN LOCALE, BOTTE IN REMOTO, IMPOSTAZIONI. Their code stays, unreachable, so the branches only differ by the menu.
