@@ -1,0 +1,112 @@
+{
+  "frames": {
+    "cumulus_big": {
+      "frame": {
+        "x": 4,
+        "y": 4,
+        "w": 1707,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1707,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 1707,
+        "h": 640
+      }
+    },
+    "tower": {
+      "frame": {
+        "x": 4,
+        "y": 652,
+        "w": 955,
+        "h": 480
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 955,
+        "h": 480
+      },
+      "sourceSize": {
+        "w": 955,
+        "h": 480
+      }
+    },
+    "cumulus_flat": {
+      "frame": {
+        "x": 967,
+        "y": 652,
+        "w": 1034,
+        "h": 428
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1034,
+        "h": 428
+      },
+      "sourceSize": {
+        "w": 1034,
+        "h": 428
+      }
+    },
+    "cumulus_low": {
+      "frame": {
+        "x": 4,
+        "y": 1140,
+        "w": 838,
+        "h": 365
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 838,
+        "h": 365
+      },
+      "sourceSize": {
+        "w": 838,
+        "h": 365
+      }
+    },
+    "puff": {
+      "frame": {
+        "x": 850,
+        "y": 1140,
+        "w": 631,
+        "h": 253
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 631,
+        "h": 253
+      },
+      "sourceSize": {
+        "w": 631,
+        "h": 253
+      }
+    }
+  },
+  "meta": {
+    "image": "clouds.webp",
+    "size": {
+      "w": 2048,
+      "h": 1509
+    },
+    "scale": 0.39
+  }
+}

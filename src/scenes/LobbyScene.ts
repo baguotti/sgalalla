@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
 import { SMASH_COLORS } from '../ui/PlayerHUD';
-import { charConfigs } from '../config/CharacterConfig';
-import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavX } from '../input/JoyConMapper';
+import { cardPositions, PlayerCard, type CardState } from '../ui/PlayerCard';
+import { MenuInput, type MenuAction } from '../input/MenuInput';
 import { STAGES, STAGE_KEYS, loadStagePreviews, previewKey } from '../stages/StageBackgrounds';
 
 type CharacterType = 'fok' | 'dummy';
@@ -30,43 +30,16 @@ export class LobbyScene extends Phaser.Scene {
     private initialGamepadIndex: number | null = null;
 
     // UI Elements
-    private slotContainers: Phaser.GameObjects.Container[] = [];
-    private backKey!: Phaser.Input.Keyboard.Key;
+    private cards: PlayerCard[] = [];
 
     // Character Data
     private characters: CharacterType[] = ['fok', 'sgu', 'sga', 'pe', 'nock', 'greg'] as any;
-    private charLabels: string[] = ['Fok', 'Sgu', 'Sga', 'Pe', 'Nock', 'Greg'];
 
-    // Input debounce & Safety
-    private lastInputTime: Map<number, number> = new Map();
-    private joinTime: Map<number, number> = new Map(); // Track when player joined to prevent instant ready
+    // Input
+    private menuInput!: MenuInput;
     private canInput: boolean = false;
     private _initData: any = null;
-    private sceneStartTime: number = 0;
-    private inputUnlockTime: number = 0; // Phaser time when inputs were unlocked
 
-    // Frame inputs (capture once per update to avoid JustDown clearing)
-    private frameInputs = {
-        space: false,
-        enter: false
-    };
-
-    // Gamepad edge detection
-    private prevGamepadSelects: Map<number, boolean> = new Map();
-
-    // Keys
-    private keys!: {
-        left: Phaser.Input.Keyboard.Key;
-        right: Phaser.Input.Keyboard.Key;
-        up: Phaser.Input.Keyboard.Key;
-        down: Phaser.Input.Keyboard.Key;
-        space: Phaser.Input.Keyboard.Key;
-        enter: Phaser.Input.Keyboard.Key;
-        w: Phaser.Input.Keyboard.Key;
-        a: Phaser.Input.Keyboard.Key;
-        s: Phaser.Input.Keyboard.Key;
-        d: Phaser.Input.Keyboard.Key;
-    };
 
     constructor() {
         super({ key: 'LobbyScene' });
@@ -83,12 +56,7 @@ export class LobbyScene extends Phaser.Scene {
         this.initialGamepadIndex = safeData.gamepadIndex !== undefined ? safeData.gamepadIndex : null;
 
         // Reset state
-        this.lastInputTime.clear();
-        this.joinTime.clear();
         this.canInput = false; // Will be enabled after safety delay in create()
-        this.frameInputs = { space: false, enter: false };
-        this.prevGamepadSelects.clear();
-        this.sceneStartTime = Date.now();
     }
 
     preload(): void {
@@ -107,7 +75,7 @@ export class LobbyScene extends Phaser.Scene {
 
 
     create(): void {
-        this.slotContainers = []; // CRITICAL: Reset container references on scene restart
+        this.cards = []; // The scene object survives restarts: drop the previous visit's cards
 
         const { width, height } = this.scale;
 
@@ -196,29 +164,11 @@ export class LobbyScene extends Phaser.Scene {
         // This prevents stale key states from previous scene causing freeze
         this.input.keyboard!.resetKeys();
 
-        // Initialize Keys (fresh after reset)
-        this.keys = {
-            left: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),
-            right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
-            up: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP),
-            down: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN),
-            space: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
-            enter: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER),
-            w: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-            a: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-            s: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-            d: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-        };
-
-        this.backKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+        this.menuInput = new MenuInput(this);
 
         // Input safety delay: prevent ghost inputs from previous scene
         this.canInput = false;
-        this.time.delayedCall(500, () => {
-            this.canInput = true;
-            this.sceneStartTime = Date.now(); // Reset debounce timer here to guarantee safety after loading
-            this.inputUnlockTime = this.time.now; // Track Phaser time when inputs unlock
-        });
+        this.time.delayedCall(500, () => this.canInput = true);
     }
 
     private selectionPhase: 'P1' | 'CPU' | 'MAP' = 'P1';
@@ -247,221 +197,51 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private createSlotUI(): void {
-        const { width } = this.scale;
-        const count = this.slots.length;
-
-        // Dynamic Card Dimensions and Spacing
-        let cardWidth = 180;
-        let cardHeight = 300;
-        let spacing = 200;
-
-        // Up to 6 cards fit across 1920 px at these spacings
-        if (count > 4) {
-            spacing = count <= 2 ? 300 : 220;
-        } else {
-            spacing = count <= 2 ? 260 : 200;
-        }
-
-        const totalWidth = (count - 1) * spacing;
-        const startX = width / 2 - totalWidth / 2;
         const centerY = this.scale.height / 2 + 20;
-
-        // Ensure idle animations exist
-        this.ensureIdleAnimations();
-
-        for (let i = 0; i < count; i++) {
-            const cx = startX + (i * spacing);
-            const container = this.add.container(cx, centerY);
-
-            // Player color for this slot
-            let playerColor = SMASH_COLORS[i % SMASH_COLORS.length];
-            if (this.mode === 'campaign') playerColor = 0xFFFFFF; // Campaign uses white for P1
-            const colorHex = '#' + playerColor.toString(16).padStart(6, '0');
-
-            // Gradient Background with Mask
-            const gradient = this.add.graphics();
-            gradient.fillGradientStyle(playerColor, playerColor, 0x000000, 0x000000, 0.2, 0.2, 0.2, 0.2);
-            gradient.fillRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
-
-            const maskGraphics = this.make.graphics({});
-            maskGraphics.fillStyle(0xffffff);
-            const absX = cx; // Container is at cx, centerY. Local 0,0 is center.
-            const absY = centerY;
-            maskGraphics.fillRoundedRect(absX - cardWidth / 2, absY - cardHeight / 2, cardWidth, cardHeight, 16);
-            gradient.setMask(maskGraphics.createGeometryMask());
-            container.add(gradient);
-
-            // Shadow (Circle under feet)
-            const shadow = this.add.ellipse(0, -45 + 55, 80, 20, 0x000000, 0.5);
-            shadow.setVisible(false); // Hidden by default
-            container.add(shadow);
-
-            // Rounded Card Background
-            const card = this.add.graphics();
-            card.lineStyle(3, playerColor);
-            card.fillStyle(0x000000, 0.4);
-            card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-            card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-
-            // Player Label ("P1", "P2", etc.) at top of card
-            const pLabel = this.add.text(0, 75, `P${i + 1}`, {
-                fontSize: '20px',
-                fontStyle: 'bold',
-                fontFamily: '"Pixeloid Sans"',
-                color: colorHex
-            }).setOrigin(0.5);
-
-            // State Text (Join / Select / Ready) - Moved to y=-45 to overlay sprite
-            const stateText = this.add.text(0, -45, 'Premi un tasto\nper entrare', {
-                fontSize: '22px',
-                color: '#888888',
-                fontFamily: '"Pixeloid Sans"',
-                align: 'center'
-            }).setOrigin(0.5);
-
-            // Character Name (below label)
-            const charText = this.add.text(0, 105, '', {
-                fontSize: '22px',
-                color: '#ffffff',
-                fontFamily: '"Pixeloid Sans"',
-                fontStyle: 'bold'
-            }).setOrigin(0.5);
-
-            // Selection Arrows (centered on card Y midpoint, equidistant from borders)
-            const leftArrow = this.add.text(-70, 0, '◀', {
-                fontSize: '28px',
-                fontFamily: '"Pixeloid Sans"',
-                color: colorHex
-            }).setOrigin(0.5).setVisible(false);
-
-            const rightArrow = this.add.text(70, 0, '▶', {
-                fontSize: '28px',
-                fontFamily: '"Pixeloid Sans"',
-                color: colorHex
-            }).setOrigin(0.5).setVisible(false);
-
-            // Character Sprite (idle animation, centered above label area)
-            const charSprite = this.add.sprite(0, -45, 'fok', 'fok_idle_000');
-            charSprite.setScale(1);
-            charSprite.setVisible(false);
-
-            container.add([card, pLabel, charText, leftArrow, rightArrow, charSprite, stateText]);
-            container.setData('card', card);
-            container.setData('stateText', stateText);
-            container.setData('charText', charText);
-            container.setData('arrows', [leftArrow, rightArrow]);
-            container.setData('charSprite', charSprite);
-            container.setData('playerColor', playerColor);
-            container.setData('shadow', shadow);
-
-            this.slotContainers.push(container);
-        }
+        this.cards = cardPositions(this.scale.width, this.slots.length).map((x, i) => {
+            // Campaign uses white for P1
+            const colour = this.mode === 'campaign' ? 0xffffff : SMASH_COLORS[i % SMASH_COLORS.length];
+            return new PlayerCard(this, x, centerY, `P${i + 1}`, colour);
+        });
     }
 
-    private ensureIdleAnimations(): void {
-        for (const [charKey, config] of Object.entries(charConfigs)) {
-            const animKey = `${charKey}_idle`;
-            if (!this.anims.exists(animKey) && config.idle) {
-                const cfg = config.idle;
-                const frames: { key: string; frame: string }[] = [];
-                for (let f = 0; f < cfg.count; f++) {
-                    frames.push({ key: charKey, frame: `${cfg.prefix}${String(f).padStart(3, '0')}` });
-                }
-                this.anims.create({
-                    key: animKey,
-                    frames,
-                    frameRate: 10,
-                    repeat: -1
-                });
-            }
-        }
-    }
-
-    update(time: number, _delta: number): void {
-        // --- 1. ALWAYS clear Keyboard JustDown buffers ---
-        this.frameInputs.space = Phaser.Input.Keyboard.JustDown(this.keys.space);
-        const enterPressed = Phaser.Input.Keyboard.JustDown(this.keys.enter);
-        this.frameInputs.enter = enterPressed;
-        let goBack = Phaser.Input.Keyboard.JustDown(this.backKey);
-
-        // --- 2. Update Gamepads and evaluate Back ---
-        const gamepads = navigator.getGamepads();
-        for (let i = 0; i < gamepads.length; i++) {
-            const gp = gamepads[i];
-            if (gp) {
-                const backIdx = getBackButtonIndex(gp);
-                if (gp.buttons[backIdx]?.pressed || gp.buttons[9]?.pressed) {
-                    goBack = true;
-                }
-
-                // During the input lock, we must update prevGamepadSelects 
-                // so that held buttons from the menu don't trigger as fresh presses later.
-                if (!this.canInput) {
-                    const confirmIdx = getConfirmButtonIndex(gp);
-                    this.prevGamepadSelects.set(gp.index, gp.buttons[confirmIdx]?.pressed ?? false);
-                }
-            }
-        }
-
-        // --- 3. Enforce Safety Window ---
+    update(): void {
+        // Polled during the safety delay too, so what's pressed then is used up
+        const presses = this.menuInput.poll();
         if (!this.canInput) return;
 
-        this.handleNewConnections();
-        const joinedThisFrame = this.handleKeyboardJoin(); // Poll for join if not event-based
-
-        // CRITICAL: Clear frameInputs ONLY if the keyboard was just used to join,
-        // so the same press can't also trigger "Ready" in handlePlayerInput
-        if (joinedThisFrame) {
-            this.frameInputs.space = false;
-            this.frameInputs.enter = false;
-        }
-
-        this.handlePlayerInput(time);
-
-        if (goBack) {
-            AudioManager.getInstance().playSFX('ui_back', { volume: 0.5 });
-            this.scene.start('MainMenuScene');
+        for (const { action, pad } of presses) {
+            // Back, or a gamepad's Start, leaves
+            if (action === 'back' || (action === 'start' && pad !== null)) {
+                AudioManager.getInstance().playSFX('ui_back', { volume: 0.5 });
+                this.scene.start('MainMenuScene');
+                return;
+            }
+            if (this.mode === 'training' || this.mode === 'campaign') {
+                // Player 1 picks both fighters, then the stage
+                if (this.isPlayerOneDevice(pad)) this.onTrainingPress(action);
+                continue;
+            }
+            // A confirm from a device that hasn't joined joins it, and does nothing else
+            if (action === 'confirm' && this.joinDevice(pad)) continue;
+            const slot = this.slots.find(s => s.joined && !s.isAI && (pad === null
+                ? s.input.type === 'KEYBOARD'
+                : s.input.type === 'GAMEPAD' && s.input.gamepadIndex === pad));
+            if (slot) this.onPlayerPress(slot, action);
         }
 
         this.updateUI();
     }
 
-    private handleNewConnections(): void {
-        if (this.mode === 'training') return; // No new joins in training mode
-
-        const gamepads = navigator.getGamepads();
-
-        for (let i = 0; i < gamepads.length; i++) {
-            const gp = gamepads[i];
-            if (!gp) continue;
-
-            const isAssigned = this.slots.some(s => s.joined && s.input.type === 'GAMEPAD' && s.input.gamepadIndex === gp.index);
-
-            if (!isAssigned) {
-                const confirmIdx = getConfirmButtonIndex(gp);
-
-                if (gp.buttons[confirmIdx]?.pressed) {
-                    this.joinPlayer('GAMEPAD', gp.index);
-                }
-            }
-        }
-    }
-
-    private handleKeyboardJoin(): boolean {
-        if (this.mode === 'training' && this.slots[0].joined) return false;
-
-        const spacePressed = this.frameInputs.space;
-        const enterPressed = this.frameInputs.enter;
-
-        if (spacePressed || enterPressed) {
-            // Only one keyboard player allowed
-            const hasKeyboard = this.slots.some(s => s.joined && s.input.type === 'KEYBOARD');
-            if (!hasKeyboard) {
-                this.joinPlayer('KEYBOARD', null, 'all');
-                return true;
-            }
-        }
-        return false;
+    /** Joins the keyboard (pad null) or a gamepad as a new player, if it hasn't joined; true if it did. */
+    private joinDevice(pad: number | null): boolean {
+        const joined = this.slots.some(s => s.joined && (pad === null
+            ? s.input.type === 'KEYBOARD'
+            : s.input.type === 'GAMEPAD' && s.input.gamepadIndex === pad));
+        if (joined || !this.slots.some(s => !s.joined)) return false;
+        if (pad === null) this.joinPlayer('KEYBOARD', null, 'all');
+        else this.joinPlayer('GAMEPAD', pad);
+        return true;
     }
 
     private joinPlayer(type: 'KEYBOARD' | 'GAMEPAD', index: number | null, keyboardMapping: 'all' = 'all'): void {
@@ -481,205 +261,81 @@ export class LobbyScene extends Phaser.Scene {
 
             AudioManager.getInstance().playSFX('ui_player_found', { volume: 0.5 });
 
-            this.lastInputTime.set(slot.playerId, this.time.now);
-            this.joinTime.set(slot.playerId, this.time.now);
         }
     }
 
-    private handlePlayerInput(time: number): void {
-        // Special Training/Campaign Mode Handling
-        if (this.mode === 'training' || this.mode === 'campaign') {
-            this.handleTrainingInput(time);
-            return;
+    /** Versus: each player picks a fighter and gets ready; then player 1 picks the stage. */
+    private onPlayerPress(slot: typeof this.slots[number], action: MenuAction): void {
+        if (this.selectionPhase === 'MAP') {
+            if (slot.playerId !== 0) return;
+            if (action === 'left') this.changeMap(-1);
+            else if (action === 'right') this.changeMap(1);
+            else if (action === 'confirm') {
+                AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
+                this.hideMapSelection();
+                const joinedSlots = this.slots.filter(s => s.joined);
+                this.time.delayedCall(500, () => {
+                    this.scene.start('GameScene', {
+                        playerData: joinedSlots,
+                        mode: this.mode,
+                        slotIndex: (this._initData as any)?.slotIndex ?? 0,
+                        selectedMap: STAGE_KEYS[this.selectedMapIndex]
+                    });
+                });
+            }
+        } else if (!slot.ready) {
+            if (action === 'left') this.changeCharacter(slot, -1);
+            else if (action === 'right') this.changeCharacter(slot, 1);
+            else if (action === 'confirm') {
+                AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 });
+                slot.ready = true;
+                this.checkAllReady();
+            }
         }
-
-        this.slots.forEach(slot => {
-            if (!slot.joined) return;
-            if (slot.isAI) return; // Skip input for Dummy/AI
-
-            // Debounce for Hold inputs (arrows/stick), separate from Button press (Ready)
-            const lastTime = this.lastInputTime.get(slot.playerId) || 0;
-            const canHoldInput = time - lastTime > 200;
-
-            let left = false;
-            let right = false;
-            let select = false;
-
-            if (slot.input.type === 'KEYBOARD') {
-                if (canHoldInput) {
-                    left = this.keys.left.isDown || this.keys.a.isDown;
-                    right = this.keys.right.isDown || this.keys.d.isDown;
-                }
-
-                const timeSinceUnlock = time - this.inputUnlockTime;
-                const timeSinceJoin = time - (this.joinTime.get(slot.playerId) || 0);
-
-                if (timeSinceUnlock > 600 && timeSinceJoin > 500) {
-                    select = this.frameInputs.space || this.frameInputs.enter;
-                }
-
-            } else if (slot.input.type === 'GAMEPAD' && slot.input.gamepadIndex !== null) {
-                const gp = navigator.getGamepads()[slot.input.gamepadIndex];
-                if (gp) {
-                    if (canHoldInput) {
-                        // Use JoyConMapper for stick navigation (handles rotated axes)
-                        const navX = getMenuNavX(gp);
-                        left = navX < 0;
-                        right = navX > 0;
-                    }
-
-                    const confirmIdx = getConfirmButtonIndex(gp);
-                    const currentSelect = gp.buttons[confirmIdx]?.pressed ?? false;
-
-                    const timeSinceJoin = time - (this.joinTime.get(slot.playerId) || 0);
-
-                    if (Date.now() - this.sceneStartTime > 800 && timeSinceJoin > 500) {
-                        select = currentSelect && !this.prevGamepadSelects.get(gp.index);
-                    }
-                    this.prevGamepadSelects.set(gp.index, currentSelect);
-                }
-            }
-
-            let inputRegistered = false;
-            // If in MAP phase, only P1 (slot 0) handles input
-            if (this.selectionPhase === 'MAP') {
-                if (slot.playerId === 0) {
-                    if (left) {
-                        this.changeMap(-1);
-                        inputRegistered = true;
-                    } else if (right) {
-                        this.changeMap(1);
-                        inputRegistered = true;
-                    } else if (select) {
-                        AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
-                        inputRegistered = true;
-                        this.hideMapSelection();
-                        const joinedSlots = this.slots.filter(s => s.joined);
-                        this.time.delayedCall(500, () => {
-                            this.scene.start('GameScene', {
-                                playerData: joinedSlots,
-                                mode: this.mode,
-                                slotIndex: (this._initData as any)?.slotIndex ?? 0,
-                                selectedMap: STAGE_KEYS[this.selectedMapIndex]
-                            });
-                        });
-                    }
-                }
-            } else if (!slot.ready) {
-                if (left) {
-                    this.changeCharacter(slot, -1);
-                    inputRegistered = true;
-                } else if (right) {
-                    this.changeCharacter(slot, 1);
-                    inputRegistered = true;
-                } else if (select) {
-                    // SAFETY: Prevent immediate ready if scene just started (prevent held button carryover)
-                    if (Date.now() - this.sceneStartTime > 800) {
-                        AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 });
-                        slot.ready = true;
-                        inputRegistered = true;
-                        this.checkAllReady();
-                    }
-                }
-            } else {
-                // If ready, allow un-ready with Back/B?
-                // Not implemented yet, but good idea.
-            }
-
-            if (inputRegistered) {
-                this.lastInputTime.set(slot.playerId, time);
-            }
-        });
     }
 
-    private handleTrainingInput(time: number): void {
+    private isPlayerOneDevice(pad: number | null): boolean {
+        const input = this.slots[0].input;
+        return pad === null ? input.type === 'KEYBOARD' : input.type === 'GAMEPAD' && input.gamepadIndex === pad;
+    }
+
+    /** Training and campaign: player 1 picks their fighter, then the CPU's (training), then the stage. */
+    private onTrainingPress(action: MenuAction): void {
         const p1 = this.slots[0];
         const cpu = this.slots[1];
-
-        // Target slot depends on phase
         const targetSlot = this.selectionPhase === 'P1' ? p1 : cpu;
-
-        // Use P1 input device to control targetSlot
-        const lastTime = this.lastInputTime.get(0) || 0;
-        const canHoldInput = time - lastTime > 200;
-
-        let left = false;
-        let right = false;
-        let select = false;
-
-        if (p1.input.type === 'KEYBOARD') {
-            if (canHoldInput) {
-                left = this.keys.left.isDown || this.keys.a.isDown;
-                right = this.keys.right.isDown || this.keys.d.isDown;
-            }
-            // Debounce select - use Date.now() to compare with sceneStartTime (also Date.now())
-            if (Date.now() - this.sceneStartTime > 800) {
-                select = this.frameInputs.space || this.frameInputs.enter;
-            }
-        } else if (p1.input.type === 'GAMEPAD' && p1.input.gamepadIndex !== null) {
-            const gp = navigator.getGamepads()[p1.input.gamepadIndex];
-            if (gp) {
-                if (canHoldInput) {
-                    // Use JoyConMapper for stick navigation (handles rotated axes)
-                    const navX = getMenuNavX(gp);
-                    left = navX < 0;
-                    right = navX > 0;
-                }
-                // Edge detection for select
-                const confirmIdx = getConfirmButtonIndex(gp);
-                const currentSelect = gp.buttons[confirmIdx]?.pressed ?? false;
-                if (Date.now() - this.sceneStartTime > 800) {
-                    select = currentSelect && !this.prevGamepadSelects.get(gp.index);
-                }
-                this.prevGamepadSelects.set(gp.index, currentSelect);
-            }
-        }
-
-        let inputRegistered = false;
 
         // MAP phase must be checked FIRST (before character cycling)
         if (this.selectionPhase === 'MAP') {
-            if (left) {
+            if (action === 'left') {
                 this.changeMap(-1);
-                inputRegistered = true;
-            } else if (right) {
+            } else if (action === 'right') {
                 this.changeMap(1);
-                inputRegistered = true;
-            } else if (select) {
+            } else if (action === 'confirm') {
                 AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.6 });
-                inputRegistered = true;
                 this.startTrainingGame();
             }
-        } else if (left) {
+        } else if (action === 'left') {
             this.changeCharacter(targetSlot, -1);
-            inputRegistered = true;
-        } else if (right) {
+        } else if (action === 'right') {
             this.changeCharacter(targetSlot, 1);
-            inputRegistered = true;
-        } else if (select) {
+        } else if (action === 'confirm') {
             if (this.selectionPhase === 'P1') {
                 AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 });
                 p1.ready = true;
 
                 if (this.mode === 'campaign') {
-                    inputRegistered = true;
                     this.startCampaignGame();
                 } else {
                     this.selectionPhase = 'CPU';
-                    inputRegistered = true;
                 }
             } else {
                 AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 });
                 cpu.ready = true;
-                inputRegistered = true;
                 // Move to map selection instead of starting immediately
                 this.selectionPhase = 'MAP';
                 this.showMapSelection();
             }
-        }
-
-        if (inputRegistered) {
-            this.lastInputTime.set(0, time);
         }
     }
 
@@ -725,7 +381,7 @@ export class LobbyScene extends Phaser.Scene {
 
     private showMapSelection(): void {
         // Hide player cards
-        this.slotContainers.forEach(c => c.setVisible(false));
+        this.cards.forEach(c => c.setVisible(false));
 
         const { width, height } = this.scale;
         const centerY = height / 2;
@@ -797,7 +453,7 @@ export class LobbyScene extends Phaser.Scene {
             this.mapUIContainer = undefined;
         }
         // Restore player cards
-        this.slotContainers.forEach(c => c.setVisible(true));
+        this.cards.forEach(c => c.setVisible(true));
     }
 
     private changeMap(dir: number): void {
@@ -817,96 +473,19 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     private updateUI(): void {
-        this.slots.forEach((slot, i) => {
-            const container = this.slotContainers[i];
-            const card = container.getData('card') as Phaser.GameObjects.Graphics;
-            const stateText = container.getData('stateText') as Phaser.GameObjects.Text;
-            const charText = container.getData('charText') as Phaser.GameObjects.Text;
-            const arrows = container.getData('arrows') as Phaser.GameObjects.Text[];
-            const charSprite = container.getData('charSprite') as Phaser.GameObjects.Sprite;
-            const playerColor = container.getData('playerColor') as number;
-            const shadow = container.getData('shadow') as Phaser.GameObjects.Ellipse;
+        this.slots.forEach((slot, i) => this.cards[i].show(this.cardState(slot, i)));
+    }
 
-            const cardWidth = 180;
-            const cardHeight = 300;
-
-            if (slot.joined) {
-                // Redraw card with player color (brighter when ready)
-                card.clear();
-                card.lineStyle(3, slot.ready ? 0x00ff00 : playerColor);
-                card.fillStyle(0x000000, 0.4);
-                card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-                card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-
-                // Show sprite & play idle
-                charSprite.setVisible(true);
-                shadow.setVisible(true);
-                const charKey = slot.character as string;
-                const idleAnim = `${charKey}_idle`;
-                if (charSprite.anims.currentAnim?.key !== idleAnim) {
-                    charSprite.setTexture(charKey);
-                    if (this.anims.exists(idleAnim)) {
-                        charSprite.play(idleAnim, true);
-                    }
-                }
-
-                if (slot.ready) {
-                    stateText.setText('PRONTO!');
-                    stateText.setColor('#00ff00');
-                    stateText.setFontSize(36);
-                    stateText.setBackgroundColor('#004400'); // Overlay style
-                    arrows.forEach(a => a.setVisible(false));
-                } else {
-                    if (this.mode === 'training' && i === 1 && this.selectionPhase === 'P1') {
-                        stateText.setText('In attesa...');
-                        stateText.setColor('#888888');
-                        stateText.setFontSize(20);
-                        stateText.setBackgroundColor(''); // Clear bg
-                        arrows.forEach(a => a.setVisible(false));
-                    } else if (this.mode === 'training' && i === 1 && this.selectionPhase === 'CPU') {
-                        stateText.setText('SCEGLI IL CPU');
-                        stateText.setColor('#ffff00');
-                        stateText.setFontSize(20);
-                        stateText.setBackgroundColor('');
-                        arrows.forEach(a => a.setVisible(true));
-                    } else {
-                        stateText.setText('');
-                        stateText.setBackgroundColor('');
-                        arrows.forEach(a => a.setVisible(true));
-                    }
-                }
-
-                const charIdx = this.characters.indexOf(slot.character);
-                charText.setText(this.charLabels[charIdx]);
-                charText.setVisible(true);
-
-                if (slot.isTrainingDummy) {
-                    if (slot.ready) {
-                        stateText.setText('PRONTO!');
-                    } else if (this.selectionPhase === 'CPU') {
-                        stateText.setText('SCEGLI IL CPU');
-                    } else {
-                        stateText.setText('MANICHINO');
-                    }
-                }
-
-            } else {
-                // Empty slot
-                card.clear();
-                card.lineStyle(2, 0x333333);
-                card.fillStyle(0x000000, 0.2);
-                card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-                card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 16);
-
-                stateText.setText('Premi\nper entrare');
-                stateText.setColor('#555555');
-                stateText.setFontSize(20);
-                stateText.setBackgroundColor('');
-                charText.setVisible(false);
-                charSprite.setVisible(false);
-                shadow.setVisible(false);
-                arrows.forEach(a => a.setVisible(false));
-            }
-        });
+    /** What slot `i`'s card shows: the empty prompt, or the fighter with where its player is in choosing. */
+    private cardState(slot: PlayerSelection, i: number): CardState {
+        if (!slot.joined) return { kind: 'empty', text: 'Premi\nper entrare' };
+        const fighter = { kind: 'fighter' as const, character: slot.character, ready: slot.ready };
+        if (slot.ready) return { ...fighter, choosing: false };
+        const cpuSlot = this.mode === 'training' && i === 1;
+        if (cpuSlot && this.selectionPhase === 'CPU') return { ...fighter, choosing: true, text: 'SCEGLI IL CPU' };
+        if (cpuSlot && this.selectionPhase === 'P1') {
+            return { ...fighter, choosing: false, text: slot.isTrainingDummy ? 'MANICHINO' : 'In attesa...', textColour: '#888888' };
+        }
+        return { ...fighter, choosing: true };
     }
 }

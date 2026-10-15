@@ -3,9 +3,15 @@ import { NetEvent, PROTOCOL_VERSION } from '../../shared/NetProtocol';
 
 type NetEventName = typeof NetEvent[keyof typeof NetEvent];
 
+/** The release's game server; the experimental site (port 8080 on the droplet) has its own on 9209. */
 const SERVER_PORT = 9208;
+const EXPERIMENTAL_SITE_PORT = '8080';
+const EXPERIMENTAL_SERVER_PORT = 9209;
 const PING_INTERVAL_MS = 500;
-const SERVER_EVENTS = [NetEvent.REJECTED, NetEvent.ROOM, NetEvent.START, NetEvent.PLAYER_LEFT];
+const SERVER_EVENTS = [
+    NetEvent.REJECTED, NetEvent.ROOM, NetEvent.START, NetEvent.PLAYER_LEFT,
+    NetEvent.WATCH, NetEvent.WATCH_INPUTS, NetEvent.WATCH_END, NetEvent.SPECTATORS,
+];
 
 /**
  * The connection to the online server.
@@ -31,7 +37,7 @@ export class NetClient {
     connect(): Promise<void> {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('Connection timed out')), 8000);
-            const channel = geckos({ url: serverUrl(), port: SERVER_PORT });
+            const channel = geckos({ url: serverUrl(), port: serverPort() });
             this.channel = channel;
 
             channel.onConnect(error => {
@@ -47,6 +53,9 @@ export class NetClient {
                     return;
                 }
                 this.connected = true;
+                // Closing the tab or the window closes the connection straight away, so the others
+                // aren't left waiting until the server notices the silence
+                window.addEventListener('pagehide', this.closeOnExit);
                 // Geckos can't remove listeners, so each event gets one that forwards to the current handler
                 for (const event of SERVER_EVENTS) {
                     channel.on(event, data => this.handlers.get(event)?.(data));
@@ -84,7 +93,10 @@ export class NetClient {
         this.channel?.raw.emit(packet);
     }
 
+    private readonly closeOnExit = (): void => this.close();
+
     close(): void {
+        window.removeEventListener('pagehide', this.closeOnExit);
         if (this.pingTimer) clearInterval(this.pingTimer);
         this.pingTimer = null;
         this.handlers.clear();
@@ -110,6 +122,10 @@ export class NetClient {
         if (delay > 0) setTimeout(deliver, delay);
         else deliver();
     }
+}
+
+function serverPort(): number {
+    return window.location.port === EXPERIMENTAL_SITE_PORT ? EXPERIMENTAL_SERVER_PORT : SERVER_PORT;
 }
 
 /** The server is on the host the page came from; the packaged app uses the production server. */

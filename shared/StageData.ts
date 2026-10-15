@@ -24,7 +24,10 @@ export interface SimPlatform extends SimRect {
 /** Full stage geometry. */
 export interface SimStage {
     platforms: SimPlatform[];
+    /** Sides: they stop fighters moving across. */
     walls: SimRect[];
+    /** Undersides: they stop fighters moving up. */
+    ceilings: SimRect[];
     blastZones: {
         left: number;
         right: number;
@@ -55,6 +58,8 @@ export const STAGE_LAYOUT: SimStage = {
         // Left platform inner and outer sides
         { x: 125, y: 385, w: 20, h: 450 },
         { x: -50, y: 500, w: 20, h: 680 },
+    ],
+    ceilings: [
         // Left platform underside
         { x: 25, y: 565, w: 170, h: 20 },
         // Main stage underside

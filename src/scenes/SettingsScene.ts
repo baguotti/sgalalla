@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
 import { VideoManager } from '../managers/VideoManager';
-import { getConfirmButtonIndex, getBackButtonIndex, getMenuNavX, getMenuNavY } from '../input/JoyConMapper';
+import { MenuInput, type MenuAction } from '../input/MenuInput';
 import { GamepadMapping, BUTTON_NAMES, ACTION_LABELS } from '../input/GamepadMapping';
 import type { GameAction } from '../input/GamepadMapping';
 import { KeyboardMapping, KB_ACTION_LABELS, keyCodeToLabel } from '../input/KeyboardMapping';
@@ -63,13 +63,7 @@ export class SettingsScene extends Phaser.Scene {
     private kbListeningFlashTimer: number = 0;
 
     // Keys
-    private keyUp!: Phaser.Input.Keyboard.Key;
-    private keyDown!: Phaser.Input.Keyboard.Key;
-    private keyLeft!: Phaser.Input.Keyboard.Key;
-    private keyRight!: Phaser.Input.Keyboard.Key;
-    private keyEnter!: Phaser.Input.Keyboard.Key;
-    private keyEsc!: Phaser.Input.Keyboard.Key;
-    private keySpace!: Phaser.Input.Keyboard.Key;
+    private menuInput!: MenuInput;
 
     private canInput: boolean = false;
     private returnScene: string = 'MainMenuScene';
@@ -144,13 +138,7 @@ export class SettingsScene extends Phaser.Scene {
         this.createKeyboardUI();
 
         // Input
-        this.keyUp = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
-        this.keyDown = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
-        this.keyLeft = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
-        this.keyRight = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
-        this.keyEnter = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-        this.keySpace = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-        this.keyEsc = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+        this.menuInput = new MenuInput(this);
 
         // Delay input activation
         this.time.delayedCall(500, () => {
@@ -158,14 +146,6 @@ export class SettingsScene extends Phaser.Scene {
         });
 
         this.updateSelection();
-
-        // Cleanup
-        this.events.once('shutdown', () => {
-            if (this.input.gamepad && Array.isArray(this.input.gamepad.gamepads)) {
-                // @ts-ignore
-                this.input.gamepad.gamepads = this.input.gamepad.gamepads.filter(p => !!p);
-            }
-        });
     }
 
     // ─── Main Menu UI ───
@@ -473,6 +453,8 @@ export class SettingsScene extends Phaser.Scene {
             const show = Math.floor(this.listeningFlashTimer / 400) % 2 === 0;
             this.listeningText.setAlpha(show ? 1 : 0.3);
             this.pollGamepadForRebind();
+            // The button taken for the rebind doesn't also act on the menu
+            this.menuInput.holdEverything();
             return;
         }
 
@@ -480,183 +462,47 @@ export class SettingsScene extends Phaser.Scene {
             this.kbListeningFlashTimer += delta;
             const show = Math.floor(this.kbListeningFlashTimer / 400) % 2 === 0;
             this.kbListeningText.setAlpha(show ? 1 : 0.3);
-            // Keyboard listening is handled by the keydown event listener
+            // Keyboard listening is handled by the keydown event listener; that key doesn't also act on the menu
+            this.menuInput.holdEverything();
             return;
         }
 
-        if (this.screenMode === 'MAIN') {
-            this.updateMainMenu();
-        } else if (this.screenMode === 'AUDIO') {
-            this.updateAudioMenu();
-        } else if (this.screenMode === 'VIDEO') {
-            this.updateVideoMenu();
-        } else if (this.screenMode === 'KEYBOARD') {
-            this.updateKeyboardMenu();
-        } else if (this.screenMode === 'CONTROLLER') {
-            this.updateControllerMenu();
-        }
-
-        this.handleGamepad();
-    }
-
-    private updateMainMenu(): void {
-        if (Phaser.Input.Keyboard.JustDown(this.keyUp)) {
-            this.changeSelection(-1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyDown)) {
-            this.changeSelection(1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEnter) || Phaser.Input.Keyboard.JustDown(this.keySpace)) {
-            this.confirmSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
-            this.goBack();
+        for (const { action, pad } of this.menuInput.poll()) {
+            // Confirm, Start and back can change screens: the rest of this frame's presses would act on the wrong one
+            if (this.onPress(action, pad)) return;
         }
     }
 
-    private updateAudioMenu(): void {
-        if (Phaser.Input.Keyboard.JustDown(this.keyUp)) {
-            this.changeAudioSelection(-1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyDown)) {
-            this.changeAudioSelection(1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyLeft)) {
-            this.modifyAudioValue(-1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyRight)) {
-            this.modifyAudioValue(1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEnter) || Phaser.Input.Keyboard.JustDown(this.keySpace)) {
-            this.confirmAudioSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
-            this.goBack();
+    /** One press on whichever screen is open; true when it may have changed the screen. */
+    private onPress(action: MenuAction, pad: number | null): boolean {
+        const mode = this.screenMode;
+        if (action === 'up' || action === 'down') {
+            const dir = action === 'up' ? -1 : 1;
+            if (mode === 'MAIN') this.changeSelection(dir);
+            else if (mode === 'AUDIO') this.changeAudioSelection(dir);
+            else if (mode === 'VIDEO') this.changeVideoSelection(dir);
+            else if (mode === 'KEYBOARD') this.changeKbSelection(dir);
+            else if (mode === 'CONTROLLER') this.changeControllerSelection(dir);
+            return false;
         }
-    }
-
-    private updateVideoMenu(): void {
-        if (Phaser.Input.Keyboard.JustDown(this.keyUp)) {
-            this.changeVideoSelection(-1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyDown)) {
-            this.changeVideoSelection(1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEnter) || Phaser.Input.Keyboard.JustDown(this.keySpace)) {
-            this.confirmVideoSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
-            this.goBack();
+        if (action === 'left' || action === 'right') {
+            const dir = action === 'left' ? -1 : 1;
+            if (mode === 'AUDIO') this.modifyAudioValue(dir);
+            else if (mode === 'CONTROLLER') this.switchControllerSlot(dir);
+            return false;
         }
-    }
-
-    private updateControllerMenu(): void {
-        if (Phaser.Input.Keyboard.JustDown(this.keyUp)) {
-            this.changeControllerSelection(-1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyDown)) {
-            this.changeControllerSelection(1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyLeft)) {
-            this.switchControllerSlot(-1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyRight)) {
-            this.switchControllerSlot(1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEnter) || Phaser.Input.Keyboard.JustDown(this.keySpace)) {
-            this.confirmControllerSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
-            this.goBack();
+        if (action === 'confirm' || action === 'start') {
+            if (mode === 'MAIN') this.confirmSelection();
+            else if (mode === 'AUDIO') this.confirmAudioSelection();
+            else if (mode === 'VIDEO') this.confirmVideoSelection();
+            else if (mode === 'KEYBOARD') this.confirmKbSelection();
+            else if (mode === 'CONTROLLER') this.confirmControllerSelection(action === 'start' ? 'START' : 'A');
+            return true;
         }
-    }
-
-    private updateKeyboardMenu(): void {
-        if (Phaser.Input.Keyboard.JustDown(this.keyUp)) {
-            this.changeKbSelection(-1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyDown)) {
-            this.changeKbSelection(1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEnter) || Phaser.Input.Keyboard.JustDown(this.keySpace)) {
-            this.confirmKbSelection();
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
-            this.goBack();
-        }
-    }
-
-    // ─── Gamepad Navigation ───
-
-    private previousAxis: Map<number, { x: number, y: number }> = new Map();
-    private previousButtons: Map<number, { a: boolean; b: boolean; start: boolean }> = new Map();
-
-    private handleGamepad(): void {
-        const pads = this.input.gamepad?.gamepads;
-        if (!pads) return;
-
-        for (let i = 0; i < pads.length; i++) {
-            const pad = pads[i];
-            if (!pad) continue;
-
-            const rawGp = navigator.getGamepads()[pad.index];
-            if (!rawGp) continue;
-
-            const navX = getMenuNavX(rawGp);
-            const navY = getMenuNavY(rawGp);
-
-            if (!this.previousAxis.has(pad.index)) this.previousAxis.set(pad.index, { x: 0, y: 0 });
-            if (!this.previousButtons.has(pad.index)) this.previousButtons.set(pad.index, { a: false, b: false, start: false });
-
-            const prevAxis = this.previousAxis.get(pad.index)!;
-            const prevBtns = this.previousButtons.get(pad.index)!;
-
-            // NAV Y
-            if (navY < 0 && prevAxis.y >= 0) {
-                if (this.screenMode === 'MAIN') this.changeSelection(-1);
-                else if (this.screenMode === 'AUDIO') this.changeAudioSelection(-1);
-                else if (this.screenMode === 'VIDEO') this.changeVideoSelection(-1);
-                else if (this.screenMode === 'KEYBOARD') this.changeKbSelection(-1);
-                else if (this.screenMode === 'CONTROLLER') this.changeControllerSelection(-1);
-            } else if (navY > 0 && prevAxis.y <= 0) {
-                if (this.screenMode === 'MAIN') this.changeSelection(1);
-                else if (this.screenMode === 'AUDIO') this.changeAudioSelection(1);
-                else if (this.screenMode === 'VIDEO') this.changeVideoSelection(1);
-                else if (this.screenMode === 'KEYBOARD') this.changeKbSelection(1);
-                else if (this.screenMode === 'CONTROLLER') this.changeControllerSelection(1);
-            }
-
-            // NAV X (volume sliders in AUDIO, slot tabs in CONTROLLER)
-            if (this.screenMode === 'AUDIO') {
-                if (navX < 0 && prevAxis.x >= 0) this.modifyAudioValue(-1);
-                else if (navX > 0 && prevAxis.x <= 0) this.modifyAudioValue(1);
-            } else if (this.screenMode === 'CONTROLLER') {
-                if (navX < 0 && prevAxis.x >= 0) this.switchControllerSlot(-1);
-                else if (navX > 0 && prevAxis.x <= 0) this.switchControllerSlot(1);
-            }
-
-            // A (Confirm)
-            const confirmIdx = getConfirmButtonIndex(rawGp);
-            const isA = rawGp.buttons[confirmIdx]?.pressed;
-            if (isA && !prevBtns.a) {
-                if (this.screenMode === 'MAIN') this.confirmSelection();
-                else if (this.screenMode === 'AUDIO') this.confirmAudioSelection();
-                else if (this.screenMode === 'VIDEO') this.confirmVideoSelection();
-                else if (this.screenMode === 'KEYBOARD') this.confirmKbSelection();
-                else if (this.screenMode === 'CONTROLLER') this.confirmControllerSelection('A');
-                prevBtns.a = true;
-            } else if (!isA) {
-                prevBtns.a = false;
-            }
-
-            // START (Alternate Confirm, required for remapping)
-            const isStart = rawGp.buttons[9]?.pressed;
-            if (isStart && !prevBtns.start) {
-                if (this.screenMode === 'MAIN') this.confirmSelection();
-                else if (this.screenMode === 'AUDIO') this.confirmAudioSelection();
-                else if (this.screenMode === 'VIDEO') this.confirmVideoSelection();
-                else if (this.screenMode === 'KEYBOARD') this.confirmKbSelection();
-                else if (this.screenMode === 'CONTROLLER') this.confirmControllerSelection('START');
-                prevBtns.start = true;
-            } else if (!isStart) {
-                prevBtns.start = false;
-            }
-
-            // B (Back) - active in MAIN, AUDIO, VIDEO but disabled in CONTROLLER so it can be remapped
-            const backIdx = getBackButtonIndex(rawGp);
-            const isB = rawGp.buttons[backIdx]?.pressed;
-            if (isB && !prevBtns.b) {
-                if (this.screenMode !== 'CONTROLLER' && this.screenMode !== 'KEYBOARD') {
-                    this.goBack();
-                }
-                prevBtns.b = true;
-            } else if (!isB) {
-                prevBtns.b = false;
-            }
-
-            this.previousAxis.set(pad.index, { x: navX, y: navY });
-        }
+        // Back: on the remapping screens a gamepad's B is a button to remap, so only the keyboard goes back
+        if (pad !== null && (mode === 'CONTROLLER' || mode === 'KEYBOARD')) return false;
+        this.goBack();
+        return true;
     }
 
     // ─── Rebind Logic ───

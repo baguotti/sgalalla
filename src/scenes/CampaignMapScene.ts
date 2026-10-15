@@ -3,7 +3,7 @@ import { CampaignManager } from '../managers/CampaignManager';
 import { ISLAND_NAMES } from '../data/CampaignIslandData';
 import { charConfigs, ANIM_FRAME_RATES } from '../config/CharacterConfig';
 import { AudioManager } from '../managers/AudioManager';
-import { getConfirmButtonIndex, getMenuNavX } from '../input/JoyConMapper';
+import { MenuInput } from '../input/MenuInput';
 
 interface IslandNode {
     x: number;
@@ -33,8 +33,9 @@ export class CampaignMapScene extends Phaser.Scene {
     private slotIndex: number = 0;
 
     // Gamepad edge detection
-    private prevGamepadA: Map<number, boolean> = new Map();
-    private lastGamepadInputTime: number = 0;
+    private menuInput!: MenuInput;
+    /** The yes/no prompt, while it's open: it takes the menu presses. */
+    private prompt: { choose(dir: -1 | 1): void; confirm(): void } | null = null;
 
     // Path lines
     private pathGraphics!: Phaser.GameObjects.Graphics;
@@ -47,13 +48,6 @@ export class CampaignMapScene extends Phaser.Scene {
     private static readonly START_X = 250;    // Left margin
 
     // Cached keyboard keys (initialised in create)
-    private keyLeft!: Phaser.Input.Keyboard.Key;
-    private keyRight!: Phaser.Input.Keyboard.Key;
-    private keyA!: Phaser.Input.Keyboard.Key;
-    private keyD!: Phaser.Input.Keyboard.Key;
-    private keySpace!: Phaser.Input.Keyboard.Key;
-    private keyEnter!: Phaser.Input.Keyboard.Key;
-    private keyEsc!: Phaser.Input.Keyboard.Key;
 
     constructor() {
         super({ key: 'CampaignMapScene' });
@@ -74,7 +68,7 @@ export class CampaignMapScene extends Phaser.Scene {
         this.currentIslandIndex = 0;
         this.isMoving = false;
         this.canInput = false;
-        this.prevGamepadA.clear();
+        this.prompt = null;
     }
 
     create() {
@@ -325,86 +319,36 @@ export class CampaignMapScene extends Phaser.Scene {
             this.canInput = true;
         });
 
-        // Cache keyboard keys once
-        const kb = this.input.keyboard!;
-        this.keyLeft = kb.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT, false);
-        this.keyRight = kb.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT, false);
-        this.keyA = kb.addKey(Phaser.Input.Keyboard.KeyCodes.A, false);
-        this.keyD = kb.addKey(Phaser.Input.Keyboard.KeyCodes.D, false);
-        this.keySpace = kb.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE, false);
-        this.keyEnter = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER, false);
-        this.keyEsc = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ESC, false);
+        this.menuInput = new MenuInput(this);
 
         // Initial visual update
         this.updateIslandVisuals();
-
-        // Cleanup
-        this.events.once('shutdown', () => {
-            if (this.input.gamepad && Array.isArray(this.input.gamepad.gamepads)) {
-                // @ts-ignore
-                this.input.gamepad.gamepads = this.input.gamepad.gamepads.filter((p: any) => !!p);
-            }
-        });
     }
 
     update() {
-        this.pollGamepadEdge();
+        const presses = this.menuInput.poll();
+        if (this.prompt) {
+            for (const { action } of presses) {
+                if (action === 'left' || action === 'up') this.prompt.choose(-1);
+                else if (action === 'right' || action === 'down') this.prompt.choose(1);
+                else if (action === 'confirm') {
+                    this.prompt.confirm();
+                    return;
+                }
+            }
+            return;
+        }
         if (!this.canInput || this.isMoving) return;
 
-        // --- Keyboard Input (using cached keys from create()) ---
-        if (Phaser.Input.Keyboard.JustDown(this.keyLeft) || Phaser.Input.Keyboard.JustDown(this.keyA)) {
-            this.movePlayer(-1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyRight) || Phaser.Input.Keyboard.JustDown(this.keyD)) {
-            this.movePlayer(1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.keySpace) || Phaser.Input.Keyboard.JustDown(this.keyEnter)) {
-            this.enterIsland();
-        } else if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) {
-            this.goBack();
-        }
-
-        // --- Gamepad Input ---
-        this.handleGamepad();
-    }
-
-    private pollGamepadEdge(): void {
-        const gamepads = navigator.getGamepads();
-        for (let i = 0; i < gamepads.length; i++) {
-            const pad = gamepads[i];
-            if (!pad) continue;
-            const confirmIdx = getConfirmButtonIndex(pad);
-            const aPressed = pad.buttons[confirmIdx]?.pressed || false;
-            if (!this.canInput) {
-                this.prevGamepadA.set(pad.index, aPressed);
-            }
-        }
-    }
-
-    private handleGamepad(): void {
-        const gamepads = navigator.getGamepads();
-        const now = Date.now();
-        if (now - this.lastGamepadInputTime < 200) return;
-
-        for (let i = 0; i < gamepads.length; i++) {
-            const pad = gamepads[i];
-            if (!pad) continue;
-
-            const navX = getMenuNavX(pad);
-            if (navX < 0) {
-                this.movePlayer(-1);
-                this.lastGamepadInputTime = now;
-            } else if (navX > 0) {
-                this.movePlayer(1);
-                this.lastGamepadInputTime = now;
-            }
-
-            // A button edge detection
-            const confirmIdx = getConfirmButtonIndex(pad);
-            const aPressed = pad.buttons[confirmIdx]?.pressed || false;
-            const wasA = this.prevGamepadA.get(pad.index) ?? false;
-            this.prevGamepadA.set(pad.index, aPressed);
-            if (aPressed && !wasA) {
+        for (const { action } of presses) {
+            if (action === 'left') this.movePlayer(-1);
+            else if (action === 'right') this.movePlayer(1);
+            else if (action === 'confirm') {
                 this.enterIsland();
-                this.lastGamepadInputTime = now;
+                return;
+            } else if (action === 'back') {
+                this.goBack();
+                return;
             }
         }
     }
@@ -604,113 +548,32 @@ export class CampaignMapScene extends Phaser.Scene {
             }
         };
 
-        let cleanup = () => {
-            allUI.forEach(obj => obj.destroy());
-            this.input.keyboard?.off('keydown-LEFT', onLeft);
-            this.input.keyboard?.off('keydown-RIGHT', onRight);
-            this.input.keyboard?.off('keydown-A', onLeft);
-            this.input.keyboard?.off('keydown-D', onRight);
-            this.input.keyboard?.off('keydown-SPACE', onConfirm);
-            this.input.keyboard?.off('keydown-ENTER', onConfirm);
+        const choose = (index: number) => {
+            selectedIndex = index;
+            updateHighlight();
         };
-
-        const onLeft = () => { selectedIndex = 0; updateHighlight(); };
-        const onRight = () => { selectedIndex = 1; updateHighlight(); };
         const onConfirm = () => {
-            cleanup();
+            allUI.forEach(obj => obj.destroy());
+            this.prompt = null;
             if (selectedIndex === 0) {
                 // YES — start training fight
                 this.transitionToFight(true);
             } else {
-                // NO — delay re-enabling input so the same Space press
-                // doesn't immediately re-trigger enterIsland()
+                // NO — delay re-enabling input so the same press doesn't immediately re-trigger enterIsland()
                 this.time.delayedCall(300, () => {
                     this.canInput = true;
                 });
             }
         };
-
-        this.input.keyboard?.on('keydown-LEFT', onLeft, this);
-        this.input.keyboard?.on('keydown-RIGHT', onRight, this);
-        this.input.keyboard?.on('keydown-A', onLeft, this);
-        this.input.keyboard?.on('keydown-D', onRight, this);
-
-        // Delay confirm listener registration so the Space/Enter that opened
-        // this prompt doesn't immediately trigger onConfirm
-        this.time.delayedCall(200, () => {
-            this.input.keyboard?.on('keydown-SPACE', onConfirm, this);
-            this.input.keyboard?.on('keydown-ENTER', onConfirm, this);
-        });
-
-        // --- Gamepad Support ---
-        // Create an update listener just for this prompt
-        let lastPadTime = Date.now();
-        const padPrevA = new Map<number, boolean>();
-        const gamepadUpdate = () => {
-            const gamepads = navigator.getGamepads();
-            const now = Date.now();
-            if (now - lastPadTime < 200) return;
-
-            for (let i = 0; i < gamepads.length; i++) {
-                const pad = gamepads[i];
-                if (!pad) continue;
-
-                // Move
-                const navX = getMenuNavX(pad);
-                if (navX < 0) {
-                    onLeft();
-                    lastPadTime = now;
-                } else if (navX > 0) {
-                    onRight();
-                    lastPadTime = now;
-                }
-
-                // Confirm - Edge detection
-                const confirmIdx = getConfirmButtonIndex(pad);
-                const aPressed = pad.buttons[confirmIdx]?.pressed || false;
-                const wasA = padPrevA.get(pad.index) ?? false;
-                padPrevA.set(pad.index, aPressed);
-
-                // Need extra delay check on confirm so A button from opening the menu
-                // doesn't instantly click YES
-                if (aPressed && !wasA) {
-                    // Similar to the keyboard 200ms delay logic
-                    if (now - lastPadTime > 300) {
-                        onConfirm();
-                        lastPadTime = now;
-                    }
-                }
-            }
-        };
-
-        // Clear pad states initially to consume holding presses
-        const setupGamepads = navigator.getGamepads();
-        for (let i = 0; i < setupGamepads.length; i++) {
-            const pad = setupGamepads[i];
-            if (pad) {
-                const confIdx = getConfirmButtonIndex(pad);
-                padPrevA.set(pad.index, pad.buttons[confIdx]?.pressed || false);
-            }
-        }
-
-        this.events.on('update', gamepadUpdate);
-
-        // Append to cleanup
-        const oldCleanup = cleanup;
-        cleanup = () => {
-            oldCleanup();
-            this.events.off('update', gamepadUpdate);
-            this.events.off('shutdown', cleanup); // Remove shutdown listener too
-        };
-
-        // Ensure cleanup runs on scene shutdown (e.g. player presses ESC while prompt is open)
-        this.events.once('shutdown', cleanup);
+        this.prompt = { choose: dir => choose(dir < 0 ? 0 : 1), confirm: onConfirm };
+        // The press that opened the prompt doesn't also answer it
+        this.menuInput.holdEverything();
 
         // Mouse/touch support
         yesBtn.setInteractive();
         noBtn.setInteractive();
-        yesBtn.on('pointerover', () => { selectedIndex = 0; updateHighlight(); });
-        noBtn.on('pointerover', () => { selectedIndex = 1; updateHighlight(); });
+        yesBtn.on('pointerover', () => choose(0));
+        noBtn.on('pointerover', () => choose(1));
         yesBtn.on('pointerdown', () => { selectedIndex = 0; onConfirm(); });
         noBtn.on('pointerdown', () => { selectedIndex = 1; onConfirm(); });
 

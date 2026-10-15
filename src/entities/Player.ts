@@ -5,8 +5,10 @@ import type { TouchController } from '../components/TouchController';
 import { AudioManager } from '../managers/AudioManager';
 import type { GameSceneInterface } from '../scenes/GameSceneInterface';
 import { PlayerAI } from './player/PlayerAI';
+import { ghostStyle } from '../effects/GhostStyle';
+import { effects } from '../config/EffectConfig';
 import { AttackDirection, AttackRegistry, AttackType } from '../../shared/AttackData';
-import { GHOST_FADE_MS, GHOST_TRAVEL_MS, HURTBOX_HEIGHT, HURTBOX_WIDTH, currentDamage } from '../../shared/Combat';
+import { currentDamage } from '../../shared/Combat';
 import { emptyInput, type FighterInput } from '../../shared/FighterInput';
 import { isInPlay, type FighterState, type GhostHitbox } from '../../shared/FighterState';
 import { SIM_STEP_MS } from '../../shared/FixedStepClock';
@@ -27,6 +29,8 @@ export interface PlayerConfig {
 }
 
 const DAMAGE_FLASH_MS = 150;
+/** Landing this fast (px/s) raises the most dust. */
+const HARD_LANDING_SPEED = 1600;
 
 /**
  * A fighter on screen and the input that drives it. The match simulation owns
@@ -62,6 +66,13 @@ export class Player extends Phaser.GameObjects.Container {
     private pose: string | null = null;
 
     private damageFlashMs = 0;
+    private inHitstop = false;
+    /** The fighter as last drawn, to spot landings, dashes and air jumps. */
+    private wasGrounded = true;
+    private lastState = '';
+    private lastJumps = 0;
+    private lastVy = 0;
+    private afterimageMs = 0;
     private isCharging = false;
     private chargeGhost: Phaser.GameObjects.Sprite | null = null;
     private chargeBlurFx: Phaser.FX.Blur | null = null;
@@ -95,7 +106,7 @@ export class Player extends Phaser.GameObjects.Container {
         this.nameTag.setVisible(false);
         this.add(this.nameTag);
 
-        this.hurtboxRect = scene.add.rectangle(0, 0, HURTBOX_WIDTH, HURTBOX_HEIGHT);
+        this.hurtboxRect = scene.add.rectangle(0, 0, PhysicsConfig.HURTBOX_WIDTH, PhysicsConfig.HURTBOX_HEIGHT);
         this.hurtboxRect.setStrokeStyle(2, 0x00ff00);
         this.hurtboxRect.setFillStyle(0x00ff00, 0.2);
         this.hurtboxRect.setVisible(false);
@@ -170,6 +181,8 @@ export class Player extends Phaser.GameObjects.Container {
         this.updateRecoveryGhost(f, inPlay);
         this.updateFacing(f);
         this.updateAnimation(f);
+        this.updateHitstop(f);
+        this.updateMotionEffects(f, inPlay, deltaMs);
         this.updateAlpha(f);
 
         if (this.damageFlashMs > 0) {
@@ -177,7 +190,10 @@ export class Player extends Phaser.GameObjects.Container {
             if (this.damageFlashMs <= 0) this.sprite.clearTint();
         }
 
-        if (this.showDebug) this.drawHitbox(f, inPlay);
+        if (this.showDebug) {
+            this.hurtboxRect.setSize(PhysicsConfig.HURTBOX_WIDTH, PhysicsConfig.HURTBOX_HEIGHT);
+            this.drawHitbox(f, inPlay);
+        }
     }
 
     /** Holds an animation (cutscenes, victory) until cleared with null. */
@@ -221,11 +237,12 @@ export class Player extends Phaser.GameObjects.Container {
         const b = f.body;
         if (f.invulnerabilityTimer > 0) {
             // Respawn invulnerability blinks, except while dashing
-            const isDashing = f.isDodging && Math.abs(b.vx) > 10;
+            const isDashing = (f.isDodging || b.isDashing) && Math.abs(b.vx) > 10;
             const blinkOff = Math.floor(f.invulnerabilityTimer / 50) % 2 === 0;
             this.sprite.setAlpha(!isDashing && blinkOff ? 0.5 : 1);
         } else {
-            this.sprite.setAlpha(b.isSpotDodging ? PhysicsConfig.SPOT_DODGE_ALPHA : 1);
+            // See-through while a dodge makes the fighter invincible
+            this.sprite.setAlpha(b.isInvincible ? PhysicsConfig.SPOT_DODGE_ALPHA : 1);
         }
     }
 
@@ -293,7 +310,7 @@ export class Player extends Phaser.GameObjects.Container {
             f.body.x + ghostOffset(this.character) * facing + (Math.random() - 0.5),
             f.body.y + (Math.random() - 0.5),
         );
-        this.chargeGhost.setAlpha(chargePercent * 0.7);
+        this.chargeGhost.setAlpha(chargePercent * ghostStyle.opacity);
         if (this.chargeBlurFx) {
             this.chargeBlurFx.x = (1 - chargePercent) * 1.5;
             this.chargeBlurFx.y = (1 - chargePercent) * 1.5;
@@ -306,7 +323,7 @@ export class Player extends Phaser.GameObjects.Container {
         ghost.setDepth(this.depth - 1);
         ghost.setAlpha(0);
         if (ghost.preFX) {
-            ghost.preFX.addGlow(0xffffff, 0.4, 0, false, 0.05, 5);
+            ghost.preFX.addGlow(ghostStyle.color, ghostStyle.glow, 0, false, 0.05, 5);
             this.chargeBlurFx = ghost.preFX.addBlur(0, 1.5, 1.5, 1);
         }
         this.ignoreInUiCamera(ghost);
@@ -339,6 +356,46 @@ export class Player extends Phaser.GameObjects.Container {
         this.chargeSounds = [];
     }
 
+    /** Dust on landing and at a dash's start, a ring on an air jump, afterimages while dashing or chase dodging. */
+    private updateMotionEffects(f: FighterState, inPlay: boolean, deltaMs: number): void {
+        const b = f.body;
+        if (inPlay) {
+            const fx = this.effects();
+            const feet = b.y + b.height / 2;
+            if (b.isGrounded && !this.wasGrounded) {
+                fx.spawnDust(b.x, feet, Phaser.Math.Clamp(this.lastVy / HARD_LANDING_SPEED, 0.3, 1), 0);
+            }
+            if (f.state === 'Dash' && this.lastState !== 'Dash') fx.spawnDust(b.x, feet, 0.7, b.dodgeDirection);
+            if (!b.isGrounded && b.jumpsRemaining < this.lastJumps) fx.spawnJumpRing(b.x, feet);
+
+            if (f.state === 'Dash' || b.isChaseDodging) {
+                this.afterimageMs -= deltaMs;
+                if (this.afterimageMs <= 0) {
+                    fx.spawnAfterimage(this.sprite, this.x + this.sprite.x, this.y + this.sprite.y);
+                    this.afterimageMs = effects.AFTERIMAGE_EVERY_MS;
+                }
+            } else {
+                this.afterimageMs = 0;
+            }
+        }
+        this.wasGrounded = !inPlay || b.isGrounded;
+        this.lastState = f.state;
+        this.lastJumps = b.jumpsRemaining;
+        this.lastVy = b.vy;
+    }
+
+    /** In hit-stop the animation holds and the fighter who was hit trembles, a little less as it runs out. */
+    private updateHitstop(f: FighterState): void {
+        if (f.hitstopSteps > 0) {
+            this.sprite.anims.timeScale = 0;
+            if (f.isHitStunned) this.shakeSprite(Math.min(effects.HITSTOP_TREMBLE, 1 + f.hitstopSteps * 0.4));
+            this.inHitstop = true;
+        } else if (this.inHitstop) {
+            this.inHitstop = false;
+            this.sprite.setPosition(0, 0);
+        }
+    }
+
     private shakeSprite(intensity: number): void {
         this.sprite.setPosition((Math.random() - 0.5) * 2 * intensity, (Math.random() - 0.5) * 2 * intensity);
     }
@@ -349,7 +406,7 @@ export class Player extends Phaser.GameObjects.Container {
     public spawnSignatureGhost(ghost: GhostHitbox): void {
         const char = this.character;
         const kind = ghost.vertical ? 'up' : 'side';
-        const sprite = this.effects().spawnGhost(ghost.startX, ghost.startY, char, `${char}_${kind}_sig_ghost_000`, `${char}_${kind}_sig_ghost`, ghost.facing, 1);
+        const sprite = this.effects().spawnGhost(ghost.startX, ghost.startY, char, `${char}_${kind}_sig_ghost_000`, `${char}_${kind}_sig_ghost`, ghost.facing, ghostStyle.opacity);
         if (!sprite) return;
 
         const scale = char === 'nock' && ghost.vertical ? 1.2 : 1;
@@ -363,14 +420,14 @@ export class Player extends Phaser.GameObjects.Container {
         this.scene.tweens.add({
             targets: sprite,
             ...(ghost.vertical ? { y: ghost.startY - ghost.travel } : { x: ghost.startX + ghost.travel * ghost.facing }),
-            duration: GHOST_TRAVEL_MS,
+            duration: PhysicsConfig.GHOST_TRAVEL_MS,
             ease: 'Cubic.easeOut',
         });
         this.scene.tweens.add({
             targets: sprite,
             alpha: 0,
-            delay: ghost.lifetime - GHOST_FADE_MS,
-            duration: GHOST_FADE_MS,
+            delay: ghost.lifetime - PhysicsConfig.GHOST_FADE_MS,
+            duration: PhysicsConfig.GHOST_FADE_MS,
             onUpdate: () => setGhostBlur(blurFx, sprite),
             onComplete: () => this.effects().releaseGhost(sprite),
         });
@@ -387,7 +444,7 @@ export class Player extends Phaser.GameObjects.Container {
     /** The recovery move flashes an up-signature ghost that follows the fighter. */
     private spawnRecoveryGhost(facing: number): void {
         const char = this.character;
-        const sprite = this.effects().spawnGhost(this.x, this.y, char, `${char}_up_sig_ghost_000`, `${char}_up_sig_ghost`, facing, 1);
+        const sprite = this.effects().spawnGhost(this.x, this.y, char, `${char}_up_sig_ghost_000`, `${char}_up_sig_ghost`, facing, ghostStyle.opacity);
         if (!sprite) return;
 
         const scale = char === 'nock' ? 1.2 : 1;
@@ -431,7 +488,7 @@ export class Player extends Phaser.GameObjects.Container {
     private addGhostFx(sprite: Phaser.GameObjects.Sprite): Phaser.FX.Blur | null {
         if (!sprite.preFX) return null;
         sprite.preFX.clear();
-        sprite.preFX.addGlow(0xffffff, 0.4, 0, false, 0.05, 5);
+        sprite.preFX.addGlow(ghostStyle.color, ghostStyle.glow, 0, false, 0.05, 5);
         return sprite.preFX.addBlur(0, 0, 0, 1);
     }
 
@@ -501,20 +558,23 @@ function isGroundPoundCharge(f: FighterState): boolean {
 
 /** Signature ghosts start this far in front of the fighter. */
 function ghostOffset(character: string): number {
-    return character === 'nock' ? 35 : 25;
+    return character === 'nock' ? PhysicsConfig.NOCK_GHOST_OFFSET : PhysicsConfig.GHOST_OFFSET;
 }
 
 /** Ghosts blur as they fade. */
 function setGhostBlur(blurFx: Phaser.FX.Blur | null, sprite: Phaser.GameObjects.Sprite): void {
     if (!blurFx) return;
-    blurFx.x = 0.5 + (1 - sprite.alpha) * 3;
-    blurFx.y = 0.5 + (1 - sprite.alpha) * 3;
+    // Blurrier as it fades from the ghosts' opacity
+    const faded = 1 - sprite.alpha / Math.max(ghostStyle.opacity, 0.01);
+    blurFx.x = 0.5 + faded * 3;
+    blurFx.y = 0.5 + faded * 3;
 }
 
 /** The animation for a fighter's state. */
 function animationFor(f: FighterState): string {
     switch (f.state) {
         case 'Run': return 'run';
+        case 'Dash': return 'dash';
         case 'Jump': return 'jump';
         case 'Fall': return 'fall';
         case 'WallSlide': return 'wall_slide';
@@ -534,8 +594,9 @@ function animationFor(f: FighterState): string {
 function attackAnimation(f: FighterState): string {
     const attack = f.combat.attack;
     if (!attack) return 'idle';
-    const { type, direction } = AttackRegistry[attack.key];
-    const grounded = f.body.isGrounded;
+    // The move decides, not the ground: a gravity cancel does grounded moves in the air
+    const { type, direction, isAerial } = AttackRegistry[attack.key];
+    const grounded = !isAerial;
 
     if (type === AttackType.HEAVY) {
         switch (direction) {

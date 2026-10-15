@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
+import { MenuInput } from '../input/MenuInput';
 
 export interface DialogueLine {
     speaker: string;
@@ -29,6 +30,7 @@ export class DialogueScene extends Phaser.Scene {
     private choiceButtons: Phaser.GameObjects.Text[] = [];
     private selectedChoiceIndex: number = 0;
     private isShowingChoices: boolean = false;
+    private menuInput!: MenuInput;
     private sceneActive: boolean = false; // Guard against post-stop callbacks
 
     private blackBackground: boolean = false; // Add black background support
@@ -102,20 +104,8 @@ export class DialogueScene extends Phaser.Scene {
         this.textMask = this.make.graphics();
         this.textElement.setMask(this.textMask.createGeometryMask());
 
-        // Setup input to advance dialogue
-        this.input.keyboard?.on('keydown-SPACE', this.onConfirmInput, this);
-        this.input.keyboard?.on('keydown-ENTER', this.onConfirmInput, this);
-
-        // Choice navigation
-        this.input.keyboard?.on('keydown-LEFT', this.onNavLeft, this);
-        this.input.keyboard?.on('keydown-RIGHT', this.onNavRight, this);
-        this.input.keyboard?.on('keydown-A', this.onNavLeft, this);
-        this.input.keyboard?.on('keydown-D', this.onNavRight, this);
-
-        // Map Gamepad
-        if (this.input.gamepad) {
-            this.input.gamepad.on('down', this.onGamepadDown, this);
-        }
+        // Confirm advances the dialogue; left and right pick among choices
+        this.menuInput = new MenuInput(this);
 
         // Register shutdown event for clean lifecycle teardown
         this.events.once('shutdown', this.shutdown, this);
@@ -426,75 +416,20 @@ export class DialogueScene extends Phaser.Scene {
         this.scene.stop();
     }
 
-    private onConfirmInput(): void {
-        this.handleConfirm();
-    }
-
-    private onNavLeft(): void {
-        this.navigateChoice(-1);
-    }
-
-    private onNavRight(): void {
-        this.navigateChoice(1);
-    }
-
-    private onGamepadDown(_pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button): void {
-        if (button.index === 0) {
-            this.handleConfirm();
-        }
-        if (button.index === 14) this.navigateChoice(-1);
-        if (button.index === 15) this.navigateChoice(1);
-    }
-
-    // Stick navigation state
-    private stickMovedX: Map<number, boolean> = new Map();
-
     override update() {
-        // Poll gamepad sticks for menu navigation since events only fire on button down
-        if (this.isShowingChoices && this.input.gamepad) {
-            const pads = this.input.gamepad.gamepads;
-            for (let i = 0; i < pads.length; i++) {
-                const pad = pads[i];
-                if (!pad) continue;
-
-                // Simple stick deadzone check
-                const xAxis = pad.axes[0] ? pad.axes[0].getValue() : 0;
-                const moved = this.stickMovedX.get(pad.index) || false;
-
-                // Track stick release to allow single steps
-                if (!moved) {
-                    if (xAxis < -0.5) {
-                        this.navigateChoice(-1);
-                        this.stickMovedX.set(pad.index, true);
-                    } else if (xAxis > 0.5) {
-                        this.navigateChoice(1);
-                        this.stickMovedX.set(pad.index, true);
-                    }
-                } else if (Math.abs(xAxis) < 0.2) {
-                    this.stickMovedX.set(pad.index, false);
-                }
-            }
+        for (const { action } of this.menuInput.poll()) {
+            if (action === 'confirm') this.handleConfirm();
+            else if (action === 'left') this.navigateChoice(-1);
+            else if (action === 'right') this.navigateChoice(1);
         }
     }
 
     shutdown(): void {
-        this.input.keyboard?.off('keydown-SPACE', this.onConfirmInput, this);
-        this.input.keyboard?.off('keydown-ENTER', this.onConfirmInput, this);
-        this.input.keyboard?.off('keydown-LEFT', this.onNavLeft, this);
-        this.input.keyboard?.off('keydown-RIGHT', this.onNavRight, this);
-        this.input.keyboard?.off('keydown-A', this.onNavLeft, this);
-        this.input.keyboard?.off('keydown-D', this.onNavRight, this);
-
-        if (this.input.gamepad) {
-            this.input.gamepad.off('down', this.onGamepadDown, this);
-        }
-
         if (this.typewriterTimer) {
             this.typewriterTimer.remove();
             this.typewriterTimer = undefined;
         }
 
-        this.stickMovedX.clear();
         this.choiceButtons = [];
     }
 }

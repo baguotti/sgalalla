@@ -5,14 +5,12 @@
 
 import type { AttackDirection, AttackPhase } from './AttackData.js';
 import { emptyInput, type FighterInput } from './FighterInput.js';
-import { createBody, type SimBody } from './PhysicsSimulation.js';
-
-/** Presses stay usable for this many steps. */
-const INPUT_BUFFER_STEPS = 6;
+import { PhysicsConfig } from './PhysicsConfig.js';
+import { createBody, endDash, type SimBody } from './PhysicsSimulation.js';
 
 export const FIGHTER_STATES = [
     'Idle', 'Run', 'Jump', 'Fall', 'WallSlide', 'Attack', 'Charging', 'HitStun',
-    'Dodge', 'AirDodge', 'Recovery', 'GroundPound', 'Taunt', 'Defeat',
+    'Dodge', 'AirDodge', 'Recovery', 'GroundPound', 'Taunt', 'Defeat', 'Dash',
 ] as const;
 export type FighterStateName = typeof FIGHTER_STATES[number];
 
@@ -72,6 +70,10 @@ export interface CombatState {
     groundPoundChargeRatio: number;
     /** Alternates the light-attack animation. */
     lightAttackVariant: number;
+    /** While above 0, a directional dodge is a chase dodge (ms). */
+    chaseDodgeTimer: number;
+    /** The current attack or charge came out of an aerial spot dodge, so it's the grounded version. */
+    gravityCancel: boolean;
 }
 
 export interface FighterState {
@@ -97,6 +99,8 @@ export interface FighterState {
     respawnSteps: number;
     /** Steps after a respawn during which blast zones ignore the fighter. */
     koImmunitySteps: number;
+    /** Steps the fighter stays frozen after landing or taking a hit. */
+    hitstopSteps: number;
 }
 
 export interface FighterSetup {
@@ -129,6 +133,8 @@ export function createFighter(id: number, setup: FighterSetup): FighterState {
             groundPoundStartupTimer: 0,
             groundPoundChargeRatio: 0,
             lightAttackVariant: 0,
+            chaseDodgeTimer: 0,
+            gravityCancel: false,
         },
         isDodging: false,
         isAttacking: false,
@@ -140,6 +146,7 @@ export function createFighter(id: number, setup: FighterSetup): FighterState {
         lives: 3,
         respawnSteps: 0,
         koImmunitySteps: 0,
+        hitstopSteps: 0,
     };
 }
 
@@ -153,15 +160,25 @@ export function isInPlay(f: FighterState): boolean {
 export function updateInputBuffer(f: FighterState): void {
     const buffer = f.buffer;
     const step = ++buffer.step;
+    recordPresses(f, step);
+
+    for (const action of ['jump', 'lightAttack', 'heavyAttack', 'dodge'] as const) {
+        const presses = buffer[action];
+        while (presses.length > 0 && step - presses[0] > PhysicsConfig.INPUT_BUFFER_STEPS) presses.shift();
+    }
+}
+
+/** In hit-stop the buffer's clock stops: presses are kept for when the fighter moves again. */
+export function holdInputBuffer(f: FighterState): void {
+    recordPresses(f, f.buffer.step);
+}
+
+function recordPresses(f: FighterState, step: number): void {
+    const buffer = f.buffer;
     if (f.input.jump) buffer.jump.push(step);
     if (f.input.lightAttack) buffer.lightAttack.push(step);
     if (f.input.heavyAttack) buffer.heavyAttack.push(step);
     if (f.input.dodge) buffer.dodge.push(step);
-
-    for (const action of ['jump', 'lightAttack', 'heavyAttack', 'dodge'] as const) {
-        const presses = buffer[action];
-        while (presses.length > 0 && step - presses[0] > INPUT_BUFFER_STEPS) presses.shift();
-    }
 }
 
 export function isBuffered(f: FighterState, action: BufferedAction): boolean {
@@ -201,6 +218,8 @@ function enterState(f: FighterState): void {
             combat.hitbox.active = false;
             combat.isCharging = false;
             combat.chargeTime = 0;
+            combat.chaseDodgeTimer = 0;
+            combat.gravityCancel = false;
             break;
         case 'Dodge':
         case 'AirDodge':
@@ -214,6 +233,9 @@ function exitState(f: FighterState): void {
         case 'Run':
             f.body.isRunning = false;
             break;
+        case 'Dash':
+            endDash(f.body);
+            break;
         case 'GroundPound':
             f.combat.isGroundPounding = false;
             f.isAttacking = false;
@@ -225,39 +247,37 @@ function airborneState(f: FighterState): FighterStateName {
     return f.body.vy < 0 ? 'Jump' : 'Fall';
 }
 
-function canDodge(f: FighterState): boolean {
-    return isBuffered(f, 'dodge') && f.body.dodgeCooldownTimer <= 0;
-}
-
 export function updateState(f: FighterState): void {
     const b = f.body;
     const input = f.input;
     const isMoving = input.moveLeft || input.moveRight;
 
+    // Jumps, dashes and dodges start in the physics; their events change the state
     switch (f.state) {
         case 'Idle':
             if (f.isHitStunned) return changeState(f, 'HitStun');
             if (!b.isGrounded) return changeState(f, airborneState(f));
             if (input.taunt) return changeState(f, 'Taunt');
             if (input.defeat) return changeState(f, 'Defeat');
-            if (canDodge(f)) return changeState(f, 'Dodge');
-            if (isBuffered(f, 'jump')) return changeState(f, 'Jump');
             if (isMoving) return changeState(f, 'Run');
             return;
 
         case 'Run':
             if (f.isHitStunned) return changeState(f, 'HitStun');
             if (!b.isGrounded) return changeState(f, airborneState(f));
-            if (canDodge(f)) return changeState(f, 'Dodge');
-            if (isBuffered(f, 'jump')) return changeState(f, 'Jump');
             if (!isMoving) return changeState(f, 'Idle');
+            return;
+
+        case 'Dash':
+            if (f.isHitStunned) return changeState(f, 'HitStun');
+            if (!b.isGrounded) return changeState(f, airborneState(f));
+            if (!b.isDashing) return changeState(f, isMoving ? 'Run' : 'Idle');
             return;
 
         case 'Jump':
             if (f.isHitStunned) return changeState(f, 'HitStun');
             if (b.isGrounded) return changeState(f, 'Idle');
             if (b.vy > 0) return changeState(f, 'Fall');
-            if (canDodge(f)) return changeState(f, 'AirDodge');
             return;
 
         case 'Fall':
@@ -265,7 +285,6 @@ export function updateState(f: FighterState): void {
             if (b.isGrounded) return changeState(f, 'Idle');
             if (b.vy < 0) return changeState(f, 'Jump');
             if (b.isWallSliding) return changeState(f, 'WallSlide');
-            if (canDodge(f)) return changeState(f, 'AirDodge');
             return;
 
         case 'WallSlide':

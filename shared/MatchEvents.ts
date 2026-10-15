@@ -13,8 +13,11 @@ export type MatchEvent =
     | { type: 'attack'; fighter: number; key: string; charged: boolean }
     /** A signature attack threw its ghost; a copy of the ghost as spawned. */
     | { type: 'ghost'; fighter: number; ghost: GhostHitbox }
-    /** `attackKey` is null for a hit with the recovery move. */
-    | { type: 'hit'; attacker: number; target: number; attackKey: string | null }
+    /**
+     * `attackKey` is null for a hit with the recovery move. Where it landed
+     * (x, y), the damage it did, and the knockback it gave (px/s).
+     */
+    | { type: 'hit'; attacker: number; target: number; attackKey: string | null; x: number; y: number; damage: number; knockbackX: number; knockbackY: number }
     | { type: 'groundPoundMiss'; fighter: number }
     /** Position is where the fighter left the stage. */
     | { type: 'ko'; fighter: number; x: number; y: number }

@@ -1,23 +1,24 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../managers/AudioManager';
-import { getConfirmButtonIndex, getMenuNavY } from '../input/JoyConMapper';
+import { MenuInput } from '../input/MenuInput';
+import { labSceneData } from '../lab/StudioLab';
+import { enterFullscreenOnPhone, isPhone } from '../input/Touch';
 
 export class MainMenuScene extends Phaser.Scene {
-    private startKey!: Phaser.Input.Keyboard.Key;
-    private upKey!: Phaser.Input.Keyboard.Key;
-    private downKey!: Phaser.Input.Keyboard.Key;
-    private enterKey!: Phaser.Input.Keyboard.Key;
-
+    private menuInput!: MenuInput;
     private canInput: boolean = false;
     private selectedIndex: number = 0;
-    private prevGamepadA: Map<number, boolean> = new Map(); // Edge detection for A/Start
     private menuOptions = [
+        { label: 'CAMPAGNA', mode: 'campaign' },
         { label: 'ALLENAMENTO', mode: 'training' },
         { label: 'BOTTE IN LOCALE', mode: 'versus' },
         { label: 'BOTTE IN REMOTO', mode: 'online' },
+        // CORSA (RacingScene) is hidden until it's ready: { label: 'CORSA', mode: 'racing' },
+        { label: 'STUDIO LAB', mode: 'lab' },
         { label: 'IMPOSTAZIONI', mode: 'settings' }
     ];
     private menuTexts: Phaser.GameObjects.Text[] = [];
+    private itemSize = 40;
 
     constructor() {
         super({ key: 'MainMenuScene' });
@@ -72,117 +73,56 @@ export class MainMenuScene extends Phaser.Scene {
             fontSize: '18px', fontFamily: '"Pixeloid Sans"', color: '#888888'
         }).setOrigin(1, 1);
 
-        // Menu items; the last sits 40 px above the bottom
-        const startY = height - 40 - (this.menuOptions.length - 1) * 55;
+        // Menu items; the last sits 40 px above the bottom. On a phone, bigger and further apart for thumbs
+        const phone = isPhone(this);
+        this.itemSize = phone ? 58 : 40;
+        const spacing = phone ? 70 : 55;
+        const startY = height - 40 - (this.menuOptions.length - 1) * spacing;
         this.menuOptions.forEach((opt, index) => {
-            const text = this.add.text(width / 2, startY + (index * 55), opt.label, {
-                fontSize: '40px', fontFamily: '"Pixeloid Sans"', color: '#888888'
+            const text = this.add.text(width / 2, startY + (index * spacing), opt.label, {
+                fontSize: `${this.itemSize}px`, fontFamily: '"Pixeloid Sans"', color: '#888888'
             }).setOrigin(0.5);
             this.menuTexts.push(text);
+            // Touch and mouse: a row the width of the menu, easy to hit with a thumb; tapping picks it
+            text.setInteractive({
+                hitArea: new Phaser.Geom.Rectangle(text.width / 2 - 360, -6, 720, text.height + 12),
+                hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+                useHandCursor: true,
+            });
+            text.on('pointerover', () => {
+                if (this.selectedIndex === index) return;
+                this.selectedIndex = index;
+                AudioManager.getInstance().playSFX('ui_menu_hover', { volume: 0.5 });
+                this.updateSelection();
+            });
+            text.on('pointerup', () => {
+                if (!this.canInput) return;
+                this.selectedIndex = index;
+                this.updateSelection();
+                enterFullscreenOnPhone(this);
+                this.selectOption(this.sys.game.device.input.touch ? 'TOUCH' : 'KEYBOARD');
+            });
         });
 
         this.updateSelection();
 
         // Ignore input for half a second, so a press from the previous screen doesn't carry over
+        this.menuInput = new MenuInput(this);
         this.canInput = false;
-        this.prevGamepadA.clear();
-        this.lastGamepadInputTime = Date.now(); // Reset debounce
-        this.time.delayedCall(500, () => {
-            this.canInput = true;
-            this.startKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-            this.upKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
-            this.downKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
-            this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-        });
-
-        // Cleanup
-        this.events.once('shutdown', () => {
-            this.input.gamepad?.off('connected');
-
-            // PHASER BUG FIX: GamepadPlugin.stopListeners crashes on sparse arrays (e.g. pad index 1 w/o 0)
-            if (this.input.gamepad && Array.isArray(this.input.gamepad.gamepads)) {
-                // Filter out null/undefined slots so stopListeners loop doesn't crash
-                // @ts-ignore - gamepads is technically readonly in types but mutable in JS
-                this.input.gamepad.gamepads = this.input.gamepad.gamepads.filter(p => !!p);
-            }
-        });
+        this.time.delayedCall(500, () => this.canInput = true);
     }
 
     update(): void {
-        // Always poll gamepads to track edge states (even during lockout)
-        this.pollGamepadEdgeStates();
-
+        // Polled during the lockout too, so what's pressed then is used up
+        const presses = this.menuInput.poll();
         if (!this.canInput) return;
 
-        if (Phaser.Input.Keyboard.JustDown(this.upKey)) {
-            this.changeSelection(-1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.downKey)) {
-            this.changeSelection(1);
-        } else if (Phaser.Input.Keyboard.JustDown(this.startKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-            this.selectOption('KEYBOARD');
-        }
-
-        this.handleGamepad();
-    }
-
-    /** Track gamepad A/Start states every frame so held buttons from previous scenes get swallowed */
-    private pollGamepadEdgeStates(): void {
-        const gamepads = navigator.getGamepads();
-        for (let i = 0; i < gamepads.length; i++) {
-            const pad = gamepads[i];
-            if (!pad) continue;
-
-            const confirmIdx = getConfirmButtonIndex(pad);
-            const aPressed = pad.buttons[confirmIdx]?.pressed || pad.buttons[9]?.pressed;
-            if (!this.canInput) {
-                // During lockout, just record the state so held buttons are consumed
-                this.prevGamepadA.set(pad.index, !!aPressed);
-            }
-        }
-    }
-
-    private lastGamepadInputTime: number = 0;
-
-    private handleGamepad(): void {
-        const gamepads = navigator.getGamepads();
-        const now = Date.now();
-
-        // Throttle input to prevent super fast scrolling (200ms delay)
-        if (now - this.lastGamepadInputTime < 150) {
-            return;
-        }
-
-        for (let i = 0; i < gamepads.length; i++) {
-            const pad = gamepads[i];
-            if (!pad) continue;
-
-            // Use JoyConMapper for vertical navigation (handles axis rotation for sideways Joy-Cons)
-            const navY = getMenuNavY(pad);
-
-            let moved = false;
-
-            if (navY < 0) {
-                this.changeSelection(-1);
-                moved = true;
-            } else if (navY > 0) {
-                this.changeSelection(1);
-                moved = true;
-            }
-
-            if (moved) {
-                this.lastGamepadInputTime = now;
-            }
-
-            const confirmIdx = getConfirmButtonIndex(pad);
-
-            // A Button or Start (9) to select — EDGE DETECTION
-            const aPressed = pad.buttons[confirmIdx]?.pressed || pad.buttons[9]?.pressed;
-            const wasPressed = this.prevGamepadA.get(pad.index) ?? false;
-            this.prevGamepadA.set(pad.index, !!aPressed);
-
-            if (aPressed && !wasPressed) {
-                    this.selectOption('GAMEPAD', pad.index);
-                this.lastGamepadInputTime = now;
+        for (const { action, pad } of presses) {
+            if (action === 'up') this.changeSelection(-1);
+            else if (action === 'down') this.changeSelection(1);
+            else if (action === 'confirm' || action === 'start') {
+                this.selectOption(pad === null ? 'KEYBOARD' : 'GAMEPAD', pad);
+                return;
             }
         }
     }
@@ -202,23 +142,40 @@ export class MainMenuScene extends Phaser.Scene {
             } else {
                 text.setColor('#888888');
                 text.setAlpha(0.5);
-                text.setFontSize(40);
+                text.setFontSize(this.itemSize);
                 text.setShadow(0, 0, 'transparent', 0, false, false); // remove glow
             }
         });
     }
 
-    private selectOption(inputType: 'KEYBOARD' | 'GAMEPAD' = 'KEYBOARD', gamepadIndex: number | null = null): void {
+    private selectOption(input: 'KEYBOARD' | 'GAMEPAD' | 'TOUCH' = 'KEYBOARD', gamepadIndex: number | null = null): void {
         AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
         const mode = this.menuOptions[this.selectedIndex].mode;
+        // A tap picks with the keyboard as the input: the modes themselves take a keyboard or gamepad
+        const inputType = input === 'TOUCH' ? 'KEYBOARD' : input;
 
         if (mode === 'online') {
             this.scene.start('OnlineLobbyScene');
             return;
         }
 
+        if (mode === 'campaign') {
+            this.scene.start('SaveFileScene', { mode: 'campaign', inputType: inputType, gamepadIndex: gamepadIndex });
+            return;
+        }
+
         if (mode === 'settings') {
             this.scene.start('SettingsScene');
+            return;
+        }
+
+        if (mode === 'racing') {
+            this.scene.start('RacingScene');
+            return;
+        }
+
+        if (mode === 'lab') {
+            this.scene.start('GameScene', labSceneData());
             return;
         }
 

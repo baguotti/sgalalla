@@ -7,19 +7,19 @@
  * reproduces the recording exactly.
  */
 
-import { SIM_STEP_MS } from './FixedStepClock.js';
+import { countDown, SIM_STEP_MS } from './FixedStepClock.js';
 import { AttackPhase, AttackRegistry, AttackType } from './AttackData.js';
-import { HURTBOX_HEIGHT, HURTBOX_WIDTH, checkHit, handleCombatInput, updateCombat } from './Combat.js';
+import { cancelAttackForChaseDodge, checkHit, handleCombatInput, updateCombat } from './Combat.js';
 import type { FighterInput } from './FighterInput.js';
 import {
-    FIGHTER_STATES, changeState, consumeBuffered, createFighter, isBuffered, isInPlay, updateInputBuffer, updateState,
+    FIGHTER_STATES, changeState, consumeBuffered, createFighter, holdInputBuffer, isBuffered, isInPlay, updateInputBuffer, updateState,
     type FighterSetup, type FighterState, type FighterStateName,
 } from './FighterState.js';
 import { pushPhysicsSounds, type MatchEvent } from './MatchEvents.js';
 import { PhysicsConfig } from './PhysicsConfig.js';
 import {
     type SimInput as PhysicsInput, type PhysicsEvent,
-    stepPhysics, checkSinglePlatformCollision, resetWallState, checkSingleWallCollision,
+    stepPhysics, checkSinglePlatformCollision, resetWallState, checkSingleWallCollision, checkSingleCeilingCollision,
     ATTACK_PHASE_NONE, ATTACK_PHASE_STARTUP, ATTACK_PHASE_ACTIVE, ATTACK_PHASE_RECOVERY,
     ATTACK_TYPE_NONE, ATTACK_TYPE_LIGHT, ATTACK_TYPE_HEAVY,
 } from './PhysicsSimulation.js';
@@ -31,14 +31,12 @@ const STEP_S = SIM_STEP_MS / 1000;
 /** States in which a fighter cannot start attacks. */
 const COMBAT_BLOCKED_STATES: ReadonlySet<FighterStateName> = new Set(['HitStun', 'Taunt', 'Defeat']);
 
-/** A KO'd fighter sits out 2 s, then drops in above the stage centre. */
-const RESPAWN_DELAY_STEPS = 120;
+/** A KO'd fighter sits out RESPAWN_DELAY_STEPS (PhysicsConfig), then drops in above the stage centre. */
 const RESPAWN_X = 960;
 const RESPAWN_Y = 200;
 /** Random horizontal offset, so fighters respawning together don't stack. */
 const RESPAWN_SPREAD = 50;
-/** After a respawn, hits are ignored for 1 s and blast zones for 1.5 s. */
-const RESPAWN_INVULNERABILITY_MS = 1000;
+/** After a respawn, hits are ignored for RESPAWN_INVULNERABILITY_MS (PhysicsConfig) and blast zones for 1.5 s. */
 const KO_IMMUNITY_STEPS = 90;
 
 export interface MatchState {
@@ -78,26 +76,33 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[], ev
         }
     }
     const fighters = match.fighters.filter(isInPlay);
-
-    for (const f of fighters) {
+    // Fighters in hit-stop are frozen this step, though they can still be hit by someone else
+    const moving = fighters.filter(f => {
         Object.assign(f.input, inputs[f.id]);
+        if (f.hitstopSteps <= 0) return true;
+        f.hitstopSteps--;
+        holdInputBuffer(f);
+        return false;
+    });
+
+    for (const f of moving) {
         updateInputBuffer(f);
         stepFighterPhysics(f, events);
         updateFacing(f);
     }
 
-    for (const f of fighters) collidePlatforms(f, events);
+    for (const f of moving) collidePlatforms(f, events);
 
-    for (const f of fighters) {
+    for (const f of moving) {
         updateState(f);
         updateCombat(f, events);
         if (!COMBAT_BLOCKED_STATES.has(f.state)) handleCombatInput(f, events);
         updateTimers(f);
     }
 
-    for (const f of fighters) collideWalls(f);
+    for (const f of moving) collideWalls(f);
 
-    for (const attacker of fighters) {
+    for (const attacker of moving) {
         for (const target of fighters) {
             if (attacker !== target) checkHit(attacker, target, events);
         }
@@ -141,8 +146,7 @@ export function placeFighter(match: MatchState, id: number, x: number, y: number
 // Reused every step: the physics' input and the events it reports
 const physicsInput: PhysicsInput = {
     moveLeft: false, moveRight: false, moveDown: false, moveUp: false,
-    jumpBuffered: false, jumpHeld: false, dodgeBuffered: false,
-    aimUp: false, aimDown: false,
+    jumpBuffered: false, jumpHeld: false, dodgeBuffered: false, chaseDodgeReady: false,
 };
 const physicsEvents: PhysicsEvent[] = [];
 
@@ -177,8 +181,7 @@ function stepFighterPhysics(f: FighterState, events: MatchEvent[]): void {
     physicsInput.jumpBuffered = isBuffered(f, 'jump');
     physicsInput.jumpHeld = input.jumpHeld;
     physicsInput.dodgeBuffered = isBuffered(f, 'dodge');
-    physicsInput.aimUp = input.aimUp;
-    physicsInput.aimDown = input.aimDown;
+    physicsInput.chaseDodgeReady = combat.chaseDodgeTimer > 0;
 
     physicsEvents.length = 0;
     stepPhysics(b, physicsInput, STEP_S, physicsEvents);
@@ -192,7 +195,10 @@ function handlePhysicsEvents(f: FighterState, physicsEvents: readonly PhysicsEve
         if (event.type === 'consume') {
             consumeBuffered(f, event.input);
         } else if (event.type === 'dodge_start') {
+            if (event.chase) cancelAttackForChaseDodge(f);
             changeState(f, event.isGrounded ? 'Dodge' : 'AirDodge');
+        } else if (event.type === 'dash_start') {
+            changeState(f, 'Dash');
         }
     }
 }
@@ -215,6 +221,9 @@ function collideWalls(f: FighterState): void {
     resetWallState(b);
     for (const w of STAGE_LAYOUT.walls) {
         checkSingleWallCollision(b, w.x, w.y, w.w, w.h);
+    }
+    for (const c of STAGE_LAYOUT.ceilings) {
+        checkSingleCeilingCollision(b, c.x, c.y, c.w, c.h);
     }
     f.isDodging = b.isDodging;
 }
@@ -240,19 +249,24 @@ function updateFacing(f: FighterState): void {
 }
 
 function updateTimers(f: FighterState): void {
-    f.hitStunTimer -= SIM_STEP_MS;
+    f.hitStunTimer = countDown(f.hitStunTimer);
     if (f.hitStunTimer <= 0 && f.isHitStunned) {
-        f.isHitStunned = false;
+        // Still flying fast across or upward: the stun goes on, up to its limit (falling doesn't count)
+        const b = f.body;
+        const flying = Math.abs(b.vx) > PhysicsConfig.STUN_FLYING_SPEED || b.vy < -PhysicsConfig.STUN_FLYING_SPEED;
+        const overLimit = f.hitStunTimer <= PhysicsConfig.HIT_STUN_DURATION - PhysicsConfig.MAX_HIT_STUN;
+        if (!flying || overLimit) f.isHitStunned = false;
     }
 
     if (f.invulnerabilityTimer > 0) {
-        f.invulnerabilityTimer -= SIM_STEP_MS;
+        f.invulnerabilityTimer = countDown(f.invulnerabilityTimer);
         if (f.invulnerabilityTimer <= 0) {
             f.isInvulnerable = false;
         }
     }
 
     if (f.koImmunitySteps > 0) f.koImmunitySteps--;
+    if (f.body.landingLagSteps > 0) f.body.landingLagSteps--;
 }
 
 // ─── KOs ───
@@ -266,22 +280,39 @@ function checkBlastZones(match: MatchState, fighters: readonly FighterState[], e
         if (f.koImmunitySteps > 0) continue;
 
         const b = f.body;
-        if (b.x - HURTBOX_WIDTH / 2 < zone.left || b.x + HURTBOX_WIDTH / 2 > zone.right ||
-            b.y - HURTBOX_HEIGHT / 2 < zone.top || b.y + HURTBOX_HEIGHT / 2 > zone.bottom) {
+        const halfW = PhysicsConfig.HURTBOX_WIDTH / 2;
+        const halfH = PhysicsConfig.HURTBOX_HEIGHT / 2;
+        if (b.x - halfW < zone.left || b.x + halfW > zone.right || b.y - halfH < zone.top || b.y + halfH > zone.bottom) {
             f.lives--;
-            if (f.lives > 0) f.respawnSteps = RESPAWN_DELAY_STEPS;
+            if (f.lives > 0) f.respawnSteps = PhysicsConfig.RESPAWN_DELAY_STEPS;
             else eliminated = true;
             events.push({ type: 'ko', fighter: f.id, x: b.x, y: b.y });
         }
     }
 
-    if (eliminated) {
-        const survivors = match.fighters.filter(f => f.lives > 0);
-        if (survivors.length <= 1) {
-            match.isOver = true;
-            match.winnerId = survivors.length === 1 ? survivors[0].id : -1;
-        }
+    if (eliminated) endIfOneLeft(match);
+}
+
+/** At most one fighter has lives left: the match is over. */
+function endIfOneLeft(match: MatchState): void {
+    const survivors = match.fighters.filter(f => f.lives > 0);
+    if (survivors.length <= 1) {
+        match.isOver = true;
+        match.winnerId = survivors.length === 1 ? survivors[0].id : -1;
     }
+}
+
+/**
+ * Online: a player left, so their fighter leaves the match, out of play for
+ * good; the match ends if one fighter is left. Every machine calls it at the
+ * same frame. Calling it again changes nothing.
+ */
+export function retireFighter(match: MatchState, id: number): void {
+    const f = match.fighters[id];
+    if (!f || f.lives === 0) return;
+    f.lives = 0;
+    f.respawnSteps = 0;
+    if (!match.isOver) endIfOneLeft(match);
 }
 
 /** Puts a KO'd fighter back in play with a clean slate, keeping lives and facing. */
@@ -297,7 +328,7 @@ function respawn(match: MatchState, f: FighterState): void {
     f.body.isGrounded = true;
     f.body.jumpsRemaining = PhysicsConfig.MAX_JUMPS - 1;
     f.isInvulnerable = true;
-    f.invulnerabilityTimer = RESPAWN_INVULNERABILITY_MS;
+    f.invulnerabilityTimer = PhysicsConfig.RESPAWN_INVULNERABILITY_MS;
     f.koImmunitySteps = KO_IMMUNITY_STEPS;
 }
 

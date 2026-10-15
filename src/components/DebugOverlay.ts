@@ -22,6 +22,7 @@ export class DebugOverlay {
     private recoveryText: Phaser.GameObjects.Text;
     private attackText: Phaser.GameObjects.Text;
     private gamepadText: Phaser.GameObjects.Text;
+    private panelWidth = 0;
 
     // Styling constants
     private static readonly PANEL_X = 8;
@@ -112,8 +113,14 @@ export class DebugOverlay {
         this.drawPanel();
     }
 
+    /** Right edge of the panel on screen while it's shown, else 0: the Studio Lab's stats sit beside it. */
+    public get panelRight(): number {
+        return this.bgPanel.visible && this.panelWidth > 0 ? DebugOverlay.PANEL_X + this.panelWidth : 0;
+    }
+
     private drawPanel(): void {
         this.bgPanel.clear();
+        this.panelWidth = 0;
 
         // Determine how many lines are visible to size the panel
         const visibleTexts = this.getVisibleTexts();
@@ -127,6 +134,7 @@ export class DebugOverlay {
             if (t.width > maxWidth) maxWidth = t.width;
         }
         const panelWidth = maxWidth + DebugOverlay.PANEL_PADDING * 2;
+        this.panelWidth = panelWidth;
         const panelHeight = (lastText.y + lastText.height) - DebugOverlay.PANEL_Y + DebugOverlay.PANEL_PADDING;
 
         // Semi-transparent background
