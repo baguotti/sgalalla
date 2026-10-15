@@ -1162,3 +1162,7 @@ Part 2
 - **[Arch]** DERAPATE now lives in its own repository (`/Users/riccardofusetti/Documents/Coding/Derapate`, https://github.com/baguotti/derapate), self-contained with its own title scene, shaders, Lab controls, assets and tests; its entries above stay as history.
 - **[Cleanup]** Removed here: `src/minigames/donut/`, `src/scenes/DonutScene.ts`, the main menu's DERAPATE entry, `public/assets/donut/`, `public/assets/audio/derapate/`, the soundtrack, `scripts/donut-car-sprites.py` and its tests. The main menu keeps its tap and hover support.
 - **[Shared]** What only DERAPATE needed is undone: the lit shader's falloff scale, rim offsets and cones, the exported glow textures, the narrower atmosphere settings type, and the Studio Lab's exported windowed view with a top-band setting. The atmosphere pass still skips its rays pass when there are no rays.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-15] Experimental site on port 8081 (branch `experimental-branch`)
+- **[Deploy]** The experimental build moves to http://138.68.126.112:8081 (8080 is DERAPATE's now): `deploy_experimental.sh` serves it there and opens the port; the client picks the experimental game server (9209) when the page is on 8081.
