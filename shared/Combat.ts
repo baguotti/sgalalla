@@ -502,9 +502,7 @@ export function findHit(attacker: FighterState, target: FighterState): Hit | nul
     }
     const damage = currentDamage(attacker);
 
-    // Brawlhalla's force: the variable part grows with the target's damage after the hit, steeply past red
-    const d = Math.min(target.damagePercent + damage, PhysicsConfig.MAX_DAMAGE);
-    const knockback = (fixedForce + variableForce * (d / 100 + (d * d) / 20000)) * PhysicsConfig.FORCE_SCALE;
+    const knockback = knockbackSpeed(fixedForce, variableForce, target.damagePercent + damage);
     const [cos, sin] = KNOCKBACK_DIRECTIONS[angle];
     let knockbackY = -sin * knockback;
     // Spiking a grounded target pops it up
@@ -514,11 +512,21 @@ export function findHit(attacker: FighterState, target: FighterState): Hit | nul
     return {
         attacker, target, attackKey: c.attack?.key ?? null, damage,
         knockbackX: cos * knockback * attacker.body.facingDirection, knockbackY, stun, popUp,
-        // Both freeze for a moment, longer for hits that launch harder
-        hitstop: Math.min(PhysicsConfig.HITSTOP_MAX_STEPS, PhysicsConfig.HITSTOP_MIN_STEPS + Math.floor(knockback / PhysicsConfig.HITSTOP_SPEED_PER_STEP)),
+        hitstop: hitstopFor(knockback),
         x: Math.min(Math.max(hitbox.x, targetLeft), targetLeft + hurtW),
         y: Math.min(Math.max(hitbox.y, targetTop), targetTop + hurtH),
     };
+}
+
+/** Brawlhalla's force, in px/s: the variable part grows with the target's damage after the hit, steeply past red. */
+export function knockbackSpeed(fixedForce: number, variableForce: number, damageAfter: number): number {
+    const d = Math.min(damageAfter, PhysicsConfig.MAX_DAMAGE);
+    return (fixedForce + variableForce * (d / 100 + (d * d) / 20000)) * PhysicsConfig.FORCE_SCALE;
+}
+
+/** Hit pause in steps: a moment, longer for hits that launch harder. */
+export function hitstopFor(knockback: number): number {
+    return Math.min(PhysicsConfig.HITSTOP_MAX_STEPS, PhysicsConfig.HITSTOP_MIN_STEPS + Math.floor(knockback / PhysicsConfig.HITSTOP_SPEED_PER_STEP));
 }
 
 /** Damage the fighter's current move deals. */
@@ -538,20 +546,9 @@ export function applyHit(hit: Hit, events: MatchEvent[]): void {
     const { attacker, target } = hit;
     const tb = target.body;
     if (hit.popUp) tb.y -= PhysicsConfig.GROUNDED_SPIKE_LIFT;
-    target.damagePercent = Math.min(target.damagePercent + hit.damage, PhysicsConfig.MAX_DAMAGE);
-    interruptMovement(tb);
-    tb.vx = hit.knockbackX;
-    tb.vy = hit.knockbackY;
-    tb.isLaunched = true;
-    tb.isJumpRising = false;
-    target.isHitStunned = true;
-    target.hitStunTimer = hit.stun * SIM_STEP_MS;
-    changeState(target, 'HitStun');
-
-    // Hitting or being hit restarts the wall slip count; a target out of jumps gets one back
-    tb.airActionCounter = 0;
+    launchFighter(target, hit.damage, hit.knockbackX, hit.knockbackY, hit.stun, hit.hitstop);
+    // Hitting restarts the wall slip count too
     attacker.body.airActionCounter = 0;
-    if (tb.jumpsRemaining === 0) tb.jumpsRemaining = 1;
 
     // An attacker hit back on the same step (a trade) is stunned: its move is over
     const c = attacker.combat;
@@ -566,12 +563,29 @@ export function applyHit(hit: Hit, events: MatchEvent[]): void {
     }
 
     attacker.hitstopSteps = Math.max(attacker.hitstopSteps, hit.hitstop);
-    target.hitstopSteps = Math.max(target.hitstopSteps, hit.hitstop);
 
     events.push({
         type: 'hit', attacker: attacker.id, target: target.id, attackKey: hit.attackKey,
         x: hit.x, y: hit.y, damage: hit.damage, knockbackX: tb.vx, knockbackY: tb.vy,
     });
+}
+
+/** What any hit does to its target (a move's or an explosion's): damage, the launch, stun and hit pause. */
+export function launchFighter(target: FighterState, damage: number, knockbackX: number, knockbackY: number, stun: number, hitstop: number): void {
+    const tb = target.body;
+    target.damagePercent = Math.min(target.damagePercent + damage, PhysicsConfig.MAX_DAMAGE);
+    interruptMovement(tb);
+    tb.vx = knockbackX;
+    tb.vy = knockbackY;
+    tb.isLaunched = true;
+    tb.isJumpRising = false;
+    target.isHitStunned = true;
+    target.hitStunTimer = stun * SIM_STEP_MS;
+    changeState(target, 'HitStun');
+    target.hitstopSteps = Math.max(target.hitstopSteps, hitstop);
+    // Being hit restarts the wall slip count; a target out of jumps gets one back
+    tb.airActionCounter = 0;
+    if (tb.jumpsRemaining === 0) tb.jumpsRemaining = 1;
 }
 
 /** Time left in the fighter's current move, in ms. */

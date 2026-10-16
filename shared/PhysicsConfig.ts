@@ -193,4 +193,25 @@ export const PhysicsConfig = {
     // Dodge mechanics
     SPOT_DODGE_AERIAL_Y_DAMP: 0.2,
     SPOT_DODGE_ALPHA: 0.7,
+
+    // Bombs (Brawlhalla's Bouncy Bomb): the first drops BOMB_FIRST ms in, the next BOMB_GAP plus up to
+    // BOMB_GAP_RANDOM ms after one is gone, one at a time (two with 4 fighters or more); a loose bomb is gone
+    // after BOMB_LIFETIME ms. Thrown at BOMB_THROW_SPEED, it bounces keeping BOMB_BOUNCE of its speed, passes
+    // through everyone for BOMB_GRACE_STEPS, and is safe again once slower than BOMB_SAFE_SPEED.
+    BOMB_FIRST: 15000,
+    BOMB_GAP: 5000,
+    BOMB_GAP_RANDOM: 5000,
+    BOMB_LIFETIME: 15000,
+    BOMB_RADIUS: 22,
+    BOMB_PICKUP_RANGE: 50,
+    BOMB_THROW_SPEED: 1900,
+    BOMB_BOUNCE: 0.7,
+    BOMB_SAFE_SPEED: 500,
+    BOMB_GRACE_STEPS: 8,
+    // Its explosion hurts every fighter this close (thrower included), launching them away from it
+    BOMB_BLAST_RADIUS: 150,
+    BOMB_DAMAGE: 18,
+    BOMB_FIXED_FORCE: 55,
+    BOMB_VARIABLE_FORCE: 45,
+    BOMB_STUN: 25,
 } as const;

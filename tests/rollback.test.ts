@@ -35,8 +35,8 @@ function random(seed: number): () => number {
 
 /** Directions and held buttons (bits 0-7, 9, 11, 13, 15 of packInput). */
 const HELD_BITS = 0xAAFF;
-/** Jump, light, heavy and dodge presses. */
-const PRESS_BITS = [8, 10, 12, 14];
+/** Jump, light, heavy, dodge and throw (bombs) presses. */
+const PRESS_BITS = [8, 10, 12, 14, 18];
 
 /** Button mashing: a new held mask every 10 frames, plus random presses. */
 function masher(seed: number): () => number {

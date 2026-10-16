@@ -23,6 +23,8 @@ import {
     ATTACK_PHASE_NONE, ATTACK_PHASE_STARTUP, ATTACK_PHASE_ACTIVE, ATTACK_PHASE_RECOVERY,
     ATTACK_TYPE_NONE, ATTACK_TYPE_LIGHT, ATTACK_TYPE_HEAVY,
 } from './PhysicsSimulation.js';
+import { createBombs, updateBombs, type Bombs } from './Bombs.js';
+import { randomInt } from './Random.js';
 import { STAGE_LAYOUTS, type SimStage, type StageLayoutId } from './StageData.js';
 import { hashString } from './StateHash.js';
 
@@ -50,11 +52,14 @@ export interface MatchState {
     winnerId: number;
     /** The stage's collision layout (STAGE_LAYOUTS). */
     stage: StageLayoutId;
+    /** Bombs dropping in (shared/Bombs.ts), or null for a match without them. */
+    bombs: Bombs | null;
 }
 
-export function createMatch(fighters: readonly FighterSetup[], seed: number, stage: StageLayoutId = 'standard'): MatchState {
+export function createMatch(fighters: readonly FighterSetup[], seed: number, stage: StageLayoutId = 'standard', bombs = true): MatchState {
     return {
         stage,
+        bombs: bombs ? createBombs() : null,
         frame: 0,
         fighters: fighters.map((setup, id) => createFighter(id, setup)),
         rng: seed | 0,
@@ -115,6 +120,8 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[], ev
         }
     }
     for (const hit of hits) applyHit(hit, events);
+
+    updateBombs(match, layout, events);
 
     checkBlastZones(match, fighters, events);
 
@@ -338,14 +345,6 @@ function respawn(match: MatchState, f: FighterState): void {
     f.isInvulnerable = true;
     f.invulnerabilityTimer = PhysicsConfig.RESPAWN_INVULNERABILITY_MS;
     f.koImmunitySteps = KO_IMMUNITY_STEPS;
-}
-
-/** Uniform integer in [min, max] from the match's seeded generator (mulberry32). */
-function randomInt(match: MatchState, min: number, max: number): number {
-    const a = match.rng = (match.rng + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), a | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return min + ((t ^ (t >>> 14)) >>> 0) % (max - min + 1);
 }
 
 // ─── Comparing runs ───

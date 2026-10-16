@@ -51,7 +51,7 @@ export class SettingsScene extends Phaser.Scene {
     private listeningFlashTimer: number = 0;
 
     // Keyboard remap screen
-    private kbActions: KeyboardAction[] = ['jump', 'lightAttack', 'heavyAttack', 'dodge', 'taunt', 'recovery'];
+    private kbActions: KeyboardAction[] = ['jump', 'lightAttack', 'heavyAttack', 'dodge', 'throw', 'taunt', 'recovery'];
     private kbOptions: string[] = [];
     private kbSelectedIndex = 0;
     private kbTexts: Phaser.GameObjects.Text[] = [];

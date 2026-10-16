@@ -14,7 +14,7 @@ export const FIGHTER_STATES = [
 ] as const;
 export type FighterStateName = typeof FIGHTER_STATES[number];
 
-export type BufferedAction = 'jump' | 'lightAttack' | 'heavyAttack' | 'dodge';
+export type BufferedAction = 'jump' | 'lightAttack' | 'heavyAttack' | 'dodge' | 'throw';
 
 /** Steps (per-fighter counter) at which each action was pressed, oldest first. */
 interface InputBuffer {
@@ -23,6 +23,7 @@ interface InputBuffer {
     lightAttack: number[];
     heavyAttack: number[];
     dodge: number[];
+    throw: number[];
 }
 
 export interface AttackInstance {
@@ -116,7 +117,7 @@ export function createFighter(id: number, setup: FighterSetup): FighterState {
         body: createBody(setup.x, setup.y, 1),
         state: 'Idle',
         input: emptyInput(),
-        buffer: { step: 0, jump: [], lightAttack: [], heavyAttack: [], dodge: [] },
+        buffer: { step: 0, jump: [], lightAttack: [], heavyAttack: [], dodge: [], throw: [] },
         combat: {
             attack: null,
             attackCooldownTimer: 0,
@@ -161,7 +162,7 @@ export function updateInputBuffer(f: FighterState): void {
     const step = ++buffer.step;
     recordPresses(f, step);
 
-    for (const action of ['jump', 'lightAttack', 'heavyAttack', 'dodge'] as const) {
+    for (const action of ['jump', 'lightAttack', 'heavyAttack', 'dodge', 'throw'] as const) {
         const presses = buffer[action];
         while (presses.length > 0 && step - presses[0] > PhysicsConfig.INPUT_BUFFER_STEPS) presses.shift();
     }
@@ -178,6 +179,7 @@ function recordPresses(f: FighterState, step: number): void {
     if (f.input.lightAttack) buffer.lightAttack.push(step);
     if (f.input.heavyAttack) buffer.heavyAttack.push(step);
     if (f.input.dodge) buffer.dodge.push(step);
+    if (f.input.throw) buffer.throw.push(step);
 }
 
 export function isBuffered(f: FighterState, action: BufferedAction): boolean {

@@ -365,6 +365,7 @@ function eventKey(event: MatchEvent): string {
         case 'sound': return `sound:${event.fighter}:${event.key}`;
         case 'attack': return `attack:${event.fighter}:${event.key}`;
         case 'hit': return `hit:${event.attacker}:${event.target}:${event.attackKey}`;
+        case 'explosion': return 'explosion';
         default: return `${event.type}:${event.fighter}`;
     }
 }

@@ -2,13 +2,13 @@
  * KeyboardMapping — Persistent, user-configurable keyboard key mapping.
  *
  * Default layout (Brawlhalla-style):
- *   WASD = Move, Space = Jump, J = Light, K = Heavy, L = Dodge, P = Taunt, Shift = Recovery
+ *   WASD = Move, Space = Jump, J = Light, K = Heavy, L = Dodge, H = Pick up / throw, P = Taunt, Shift = Recovery
  *
  * Mappings are persisted to localStorage under `keyboard_mapping`.
  */
 
 /** The keyboard actions that can be rebound. */
-export type KeyboardAction = 'moveUp' | 'moveDown' | 'moveLeft' | 'moveRight' | 'jump' | 'lightAttack' | 'heavyAttack' | 'dodge' | 'taunt' | 'recovery' | 'defeat';
+export type KeyboardAction = 'moveUp' | 'moveDown' | 'moveLeft' | 'moveRight' | 'jump' | 'lightAttack' | 'heavyAttack' | 'dodge' | 'throw' | 'taunt' | 'recovery' | 'defeat';
 
 /** Human-readable labels for the settings UI. */
 export const KB_ACTION_LABELS: Record<KeyboardAction, string> = {
@@ -20,6 +20,7 @@ export const KB_ACTION_LABELS: Record<KeyboardAction, string> = {
     lightAttack: 'ATTACCO LEGGERO',
     heavyAttack: 'ATTACCO PESANTE',
     dodge: 'SCHIVATA',
+    throw: 'RACCOGLI / LANCIA',
     taunt: 'PROVOCA',
     recovery: 'RECOVERY',
     defeat: 'SCONFITTA',
@@ -34,6 +35,7 @@ export interface KeyboardMappingData {
     lightAttack: string;
     heavyAttack: string;
     dodge: string;
+    throw: string;
     taunt: string;
     recovery: string;
     defeat: string;
@@ -48,6 +50,7 @@ const DEFAULT_MAPPING: KeyboardMappingData = {
     lightAttack: 'KeyJ',
     heavyAttack: 'KeyK',
     dodge: 'KeyL',
+    throw: 'KeyH',
     taunt: 'KeyP',
     recovery: 'ShiftLeft',
     defeat: 'KeyO',

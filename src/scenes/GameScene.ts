@@ -12,6 +12,7 @@ import { ControlsOverlay } from '../components/ControlsOverlay';
 import { freeStageBackgrounds, isStageKey, loadStageBackground, onlineStage, STAGES, type StageKey } from '../stages/StageBackgrounds';
 import { freeLondraLayers, GRANDE_CLOUDS, grandeStageStyle, loadLondraLayers, LondraLayers } from '../stages/LondraLayers';
 import { createStage as createSharedStage } from '../stages/StageFactory';
+import { BombSprites } from '../effects/BombSprites';
 import { ContactShadows, DEFAULT_SHADOW_DARKNESS } from '../effects/ContactShadows';
 import { EffectManager } from '../effects/EffectManager';
 import { effects } from '../config/EffectConfig';
@@ -134,6 +135,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private offscreenBubbles: OffscreenBubbles | null = null;
     private readonly cameraKick = { x: 0, y: 0 };
     private contactShadows: ContactShadows | null = null;
+    private bombSprites: BombSprites | null = null;
 
     // Pause menu
     private isPaused: boolean = false;
@@ -435,6 +437,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.configureCameraExclusions();
 
             this.contactShadows = new ContactShadows(this, [this.uiCamera]);
+            this.bombSprites = new BombSprites(this, this.uiCamera);
             this.createBubbles();
             this.stageView = false;
             this.cameraCentre = null;
@@ -745,6 +748,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
         this.online?.flush();
         this.players.forEach(p => p.render(this.match, delta));
+        this.bombSprites?.update(this.match);
         this.contactShadows?.update(this.match, this.lighting?.look.shadow ?? DEFAULT_SHADOW_DARKNESS);
         if (this.lighting) {
             for (const p of this.players) this.lighting.setGrounded(p.spriteObject, this.match.fighters[p.fighterIndex].body.isGrounded);
@@ -832,7 +836,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     /** Starts a fresh match with the current fighters. */
     private startMatch(): void {
         const seed = this.online?.start.seed ?? this.spectator?.watch.seed ?? Math.floor(Math.random() * 0x100000000);
-        this.match = createMatch(this.fighterSetups, seed, STAGES[this.currentStageBackground].layout);
+        // Bombs drop in every match but the Lab's and the campaign's
+        this.match = createMatch(this.fighterSetups, seed, STAGES[this.currentStageBackground].layout, !this.isLab && !this.campaign);
         this.online?.begin(this.match);
         this.spectator?.begin(this.match);
         // Online frames can be simulated more than once, so only local matches are recorded
@@ -864,6 +869,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 break;
             case 'respawn':
                 this.showRespawnFlash(event.x, event.y);
+                break;
+            case 'explosion':
+                this.bombSprites?.explode(event.x, event.y);
+                this.cameras.main.shake(effects.KO_SHAKE_MS, effects.KO_SHAKE * 0.7);
+                this.lighting?.flash('ko', event.x, event.y);
+                audio.playSFX('sfx_bomb_explode', { volume: 0.7 });
                 break;
         }
     }
@@ -1147,6 +1158,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.setLabTime(1, false);
         this.contactShadows?.destroy();
         this.contactShadows = null;
+        this.bombSprites?.destroy();
+        this.bombSprites = null;
         this.offscreenBubbles?.destroy();
         this.offscreenBubbles = null;
 

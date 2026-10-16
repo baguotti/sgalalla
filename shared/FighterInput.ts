@@ -1,7 +1,7 @@
 /**
  * One fighter's input for one simulation step.
  *
- * `jump`, `lightAttack`, `heavyAttack`, `dodge`, `taunt` and `defeat` are presses:
+ * `jump`, `lightAttack`, `heavyAttack`, `dodge`, `taunt`, `defeat` and `throw` are presses:
  * true only on the step the button went down. The `*Held` fields and the
  * directions are the button's current state. Aim uses a stricter stick
  * threshold than movement on gamepads, so it has its own bits.
@@ -25,6 +25,8 @@ export interface FighterInput {
     dodgeHeld: boolean;
     taunt: boolean;
     defeat: boolean;
+    /** Picks up or throws a bomb. */
+    throw: boolean;
 }
 
 /** Bit order of the packed form. Append only: recordings and packets depend on it. */
@@ -36,6 +38,7 @@ const INPUT_BITS = [
     'heavyAttack', 'heavyAttackHeld',
     'dodge', 'dodgeHeld',
     'taunt', 'defeat',
+    'throw',
 ] as const satisfies readonly (keyof FighterInput)[];
 
 export function emptyInput(): FighterInput {
@@ -62,4 +65,4 @@ export function unpackInput(mask: number, out: FighterInput = {} as FighterInput
  * input without these, since a held button is likely still held but a press
  * is not repeated.
  */
-export const PRESS_BITS = packInput({ ...emptyInput(), jump: true, lightAttack: true, heavyAttack: true, dodge: true, taunt: true, defeat: true });
+export const PRESS_BITS = packInput({ ...emptyInput(), jump: true, lightAttack: true, heavyAttack: true, dodge: true, taunt: true, defeat: true, throw: true });
