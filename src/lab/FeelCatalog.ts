@@ -67,7 +67,6 @@ export const MOVEMENT_GROUPS: Group<PhysicsKey>[] = [
         ['AIR_DODGE_DURATION', 'Air dodge', 'ms', 'Directional dodge in the air.'],
         ['AIR_DODGE_DISTANCE', 'Air dodge distance', 'px'],
         ['AIR_DODGE_END_SPEED', 'Air dodge end speed', 'share', 'Vertical speed kept when a directional air dodge ends.'],
-        ['AIR_DODGE_VERTICAL_DAMP', 'Air dodge vertical', 'share', 'Share of the dodge speed used up and down.'],
         ['DODGE_COOLDOWN', 'Dodge cooldown', 'ms', 'After a spot dodge.'],
         ['AIR_DODGE_COOLDOWN', 'Air dodge cooldown', 'ms', 'Until landing, after an air dodge.'],
         ['LANDED_AIR_DODGE_COOLDOWN', 'Landed air dodge cooldown', 'ms', 'Landing after an air dodge: the dodge is back this long after it ended.'],

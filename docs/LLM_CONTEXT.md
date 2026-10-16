@@ -35,6 +35,7 @@ Changing gameplay means changing the simulation, and then:
 - **Walls** give back the air jumps and the recovery; after 9 air actions without landing, hitting or being hit, walls stop holding the fighter (wall slip).
 - **Moving** (Brawlhalla's feel, sized to the 6.4-fighter-wide main stage): a run speed and an air speed reached in a few steps (`RUN_SPEED`/`GROUND_ACCEL`, `AIR_SPEED`/`AIR_ACCEL`; a run crosses the main stage in 1.8 s), crisp stops on the ground and a short ease-off in the air (`AIR_DECEL`). Attacks own the movement on the ground to their end (recovery is stuck); in the air they drift at `AIR_ATTACK_DRIFT` of the air speed, so a move carries the fighter under a fighter's height. Gravity 4300: a full jump rises 1.55 fighters, an air jump 1.3, a short hop 0.8; letting go of jump cuts only a jump's rise (`isJumpRising`), not a dash jump, wall jump, recovery or launch.
 - **Launches**: the knockback speed loses a steady amount along its angle (`LAUNCH_DECEL`, Brawlhalla's Defense rule) under light gravity (`HITSTUN_GRAVITY`): a flight goes speed²/2 × decel far, so soft hits barely push and hard hits fly. The launch (`isLaunched`) outlasts the stun until the fighter lands, jumps, dodges, recovers or slows below `LAUNCH_END_SPEED`, and out of stun it can drift against it.
+- **Trades**: every hit of a step is found before any lands (`findHit`, then `applyHit`), so two fighters hitting each other on the same step both get hit, whatever their slots.
 - **Hitstun** takes all control away for the move's stun frames, and longer while the fighter still flies fast; a hit gives a fighter out of jumps one back.
 
 ### Combat (experimental branch): Brawlhalla's Unarmed
@@ -49,7 +50,7 @@ Changing gameplay means changing the simulation, and then:
 
 ### The view (`src/`)
 Phaser only draws and reads input.
-- `scenes/GameScene.ts`: the match scene for every mode (versus, training, campaign, online, Studio Lab). Each drawn frame it runs the simulation steps that are due, then draws.
+- `scenes/GameScene.ts`: the match scene for every mode (versus, training, campaign, online, Studio Lab). Each drawn frame it runs the simulation steps that are due, then draws. The camera (Brawlhalla's) frames every fighter in play but never shows past the stage's camera bounds (`SimStage.camera`, 300 px inside the blast zones): fighters beyond show as portrait bubbles at the screen's edge (`ui/OffscreenBubbles.ts`), and a KO bursts in the fighter's colour where it left the screen.
 - `entities/Player.ts`: draws a fighter from its simulation state, and reads its input from the keyboard, a gamepad, touch, the CPU (`player/PlayerAI.ts`) or the network.
 - Sounds and effects react to the simulation's `MatchEvent`s.
 - `network/`: `NetClient` (Geckos.io over WebRTC) and `OnlineMatch` (the rollback session).

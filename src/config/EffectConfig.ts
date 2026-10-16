@@ -5,7 +5,7 @@
  */
 export const DEFAULT_EFFECTS = {
     // Camera kick on hard hits: knockback (px/s) it starts at, knockback per pixel of kick, most pixels, share left each step
-    CAMERA_KICK_FROM: 1200,
+    CAMERA_KICK_FROM: 2600,
     CAMERA_KICK_PER_PIXEL: 300,
     CAMERA_KICK_MAX: 10,
     CAMERA_KICK_DECAY: 0.75,
@@ -19,14 +19,14 @@ export const DEFAULT_EFFECTS = {
     HITSTOP_TREMBLE: 4,
     // Hit sparks: size multiplier, and the damage from which a ring joins them
     SPARK_SIZE: 1,
-    SPARK_RING_DAMAGE: 8,
+    SPARK_RING_DAMAGE: 16,
     // Dust, air-jump rings and dash afterimages: opacity multipliers, and time between afterimages
     DUST_OPACITY: 1,
     JUMP_RING_OPACITY: 1,
     AFTERIMAGE_OPACITY: 1,
     AFTERIMAGE_EVERY_MS: 35,
     // A fighter launched faster than this (px/s) leaves afterimages too: big hits read as big
-    LAUNCH_TRAIL_SPEED: 1400,
+    LAUNCH_TRAIL_SPEED: 2600,
 };
 
 export type EffectKey = keyof typeof DEFAULT_EFFECTS;

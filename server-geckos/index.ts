@@ -18,7 +18,7 @@ import geckos, { type GeckosServer, type ServerChannel } from '@geckos.io/server
 import http from 'http';
 import {
     MAX_PLAYERS, MAX_SPECTATORS, MIN_PLAYERS, NetEvent, PROTOCOL_VERSION, decodeInputPacket, inputDelayFor,
-    type MatchStart, type RoomState, type WatchInputs, type WatchStart,
+    type InputPacket, type MatchStart, type RoomState, type WatchInputs, type WatchStart,
 } from '../shared/NetProtocol.js';
 
 /** When a player leaves, the others get up to this many of their final inputs (10 s), more than anyone can be missing. */
@@ -195,17 +195,19 @@ io.onConnection((channel: ServerChannel) => {
         startRematchIfAgreed(room);
     });
 
-    // Input packets go to everyone else in the room still playing; the server keeps the inputs too
-    channel.onRaw((packet) => {
+    // A player's input packets for the match on go to everyone else still playing; the server keeps
+    // the inputs too. Anything else (a spectator's, another match's, one claiming another slot) is dropped
+    channel.onRaw((raw) => {
         const room = roomsByChannel.get(channel.id!);
-        if (!room) return;
-        const seat = seatOf(room, channel);
-        if (seat && room.start) {
-            seat.heardAt = Date.now();
-            record(seat, room.start.seed, packet);
-        }
+        const slot = room ? room.seats.findIndex(s => s.channel === channel) : -1;
+        if (!room?.start || slot < 0 || room.seats[slot].left) return;
+        const packet = decodeInputPacket(toBytes(raw));
+        if (!packet || packet.match !== room.start.seed || packet.slot !== slot) return;
+        const seat = room.seats[slot];
+        seat.heardAt = Date.now();
+        record(seat, packet);
         for (const other of room.seats) {
-            if (other.channel !== channel && !other.left) other.channel.raw.emit(packet);
+            if (other !== seat && !other.left) other.channel.raw.emit(raw);
         }
     });
 
@@ -354,12 +356,14 @@ function startRematchIfAgreed(room: Room): void {
     startMatch(room, { ...room.start, seed: randomSeed(), characters: room.seats.map(s => s.character) });
 }
 
+function toBytes(raw: unknown): Uint8Array {
+    if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
+    if (ArrayBuffer.isView(raw)) return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+    return new Uint8Array(0);
+}
+
 /** Keeps a copy of the inputs in a player's packet for this match. */
-function record(seat: Seat, match: number, raw: unknown): void {
-    const bytes = raw instanceof ArrayBuffer ? new Uint8Array(raw)
-        : ArrayBuffer.isView(raw) ? new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength) : null;
-    const packet = bytes && decodeInputPacket(bytes);
-    if (!packet || packet.match !== match) return;
+function record(seat: Seat, packet: InputPacket): void {
     packet.inputs.forEach((mask, i) => {
         const frame = packet.first + i;
         if (frame >= seat.next && seat.inputs[frame] === undefined) seat.inputs[frame] = mask;

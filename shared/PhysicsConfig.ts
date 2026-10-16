@@ -193,5 +193,4 @@ export const PhysicsConfig = {
     // Dodge mechanics
     SPOT_DODGE_AERIAL_Y_DAMP: 0.2,
     SPOT_DODGE_ALPHA: 0.7,
-    AIR_DODGE_VERTICAL_DAMP: 0.3,
 } as const;

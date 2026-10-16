@@ -439,52 +439,55 @@ function ghostPosition(g: GhostHitbox): [number, number] {
 
 // ─── Hits ───
 
-/** Attacker's hitbox against the target's hurtbox. */
-export function checkHit(attacker: FighterState, target: FighterState, events: MatchEvent[]): void {
+/** A hit found this step: everything it does, worked out before any hit of the step lands. */
+export interface Hit {
+    attacker: FighterState;
+    target: FighterState;
+    attackKey: string | null;
+    damage: number;
+    knockbackX: number;
+    knockbackY: number;
+    stun: number;
+    hitstop: number;
+    /** A spike on a grounded target, turned into a pop-up: the target is lifted off the floor. */
+    popUp: boolean;
+    /** Where it landed: the hitbox's middle, within the target's hurtbox. */
+    x: number;
+    y: number;
+}
+
+/**
+ * The attacker's hitbox against the target's hurtbox: the hit, or null. Every
+ * hit of a step is found first and applied after (applyHit), so two fighters
+ * hitting each other on the same step both get hit, whatever their slots.
+ */
+export function findHit(attacker: FighterState, target: FighterState): Hit | null {
     const c = attacker.combat;
     const targetBit = 1 << target.id;
-    if (c.hitTargets & targetBit) return;
-    if (!c.attack && !attacker.body.isRecovering) return;
+    if (c.hitTargets & targetBit) return null;
+    if (!c.attack && !attacker.body.isRecovering) return null;
 
     const hitbox = c.hitbox;
-    if (!hitbox.active) return;
+    if (!hitbox.active || hitbox.w <= 0 || hitbox.h <= 0) return null;
 
     // Inclusive overlap, as Phaser's RectangleToRectangle
     const left = hitbox.x - hitbox.w / 2;
     const top = hitbox.y - hitbox.h / 2;
     const hurtW = PhysicsConfig.HURTBOX_WIDTH;
     const hurtH = PhysicsConfig.HURTBOX_HEIGHT;
-    const targetLeft = target.body.x - hurtW / 2;
-    const targetTop = target.body.y - hurtH / 2;
-    if (hitbox.w <= 0 || hitbox.h <= 0) return;
+    const tb = target.body;
+    const targetLeft = tb.x - hurtW / 2;
+    const targetTop = tb.y - hurtH / 2;
     if (left + hitbox.w < targetLeft || top + hitbox.h < targetTop ||
-        left > targetLeft + hurtW || top > targetTop + hurtH) return;
+        left > targetLeft + hurtW || top > targetTop + hurtH) return null;
 
     c.hitTargets |= targetBit;
-    if (target.body.isInvincible || target.isInvulnerable) return;
+    if (tb.isInvincible || target.isInvulnerable) return null;
 
-    applyHit(attacker, target, events);
-}
-
-/** Damage the fighter's current move deals. */
-export function currentDamage(f: FighterState): number {
-    const c = f.combat;
-    if (!c.attack) return f.body.isRecovering ? PhysicsConfig.RECOVERY_DAMAGE : 0;
-    return Math.floor(AttackRegistry[c.attack.key].damage * chargeBonus(f));
-}
-
-/** A charged heavy deals more damage and variable force: up to FULL_CHARGE_BONUS more at full charge. */
-function chargeBonus(f: FighterState): number {
-    return 1 + chargeRatio(f) * PhysicsConfig.FULL_CHARGE_BONUS;
-}
-
-function applyHit(attacker: FighterState, target: FighterState, events: MatchEvent[]): void {
-    const c = attacker.combat;
     let fixedForce: number;
     let variableForce: number;
     let angle: number;
     let stun: number;
-
     if (c.attack) {
         const data = AttackRegistry[c.attack.key];
         fixedForce = data.fixedForce;
@@ -503,24 +506,46 @@ function applyHit(attacker: FighterState, target: FighterState, events: MatchEve
     const d = Math.min(target.damagePercent + damage, PhysicsConfig.MAX_DAMAGE);
     const knockback = (fixedForce + variableForce * (d / 100 + (d * d) / 20000)) * PhysicsConfig.FORCE_SCALE;
     const [cos, sin] = KNOCKBACK_DIRECTIONS[angle];
-    const knockbackX = cos * knockback * attacker.body.facingDirection;
     let knockbackY = -sin * knockback;
-
-    const tb = target.body;
     // Spiking a grounded target pops it up
-    if (tb.isGrounded && knockbackY > 0) {
-        knockbackY *= -PhysicsConfig.GROUNDED_SPIKE_BOUNCE;
-        tb.y -= PhysicsConfig.GROUNDED_SPIKE_LIFT;
-    }
+    const popUp = tb.isGrounded && knockbackY > 0;
+    if (popUp) knockbackY *= -PhysicsConfig.GROUNDED_SPIKE_BOUNCE;
 
-    target.damagePercent = Math.min(target.damagePercent + damage, PhysicsConfig.MAX_DAMAGE);
+    return {
+        attacker, target, attackKey: c.attack?.key ?? null, damage,
+        knockbackX: cos * knockback * attacker.body.facingDirection, knockbackY, stun, popUp,
+        // Both freeze for a moment, longer for hits that launch harder
+        hitstop: Math.min(PhysicsConfig.HITSTOP_MAX_STEPS, PhysicsConfig.HITSTOP_MIN_STEPS + Math.floor(knockback / PhysicsConfig.HITSTOP_SPEED_PER_STEP)),
+        x: Math.min(Math.max(hitbox.x, targetLeft), targetLeft + hurtW),
+        y: Math.min(Math.max(hitbox.y, targetTop), targetTop + hurtH),
+    };
+}
+
+/** Damage the fighter's current move deals. */
+export function currentDamage(f: FighterState): number {
+    const c = f.combat;
+    if (!c.attack) return f.body.isRecovering ? PhysicsConfig.RECOVERY_DAMAGE : 0;
+    return Math.floor(AttackRegistry[c.attack.key].damage * chargeBonus(f));
+}
+
+/** A charged heavy deals more damage and variable force: up to FULL_CHARGE_BONUS more at full charge. */
+function chargeBonus(f: FighterState): number {
+    return 1 + chargeRatio(f) * PhysicsConfig.FULL_CHARGE_BONUS;
+}
+
+/** Lands a hit found by findHit. */
+export function applyHit(hit: Hit, events: MatchEvent[]): void {
+    const { attacker, target } = hit;
+    const tb = target.body;
+    if (hit.popUp) tb.y -= PhysicsConfig.GROUNDED_SPIKE_LIFT;
+    target.damagePercent = Math.min(target.damagePercent + hit.damage, PhysicsConfig.MAX_DAMAGE);
     interruptMovement(tb);
-    tb.vx = knockbackX;
-    tb.vy = knockbackY;
+    tb.vx = hit.knockbackX;
+    tb.vy = hit.knockbackY;
     tb.isLaunched = true;
     tb.isJumpRising = false;
     target.isHitStunned = true;
-    target.hitStunTimer = stun * SIM_STEP_MS;
+    target.hitStunTimer = hit.stun * SIM_STEP_MS;
     changeState(target, 'HitStun');
 
     // Hitting or being hit restarts the wall slip count; a target out of jumps gets one back
@@ -528,28 +553,24 @@ function applyHit(attacker: FighterState, target: FighterState, events: MatchEve
     attacker.body.airActionCounter = 0;
     if (tb.jumpsRemaining === 0) tb.jumpsRemaining = 1;
 
-    // A hit ends the move's active frames (as the last hit of one of Unarmed's strings would): its recovery starts
-    if (c.attack && !c.isGroundPounding && c.attack.phase === AttackPhase.ACTIVE) {
-        c.attack.phase = AttackPhase.RECOVERY;
-        c.attack.phaseTimer = 0;
+    // An attacker hit back on the same step (a trade) is stunned: its move is over
+    const c = attacker.combat;
+    if (!attacker.isHitStunned) {
+        // A hit ends the move's active frames (as the last hit of one of Unarmed's strings would): its recovery starts
+        if (c.attack && !c.isGroundPounding && c.attack.phase === AttackPhase.ACTIVE) {
+            c.attack.phase = AttackPhase.RECOVERY;
+            c.attack.phaseTimer = 0;
+        }
+        // The attacker can chase: a directional dodge until a moment after this attack ends
+        c.chaseDodgeTimer = remainingAttackTime(attacker) + PhysicsConfig.CHASE_DODGE_WINDOW;
     }
 
-    // The attacker can chase: a directional dodge until a moment after this attack ends
-    c.chaseDodgeTimer = remainingAttackTime(attacker) + PhysicsConfig.CHASE_DODGE_WINDOW;
+    attacker.hitstopSteps = Math.max(attacker.hitstopSteps, hit.hitstop);
+    target.hitstopSteps = Math.max(target.hitstopSteps, hit.hitstop);
 
-    // Both freeze for a moment, longer for hits that launch harder
-    const hitstop = Math.min(PhysicsConfig.HITSTOP_MAX_STEPS,
-        PhysicsConfig.HITSTOP_MIN_STEPS + Math.floor(knockback / PhysicsConfig.HITSTOP_SPEED_PER_STEP));
-    attacker.hitstopSteps = Math.max(attacker.hitstopSteps, hitstop);
-    target.hitstopSteps = Math.max(target.hitstopSteps, hitstop);
-
-    // Where the hit landed: the hitbox's middle, within the target's hurtbox
-    const hitbox = c.hitbox;
     events.push({
-        type: 'hit', attacker: attacker.id, target: target.id, attackKey: c.attack?.key ?? null,
-        x: Math.min(Math.max(hitbox.x, tb.x - PhysicsConfig.HURTBOX_WIDTH / 2), tb.x + PhysicsConfig.HURTBOX_WIDTH / 2),
-        y: Math.min(Math.max(hitbox.y, tb.y - PhysicsConfig.HURTBOX_HEIGHT / 2), tb.y + PhysicsConfig.HURTBOX_HEIGHT / 2),
-        damage, knockbackX: tb.vx, knockbackY: tb.vy,
+        type: 'hit', attacker: attacker.id, target: target.id, attackKey: hit.attackKey,
+        x: hit.x, y: hit.y, damage: hit.damage, knockbackX: tb.vx, knockbackY: tb.vy,
     });
 }
 

@@ -9,7 +9,7 @@
 
 import { countDown, SIM_STEP_MS } from './FixedStepClock.js';
 import { AttackPhase, AttackRegistry, AttackType } from './AttackData.js';
-import { cancelAttackForChaseDodge, checkHit, handleCombatInput, updateCombat } from './Combat.js';
+import { applyHit, cancelAttackForChaseDodge, findHit, handleCombatInput, updateCombat, type Hit } from './Combat.js';
 import type { FighterInput } from './FighterInput.js';
 import {
     FIGHTER_STATES, changeState, consumeBuffered, createFighter, holdInputBuffer, isBuffered, isInPlay, updateInputBuffer, updateState,
@@ -106,11 +106,15 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[], ev
 
     for (const f of moving) collideWalls(f, layout);
 
+    // Every hit is found before any lands, so a trade hits both fighters
+    hits.length = 0;
     for (const attacker of moving) {
         for (const target of fighters) {
-            if (attacker !== target) checkHit(attacker, target, events);
+            const hit = attacker !== target ? findHit(attacker, target) : null;
+            if (hit) hits.push(hit);
         }
     }
+    for (const hit of hits) applyHit(hit, events);
 
     checkBlastZones(match, fighters, events);
 
@@ -147,7 +151,8 @@ export function placeFighter(match: MatchState, id: number, x: number, y: number
 
 // ─── Movement ───
 
-// Reused every step: the physics' input and the events it reports
+// Reused every step: the hits found, the physics' input and the events it reports
+const hits: Hit[] = [];
 const physicsInput: PhysicsInput = {
     moveLeft: false, moveRight: false, moveDown: false, moveUp: false,
     jumpBuffered: false, jumpHeld: false, dodgeBuffered: false, chaseDodgeReady: false,
@@ -252,13 +257,13 @@ function updateFacing(f: FighterState): void {
 }
 
 function updateTimers(f: FighterState): void {
-    f.hitStunTimer = countDown(f.hitStunTimer);
-    if (f.hitStunTimer <= 0 && f.isHitStunned) {
-        // Still flying fast across or upward: the stun goes on, up to its limit (falling doesn't count)
+    if (f.isHitStunned) {
+        f.hitStunTimer = countDown(f.hitStunTimer);
+        // Past the move's stun, it goes on while the fighter still flies fast across or upward, up to its
+        // limit (falling doesn't count)
         const b = f.body;
         const flying = Math.abs(b.vx) > PhysicsConfig.STUN_FLYING_SPEED || b.vy < -PhysicsConfig.STUN_FLYING_SPEED;
-        const overLimit = f.hitStunTimer <= -PhysicsConfig.STUN_EXTENSION_MAX;
-        if (!flying || overLimit) f.isHitStunned = false;
+        if (f.hitStunTimer <= 0 && (!flying || f.hitStunTimer <= -PhysicsConfig.STUN_EXTENSION_MAX)) f.isHitStunned = false;
     }
 
     if (f.invulnerabilityTimer > 0) {

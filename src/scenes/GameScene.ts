@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Player, type PlayerConfig } from '../entities/Player';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
+import { OffscreenBubbles } from '../ui/OffscreenBubbles';
 import { GamepadPresses } from '../input/GamepadPresses';
 import { MenuInput } from '../input/MenuInput';
 import { DebugOverlay } from '../components/DebugOverlay';
@@ -8,8 +9,6 @@ import { InputDebugOverlay } from '../components/InputDebugOverlay';
 import { TouchController } from '../components/TouchController';
 import { PauseMenu, type LabMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
-import { ZOOM_SETTINGS } from '../config/MapConfig';
-import type { ZoomLevel } from '../config/MapConfig';
 import { freeStageBackgrounds, isStageKey, loadStageBackground, onlineStage, STAGES, type StageKey } from '../stages/StageBackgrounds';
 import { freeLondraLayers, grandeStageStyle, loadLondraLayers, LondraLayers } from '../stages/LondraLayers';
 import { createStage as createSharedStage } from '../stages/StageFactory';
@@ -72,6 +71,9 @@ export interface GameSceneData {
 const GAMEPAD_SELECT = 8;
 const GAMEPAD_START = 9;
 
+/** The camera frames every fighter in play with this much room round them, zoomed within these limits (and the stage's camera bounds). */
+const CAMERA_FRAMING = { padX: 250, padY: 100, minZoom: 0.5, maxZoom: 1.5 };
+
 /** The Studio Lab's whole-stage view: centre and zoom showing every platform with room round them for lights. */
 const STAGE_VIEW = { x: 900, y: 620, zoom: 0.62 };
 
@@ -94,8 +96,6 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private trainingToggleKey!: Phaser.Input.Keyboard.Key;
 
     public uiCamera!: Phaser.Cameras.Scene2D.Camera;
-
-    private readonly currentZoomLevel: ZoomLevel = 'CLOSE';
 
     // The match simulation advances in fixed 60 Hz steps, whatever the display refresh rate.
     // players[i] draws and drives match.fighters[i].
@@ -130,6 +130,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private stageView = false;
     /** The camera's centre before any kick, eased towards the fighters; null until the first camera move. */
     private cameraCentre: { x: number; y: number } | null = null;
+    /** Fighters outside the view, as bubbles at the screen's edge. */
+    private offscreenBubbles: OffscreenBubbles | null = null;
     private readonly cameraKick = { x: 0, y: 0 };
     private contactShadows: ContactShadows | null = null;
 
@@ -403,7 +405,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 const touch = pData.playerId === this.localPlayerId() ? this.touchController : undefined;
                 const player = new Player(this, this.match.fighters[i], config, touch);
 
-                const color = this.campaign?.indicatorColor(pData.playerId) ?? this.PLAYER_COLORS[pData.playerId] ?? 0xffffff;
+                const color = this.colorOf(player);
                 player.setColor(color);
 
                 this.players.push(player);
@@ -433,6 +435,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.configureCameraExclusions();
 
             this.contactShadows = new ContactShadows(this, [this.uiCamera]);
+            this.createBubbles();
             this.stageView = false;
             this.cameraCentre = null;
             this.cameraKick.x = this.cameraKick.y = 0;
@@ -718,25 +721,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             }
         }
 
-        // Handle Training Toggle (T)
+        // T: every CPU switches between fighting and standing still as a dummy (together); without one, a dummy joins
         if (Phaser.Input.Keyboard.JustDown(this.trainingToggleKey) && !this.online) {
-            // Find all AI players
-            const aiPlayers = this.players.filter(p => p.isAI);
-
-            if (aiPlayers.length > 0) {
-                // Determine target state based on the first AI (sync them all)
-                // If first one is dummy, ALL become active. If first is active, ALL become dummy.
-                const targetIsDummy = !aiPlayers[0].isTrainingDummy;
-
-                aiPlayers.forEach(p => {
-                    p.isTrainingDummy = targetIsDummy;
-
-                    // Show floating text feedback for each
-                    p.isTrainingDummy = targetIsDummy;
-                    // No floaty text needed, debug overlay shows state
-                });
+            const cpus = this.players.filter(p => p.isAI);
+            if (cpus.length > 0) {
+                const dummy = !cpus[0].isTrainingDummy;
+                for (const p of cpus) p.isTrainingDummy = dummy;
             } else {
-                // If no AI exists (e.g. 1v1 human match, or just P1), spawn a dummy
                 this.spawnTrainingDummy();
             }
         }
@@ -764,18 +755,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // 60 Hz, moving it on the frames in between makes fighters judder against it
         const cameraMoves = this.isCutscene ? 1 : steps;
         for (let i = 0; i < cameraMoves; i++) this.updateCamera();
+        this.offscreenBubbles?.update(this.match, this.cameras.main);
 
         // Debug overlay: P1's movement and attack state, and the network stats online
         if (this.players.length > 0) {
-            // Always show the first player
-            const fighter = this.match.fighters[0];
-            const attack = fighter.combat.attack;
-            const attackData = attack ? AttackRegistry[attack.key] : null;
-            const attackInfo = attack && attackData
-                ? `${attackData.type} ${attackData.direction} (${attack.phase})`
-                : 'None';
-
             if (this.debugVisible) {
+                const fighter = this.match.fighters[0];
+                const attack = fighter.combat.attack;
+                const data = attack ? AttackRegistry[attack.key] : null;
+                const attackInfo = attack && data ? `${data.type} ${data.direction} (${attack.phase})` : 'None';
                 this.debugOverlay.update(
                     fighter.body.vx,
                     fighter.body.vy,
@@ -914,12 +902,47 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const impactX = Phaser.Math.Clamp(x, zone.left + 100, zone.right - 100);
         const impactY = Phaser.Math.Clamp(y, zone.top + 100, zone.bottom - 100);
         this.lighting?.flash('ko', impactX, impactY);
+        this.showKnockOutBurst(index, x, y);
 
         const audio = AudioManager.getInstance();
         audio.playSFX('sfx_death', { volume: 0.8 });
         audio.playSFX(Math.random() > 0.5 ? 'sfx_death_crowd_1' : 'sfx_death_crowd_2', { volume: 0.5 });
 
         this.campaign?.onKnockOut(index);
+    }
+
+    /** Bubbles for every fighter (again when one joins). */
+    private createBubbles(): void {
+        this.offscreenBubbles?.destroy();
+        const byFighter = [...this.players].sort((a, b) => a.fighterIndex - b.fighterIndex);
+        this.offscreenBubbles = new OffscreenBubbles(this, byFighter.map(p => ({ character: p.character, color: this.colorOf(p) })), this.cameras.main);
+    }
+
+    /** A fighter's colour: its HUD and indicator colour. */
+    private colorOf(player: Player): number {
+        return this.campaign?.indicatorColor(player.playerId) ?? this.PLAYER_COLORS[player.playerId] ?? 0xffffff;
+    }
+
+    /** Brawlhalla's KO: a burst in the fighter's colour at the screen's edge where it left. */
+    private showKnockOutBurst(index: number, x: number, y: number): void {
+        const cam = this.cameras.main;
+        const view = cam.worldView;
+        const player = this.players.find(p => p.fighterIndex === index);
+        const burst = this.add.container(
+            Phaser.Math.Clamp((x - view.x) * cam.zoom, 0, cam.width),
+            Phaser.Math.Clamp((y - view.y) * cam.zoom, 0, cam.height),
+        ).setDepth(950);
+        const rays = this.add.graphics().fillStyle(0xffffff, 0.9);
+        for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            const side = (dx: number) => [Math.cos(angle + dx) * 60, Math.sin(angle + dx) * 60] as const;
+            const [ax, ay] = side(-0.12);
+            const [bx, by] = side(0.12);
+            rays.fillTriangle(ax, ay, bx, by, Math.cos(angle) * (i % 2 ? 230 : 320), Math.sin(angle) * (i % 2 ? 230 : 320));
+        }
+        burst.add([this.add.circle(0, 0, 170, player ? this.colorOf(player) : 0xffffff, 0.6), rays, this.add.circle(0, 0, 75, 0xffffff)]);
+        cam.ignore(burst);
+        this.tweens.add({ targets: burst, scale: { from: 0.4, to: 1.4 }, alpha: { from: 1, to: 0 }, duration: 450, ease: 'Cubic.easeOut', onComplete: () => burst.destroy() });
     }
 
     private showRespawnFlash(x: number, y: number): void {
@@ -968,22 +991,23 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
 
-        // Viewport padding based on zoom level
-        const settings = ZOOM_SETTINGS[this.currentZoomLevel];
-        const padX = settings.padX;
-        const padY = settings.padY;
+        const { padX, padY, minZoom, maxZoom } = CAMERA_FRAMING;
+        const zoomX = this.scale.width / ((maxX - minX) + padX * 2);
+        const zoomY = this.scale.height / ((maxY - minY) + padY * 2);
 
-        const width = (maxX - minX) + padX * 2;
-        const height = (maxY - minY) + padY * 2;
-
-        const zoomX = this.scale.width / width;
-        const zoomY = this.scale.height / height;
-
-        // Clamp zoom
-        const targetZoom = Phaser.Math.Clamp(Math.min(zoomX, zoomY), settings.minZoom, settings.maxZoom);
+        // Never further out than the stage's camera bounds allow (Brawlhalla: fighters beyond show as bubbles)
+        const bounds = this.layout.camera;
+        const widest = Math.max(this.scale.width / (bounds.right - bounds.left), this.scale.height / (bounds.bottom - bounds.top));
+        const targetZoom = Phaser.Math.Clamp(Math.min(zoomX, zoomY), Math.max(minZoom, widest), maxZoom);
 
         cam.zoom = Phaser.Math.Linear(cam.zoom, targetZoom, 0.1);
-        this.moveCameraTowards(centerX, centerY);
+        // ...and the view stays inside them
+        const halfW = this.scale.width / cam.zoom / 2;
+        const halfH = this.scale.height / cam.zoom / 2;
+        this.moveCameraTowards(
+            Phaser.Math.Clamp(centerX, bounds.left + halfW, bounds.right - halfW),
+            Phaser.Math.Clamp(centerY, bounds.top + halfH, bounds.bottom - halfH),
+        );
     }
 
     /** Eases the camera's centre towards (x, y), plus what's left of the last hit's kick. Once per step. */
@@ -1075,12 +1099,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.fighterSetups.push(setup);
         const fighter = addFighter(this.match, setup);
         const player = new Player(this, fighter, { playerId, character, isAI: true, isTrainingDummy: true });
-        player.setColor(this.PLAYER_COLORS[playerId] || 0xffffff);
+        player.setColor(this.colorOf(player));
 
         this.players.push(player);
         this.uiCamera.ignore(player);
         this.lighting?.add(player.spriteObject, 'fighter');
         this.addPlayerToHUD(player);
+        this.createBubbles();
     }
 
     /** Back from a scene launched over this one (settings, dialogue): the pause menu comes back if it was up. */
@@ -1122,6 +1147,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.setLabTime(1, false);
         this.contactShadows?.destroy();
         this.contactShadows = null;
+        this.offscreenBubbles?.destroy();
+        this.offscreenBubbles = null;
 
         this.input.keyboard?.removeAllKeys();
         this.input.keyboard?.resetKeys();

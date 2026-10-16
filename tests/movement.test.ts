@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AttackPhase, AttackRegistry } from '../shared/AttackData.ts';
-import { checkHit } from '../shared/Combat.ts';
+import { applyHit, findHit } from '../shared/Combat.ts';
 import { countDown, SIM_STEP_MS } from '../shared/FixedStepClock.ts';
 import { createMatch, stepMatch, type MatchState } from '../shared/GameSim.ts';
 import { emptyInput, type FighterInput } from '../shared/FighterInput.ts';
@@ -228,9 +228,21 @@ test('a hit gives a fighter out of jumps one back', () => {
     attacker.combat.attack = { key: 'light_neutral_grounded', phase: AttackPhase.ACTIVE, phaseTimer: 0, facing: 1 };
     attacker.isAttacking = true;
     Object.assign(attacker.combat.hitbox, { active: true, x: target.body.x, y: target.body.y, w: 50, h: 50 });
-    checkHit(attacker, target, []);
+    applyHit(findHit(attacker, target)!, []);
     assert.equal(target.isHitStunned, true);
     assert.equal(target.body.jumpsRemaining, 1);
+});
+
+test('two fighters hitting each other on the same step both get hit, whatever their slots', () => {
+    const match = newMatch(700, 780);
+    const [a, b] = match.fighters;
+    a.body.facingDirection = 1;
+    b.body.facingDirection = -1;
+    step(match, { lightAttack: true, lightAttackHeld: true }, { lightAttack: true, lightAttackHeld: true });
+    for (let i = 0; i < 10 && !a.isHitStunned && !b.isHitStunned; i++) step(match);
+    assert.equal(a.isHitStunned, true, 'fighter 1 hit');
+    assert.equal(b.isHitStunned, true, 'fighter 2 hit');
+    assert.equal(a.damagePercent, b.damagePercent);
 });
 
 test('a hit opens a chase dodge: it cancels the attack, costs no cooldown, and is invincible only at first', () => {

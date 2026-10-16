@@ -4,8 +4,6 @@
  * its own layout (STAGE_LAYOUTS[match.stage]); StageFactory draws the art over it.
  */
 
-import { MapConfig } from './MapConfig.js';
-
 // ─── Core Types ───
 
 /** Axis-aligned rectangle for collision. */
@@ -28,18 +26,32 @@ export interface SimStage {
     walls: SimRect[];
     /** Undersides: they stop fighters moving up. */
     ceilings: SimRect[];
-    blastZones: {
-        left: number;
-        right: number;
-        top: number;
-        bottom: number;
-    };
+    blastZones: Bounds;
+    /** What the camera may show (inside the blast zones): fighters beyond it show as bubbles at the screen's edge. */
+    camera: Bounds;
+}
+
+export interface Bounds {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+}
+
+/** The camera stays this far inside the blast zones. */
+const CAMERA_INSET = 300;
+
+function inset(zone: Bounds, by: number): Bounds {
+    return { left: zone.left + by, right: zone.right - by, top: zone.top + by, bottom: zone.bottom - by };
 }
 
 // ─── Stage Layouts ───
 
 /** The collision layouts a match can be played on; a match keeps its own (MatchState.stage). */
 export type StageLayoutId = 'standard' | 'grande';
+
+/** Crossing these KOs a fighter. */
+const STANDARD_BLAST_ZONES: Bounds = { left: -1020, right: 2940, top: -1000, bottom: 1800 };
 
 /**
  * The collision layout of the standard stage (every painted stage: only the textures differ).
@@ -68,12 +80,8 @@ const STANDARD: SimStage = {
         // Main stage underside
         { x: 960, y: 1380, w: 1070, h: 20 },
     ],
-    blastZones: {
-        left: MapConfig.BLAST_ZONE_LEFT,
-        right: MapConfig.BLAST_ZONE_RIGHT,
-        top: MapConfig.BLAST_ZONE_TOP,
-        bottom: MapConfig.BLAST_ZONE_BOTTOM,
-    },
+    blastZones: STANDARD_BLAST_ZONES,
+    camera: inset(STANDARD_BLAST_ZONES, CAMERA_INSET),
 };
 
 /** How much wider each half of Londra Grande's main platform is than the standard one's. */
@@ -91,6 +99,12 @@ const GRANDE_PILLAR_WALLS: SimRect[] = [
     { x: -50 - GRANDE_WIDEN, y: 500, w: 20, h: 680 },
 ];
 const GRANDE_PILLAR_CEILING: SimRect = { x: 25 - GRANDE_WIDEN, y: 565, w: 170, h: 20 };
+
+const GRANDE_BLAST_ZONES: Bounds = {
+    ...STANDARD_BLAST_ZONES,
+    left: STANDARD_BLAST_ZONES.left - GRANDE_WIDEN,
+    right: STANDARD_BLAST_ZONES.right + GRANDE_WIDEN,
+};
 
 /**
  * Londra Grande, for 3 to 5 players: the main platform 1600 px wide instead of
@@ -118,12 +132,8 @@ const GRANDE: SimStage = {
         mirrored(GRANDE_PILLAR_CEILING),
         { x: 960, y: 1380, w: 1070 + 2 * GRANDE_WIDEN, h: 20 },
     ],
-    blastZones: {
-        left: MapConfig.BLAST_ZONE_LEFT - GRANDE_WIDEN,
-        right: MapConfig.BLAST_ZONE_RIGHT + GRANDE_WIDEN,
-        top: MapConfig.BLAST_ZONE_TOP,
-        bottom: MapConfig.BLAST_ZONE_BOTTOM,
-    },
+    blastZones: GRANDE_BLAST_ZONES,
+    camera: inset(GRANDE_BLAST_ZONES, CAMERA_INSET),
 };
 
 export const STAGE_LAYOUTS: Readonly<Record<StageLayoutId, SimStage>> = { standard: STANDARD, grande: GRANDE };

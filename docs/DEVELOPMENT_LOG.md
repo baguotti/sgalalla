@@ -1237,3 +1237,14 @@ Part 2
 - **[Online]** Matches of 3 or more players play on Londra Grande, 2 players on Adria as before; spectators follow the same rule.
 - **[S]** tsc (client, tests, server), 67 tests (new: Londra Grande's wider floor and further blast zones), build, a headless free-for-all of 4 CPUs on it (about 2.5 minutes, 150+ hits, 10 KOs). In the browser (muted): 4 CPUs on Londra Grande, collision boxes over the art, no errors.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] Brawlhalla's KO camera, and a pass for bugs and clean-ups (branch `experimental-branch`)
+- **[Camera]** As in Brawlhalla, the camera never shows past the stage's camera bounds (300 px inside the blast zones; it used to chase a launched fighter out to the blast zone, showing empty space beyond the art). A fighter in play outside the view shows as a bubble at the screen's edge: their portrait in their colour, pointing at them, smaller the further away (`ui/OffscreenBubbles.ts`). A KO bursts in the fighter's colour at the screen's edge where they left (there was only a shake outside the Lab). Respawns drop in above the stage as before.
+- **[Fix]** Trades: two fighters hitting each other on the same step now both get hit. Hits applied one at a time let the lower slot's hit cancel the other's attack, so fighter 1 (online, whoever joined first) always won trades. Every hit of a step is now found first and applied after.
+- **[Fix]** Effects followed the old damage scale: every light hit (now 8 to 13 damage) drew the heavy-hit spark ring, kicked the camera and left a launch trail. Sparks now size from Unarmed's damages, the ring starts at 16 damage, and the camera kick and launch trail at 2600 px/s.
+- **[Fix]** A training dummy joining mid-match got no off-screen bubble and a different colour lookup; the bubbles are freed when the scene shuts down.
+- **[Server]** Input packets are relayed only from a seated player in a running match, for that match and their own slot: a spectator's or a forged packet (another player's slot) is dropped.
+- **[Clean-up]** The hitstun timer counts only while stunned. Removed `MapConfig` (blast zones live with the stage layouts; the zoom presets were never switched), the unused `AIR_DODGE_VERTICAL_DAMP` setting and its Lab slider, a duplicated line in the training toggle, and the debug readout's work while hidden.
+- **[Change]** Protocol version 13; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 68 tests (new: a trade hits both fighters), build, KO table unchanged. In the browser (muted): a fighter far off stage shows as a bubble while the camera stays inside the bounds; a KO bursts at the screen's edge; no errors.
+
