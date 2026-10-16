@@ -54,7 +54,9 @@ export interface Hitbox {
 
 export interface CombatState {
     attack: AttackInstance | null;
+    /** While above 0 (ms), cooldownAttack can't be used again. */
     attackCooldownTimer: number;
+    cooldownAttack: string | null;
     /** Bit per fighter id already hit by the current move. */
     hitTargets: number;
     hitbox: Hitbox;
@@ -66,8 +68,6 @@ export interface CombatState {
     chargeDirection: AttackDirection;
     isGroundPounding: boolean;
     isGroundPoundLanding: boolean;
-    groundPoundStartupTimer: number;
-    groundPoundChargeRatio: number;
     /** Alternates the light-attack animation. */
     lightAttackVariant: number;
     /** While above 0, a directional dodge is a chase dodge (ms). */
@@ -120,6 +120,7 @@ export function createFighter(id: number, setup: FighterSetup): FighterState {
         combat: {
             attack: null,
             attackCooldownTimer: 0,
+            cooldownAttack: null,
             hitTargets: 0,
             hitbox: { active: false, x: 0, y: 0, w: 0, h: 0 },
             ghost: null,
@@ -130,8 +131,6 @@ export function createFighter(id: number, setup: FighterSetup): FighterState {
             chargeDirection: 'neutral',
             isGroundPounding: false,
             isGroundPoundLanding: false,
-            groundPoundStartupTimer: 0,
-            groundPoundChargeRatio: 0,
             lightAttackVariant: 0,
             chaseDodgeTimer: 0,
             gravityCancel: false,
@@ -214,6 +213,7 @@ function enterState(f: FighterState): void {
             f.isAttacking = false;
             f.isDodging = false;
             combat.isGroundPounding = false;
+            combat.isGroundPoundLanding = false;
             combat.attack = null;
             combat.hitbox.active = false;
             combat.isCharging = false;
@@ -314,7 +314,8 @@ export function updateState(f: FighterState): void {
 
         case 'GroundPound':
             if (f.isHitStunned) return changeState(f, 'HitStun');
-            if (!f.combat.isGroundPounding) return changeState(f, 'Idle');
+            // The landing (the move's recovery) keeps the pose
+            if (!f.combat.isGroundPounding && !f.combat.isGroundPoundLanding) return changeState(f, 'Idle');
             return;
 
         case 'HitStun':

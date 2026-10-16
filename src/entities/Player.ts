@@ -217,7 +217,7 @@ export class Player extends Phaser.GameObjects.Container {
         const c = f.combat;
         const facing = f.body.facingDirection;
         // The ground pound frames are drawn facing the other way
-        const groundPoundPose = c.isGroundPounding || c.isGroundPoundLanding || isGroundPoundCharge(f);
+        const groundPoundPose = c.isGroundPounding || c.isGroundPoundLanding;
         this.sprite.setFlipX(groundPoundPose ? facing > 0 : facing < 0);
     }
 
@@ -227,10 +227,6 @@ export class Player extends Phaser.GameObjects.Container {
 
         // The run cycle speeds up with running speed
         this.sprite.anims.timeScale = key === 'run' && f.body.isRunning ? 0.8 + Math.abs(f.body.vx) / 3000 : 1;
-
-        if (this.pose === null && isGroundPoundCharge(f)) {
-            this.sprite.setFrame(`${this.character}_ground_pound_000`);
-        }
     }
 
     private updateAlpha(f: FighterState): void {
@@ -297,11 +293,6 @@ export class Player extends Phaser.GameObjects.Container {
         if (!charging) return;
 
         const chargePercent = Math.min(c.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
-        if (isGroundPoundCharge(f)) {
-            this.shakeSprite(chargePercent * 2.5);
-            return;
-        }
-
         // Signature charges fade in a ghost in front of the fighter
         if (!this.chargeGhost) this.chargeGhost = this.createChargeGhost();
         const facing = f.body.facingDirection;
@@ -356,7 +347,7 @@ export class Player extends Phaser.GameObjects.Container {
         this.chargeSounds = [];
     }
 
-    /** Dust on landing and at a dash's start, a ring on an air jump, afterimages while dashing or chase dodging. */
+    /** Dust on landing and at a dash's start, a ring on an air jump, afterimages while dashing, chase dodging or flying from a big hit. */
     private updateMotionEffects(f: FighterState, inPlay: boolean, deltaMs: number): void {
         const b = f.body;
         if (inPlay) {
@@ -368,7 +359,8 @@ export class Player extends Phaser.GameObjects.Container {
             if (f.state === 'Dash' && this.lastState !== 'Dash') fx.spawnDust(b.x, feet, 0.7, b.dodgeDirection);
             if (!b.isGrounded && b.jumpsRemaining < this.lastJumps) fx.spawnJumpRing(b.x, feet);
 
-            if (f.state === 'Dash' || b.isChaseDodging) {
+            const flying = b.isLaunched && f.hitstopSteps === 0 && Math.hypot(b.vx, b.vy) > effects.LAUNCH_TRAIL_SPEED;
+            if (f.state === 'Dash' || b.isChaseDodging || flying) {
                 this.afterimageMs -= deltaMs;
                 if (this.afterimageMs <= 0) {
                     fx.spawnAfterimage(this.sprite, this.x + this.sprite.x, this.y + this.sprite.y);
@@ -549,11 +541,6 @@ export class Player extends Phaser.GameObjects.Container {
         this.damageLabel?.destroy();
         super.destroy(fromScene);
     }
-}
-
-function isGroundPoundCharge(f: FighterState): boolean {
-    const c = f.combat;
-    return c.isCharging && c.chargeDirection === AttackDirection.DOWN && !f.body.isGrounded;
 }
 
 /** Signature ghosts start this far in front of the fighter. */

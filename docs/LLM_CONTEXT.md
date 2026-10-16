@@ -32,7 +32,18 @@ Changing gameplay means changing the simulation, and then:
 - **Chase dodge**: after a hit, a directional dodge cancels the rest of the attack, costs no cooldown, and an attack cancels it. Otherwise attacks can't be dodge cancelled.
 - **Gravity cancel**: an attack out of an aerial spot dodge is the grounded move.
 - **Walls** give back the air jumps and the recovery; after 9 air actions without landing, hitting or being hit, walls stop holding the fighter (wall slip).
-- **Hitstun** takes all control away; a hit gives a fighter out of jumps one back.
+- **Moving** (Brawlhalla's feel): a run speed and an air speed reached in a few steps (`RUN_SPEED`/`GROUND_ACCEL`, `AIR_SPEED`/`AIR_ACCEL`), crisp ground stops, momentum kept in the air (`AIR_DECEL`); light attacks in the air drift freely. Gravity 4600: a full jump rises about 2 fighters in 0.4 s; letting go of jump cuts only a jump's rise (`isJumpRising`), not a dash jump, wall jump, recovery or launch.
+- **Launches**: the knockback speed loses a steady amount along its angle (`LAUNCH_DECEL`, Brawlhalla's Defense rule) under light gravity (`HITSTUN_GRAVITY`): a flight goes speed²/2 × decel far, so soft hits barely push and hard hits fly. The launch (`isLaunched`) outlasts the stun until the fighter lands, jumps, dodges, recovers or slows below `LAUNCH_END_SPEED`, and out of stun it can drift against it.
+- **Hitstun** takes all control away for the move's stun frames, and longer while the fighter still flies fast; a hit gives a fighter out of jumps one back.
+
+### Combat (experimental branch): Brawlhalla's Unarmed
+- Every move in `AttackData.ts` carries Unarmed's frame data (brawlhalla.wiki.gg), every fighter on the same average stats: damage, fixed and variable force, stun, and startup, active, recovery (on a hit and a miss) and cooldown (on a hit and a miss), in frames (sim steps). A multi-hit string is one hit with the string's damage; a hit ends the move's active frames.
+- **Knockback** = (fixed + variable × (d/100 + d²/20000)) × `FORCE_SCALE` px/s, d the target's damage after the hit. Calibrated with `npm run balance`: heavies KO around 120–160%, lights from about 270%.
+- **Cooldown** stops only the same attack; any other move comes out at once. Heavies have none.
+- **Heavies** (the signatures) charge up to `CHARGE_MAX_TIME` for up to `FULL_CHARGE_BONUS` more damage and variable force; the ghost comes out with the punch. In the air, any heavy but down is the recovery.
+- **Ground pound**: comes out on the press, hangs through its startup, falls until it lands; the landing is its recovery.
+- **Hit pause**: `HITSTOP_MIN_STEPS` plus one step per `HITSTOP_SPEED_PER_STEP` of knockback: light hits barely stop, hard launches freeze for a beat.
+- True combos come from stun against recovery + the next startup: down light into side signature or jump + neutral air, neutral light into side light at low damage.
 - Every value is in `PhysicsConfig.ts`; `tests/movement.test.ts` checks each rule.
 
 ### The view (`src/`)

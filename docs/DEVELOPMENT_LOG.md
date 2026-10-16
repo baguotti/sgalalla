@@ -1166,3 +1166,46 @@ Part 2
 ------------------------------------------------------------------------------------------------------------------------------------
 ### [2026-10-15] Experimental site on port 8081 (branch `experimental-branch`)
 - **[Deploy]** The experimental build moves to http://138.68.126.112:8081 (8080 is DERAPATE's now): `deploy_experimental.sh` serves it there and opens the port; the client picks the experimental game server (9209) when the page is on 8081.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-15] Brawlhalla feel pass: movement, jumps, launches (branch `experimental-branch`)
+- **[Investigation]** Measured with the simulation, in fighter heights (H, 184 px). Before:
+    - The ground took 0.3 s to reach full speed (top speed was the balance of push against drag).
+    - The full jump was low and floaty (1.3 H, top at 0.47 s); air drift was slow (2.7 H/s).
+    - Launches lost only their sideways speed, about 10% a step: a side signature at 120% burst at 38 H/s, stopped dead sideways after 0.4 s at 5.4 H, then dropped straight down. Vertical launches weren't slowed at all, so the two behaved differently. That was the clumsy "thrown around" feel.
+- **[Feel]** **Movement**: a top speed on the ground (1000 px/s) and in the air (900 px/s), reached in 3 steps on the ground and about 8 in the air; ground stops take 4 steps; letting go in the air keeps the momentum (about half a second to drift to a stop). Light attacks in the air no longer kill the drift. Dashes and directional dodges keep their exact speed.
+- **[Feel]** **Jumps**: gravity 2200 → 5300. A full jump rises 2.0 H with its top at 0.37 s (0.77 s in the air), an air jump about 1.8 H, a short hop about 1.25 H. Every other vertical force is rescaled to keep its height (recovery, wall jump, dash jump), and the fall speeds are 1600 (fast fall 1400 to 2300). Letting go of jump now cuts only a jump's rise: it used to cut dash jumps, recoveries and launches too.
+- **[Feel]** **Launches**:
+    - The whole knockback speed slows together (0.948 a step across, 0.995 rising, so upward launches float up longer, the top blast zone being further), under a tenth of gravity. A hit glides along its angle and slows smoothly: the same side signature now goes 1.9 H in 0.1 s, 5 H by 0.4 s and 6.5 H by 1 s.
+    - The launch outlasts the stun: control comes back mid-flight, and the fighter can drift against it, until it lands, jumps, dodges, recovers or slows below 600 px/s.
+    - Knockback growth ×5 → ×2.9, calibrated with `npm run balance` so the KO percentages stay close to before (side sig, full charge 130 → 120%; up 130 → 140%; lights 190–280%).
+- **[Feel]** **Weight**: heavy moves add 2 steps of hit-stop (most 11); fighters launched faster than 1400 px/s leave a trail of afterimages.
+- **[Lab]** FEEL panels: GROUND (run speed, speeding up, stopping, easing down from a dash), AIR (air speed, control, momentum), STUN (launch glide, glide rising, gravity in a launch, launch ends below), HIT-STOP (heavy moves add), EFFECTS (launch trail).
+- **[Change]** Protocol version 9 (simulation rules changed); the recordings re-baselined with `npm run replays:update`.
+- **[S]** tsc (client and server), 59 tests (new: quick starts and stops with air momentum, short hop only for jumps, a launch gliding along its angle past the stun, how a launch ends), build. In the browser (muted): a side signature on the dummy at 120% lands with a heavier freeze and glides off smoothly (128, 169, 144, 122 px per 50 ms) with its trail; no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-15] Feel pass, calmer; charging stops the fighter again (branch `experimental-branch`)
+- **[Feel]** Movement was a touch too quick and frantic:
+    - Run speed 1000 → 880 px/s, reached in 6 steps (was 3), stops in 6 (was 4); air speed 900 → 780, gentler air control.
+    - Gravity 5300 → 4600: jumps keep their heights (full 2.0 H, air about 1.8 H) but take 0.4 s to the top. Every vertical force rescaled to match; fall speeds 1500 (fast fall 1300 to 2150).
+- **[Fix]** **Charging a heavy move** all but stops the fighter again, as before the feel pass: a fighter charging isn't attacking yet, so steering had taken over. Now charging takes steering away and the charge's grip holds it (15 px from a full run, in the air it hangs).
+- **[Balance]** Knockback growth ×2.9 → ×2.8 for the new movement: KO percentages within 20 of the original table (side sig, full charge 120%, up 140%, neutral 130%, lights 190–280%).
+- **[S]** tsc (client and server), 60 tests (new: charging stops the fighter), replays re-baselined, build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] v3.1.5e: Brawlhalla's Unarmed rules (branch `experimental-branch`)
+- **[Research]** Brawlhalla's Unarmed frame data and combat rules from brawlhalla.wiki.gg (Unarmed, Attacks, Movement, Stats). Every fighter gets the same average stats, so Dexterity, Strength and Defense don't exist; recovery uses the middle of the Dexterity range. No public numbers exist for hit pause.
+- **[Combat]** **Frame data**: every move has Unarmed's damage, fixed and variable force, stun, and startup, active, recovery (hit / miss) and cooldown (hit / miss), in frames. Lights are slower to come out (5–13 frames) and stick longer after a miss; heavies take 16–20 frames. A multi-hit string (neutral light, neutral air) is one hit with its total damage, and a hit ends the move's active frames, as the string's last hit would.
+- **[Combat]** **Knockback** is Brawlhalla's: (fixed + variable × (d/100 + d²/20000)) × 30 px/s, d the target's damage after the hit. **Stun** is the move's frames (14–31), longer while flying fast. Replaces base + growth × 2.8 × damage and the fixed 300 ms stun.
+- **[Combat]** **Cooldown** stops only the same attack (other moves come out at once): Brawlhalla's strings. The global 100 ms cooldown after every move and Fok's charged-move cooldown are gone.
+- **[Combat]** **Heavies**: charge up to 1 s for up to 25% more damage and variable force (replaces the signature and ground pound charge bonuses); no cooldown; the signature ghost comes out with the punch, not at the press. In the air, side heavy is the recovery, as in Brawlhalla (the aerial signatures are gone).
+- **[Combat]** **Ground pound**: comes out on the press (no charge), hangs 17 frames, falls, and the landing is its recovery (20 frames on a hit, 8 on a miss), in the landing pose.
+- **[Feel]** **Launches** lose a steady 13000 px/s² along their angle (Brawlhalla's Defense rule) instead of a share each step: the flight grows with the square of the speed, so a jab at 0% pushes about 65 px and a hit near a KO flies far. Launch gravity 0.1 → 0.3.
+- **[Feel]** **Hit pause**: 1 step plus 1 per 900 px/s of knockback, up to 8: about 2 steps on a light hit, 7 on a KO hit (was 3 to 11 by damage).
+- **[Balance]** Side light sends forward (30°) instead of popping up. KO table (`npm run balance`): side sig 150% tapped, 120% charged; up and neutral sig 160%; neutral and up light 270%; side light 310%. True combos (stun beats recovery + next startup): down light into side signature or jump + neutral air (0–80%), neutral light into side light (0–40%).
+- **[CPU]** The CPU dodges with a lower chance each step of an attack's startup (0.2 → 0.08), since startups are longer: it still dodges about half the attacks. CPU against CPU now plays out 3 stocks in about 2–2.5 minutes (before: no KOs in 3 minutes).
+- **[Lab]** MOVES edits each move's frame data and forces; KNOCKBACK (px/s per force, full charge bonus), STUN (launch slows by), HIT-STOP (one more step per) follow the new settings.
+- **[Change]** Protocol version 10; recordings re-baselined with `npm run replays:update`.
+- **[S]** tsc (client, tests, server), 64 tests (new: Brawlhalla's force and stun frames, cooldown stops only the same attack, ground pound on press with landing recovery, down light true-combos into jump + neutral air; a launch slowing by a steady amount), build, KO table, headless CPU matches. Progress tracked at https://claude.ai/artifact/UafLwcZWuFZ5mccwsshy3E.
+

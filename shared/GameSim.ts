@@ -234,8 +234,7 @@ function updateFacing(f: FighterState): void {
 
     const b = f.body;
     const combat = f.combat;
-    const isGroundPoundCharge = combat.isCharging && combat.chargeDirection === 'down' && !b.isGrounded;
-    if (combat.isGroundPounding || combat.isGroundPoundLanding || isGroundPoundCharge) return;
+    if (combat.isGroundPounding || combat.isGroundPoundLanding) return;
 
     if (f.isAttacking && combat.attack && combat.attack.phase !== AttackPhase.RECOVERY) return;
 
@@ -254,7 +253,7 @@ function updateTimers(f: FighterState): void {
         // Still flying fast across or upward: the stun goes on, up to its limit (falling doesn't count)
         const b = f.body;
         const flying = Math.abs(b.vx) > PhysicsConfig.STUN_FLYING_SPEED || b.vy < -PhysicsConfig.STUN_FLYING_SPEED;
-        const overLimit = f.hitStunTimer <= PhysicsConfig.HIT_STUN_DURATION - PhysicsConfig.MAX_HIT_STUN;
+        const overLimit = f.hitStunTimer <= -PhysicsConfig.STUN_EXTENSION_MAX;
         if (!flying || overLimit) f.isHitStunned = false;
     }
 
@@ -360,7 +359,7 @@ export const PARITY_FIELDS = [
     'fastFalling', 'recovering', 'recoveryAvailable', 'recoveryTimer', 'running', 'state',
     'damage', 'lives', 'hitStunned', 'hitStunTimer', 'invulnerable', 'invulnerabilityTimer',
     'attacking', 'attackKey', 'attackPhase', 'attackPhaseTimer', 'attackCooldownTimer',
-    'charging', 'chargeTime', 'groundPounding', 'groundPoundStartupTimer', 'groundPoundLanding',
+    'charging', 'chargeTime', 'groundPounding', 'groundPoundLanding',
 ] as const;
 
 /** A fighter's parity values, in PARITY_FIELDS order. */
@@ -377,6 +376,6 @@ export function fighterParityValues(f: FighterState): number[] {
         n(f.isAttacking), c.attack ? ATTACK_KEYS.indexOf(c.attack.key) : -1,
         c.attack ? ATTACK_PHASES.indexOf(c.attack.phase) : -1, c.attack?.phaseTimer ?? 0,
         c.attackCooldownTimer, n(c.isCharging), c.chargeTime,
-        n(c.isGroundPounding), c.groundPoundStartupTimer, n(c.isGroundPoundLanding),
+        n(c.isGroundPounding), n(c.isGroundPoundLanding),
     ];
 }

@@ -342,14 +342,14 @@ class MovesPanel extends FeelPanel {
             return r.node;
         };
         const notes: HTMLElement[] = [];
-        if (move.signature) notes.push(note('A signature: its damage is in COMBAT › SIGNATURES, and it hits where its ghost is (COMBAT › GHOSTS).'));
-        if (move.groundPound) notes.push(note('The ground pound: its damage and timing are in COMBAT › GROUND POUND.'));
+        if (move.signature) notes.push(note('A signature: it hits where its ghost is (COMBAT › GHOSTS), and a full charge adds COMBAT › KNOCKBACK › Full charge.'));
+        if (move.groundPound) notes.push(note('The ground pound: it falls until it lands (COMBAT › GROUND POUND), so it has no active time.'));
 
-        const hitting = [
-            ...(move.signature || move.groundPound ? [] : [row('damage')]),
-            row('baseKnockback'), row('knockbackGrowth'), row('knockbackAngle'),
+        const hitting = [row('damage'), row('fixedForce'), row('variableForce'), row('knockbackAngle'), row('stun')];
+        const timing = [
+            row('startup'), ...(move.groundPound ? [] : [row('active')]),
+            row('recovery'), row('recoveryMiss'), row('cooldown'), row('cooldownMiss'),
         ];
-        const timing = move.groundPound ? [] : [row('startupDuration'), row('activeDuration'), row('recoveryDuration')];
         const hitbox = move.signature ? [] : [row('hitboxWidth'), row('hitboxHeight'), row('hitboxOffsetX'), row('hitboxOffsetY')];
         const stall = toggleRow('Stalls in the air', () => moveValue(key, 'shouldStallInAir') as boolean,
             value => setMoveValue(key, 'shouldStallInAir', value), defaultMoveValue(key, 'shouldStallInAir') as boolean, () => {
@@ -361,7 +361,7 @@ class MovesPanel extends FeelPanel {
         this.editor.replaceChildren(
             ...notes,
             section('HIT', true, ...hitting),
-            ...(timing.length ? [section('TIMING', true, ...timing, hint('Steps are 16.7 ms: the small number is how many steps it lasts.'))] : []),
+            section('TIMING', true, ...timing, hint('In steps (frames): 60 a second, as Brawlhalla\'s frame data.')),
             ...(hitbox.length ? [section('HITBOX', true, ...hitbox)] : []),
             section('MORE', false, stall.node),
             buttons(button('Reset this move', () => {

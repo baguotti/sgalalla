@@ -25,6 +25,8 @@ export const DEFAULT_EFFECTS = {
     JUMP_RING_OPACITY: 1,
     AFTERIMAGE_OPACITY: 1,
     AFTERIMAGE_EVERY_MS: 35,
+    // A fighter launched faster than this (px/s) leaves afterimages too: big hits read as big
+    LAUNCH_TRAIL_SPEED: 1400,
 };
 
 export type EffectKey = keyof typeof DEFAULT_EFFECTS;

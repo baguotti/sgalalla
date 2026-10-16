@@ -1,37 +1,43 @@
 /**
  * Tuning constants for the simulation (shared/). Speeds are in pixels per
  * second, accelerations in pixels per second squared, durations and timers in
- * milliseconds; friction multiplies the horizontal speed twice per step.
+ * milliseconds; a "friction" multiplies the horizontal speed twice per step.
+ * The fighters are 184 px tall: the feel follows Brawlhalla's, quick to start
+ * and stop on the ground, high snappy jumps, momentum kept in the air, and
+ * launches that glide along their angle and slow smoothly.
  */
 export const PhysicsConfig = {
-    // Gravity - high value for fast, heavy feel (like Brawlhalla)
-    GRAVITY: 2200,
+    // Gravity: strong, for high jumps that rise and land quickly (but not frantically)
+    GRAVITY: 4600,
 
-    // Movement - acceleration-based for responsive feel with slight slide
-    MOVE_ACCEL: 6500,
-    GLOBAL_KNOCKBACK_SCALING: 5.0,
-    FRICTION: 0.60,
-    RUN_FRICTION: 0.93,
+    // Moving: a top speed on the ground and in the air, reached and left at these rates
+    // (px/s²); above the top speed (a dash's run-on) the speed eases down instead of stopping
+    RUN_SPEED: 880,
+    GROUND_ACCEL: 9000,
+    GROUND_DECEL: 9000,
+    GROUND_OVERSPEED_DECEL: 3000,
+    AIR_SPEED: 780,
+    AIR_ACCEL: 4500,
+    AIR_DECEL: 1400,
     SLIDE_ATTACK_SPEED: 2200,
     SLIDE_ATTACK_DECELERATION: 0.96,
-    MAX_SPEED: 1400,
 
-    // Jump mechanics
-    JUMP_FORCE: -1050,
-    SHORT_HOP_FORCE: -540,
-    DOUBLE_JUMP_FORCE: -900,
+    // Jump mechanics: a full jump rises about 2 fighters in 0.4 s, an air jump about 1.8
+    JUMP_FORCE: -1880,
+    SHORT_HOP_FORCE: -1295,
+    DOUBLE_JUMP_FORCE: -1740,
     MAX_JUMPS: 3,
 
     // Falling: gravity accelerates a fall up to these speeds
-    MAX_FALL_SPEED: 1800,
-    MAX_FAST_FALL_SPEED: 2200,
+    MAX_FALL_SPEED: 1500,
+    MAX_FAST_FALL_SPEED: 2150,
     // Fast fall: holding down while descending; starts at least this fast
-    FAST_FALL_SPEED: 1100,
+    FAST_FALL_SPEED: 1300,
     // Above the terminal speed once a fast fall ends, the excess shrinks by this share per step
     FALL_SPEED_EASE: 0.85,
 
     // Recovery attack
-    RECOVERY_FORCE_Y: -1760,
+    RECOVERY_FORCE_Y: -2540,
     RECOVERY_FORCE_X: 550,
     RECOVERY_DURATION: 300,
     // A recovery used again before landing (or touching a wall) costs an air jump and has this share of the push
@@ -65,7 +71,7 @@ export const PhysicsConfig = {
     DASH_DURATION: 150,
     DASH_REPEAT_DELAY: 130,
     // Jumping out of a dash: low and fast, coasting until it slows to about the top air drift speed
-    DASH_JUMP_FORCE: -750,
+    DASH_JUMP_FORCE: -1080,
     DASH_JUMP_SPEED: 1300,
     DASH_JUMP_AIR_FRICTION: 0.985,
     DASH_MOMENTUM_MIN_SPEED: 520,
@@ -81,16 +87,23 @@ export const PhysicsConfig = {
     // Share of the chase dodge's speed an attack out of it keeps
     CHASE_ATTACK_SPEED_KEPT: 0.5,
 
-    // Run mechanics
-    RUN_SPEED_MULT: 2.25,
-    RUN_ACCEL_MULT: 1.2,
-
     // Damage system
     MAX_DAMAGE: 999,
-    HIT_STUN_DURATION: 300,
-    // Stun lasts past HIT_STUN_DURATION while the fighter still flies faster than this across or upward, up to MAX_HIT_STUN
-    STUN_FLYING_SPEED: 1300,
-    MAX_HIT_STUN: 1500,
+    // Knockback, as in Brawlhalla: force = fixed + variable × (d/100 + d²/20000), d the target's damage after
+    // the hit, and a full charge adds FULL_CHARGE_BONUS to a heavy's variable force and damage. Each unit of
+    // force launches at this many px/s
+    FORCE_SCALE: 30,
+    FULL_CHARGE_BONUS: 0.25,
+    // A hit stuns for the move's stun frames, and on while the fighter still flies faster than this across
+    // or upward, up to this much longer
+    STUN_FLYING_SPEED: 1000,
+    STUN_EXTENSION_MAX: 1200,
+    // A launch slows by this much along its angle (px/s²), so it flies v²/2 far: little at low damage, far
+    // near a KO. Gravity pulls at this share of its strength, so the flight arcs
+    LAUNCH_DECEL: 13000,
+    HITSTUN_GRAVITY: 0.3,
+    // The launch carries on past the stun (the fighter can act and drift) until it slows below this
+    LAUNCH_END_SPEED: 600,
     // A downward hit on a fighter standing on the floor pops it up with this share of the knockback, lifted this many px
     GROUNDED_SPIKE_BOUNCE: 0.3,
     GROUNDED_SPIKE_LIFT: 10,
@@ -98,10 +111,11 @@ export const PhysicsConfig = {
     BOUNCE_SPEED: 600,
     BOUNCE_KEEP: 0.8,
 
-    // Hit-stop: both fighters freeze on a hit, in steps: MIN plus PER_DAMAGE for each point of damage, up to MAX
-    HITSTOP_MIN_STEPS: 3,
-    HITSTOP_PER_DAMAGE: 0.3,
-    HITSTOP_MAX_STEPS: 9,
+    // Hit pause: both fighters freeze on a hit, in steps: MIN, plus one per HITSTOP_SPEED_PER_STEP of knockback,
+    // up to MAX. Light hits barely stop; hits that launch hard freeze for a beat
+    HITSTOP_MIN_STEPS: 1,
+    HITSTOP_SPEED_PER_STEP: 900,
+    HITSTOP_MAX_STEPS: 8,
 
     // Player dimensions (the body, for collisions; a new match picks them up)
     PLAYER_WIDTH: 120,
@@ -114,34 +128,16 @@ export const PhysicsConfig = {
     RESPAWN_DELAY_STEPS: 120,
     RESPAWN_INVULNERABILITY_MS: 1000,
 
-    // Attack phases
-    LIGHT_STARTUP_MS: 50,
-    LIGHT_ACTIVE_MS: 100,
-    LIGHT_RECOVERY_MS: 50,
-    HEAVY_STARTUP_MS: 30,
-    HEAVY_ACTIVE_MS: 300,
-    HEAVY_RECOVERY_MS: 200,
-
-    // Attack moves without their own: the run attack slides this much faster than the slide,
-    // and comes out above this share of MAX_SPEED; every attack ends with a short cooldown
+    // The run attack slides this much faster than the slide, and comes out above this share of RUN_SPEED
     RUN_ATTACK_SPEED_MULT: 1.2,
     RUN_ATTACK_MIN_SPEED: 0.8,
-    ATTACK_END_COOLDOWN: 100,
-    // Fok's charged moves: extra cooldown at full charge, less for a shorter charge
-    FOK_CHARGE_COOLDOWN: 600,
 
-    // Ground pound: hangs this long, then falls at MAX_FALL_SPEED times FALL_MULT.
-    // Damage and knockback grow with the charge; landing keeps this share of the speed
-    GROUND_POUND_STARTUP: 100,
+    // Ground pound: after its startup hang it falls at MAX_FALL_SPEED times FALL_MULT; landing keeps this share of the speed
     GROUND_POUND_FALL_MULT: 1.5,
-    GROUND_POUND_MIN_DAMAGE: 4,
-    GROUND_POUND_MAX_DAMAGE: 12,
-    GROUND_POUND_KNOCKBACK_BONUS: 0.8,
-    GROUND_POUND_GROWTH_BONUS: 0.5,
     GROUND_POUND_LANDING_SPEED_KEPT: 0.5,
 
-    // Chargeable heavy attacks
-    CHARGE_MAX_TIME: 1500,
+    // Heavy attacks charge while held, up to this long
+    CHARGE_MAX_TIME: 1000,
 
     // Signature ghosts (heavy side, up and neutral): thrown from in front of the fighter (NOCK's
     // further out), a side ghost a little further forward, an up ghost a little higher. It travels
@@ -162,36 +158,26 @@ export const PhysicsConfig = {
     // Wall mechanics
     WALL_SLIDE_SPEED: 400,
     WALL_JUMP_FORCE_X: 1600,
-    WALL_JUMP_FORCE_Y: -1050,
+    WALL_JUMP_FORCE_Y: -1520,
     WALL_COYOTE_TIME: 200,
 
-    // State-dependent friction multipliers
-    AIR_FRICTION: 0.91,
+    // Speed kept each half-step in these states (moving is RUN_SPEED and AIR_SPEED above)
     CHARGE_FRICTION: 0.2,
     CHARGE_GRAVITY_CANCEL: 0.5,
     ATTACK_RECOVERY_FRICTION: 0.75,
     ATTACK_ACTIVE_FRICTION: 0.95,
     AERIAL_STALL_GRAVITY_DAMP: 0.6,
     AERIAL_STALL_HORIZONTAL_DAMP: 0.9,
-    HITSTUN_FRICTION: 0.95,
     SHORT_HOP_VELOCITY_DAMP: 0.5,
 
-    // The recovery move's hit: a square round the fighter
+    // The recovery move's hit (Brawlhalla's Unarmed numbers, stun in frames): a square round the fighter
     RECOVERY_HITBOX_SIZE: 60,
-    RECOVERY_DAMAGE: 8,
-    RECOVERY_BASE_KNOCKBACK: 250,
-    RECOVERY_KNOCKBACK_GROWTH: 8,
+    RECOVERY_DAMAGE: 15,
+    RECOVERY_FIXED_FORCE: 55,
+    RECOVERY_VARIABLE_FORCE: 40,
+    RECOVERY_STUN: 25,
     RECOVERY_KNOCKBACK_ANGLE: 80,
 
-    // Signature damage grows from MIN to MAX with the charge; a charged side signature also knocks
-    // back harder, up to these shares more at full charge
-    SIDE_SIG_MIN_DAMAGE: 6,
-    SIDE_SIG_MAX_DAMAGE: 20,
-    SIDE_SIG_KNOCKBACK_BONUS: 0.5,
-    SIDE_SIG_GROWTH_BONUS: 0.3,
-
-    // Movement thresholds
-    HIGH_SPEED_THRESHOLD_MULT: 1.2,
     // Wall slip: after this many air jumps, wall jumps and recoveries without landing, hitting or
     // being hit, walls no longer hold the fighter or give back its jumps
     MAX_AIR_ACTIONS: 9,

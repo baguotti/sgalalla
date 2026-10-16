@@ -73,9 +73,9 @@ export class PlayerAI {
             return;
         }
 
-        // Sometimes react to a close attacker
+        // Sometimes react to a close attacker: a chance each step of its startup, so about half the attacks
         if (this.target && this.target.isAttacking && this.state !== 'DEFEND' && this.state !== 'RECOVER') {
-            if (this.distanceToTarget() < 200 && this.reactionTimer <= 0 && Math.random() < 0.2) {
+            if (this.distanceToTarget() < 200 && this.reactionTimer <= 0 && Math.random() < 0.08) {
                 this.enterState('DEFEND');
                 this.reactionTimer = 500;
                 return;
