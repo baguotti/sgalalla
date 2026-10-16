@@ -33,8 +33,8 @@ function random(seed: number): () => number {
     };
 }
 
-/** Directions and held buttons (bits 0-7, 9, 11, 13, 15 of packInput). */
-const HELD_BITS = 0xAAFF;
+/** Directions and held buttons (bits 0-7, 9, 11, 13, 15 and 19, throw, of packInput). */
+const HELD_BITS = 0xAAFF | (1 << 19);
 /** Jump, light, heavy, dodge and throw (bombs) presses. */
 const PRESS_BITS = [8, 10, 12, 14, 18];
 

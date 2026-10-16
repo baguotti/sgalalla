@@ -23,7 +23,7 @@ import {
     ATTACK_PHASE_NONE, ATTACK_PHASE_STARTUP, ATTACK_PHASE_ACTIVE, ATTACK_PHASE_RECOVERY,
     ATTACK_TYPE_NONE, ATTACK_TYPE_LIGHT, ATTACK_TYPE_HEAVY,
 } from './PhysicsSimulation.js';
-import { createBombs, updateBombs, type Bombs } from './Bombs.js';
+import { createBombs, pickUpBombs, updateBombs, type Bombs } from './Bombs.js';
 import { randomInt } from './Random.js';
 import { STAGE_LAYOUTS, type SimStage, type StageLayoutId } from './StageData.js';
 import { hashString } from './StateHash.js';
@@ -101,6 +101,9 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[], ev
 
     const layout = STAGE_LAYOUTS[match.stage];
     for (const f of moving) collidePlatforms(f, layout, events);
+
+    // Bombs in reach are picked up before a light attack can come out
+    pickUpBombs(match);
 
     for (const f of moving) {
         updateState(f);

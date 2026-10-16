@@ -1264,3 +1264,12 @@ Part 2
 - **[Change]** Protocol version 14; recordings re-baselined.
 - **[S]** tsc (client, tests, server), 75 tests (new: tests/bombs.test.ts, drops, pick up and throw, an explosion on the fighter it touches launching them up and away, the thrower hurt by their own bomb, a catch, dropping it when hit, safe after slowing, no bombs when off; the rollback players now also press throw, so bombs are kept in sync under rollback), build, KO table unchanged. In the browser (muted): a bomb held, thrown and exploding on the other fighter; no errors.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] Bombs: picked up with light attack, charged throws, overcharge (branch `experimental-branch`)
+- **[Gameplay]** As in Brawlhalla (whose default controls pick items up with light attack too), light attack picks up a bomb within reach instead of attacking, and catches a thrown one; the throw button still does. Holding a bomb, light attack attacks as usual.
+- **[Gameplay]** Throws charge like a heavy: holding throw charges, letting go throws, from 1100 px/s tapped to 2300 px/s after 0.8 s, in 8 directions aimed as you let go (up, down, the four diagonals at 45°, forward 15° up). Held past 2 s, the bomb goes off in the hand, on its holder and anyone near.
+- **[Visuals]** A charging bomb swells and flickers red and blue, faster as it nears going off.
+- **[Input]** A `throwHeld` input bit (appended); H held on the keyboard, RB held on gamepads.
+- **[Change]** Protocol version 15.
+- **[S]** tsc (client, tests, server), 78 tests (new: light attack picks up instead of attacking, a charged throw faster than a tapped one, a diagonal throw, overcharge blowing up in the hand; the rollback players now also hold throw, so charging and overcharging stay in sync under rollback), build. In the browser (muted): a bomb close to going off, swollen and red in the hand; no errors.
+

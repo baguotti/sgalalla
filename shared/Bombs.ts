@@ -2,13 +2,14 @@
  * Bombs, as Brawlhalla's Bouncy Bomb gadget (settings: PhysicsConfig BOMB_*).
  *
  * One drops from the sky over the main platform now and then. A fighter
- * pressing throw within reach of a loose bomb picks it up (a thrown one too:
- * a catch), and pressing it again throws it: up, down, or forward and a little
- * up. Thrown, it's armed: after a short grace period it explodes on touching
- * any fighter, its thrower included, hurting everyone near. It bounces off the
- * stage, and a bounce that leaves it slow makes it safe again. A fighter hit
- * while holding one drops it. A loose bomb is gone after a while, and one past
- * the blast zones at once.
+ * pressing light attack or throw within reach of a loose bomb picks it up (a
+ * thrown one too: a catch), instead of attacking. Holding throw charges a throw
+ * and letting go throws it, faster the longer the charge, in any of 8
+ * directions; charged too long, it goes off in the hand. Thrown, it's armed:
+ * after a short grace period it explodes on touching any fighter, its thrower
+ * included, hurting everyone near. It bounces off the stage, and a bounce that
+ * leaves it slow makes it safe again. A fighter hit while holding one drops
+ * it. A loose bomb is gone after a while, and one past the blast zones at once.
  */
 
 import { hitstopFor, KNOCKBACK_DIRECTIONS, knockbackSpeed, launchFighter } from './Combat.js';
@@ -36,6 +37,8 @@ export interface BombState {
     graceSteps: number;
     /** Steps left before a loose bomb is gone. */
     lifeSteps: number;
+    /** Its holder's throw charge so far (ms), or -1 while not charging. */
+    charge: number;
 }
 
 /** A match's bombs, and when the next one may drop (ms). */
@@ -57,8 +60,9 @@ interface Arena {
 }
 
 const STEP_S = SIM_STEP_MS / 1000;
-/** Forward throws go this much up: cos and sin of 15°. */
+/** Throw directions (cos, sin, up positive): forward goes a little up (15°), diagonals at 45°. */
 const FORWARD = [0.9659258262890683, 0.25881904510252074] as const;
+const DIAGONAL = 0.7071067811865476;
 /** Explosions launch up and away at this angle (a KNOCKBACK_DIRECTIONS entry). */
 const BLAST_ANGLE = 50;
 /** A bounce slower than this (px/s) settles the bomb on the floor, which slows it as it rolls. */
@@ -76,7 +80,7 @@ export function updateBombs(match: Arena, layout: SimStage, events: MatchEvent[]
         if (bombs.dropTimer <= 0) {
             const main = layout.platforms[0];
             const x = randomInt(match, main.x - main.w / 2 + 120, main.x + main.w / 2 - 120);
-            bombs.list.push({ id: bombs.nextId++, x, y: layout.camera.top + 100, vx: 0, vy: 0, holder: -1, thrower: -1, armed: false, graceSteps: 0, lifeSteps: lifetimeSteps() });
+            bombs.list.push({ id: bombs.nextId++, x, y: layout.camera.top + 100, vx: 0, vy: 0, holder: -1, thrower: -1, armed: false, graceSteps: 0, lifeSteps: lifetimeSteps(), charge: -1 });
             bombs.dropTimer = PhysicsConfig.BOMB_GAP + randomInt(match, 0, PhysicsConfig.BOMB_GAP_RANDOM);
         }
     }
@@ -86,35 +90,39 @@ export function updateBombs(match: Arena, layout: SimStage, events: MatchEvent[]
     }
 }
 
+/**
+ * Pick-ups, before the fighters' attacks: a fighter free to act pressing light
+ * attack or throw within reach of a loose bomb takes it instead of attacking
+ * (one bomb each). Run before the step's combat input.
+ */
+export function pickUpBombs(match: Arena): void {
+    const bombs = match.bombs;
+    if (!bombs) return;
+    for (const bomb of bombs.list) {
+        if (bomb.holder >= 0) continue;
+        for (const f of match.fighters) {
+            if (!isInPlay(f) || f.isHitStunned || f.isAttacking || bombs.list.some(b => b.holder === f.id)) continue;
+            const press = isBuffered(f, 'throw') ? 'throw' : isBuffered(f, 'lightAttack') ? 'lightAttack' : null;
+            if (!press || distanceToHurtbox(bomb, f) > PhysicsConfig.BOMB_PICKUP_RANGE) continue;
+            consumeBuffered(f, press);
+            Object.assign(bomb, { holder: f.id, armed: false, graceSteps: 0, charge: -1 });
+            carry(bomb, f);
+            break;
+        }
+    }
+}
+
 /** Returns false once the bomb is gone. */
 function stepBomb(match: Arena, bomb: BombState, layout: SimStage, events: MatchEvent[]): boolean {
     if (bomb.holder >= 0) {
         const holder = match.fighters[bomb.holder];
         if (!isInPlay(holder)) return false;
-        if (!holder.isHitStunned) {
-            carry(bomb, holder);
-            if (isBuffered(holder, 'throw')) {
-                consumeBuffered(holder, 'throw');
-                throwBomb(bomb, holder);
-            }
-            return true;
-        }
+        if (!holder.isHitStunned) return hold(match, bomb, holder, events);
         // Hit while holding it: dropped, safe
         bomb.holder = -1;
+        bomb.charge = -1;
         bomb.vy = -400;
         bomb.lifeSteps = lifetimeSteps();
-    }
-
-    // Picked up before it can explode on whoever presses throw in reach: so a thrown bomb can be caught
-    const catcher = match.fighters.find(f => isInPlay(f) && !f.isHitStunned && isBuffered(f, 'throw')
-        && !match.bombs!.list.some(b => b.holder === f.id) && distanceToHurtbox(bomb, f) <= PhysicsConfig.BOMB_PICKUP_RANGE);
-    if (catcher) {
-        consumeBuffered(catcher, 'throw');
-        bomb.holder = catcher.id;
-        bomb.armed = false;
-        bomb.graceSteps = 0;
-        carry(bomb, catcher);
-        return true;
     }
 
     fly(bomb, layout);
@@ -130,6 +138,27 @@ function stepBomb(match: Arena, bomb: BombState, layout: SimStage, events: Match
     return bomb.armed || --bomb.lifeSteps > 0;
 }
 
+/** In the hand: throw starts a charge, letting go throws; charged too long, it goes off. False once it has. */
+function hold(match: Arena, bomb: BombState, holder: FighterState, events: MatchEvent[]): boolean {
+    carry(bomb, holder);
+    if (bomb.charge < 0) {
+        if (isBuffered(holder, 'throw')) {
+            consumeBuffered(holder, 'throw');
+            bomb.charge = 0;
+        }
+        return true;
+    }
+    if (holder.input.throwHeld) {
+        bomb.charge += SIM_STEP_MS;
+        if (bomb.charge < PhysicsConfig.BOMB_OVERCHARGE) return true;
+        bomb.thrower = holder.id;
+        explode(match, bomb, events);
+        return false;
+    }
+    throwBomb(bomb, holder);
+    return true;
+}
+
 /** In the holder's hand, moving with them (so a dropped bomb keeps their momentum). */
 function carry(bomb: BombState, holder: FighterState): void {
     const b = holder.body;
@@ -139,20 +168,21 @@ function carry(bomb: BombState, holder: FighterState): void {
     bomb.vy = b.vy;
 }
 
+/** Faster the longer the charge, the way the thrower aims as they let go: up, down, a diagonal, or forward. */
 function throwBomb(bomb: BombState, thrower: FighterState): void {
     const { aimUp, aimDown, aimLeft, aimRight } = thrower.input;
-    const speed = PhysicsConfig.BOMB_THROW_SPEED;
-    if (aimUp && !aimDown) {
-        bomb.vx = 0;
-        bomb.vy = -speed;
-    } else if (aimDown && !aimUp) {
-        bomb.vx = 0;
-        bomb.vy = speed;
-    } else {
-        const facing = aimRight !== aimLeft ? (aimRight ? 1 : -1) : thrower.body.facingDirection;
-        bomb.vx = FORWARD[0] * speed * facing;
-        bomb.vy = -FORWARD[1] * speed;
-    }
+    const charge = Math.min(bomb.charge / PhysicsConfig.BOMB_CHARGE_FULL, 1);
+    const speed = PhysicsConfig.BOMB_THROW_SPEED_MIN + charge * (PhysicsConfig.BOMB_THROW_SPEED_MAX - PhysicsConfig.BOMB_THROW_SPEED_MIN);
+    const vertical = aimUp === aimDown ? 0 : aimUp ? 1 : -1;
+    const side = aimLeft === aimRight ? 0 : aimRight ? 1 : -1;
+    const facing = side || thrower.body.facingDirection;
+    // Straight up or down without a side; a diagonal with one; forward and a little up otherwise
+    const [x, y] = vertical === 0 ? [FORWARD[0] * facing, FORWARD[1]]
+        : side === 0 ? [0, vertical]
+            : [DIAGONAL * side, DIAGONAL * vertical];
+    bomb.vx = x * speed;
+    bomb.vy = -y * speed;
+    bomb.charge = -1;
     bomb.holder = -1;
     bomb.thrower = thrower.id;
     bomb.armed = true;

@@ -14,7 +14,8 @@ const BLINK_STEPS = Math.round(2500 / SIM_STEP_MS);
 
 /**
  * Draws the match's bombs (shared/Bombs.ts): blue while safe, red while
- * armed, rolling as they move, blinking before a loose one is gone; and their
+ * armed, rolling as they move, blinking before a loose one is gone, swelling
+ * and flickering faster while a throw charges towards going off; and their
  * explosions.
  */
 export class BombSprites {
@@ -62,7 +63,11 @@ export class BombSprites {
             this.sprites.set(bomb.id, sprite);
         }
         const held = bomb.holder >= 0;
-        sprite.setPosition(bomb.x, bomb.y).setTexture(bomb.armed ? ARMED : SAFE).setDepth(held ? HELD_DEPTH : LOOSE_DEPTH);
+        // Charging: red and blue in turn, faster and bigger as it nears going off
+        const danger = bomb.charge >= 0 ? Math.min(bomb.charge / PhysicsConfig.BOMB_OVERCHARGE, 1) : 0;
+        const flicker = bomb.charge >= 0 && Math.floor(bomb.charge / (220 - 180 * danger)) % 2 === 1;
+        sprite.setPosition(bomb.x, bomb.y).setTexture(bomb.armed || flicker ? ARMED : SAFE)
+            .setScale(1 + 0.35 * danger).setDepth(held ? HELD_DEPTH : LOOSE_DEPTH);
         // Rolls the way it moves; upright in a hand
         if (held) sprite.setRotation(0);
         else sprite.rotation += (bomb.vx * SIM_STEP_MS / 1000) / PhysicsConfig.BOMB_RADIUS;

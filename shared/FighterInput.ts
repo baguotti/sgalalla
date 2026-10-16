@@ -25,8 +25,9 @@ export interface FighterInput {
     dodgeHeld: boolean;
     taunt: boolean;
     defeat: boolean;
-    /** Picks up or throws a bomb. */
+    /** Picks up a bomb, or starts charging a throw: held to charge, let go to throw. */
     throw: boolean;
+    throwHeld: boolean;
 }
 
 /** Bit order of the packed form. Append only: recordings and packets depend on it. */
@@ -38,7 +39,7 @@ const INPUT_BITS = [
     'heavyAttack', 'heavyAttackHeld',
     'dodge', 'dodgeHeld',
     'taunt', 'defeat',
-    'throw',
+    'throw', 'throwHeld',
 ] as const satisfies readonly (keyof FighterInput)[];
 
 export function emptyInput(): FighterInput {
