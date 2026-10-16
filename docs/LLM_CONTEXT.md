@@ -20,6 +20,7 @@ All gameplay is a deterministic simulation of plain data: no Phaser, no wall-clo
 - `Combat.ts` + `AttackData.ts`: attacks, charging, ground pound, recovery, signature ghosts, hits and knockback (knockback directions are precomputed numbers).
 - `FixedStepClock.ts`: turns real frame time into whole 60 Hz steps, on a steady beat on 120 Hz screens.
 - `Rollback.ts`: rollback netcode for 2 to 5 players, and players leaving mid-match (`playerLeft`: every copy retires their fighter the frame after the last input the server has from them); `NetProtocol.ts`: messages, packet layout, `PROTOCOL_VERSION`.
+    - Rollback window `MAX_ROLLBACK` 16 frames: one player's network spike or stalled frame makes the others roll back further instead of freezing. Online the clock keeps the time a stalled frame lost and catches it up, 4 steps a frame (`ONLINE_BACKLOG_STEPS`), so whoever stalled gets level again instead of the others waiting. Packets go once per simulated frame. The debug overlay (Q) shows, for each other player, how many frames behind their inputs arrive and their packet loss: the player with the big number is the slow connection.
 
 Changing gameplay means changing the simulation, and then:
 1. bump `PROTOCOL_VERSION`, so builds with different rules can't meet online;

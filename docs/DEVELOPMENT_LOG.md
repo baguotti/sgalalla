@@ -1219,3 +1219,13 @@ Part 2
 - **[Change]** Protocol version 11; recordings re-baselined.
 - **[S]** tsc (client, tests, server), 64 tests (movement tests follow the new sizes), build, KO table unchanged, true combos unchanged (down light into side sig or jump + neutral air, 0–80%), headless CPU matches.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] Online: a bad connection no longer freezes the others (branch `experimental-branch`)
+- **[Investigation]** A three-player match (London, Sicily, Venice) lagged for London when Venice's connection was poor. The cost of a frame is small (a step 2 µs, saving the state 18 µs, an 8-frame rollback 0.2 ms), so CPU wasn't it. A headless simulator of the relay with each player's latency, jitter, loss, network spikes and stalled frames reproduced it: plain high ping is hidden by rollback, but Venice's 250 ms spikes or 12-frame stalls froze London and Sicily 6–15% of the time, in bursts of up to 13 frames, while Venice barely noticed. Two causes: the others hit the 8-frame rollback limit and waited, and a stalled player's lost time was dropped (Phaser's catch-up cap), leaving them behind, so the others had to wait more and skip frames.
+- **[Online]** Rollback window 8 → 16 frames: a spike or stall makes the others roll back further instead of freezing.
+- **[Online]** The online clock keeps the time a stalled frame lost (up to 1 s) and catches it up, 4 steps a frame, instead of dropping it: whoever stalled gets level again. Local play still drops it (no fast-forward after switching windows).
+- **[Online]** Saving each frame's state uses a plain-data copy, 3× faster than structuredClone (6 µs instead of 18). Packets go once per simulated frame, so 120 Hz displays no longer send twice as many.
+- **[Online]** The network overlay shows each other player's lag (how many frames behind their inputs arrive) and packet loss, to see who the slow connection is.
+- **[Result]** Simulated with Venice's spikes and stalls: London and Sicily frozen 14.5% → 5.2% of the time, and the freezes are now single skipped frames (longest burst 13 → 9 frames with both at once, 1 frame with either alone). Good connections are unchanged.
+- **[S]** tsc (client, tests, server), 66 tests (new: a player whose game stalls for a fifth of a second doesn't freeze the others, which fails with the old 8-frame window; the online clock catches up after a stall), build.
+

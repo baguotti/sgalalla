@@ -9,7 +9,9 @@
  *
  * A player who gets MAX_ROLLBACK frames past someone's inputs waits for them,
  * and a player running ahead of anyone skips an occasional frame so that
- * everybody stays level. Inputs are sampled `inputDelay` frames ahead, which
+ * everybody stays level. MAX_ROLLBACK is generous (a quarter of a second), so
+ * one player's network spike or stalled frame makes the others roll back
+ * further instead of freezing. Inputs are sampled `inputDelay` frames ahead, which
  * makes rollbacks shorter; frames before `inputDelay` have no input.
  *
  * Every packet repeats the inputs some other player hasn't acknowledged, and
@@ -26,7 +28,7 @@ import { matchChecksum, retireFighter, stepMatch, type MatchState } from './Game
 import type { MatchEvent } from './MatchEvents.js';
 import { MAX_INPUTS_PER_PACKET, decodeInputPacket, encodeInputPacket } from './NetProtocol.js';
 
-export const MAX_ROLLBACK = 8;
+export const MAX_ROLLBACK = 16;
 export const CHECKSUM_INTERVAL = 60;
 /** Frames over which each player averages their frame advantage. */
 const ADVANTAGE_WINDOW = 32;
@@ -221,23 +223,19 @@ export class RollbackSession {
         }
     }
 
-    /** Share of the other players' packets that never arrived, 0 to 1. */
-    get packetLoss(): number {
-        let received = 0;
-        let expected = 0;
-        for (const s of this.others()) {
-            if (this.received[s] === 0) continue;
-            received += this.received[s];
-            expected += this.highestSeq[s] - this.firstSeq[s] + 1;
-        }
-        return expected > 0 ? 1 - received / expected : 0;
+    /** Each other player still in: how many frames our simulation runs past their latest input, and their share of lost packets. */
+    peerStats(): { slot: number; behind: number; loss: number }[] {
+        return this.others().map(s => {
+            const expected = this.highestSeq[s] - this.firstSeq[s] + 1;
+            return { slot: s, behind: this.frame - this.next[s], loss: this.received[s] > 0 ? 1 - this.received[s] / expected : 0 };
+        });
     }
 
     // ─── Simulation ───
 
     private simulate(events: MatchEvent[]): void {
         const f = this.frame;
-        this.saved.set(f, structuredClone(this.match));
+        this.saved.set(f, cloneState(this.match));
 
         const hasInputs = f >= this.inputDelay;
         const frameInputs: FighterInput[] = [];
@@ -369,6 +367,23 @@ function eventKey(event: MatchEvent): string {
         case 'hit': return `hit:${event.attacker}:${event.target}:${event.attackKey}`;
         default: return `${event.type}:${event.fighter}`;
     }
+}
+
+/**
+ * A copy of the match, made for every simulated frame. The match is plain data
+ * (objects, arrays, numbers, strings, booleans), which this copies about three
+ * times faster than structuredClone.
+ */
+function cloneState<T>(value: T): T {
+    if (typeof value !== 'object' || value === null) return value;
+    if (Array.isArray(value)) {
+        const copy = new Array(value.length);
+        for (let i = 0; i < value.length; i++) copy[i] = cloneState(value[i]);
+        return copy as T;
+    }
+    const copy: Record<string, unknown> = {};
+    for (const key in value) copy[key] = cloneState(value[key]);
+    return copy as T;
 }
 
 function average(values: readonly number[]): number {

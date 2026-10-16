@@ -29,7 +29,7 @@ import { ALL_CHARACTERS } from '../config/CharacterConfig';
 import { AttackRegistry, AttackType } from '../../shared/AttackData';
 import type { FighterInput } from '../../shared/FighterInput';
 import { isInPlay, type FighterSetup } from '../../shared/FighterState';
-import { FixedStepClock } from '../../shared/FixedStepClock';
+import { FixedStepClock, ONLINE_BACKLOG_STEPS } from '../../shared/FixedStepClock';
 import { addFighter, createMatch, stepMatch, type MatchState } from '../../shared/GameSim';
 import type { MatchEvent } from '../../shared/MatchEvents';
 import { NetEvent, type MatchStart, type PlayerLeft, type WatchInputs, type WatchStart } from '../../shared/NetProtocol';
@@ -101,7 +101,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     // players[i] draws and drives match.fighters[i].
     private match!: MatchState;
     private fighterSetups: FighterSetup[] = [];
-    private readonly simClock = new FixedStepClock();
+    private simClock = new FixedStepClock();
     private readonly stepInputs: FighterInput[] = [];
     private readonly stepEvents: MatchEvent[] = [];
     /** Cutscenes hold the match still. */
@@ -196,6 +196,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.isLab = data.lab === true;
         // Only the Lab plays with tuned settings: every other match, online above all, uses the defaults
         if (!this.isLab) resetTuning();
+        // Online, time lost to a stalled frame is caught up, so the others don't wait for us
+        this.simClock = new FixedStepClock(this.mode === 'online' ? ONLINE_BACKLOG_STEPS : undefined);
 
         this.currentStageBackground = isStageKey(data.selectedMap) ? data.selectedMap : 'adria_bg';
 

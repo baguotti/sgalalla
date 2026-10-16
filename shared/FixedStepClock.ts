@@ -14,6 +14,12 @@ const STEP_TOLERANCE_MS = 1;
 
 /** Caps catch-up after a stall (slow frame, background tab) so the game never fast-forwards more than this many steps at once. */
 const MAX_STEPS_PER_FRAME = 4;
+/**
+ * Online, the time a stall cost is caught up over the next frames (at most
+ * MAX_STEPS_PER_FRAME each), up to this many steps: a player who stalled gets
+ * back level with the others instead of making them wait.
+ */
+export const ONLINE_BACKLOG_STEPS = 60;
 
 /** Display refresh rates the learnt frame interval snaps to when within SNAP_SHARE of one. */
 const REFRESH_RATES = [60, 75, 90, 100, 120, 144, 165, 240];
@@ -34,6 +40,7 @@ export function countDown(timerMs: number, stepMs: number = SIM_STEP_MS): number
 }
 
 export class FixedStepClock {
+    private readonly backlogMs: number;
     private accumulatorMs = 0;
     /** Average frame time, from which the display's refresh interval is learnt. */
     private averageFrameMs = SIM_STEP_MS;
@@ -44,6 +51,11 @@ export class FixedStepClock {
      * back a frame at a time, so the clock keeps real time.
      */
     private uncountedMs = 0;
+
+    /** Time beyond `backlogSteps` steps behind is dropped (by default, all a frame can't run). */
+    constructor(backlogSteps = MAX_STEPS_PER_FRAME) {
+        this.backlogMs = SIM_STEP_MS * backlogSteps;
+    }
 
     /** Adds the real time elapsed since the last frame and returns how many steps are due now. */
     advance(elapsedMs: number): number {
@@ -60,10 +72,10 @@ export class FixedStepClock {
             countedMs += frame;
             this.uncountedMs -= frame;
         }
-        this.accumulatorMs = Math.min(this.accumulatorMs + countedMs, SIM_STEP_MS * MAX_STEPS_PER_FRAME);
+        this.accumulatorMs = Math.min(this.accumulatorMs + countedMs, this.backlogMs);
 
         let steps = 0;
-        while (this.accumulatorMs >= SIM_STEP_MS - STEP_TOLERANCE_MS) {
+        while (steps < MAX_STEPS_PER_FRAME && this.accumulatorMs >= SIM_STEP_MS - STEP_TOLERANCE_MS) {
             this.accumulatorMs -= SIM_STEP_MS;
             steps++;
         }
