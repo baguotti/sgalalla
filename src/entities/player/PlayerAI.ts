@@ -1,6 +1,7 @@
 import { emptyInput, type FighterInput } from '../../../shared/FighterInput';
 import { isInPlay, type FighterState } from '../../../shared/FighterState';
 import type { MatchState } from '../../../shared/GameSim';
+import { STAGE_LAYOUTS } from '../../../shared/StageData';
 
 type AIState = 'IDLE' | 'CHASE' | 'SPACING' | 'ATTACK' | 'DEFEND' | 'RECOVER';
 
@@ -14,6 +15,9 @@ export class PlayerAI {
     private readonly input: FighterInput = emptyInput();
     private self!: FighterState;
     private target: FighterState | null = null;
+    /** The main platform's edges, a little beyond: further out (and low) means recover. */
+    private stageLeft = 200;
+    private stageRight = 1720;
 
     constructor(fighterIndex: number) {
         this.fighterIndex = fighterIndex;
@@ -22,6 +26,9 @@ export class PlayerAI {
     public update(match: MatchState, delta: number): FighterInput {
         Object.assign(this.input, emptyInput());
         this.self = match.fighters[this.fighterIndex];
+        const main = STAGE_LAYOUTS[match.stage].platforms[0];
+        this.stageLeft = main.x - main.w / 2 - 170;
+        this.stageRight = main.x + main.w / 2 + 170;
         this.findTarget(match);
 
         if (this.reactionTimer > 0) {
@@ -59,8 +66,7 @@ export class PlayerAI {
         const self = this.self.body;
 
         // Survival first: off-stage and falling means recover
-        const stageLeft = 200;
-        const stageRight = 1720;
+        const { stageLeft, stageRight } = this;
         const stageBottom = 900;
         if (self.y > stageBottom || (self.y > 600 && (self.x < stageLeft || self.x > stageRight))) {
             if (this.state !== 'RECOVER') this.enterState('RECOVER');

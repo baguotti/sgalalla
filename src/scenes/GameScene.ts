@@ -8,10 +8,10 @@ import { InputDebugOverlay } from '../components/InputDebugOverlay';
 import { TouchController } from '../components/TouchController';
 import { PauseMenu, type LabMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
-import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
+import { ZOOM_SETTINGS } from '../config/MapConfig';
 import type { ZoomLevel } from '../config/MapConfig';
-import { freeStageBackgrounds, isStageKey, loadStageBackground, type StageKey } from '../stages/StageBackgrounds';
-import { freeLondraLayers, loadLondraLayers, LondraLayers } from '../stages/LondraLayers';
+import { freeStageBackgrounds, isStageKey, loadStageBackground, onlineStage, STAGES, type StageKey } from '../stages/StageBackgrounds';
+import { freeLondraLayers, grandeStageStyle, loadLondraLayers, LondraLayers } from '../stages/LondraLayers';
 import { createStage as createSharedStage } from '../stages/StageFactory';
 import { ContactShadows, DEFAULT_SHADOW_DARKNESS } from '../effects/ContactShadows';
 import { EffectManager } from '../effects/EffectManager';
@@ -34,7 +34,7 @@ import { addFighter, createMatch, stepMatch, type MatchState } from '../../share
 import type { MatchEvent } from '../../shared/MatchEvents';
 import { NetEvent, type MatchStart, type PlayerLeft, type WatchInputs, type WatchStart } from '../../shared/NetProtocol';
 import { SpectatorMatch } from '../network/SpectatorMatch';
-import { STAGE_LAYOUT, type SimRect } from '../../shared/StageData';
+import { STAGE_LAYOUTS, type SimRect, type SimStage } from '../../shared/StageData';
 
 import { CampaignFlow } from './CampaignFlow';
 import type { GameSceneInterface } from './GameSceneInterface';
@@ -157,7 +157,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     preload(): void {
         this.loadCharacterAssets();
-        if (this.isLab) {
+        if (this.isLab || this.isLayered) {
             freeStageBackgrounds(this);
             loadLondraLayers(this);
         } else {
@@ -191,6 +191,16 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     private currentStageBackground: StageKey = 'adria_bg';
 
+    /** The stage is drawn from Londra's layers instead of a painting. */
+    private get isLayered(): boolean {
+        return STAGES[this.currentStageBackground].image === null;
+    }
+
+    /** The stage's collision layout. */
+    private get layout(): SimStage {
+        return STAGE_LAYOUTS[STAGES[this.currentStageBackground].layout];
+    }
+
     init(data: GameSceneData): void {
         this.mode = data.mode || 'versus';
         this.isLab = data.lab === true;
@@ -206,6 +216,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         if (this.mode === 'spectate') {
             const { client, watch, early } = data.watch!;
             this.spectator = new SpectatorMatch(client, watch, early);
+            this.currentStageBackground = onlineStage(watch.characters.length);
             // Every fighter is played by someone else
             this.playerData = watch.characters.map((character, playerId) => ({
                 playerId, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character, isRemote: true,
@@ -213,6 +224,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         } else if (this.mode === 'online') {
             const { client, start } = data.online!;
             this.online = new OnlineMatch(client, start);
+            // Three players or more get the big stage
+            this.currentStageBackground = onlineStage(start.characters.length);
             // Our slot plays with keyboard or the first gamepad; the others play remotely
             this.playerData = start.characters.map((character, playerId) => ({
                 playerId,
@@ -352,6 +365,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     { x: 1040, y: 300 }, // P2 (Dummy): Right of center
                     { x: 960, y: 200 },
                     { x: 960, y: 400 }
+                ];
+            } else if (STAGES[this.currentStageBackground].layout === 'grande') {
+                // Spread over the wide main platform and its soft platforms
+                this.spawnPoints = [
+                    { x: 420, y: 300 }, { x: 1500, y: 300 }, { x: 760, y: 200 },
+                    { x: 1160, y: 200 }, { x: 960, y: 100 }, { x: 260, y: 400 },
                 ];
             } else {
                 this.spawnPoints = spawnPoints;
@@ -585,7 +604,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private createStage(): void {
         const stage = createSharedStage(this, this.currentStageBackground, !this.isLab);
         this.backgroundImage = stage.background;
-        this.londraLayers = this.isLab ? new LondraLayers(this) : null;
+        this.londraLayers = this.isLab ? new LondraLayers(this) : this.isLayered ? new LondraLayers(this, grandeStageStyle()) : null;
         this.stageTextures = [...stage.platformTextures];
 
         this.campaign?.drain([stage.background, ...stage.platformTextures]);
@@ -825,7 +844,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     /** Starts a fresh match with the current fighters. */
     private startMatch(): void {
         const seed = this.online?.start.seed ?? this.spectator?.watch.seed ?? Math.floor(Math.random() * 0x100000000);
-        this.match = createMatch(this.fighterSetups, seed);
+        this.match = createMatch(this.fighterSetups, seed, STAGES[this.currentStageBackground].layout);
         this.online?.begin(this.match);
         this.spectator?.begin(this.match);
         // Online frames can be simulated more than once, so only local matches are recorded
@@ -891,8 +910,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // A short, punchy shake and a slight zoom in, which the camera eases back out of
         this.cameras.main.shake(effects.KO_SHAKE_MS, effects.KO_SHAKE);
         this.cameras.main.zoom *= effects.KO_ZOOM_PUNCH;
-        const impactX = Phaser.Math.Clamp(x, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
-        const impactY = Phaser.Math.Clamp(y, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
+        const zone = this.layout.blastZones;
+        const impactX = Phaser.Math.Clamp(x, zone.left + 100, zone.right - 100);
+        const impactY = Phaser.Math.Clamp(y, zone.top + 100, zone.bottom - 100);
         this.lighting?.flash('ko', impactX, impactY);
 
         const audio = AudioManager.getInstance();
@@ -931,10 +951,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (!isInPlay(this.match.fighters[p.fighterIndex])) return false;
 
             // Check bounds (using slightly tighter bounds than actual kill box)
-            return p.x > MapConfig.BLAST_ZONE_LEFT + 50 &&
-                p.x < MapConfig.BLAST_ZONE_RIGHT - 50 &&
-                p.y < MapConfig.BLAST_ZONE_BOTTOM - 50 &&
-                p.y > MapConfig.BLAST_ZONE_TOP + 50;
+            const zone = this.layout.blastZones;
+            return p.x > zone.left + 50 && p.x < zone.right - 50 && p.y < zone.bottom - 50 && p.y > zone.top + 50;
         });
 
         if (targets.length === 0) return;
@@ -1409,12 +1427,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Collision as the simulation sees it (shared/StageData.ts)
         let side = 0;
         let top = 0;
-        STAGE_LAYOUT.platforms.forEach((p, index) => {
+        const layout = this.layout;
+        layout.platforms.forEach((p, index) => {
             if (p.isSoft) this.drawDebugRect(p, 0xffff00, `TOP #${++top}`);
             else this.drawDebugRect(p, 0x00ff00, index === 0 ? 'MAIN #0' : `SIDE #${++side}`);
         });
-        STAGE_LAYOUT.walls.forEach((w, index) => this.drawDebugRect(w, 0xff0000, `WALL #${index + 1}`));
-        STAGE_LAYOUT.ceilings.forEach((c, index) => this.drawDebugRect(c, 0xff8800, `CEILING #${index + 1}`));
+        layout.walls.forEach((w, index) => this.drawDebugRect(w, 0xff0000, `WALL #${index + 1}`));
+        layout.ceilings.forEach((c, index) => this.drawDebugRect(c, 0xff8800, `CEILING #${index + 1}`));
     }
 
     private drawDebugRect(r: SimRect, color: number, name: string): void {

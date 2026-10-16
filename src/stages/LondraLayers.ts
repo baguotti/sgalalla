@@ -94,6 +94,13 @@ export function defaultStageStyle(): LayeredStageStyle {
     };
 }
 
+/** Londra Grande: the island further back and higher, so its rocks don't hang behind the top platform. */
+export function grandeStageStyle(): LayeredStageStyle {
+    const style = defaultStageStyle();
+    Object.assign(style.elements.island, { y: -330, scale: 0.8, parallax: 0.8 });
+    return style;
+}
+
 type CloudPiece = 'cumulus_big' | 'cumulus_low' | 'cumulus_flat' | 'tower' | 'puff';
 
 /** A cloud: piece, canvas position of its top-left, size against the piece as painted, mirrored. */

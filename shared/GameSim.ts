@@ -23,7 +23,7 @@ import {
     ATTACK_PHASE_NONE, ATTACK_PHASE_STARTUP, ATTACK_PHASE_ACTIVE, ATTACK_PHASE_RECOVERY,
     ATTACK_TYPE_NONE, ATTACK_TYPE_LIGHT, ATTACK_TYPE_HEAVY,
 } from './PhysicsSimulation.js';
-import { STAGE_LAYOUT } from './StageData.js';
+import { STAGE_LAYOUTS, type SimStage, type StageLayoutId } from './StageData.js';
 import { hashString } from './StateHash.js';
 
 const STEP_S = SIM_STEP_MS / 1000;
@@ -48,10 +48,13 @@ export interface MatchState {
     isOver: boolean;
     /** The last fighter with lives left; -1 for a draw or while the match runs. */
     winnerId: number;
+    /** The stage's collision layout (STAGE_LAYOUTS). */
+    stage: StageLayoutId;
 }
 
-export function createMatch(fighters: readonly FighterSetup[], seed: number): MatchState {
+export function createMatch(fighters: readonly FighterSetup[], seed: number, stage: StageLayoutId = 'standard'): MatchState {
     return {
+        stage,
         frame: 0,
         fighters: fighters.map((setup, id) => createFighter(id, setup)),
         rng: seed | 0,
@@ -91,7 +94,8 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[], ev
         updateFacing(f);
     }
 
-    for (const f of moving) collidePlatforms(f, events);
+    const layout = STAGE_LAYOUTS[match.stage];
+    for (const f of moving) collidePlatforms(f, layout, events);
 
     for (const f of moving) {
         updateState(f);
@@ -100,7 +104,7 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[], ev
         updateTimers(f);
     }
 
-    for (const f of moving) collideWalls(f);
+    for (const f of moving) collideWalls(f, layout);
 
     for (const attacker of moving) {
         for (const target of fighters) {
@@ -203,9 +207,9 @@ function handlePhysicsEvents(f: FighterState, physicsEvents: readonly PhysicsEve
     }
 }
 
-function collidePlatforms(f: FighterState, events: MatchEvent[]): void {
+function collidePlatforms(f: FighterState, layout: SimStage, events: MatchEvent[]): void {
     const b = f.body;
-    const platforms = STAGE_LAYOUT.platforms;
+    const platforms = layout.platforms;
     physicsEvents.length = 0;
     for (let i = 0; i < platforms.length; i++) {
         const p = platforms[i];
@@ -216,13 +220,13 @@ function collidePlatforms(f: FighterState, events: MatchEvent[]): void {
     f.isDodging = b.isDodging;
 }
 
-function collideWalls(f: FighterState): void {
+function collideWalls(f: FighterState, layout: SimStage): void {
     const b = f.body;
     resetWallState(b);
-    for (const w of STAGE_LAYOUT.walls) {
+    for (const w of layout.walls) {
         checkSingleWallCollision(b, w.x, w.y, w.w, w.h);
     }
-    for (const c of STAGE_LAYOUT.ceilings) {
+    for (const c of layout.ceilings) {
         checkSingleCeilingCollision(b, c.x, c.y, c.w, c.h);
     }
     f.isDodging = b.isDodging;
@@ -272,7 +276,7 @@ function updateTimers(f: FighterState): void {
 
 /** A fighter whose hurtbox crosses a blast zone edge loses a life. */
 function checkBlastZones(match: MatchState, fighters: readonly FighterState[], events: MatchEvent[]): void {
-    const zone = STAGE_LAYOUT.blastZones;
+    const zone = STAGE_LAYOUTS[match.stage].blastZones;
     let eliminated = false;
 
     for (const f of fighters) {

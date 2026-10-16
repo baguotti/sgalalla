@@ -1229,3 +1229,11 @@ Part 2
 - **[Result]** Simulated with Venice's spikes and stalls: London and Sicily frozen 14.5% → 5.2% of the time, and the freezes are now single skipped frames (longest burst 13 → 9 frames with both at once, 1 frame with either alone). Good connections are unchanged.
 - **[S]** tsc (client, tests, server), 66 tests (new: a player whose game stalls for a fifth of a second doesn't freeze the others, which fails with the old 8-frame window; the online clock catches up after a stall), build.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] Londra Grande: a bigger stage for 4 players (branch `experimental-branch`)
+- **[Stage]** Londra Grande, a new stage beside the others, made from Londra's art: the main platform 1600 px wide instead of 1180 (the two mirrored London halves moved apart by 210 px each; they still overlap, so no seam shows), a pillar on each side as far from the edge as the standard one, the standard top platform and two lower, smaller soft platforms a jump up, so four fighters spread over three levels. Blast zones move out with the edges: a KO takes the same flight from the ledge.
+- **[Stage]** Drawn from Londra's layers (engine sky, drifting clouds behind and in front, the island with its waterfall), not the 9862 px painting: about 21 MB of graphics memory instead of 330. The island sits further back and higher than in the painting, so its rocks don't hang behind the top platform; its waterfall falls behind it towards the main stage. A preview for the map select, rendered from the stage.
+- **[Simulation]** Each match keeps its collision layout (`MatchState.stage`: `standard` or `grande`); collisions, blast zones, the CPU's idea of the stage, contact shadows, the camera and the debug view read it. Protocol version 12.
+- **[Online]** Matches of 3 or more players play on Londra Grande, 2 players on Adria as before; spectators follow the same rule.
+- **[S]** tsc (client, tests, server), 67 tests (new: Londra Grande's wider floor and further blast zones), build, a headless free-for-all of 4 CPUs on it (about 2.5 minutes, 150+ hits, 10 KOs). In the browser (muted): 4 CPUs on Londra Grande, collision boxes over the art, no errors.
+
