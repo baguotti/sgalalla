@@ -338,14 +338,13 @@ function handleHorizontalMovement(body: SimBody, input: SimInput): Steer {
         return null;
     }
 
-    // Attacks own the movement while they come out and hit, except light attacks in the air,
-    // which drift as freely as a jump does (as in Brawlhalla)
+    // Attacks own the movement to their end (the recovery is stuck, as in Brawlhalla), except light
+    // attacks in the air, which drift (slower: AIR_ATTACK_DRIFT)
     if (body.isAttacking) {
-        if (body.attackType === ATTACK_TYPE_HEAVY) {
+        if (body.attackType === ATTACK_TYPE_HEAVY || body.isGrounded) {
             body.isRunning = false;
             return null;
         }
-        if (body.attackPhase !== ATTACK_PHASE_RECOVERY && body.isGrounded) return null;
     }
 
     // Coasting out of a dash: steering starts once the momentum runs out or the fighter pushes against it
@@ -922,7 +921,9 @@ export function startRecovery(body: SimBody, events: PhysicsEvent[]): boolean {
  */
 function steerTowards(body: SimBody, steer: -1 | 0 | 1, dt: number): void {
     const ground = body.isGrounded;
-    const top = ground ? PhysicsConfig.RUN_SPEED : PhysicsConfig.AIR_SPEED;
+    // An attack in the air drifts slower: the move carries the fighter a little, not across the stage
+    const top = ground ? PhysicsConfig.RUN_SPEED
+        : body.isAttacking ? PhysicsConfig.AIR_SPEED * PhysicsConfig.AIR_ATTACK_DRIFT : PhysicsConfig.AIR_SPEED;
     const overSpeed = Math.abs(body.vx) > top && (steer === 0 || Math.sign(body.vx) === steer);
     let rate: number;
     if (overSpeed) rate = ground ? PhysicsConfig.GROUND_OVERSPEED_DECEL : PhysicsConfig.AIR_DECEL;

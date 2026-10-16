@@ -1209,3 +1209,13 @@ Part 2
 - **[Change]** Protocol version 10; recordings re-baselined with `npm run replays:update`.
 - **[S]** tsc (client, tests, server), 64 tests (new: Brawlhalla's force and stun frames, cooldown stops only the same attack, ground pound on press with landing recovery, down light true-combos into jump + neutral air; a launch slowing by a steady amount), build, KO table, headless CPU matches. Progress tracked at https://claude.ai/artifact/UafLwcZWuFZ5mccwsshy3E.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] v3.1.6e: movement sized to the stage (branch `experimental-branch`)
+- **[Investigation]** Feedback: jumps too high, movement carries too far, air lights travel like crazy. No public raw physics numbers exist for Brawlhalla (they're in its encrypted game files), so movement was measured against our own stage in fighter heights (H, 184 px). The stage: main platform 6.4 H wide, soft platform 2.2 H above it, blast zones 7.6 H past the edges and 10 H above. Before: full jump 2.0 H, run 4.8 H/s (the stage in 1.4 s), air drift 4.2 H/s with 1.1 H of momentum after letting go, air lights carrying 2.1–3.1 H (side air 39 frames at full air speed), dash 2.8 H. The stage stays (its collision matches the art, and knockback is fine); movement is fitted to it.
+- **[Feel]** Jumps: gravity 4600 → 4300, full jump 1.55 H (apex in 21 steps), air jump 1.3 H, short hop 0.8 H; the soft platform still takes a jump and an air jump. Recovery, wall jump and dash jump keep their heights; launch gravity keeps its strength (0.32), so knockback and the KO table are unchanged.
+- **[Feel]** Run 880 → 680 px/s (the stage in 1.8 s), air 780 → 600 px/s; letting go in the air stops in 12 steps (0.3 H, was 1.1 H). Dash 2.0 H, slide (down light) 0.65 H, run light 1 H.
+- **[Feel]** Attacks: in the air they drift at 40% of the air speed (`AIR_ATTACK_DRIFT`): air lights carry 0.6–0.75 H. On the ground an attack owns the movement to its end (Brawlhalla's recovery is stuck): an air light that lands no longer runs off during its recovery.
+- **[CPU]** Recovering, the CPU jumps at once below the stage top (lower jumps punished its random spacing).
+- **[Change]** Protocol version 11; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 64 tests (movement tests follow the new sizes), build, KO table unchanged, true combos unchanged (down light into side sig or jump + neutral air, 0–80%), headless CPU matches.
+

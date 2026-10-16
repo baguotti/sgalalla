@@ -2,42 +2,45 @@
  * Tuning constants for the simulation (shared/). Speeds are in pixels per
  * second, accelerations in pixels per second squared, durations and timers in
  * milliseconds; a "friction" multiplies the horizontal speed twice per step.
- * The fighters are 184 px tall: the feel follows Brawlhalla's, quick to start
- * and stop on the ground, high snappy jumps, momentum kept in the air, and
- * launches that glide along their angle and slow smoothly.
+ * The fighters are 184 px tall (H) on a main stage 6.4 H wide: movement is sized
+ * to it, as Brawlhalla's is to its stages: a run crosses the stage in 1.8 s, a
+ * full jump rises 1.55 H, attacks carry the fighter a little, not across the
+ * stage; launches glide along their angle and slow smoothly.
  */
 export const PhysicsConfig = {
-    // Gravity: strong, for high jumps that rise and land quickly (but not frantically)
-    GRAVITY: 4600,
+    // Gravity: jumps rise in about 0.35 s and land quickly (but not frantically)
+    GRAVITY: 4300,
 
     // Moving: a top speed on the ground and in the air, reached and left at these rates
     // (px/s²); above the top speed (a dash's run-on) the speed eases down instead of stopping
-    RUN_SPEED: 880,
-    GROUND_ACCEL: 9000,
-    GROUND_DECEL: 9000,
+    RUN_SPEED: 680,
+    GROUND_ACCEL: 6800,
+    GROUND_DECEL: 6800,
     GROUND_OVERSPEED_DECEL: 3000,
-    AIR_SPEED: 780,
-    AIR_ACCEL: 4500,
-    AIR_DECEL: 1400,
-    SLIDE_ATTACK_SPEED: 2200,
-    SLIDE_ATTACK_DECELERATION: 0.96,
+    AIR_SPEED: 600,
+    AIR_ACCEL: 3600,
+    AIR_DECEL: 3000,
+    // An attack in the air drifts at this share of AIR_SPEED (faster momentum eases down to it at AIR_DECEL)
+    AIR_ATTACK_DRIFT: 0.4,
+    SLIDE_ATTACK_SPEED: 1300,
+    SLIDE_ATTACK_DECELERATION: 0.92,
 
-    // Jump mechanics: a full jump rises about 2 fighters in 0.4 s, an air jump about 1.8
-    JUMP_FORCE: -1880,
-    SHORT_HOP_FORCE: -1295,
-    DOUBLE_JUMP_FORCE: -1740,
+    // Jump mechanics: a full jump rises 1.55 H, an air jump 1.3 H, a short hop 0.8 H
+    JUMP_FORCE: -1600,
+    SHORT_HOP_FORCE: -1180,
+    DOUBLE_JUMP_FORCE: -1480,
     MAX_JUMPS: 3,
 
     // Falling: gravity accelerates a fall up to these speeds
-    MAX_FALL_SPEED: 1500,
-    MAX_FAST_FALL_SPEED: 2150,
+    MAX_FALL_SPEED: 1450,
+    MAX_FAST_FALL_SPEED: 2080,
     // Fast fall: holding down while descending; starts at least this fast
-    FAST_FALL_SPEED: 1300,
+    FAST_FALL_SPEED: 1260,
     // Above the terminal speed once a fast fall ends, the excess shrinks by this share per step
     FALL_SPEED_EASE: 0.85,
 
     // Recovery attack
-    RECOVERY_FORCE_Y: -2540,
+    RECOVERY_FORCE_Y: -2456,
     RECOVERY_FORCE_X: 550,
     RECOVERY_DURATION: 300,
     // A recovery used again before landing (or touching a wall) costs an air jump and has this share of the push
@@ -67,14 +70,14 @@ export const PhysicsConfig = {
 
     // Dash: dodge + direction on the ground. Not invincible and no dodge cooldown;
     // a jump, attack or spot dodge cancels it
-    DASH_SPEED: 1500,
+    DASH_SPEED: 1200,
     DASH_DURATION: 150,
     DASH_REPEAT_DELAY: 130,
     // Jumping out of a dash: low and fast, coasting until it slows to about the top air drift speed
-    DASH_JUMP_FORCE: -1080,
-    DASH_JUMP_SPEED: 1300,
+    DASH_JUMP_FORCE: -1000,
+    DASH_JUMP_SPEED: 1050,
     DASH_JUMP_AIR_FRICTION: 0.985,
-    DASH_MOMENTUM_MIN_SPEED: 520,
+    DASH_MOMENTUM_MIN_SPEED: 420,
 
     // Chase dodge: a directional dodge within the attack that hit or CHASE_DODGE_WINDOW after it.
     // Cancels the attack's end, costs no cooldown (at most MAX_AIR_CHASE_DODGES before landing),
@@ -101,7 +104,7 @@ export const PhysicsConfig = {
     // A launch slows by this much along its angle (px/s²), so it flies v²/2 far: little at low damage, far
     // near a KO. Gravity pulls at this share of its strength, so the flight arcs
     LAUNCH_DECEL: 13000,
-    HITSTUN_GRAVITY: 0.3,
+    HITSTUN_GRAVITY: 0.32,
     // The launch carries on past the stun (the fighter can act and drift) until it slows below this
     LAUNCH_END_SPEED: 600,
     // A downward hit on a fighter standing on the floor pops it up with this share of the knockback, lifted this many px
@@ -158,7 +161,7 @@ export const PhysicsConfig = {
     // Wall mechanics
     WALL_SLIDE_SPEED: 400,
     WALL_JUMP_FORCE_X: 1600,
-    WALL_JUMP_FORCE_Y: -1520,
+    WALL_JUMP_FORCE_Y: -1470,
     WALL_COYOTE_TIME: 200,
 
     // Speed kept each half-step in these states (moving is RUN_SPEED and AIR_SPEED above)

@@ -206,8 +206,8 @@ export class PlayerAI {
 
                 if (self.vy > 0) {
                     if (self.jumpsRemaining > 0) {
-                        // Spread the jumps out
-                        if (Math.random() < 0.1) input.jump = true;
+                        // Spread the jumps out, but jump at once below the stage top
+                        if (self.y > 700 || Math.random() < 0.1) input.jump = true;
                     } else if (self.y > 600) {
                         input.aimUp = true;
                         input.heavyAttack = true;

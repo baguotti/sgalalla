@@ -57,6 +57,7 @@ export const MOVEMENT_GROUPS: Group<PhysicsKey>[] = [
         ['AIR_SPEED', 'Air speed', 'px/s', 'Top drift speed holding a direction in the air.', [0, 3000, 10]],
         ['AIR_ACCEL', 'Air control', 'px/s²', 'How fast drifting builds up or turns round in the air.', [0, 40000, 100]],
         ['AIR_DECEL', 'Air momentum', 'px/s²', 'How fast drift (and anything faster, like the end of a launch) slows when you let go: lower keeps momentum.', [0, 20000, 50]],
+        ['AIR_ATTACK_DRIFT', 'Drift while attacking', 'share', 'An attack in the air drifts at this share of the air speed.', [0, 1, 0.01]],
         ['AERIAL_STALL_GRAVITY_DAMP', 'Air attack stall: fall', 'share', 'Moves that stall in the air keep this share of the fall speed.'],
         ['AERIAL_STALL_HORIZONTAL_DAMP', 'Air attack stall: drift', 'share', 'Moves that stall in the air keep this share of the drift.'],
     ]),

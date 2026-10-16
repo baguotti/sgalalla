@@ -149,7 +149,7 @@ test('a jump out of a dash is low, fast and carries on further', () => {
     }
 
     assert.ok(GROUND_Y - top < (GROUND_Y - plainTop) * 0.6, `dash jump height ${GROUND_Y - top}, jump ${GROUND_Y - plainTop}`);
-    assert.ok(dashJumpDistance > 350, `dash jump covers ${dashJumpDistance} px`);
+    assert.ok(dashJumpDistance > 1.5 * PhysicsConfig.PLAYER_HEIGHT, `dash jump covers ${dashJumpDistance} px`);
 });
 
 test('a dodge on the ground without a direction is an invincible spot dodge with the ground cooldown', () => {
@@ -476,7 +476,7 @@ test('jumping up into a platform from below stops under it, without a shove side
     const f = match.fighters[0];
     // Under the left platform, whose underside is at y 575
     Object.assign(f.body, { x: 40, y: 760, vx: 0, vy: -900, isGrounded: false });
-    steps(match, 12);
+    steps(match, 16);
     assert.equal(f.body.x, 40, 'no shove');
     assert.ok(f.body.y - PhysicsConfig.PLAYER_HEIGHT / 2 >= 575, `stopped below, head at ${f.body.y - PhysicsConfig.PLAYER_HEIGHT / 2}`);
     assert.ok(f.body.vy >= 0, 'falling again');
@@ -505,7 +505,7 @@ test('timers last exactly their length in steps', () => {
     assert.equal(dodging, Math.round(PhysicsConfig.SPOT_DODGE_DURATION / SIM_STEP_MS));
 });
 
-test('running reaches its top speed in a few steps and stops as quickly; in the air, letting go keeps the momentum', () => {
+test('running reaches its top speed in a few steps and stops as quickly; in the air, letting go eases off', () => {
     // At the stage's right end, clear of the soft platform above
     const match = newMatch(1330, 500);
     const f = match.fighters[0];
@@ -514,12 +514,14 @@ test('running reaches its top speed in a few steps and stops as quickly; in the 
     steps(match, 6, { moveRight: true });
     assert.ok(speed() === PhysicsConfig.RUN_SPEED, `top speed after 6 steps (${speed()})`);
     steps(match, 6);
-    assert.ok(speed() === 0, `stopped 6 steps after letting go (${speed()})`);
+    assert.ok(Math.abs(speed()) < 1e-9, `stopped 6 steps after letting go (${speed()})`);
     jump(match);
     steps(match, 11, { moveRight: true, jumpHeld: true });
     assert.ok(speed() === PhysicsConfig.AIR_SPEED, `air speed (${speed()})`);
     steps(match, 6, { jumpHeld: true });
-    assert.ok(speed() > PhysicsConfig.AIR_SPEED * 0.75, `still drifting at ${speed().toFixed(0)} px/s a tenth of a second after letting go`);
+    assert.ok(speed() > PhysicsConfig.AIR_SPEED * 0.3 && speed() < PhysicsConfig.AIR_SPEED * 0.7, `still drifting at ${speed().toFixed(0)} px/s a tenth of a second after letting go`);
+    steps(match, 8, { jumpHeld: true });
+    assert.ok(Math.abs(speed()) < 1e-9, 'stopped a quarter of a second after letting go');
 });
 
 test('letting go of jump cuts a jump short, but not a dash jump or a recovery', () => {
@@ -638,7 +640,7 @@ test('the ground pound comes out on the press, and landing is its recovery', () 
 });
 
 test('down light true-combos into a jump and neutral air', () => {
-    const match = newMatch(700, 960);
+    const match = newMatch(700, 880);
     const [attacker, target] = match.fighters;
     step(match, { lightAttack: true, lightAttackHeld: true, aimDown: true });
     for (let i = 0; i < 30 && !target.isHitStunned; i++) step(match);

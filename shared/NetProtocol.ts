@@ -8,7 +8,7 @@
  */
 
 /** Bump whenever two builds can no longer play each other. */
-export const PROTOCOL_VERSION = 10;
+export const PROTOCOL_VERSION = 11;
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 5;
