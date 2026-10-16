@@ -1248,3 +1248,9 @@ Part 2
 - **[Change]** Protocol version 13; recordings re-baselined.
 - **[S]** tsc (client, tests, server), 68 tests (new: a trade hits both fighters), build, KO table unchanged. In the browser (muted): a fighter far off stage shows as a bubble while the camera stays inside the bounds; a KO bursts at the screen's edge; no errors.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] Londra Grande: bigger island, calmer clouds (branch `experimental-branch`)
+- **[Stage]** The floating island is as big as in Londra's painting (it was shrunk to 0.8 and pushed far up), sitting just above the top platform with its waterfall behind it.
+- **[Stage]** Its own cloud layout (`GRANDE_CLOUDS`) instead of the painting's: smaller pieces (0.5 to 0.6 of their painted size) and fewer; behind the island, a few in the upper sky and two peeking out from its sides; in front of it, two that just touch its rocks and a few low round the stage, away from the middle. Both layers drift slowly left to right (6 and 9 px/s). The map-select preview is rendered again.
+- **[S]** tsc, 68 tests, build; in the browser (muted), Londra Grande beside Londra, no errors.
+

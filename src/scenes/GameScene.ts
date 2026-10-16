@@ -10,7 +10,7 @@ import { TouchController } from '../components/TouchController';
 import { PauseMenu, type LabMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
 import { freeStageBackgrounds, isStageKey, loadStageBackground, onlineStage, STAGES, type StageKey } from '../stages/StageBackgrounds';
-import { freeLondraLayers, grandeStageStyle, loadLondraLayers, LondraLayers } from '../stages/LondraLayers';
+import { freeLondraLayers, GRANDE_CLOUDS, grandeStageStyle, loadLondraLayers, LondraLayers } from '../stages/LondraLayers';
 import { createStage as createSharedStage } from '../stages/StageFactory';
 import { ContactShadows, DEFAULT_SHADOW_DARKNESS } from '../effects/ContactShadows';
 import { EffectManager } from '../effects/EffectManager';
@@ -607,7 +607,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private createStage(): void {
         const stage = createSharedStage(this, this.currentStageBackground, !this.isLab);
         this.backgroundImage = stage.background;
-        this.londraLayers = this.isLab ? new LondraLayers(this) : this.isLayered ? new LondraLayers(this, grandeStageStyle()) : null;
+        this.londraLayers = this.isLab ? new LondraLayers(this) : this.isLayered ? new LondraLayers(this, grandeStageStyle(), GRANDE_CLOUDS) : null;
         this.stageTextures = [...stage.platformTextures];
 
         this.campaign?.drain([stage.background, ...stage.platformTextures]);
