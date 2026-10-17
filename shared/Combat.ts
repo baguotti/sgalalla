@@ -90,6 +90,10 @@ function updateAttack(f: FighterState, events: MatchEvent[]): void {
     }
 
     const complete = advanceAttack(f);
+    // The side light lunges as it punches (its startup holds still, as in Brawlhalla)
+    if (attack.key === 'light_side_grounded' && attack.phase === AttackPhase.ACTIVE && attack.phaseTimer === 0 && b.isGrounded) {
+        b.vx = attack.facing * PhysicsConfig.SIDE_LIGHT_LUNGE_SPEED;
+    }
 
     // A signature's ghost comes out with the punch, and hits where it is
     if (spawnsGhost(f)) {

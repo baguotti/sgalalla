@@ -162,8 +162,8 @@ function hold(match: Arena, bomb: BombState, holder: FighterState, events: Match
 /** In the holder's hand, moving with them (so a dropped bomb keeps their momentum). */
 function carry(bomb: BombState, holder: FighterState): void {
     const b = holder.body;
-    bomb.x = b.x + b.facingDirection * 34;
-    bomb.y = b.y - 10;
+    bomb.x = b.x + b.facingDirection * PhysicsConfig.PLAYER_WIDTH * 0.28;
+    bomb.y = b.y - PhysicsConfig.PLAYER_HEIGHT * 0.05;
     bomb.vx = b.vx;
     bomb.vy = b.vy;
 }

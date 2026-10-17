@@ -29,6 +29,7 @@ import { ALL_CHARACTERS } from '../config/CharacterConfig';
 import { AttackRegistry, AttackType } from '../../shared/AttackData';
 import type { FighterInput } from '../../shared/FighterInput';
 import { isInPlay, type FighterSetup } from '../../shared/FighterState';
+import { PhysicsConfig } from '../../shared/PhysicsConfig';
 import { FixedStepClock, ONLINE_BACKLOG_STEPS } from '../../shared/FixedStepClock';
 import { addFighter, createMatch, stepMatch, type MatchState } from '../../shared/GameSim';
 import type { MatchEvent } from '../../shared/MatchEvents';
@@ -417,7 +418,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     const tri = this.add.graphics();
                     tri.fillStyle(color, 0.5);
                     tri.fillTriangle(-6, -6, 6, -6, 0, 6); // Downward-pointing
-                    tri.setPosition(0, -120); // Above nameTag (y=-100)
+                    tri.setPosition(0, -PhysicsConfig.PLAYER_HEIGHT * 0.65); // Above the name tag
                     player.add(tri);
                     this.tweens.add({
                         targets: tri,

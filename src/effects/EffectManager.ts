@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { effects } from '../config/EffectConfig';
+import { fighterScale } from '../config/FighterScale';
 
 /** Depths: dust, rings and afterimages just behind the fighters (10), sparks in front of them. */
 const BEHIND_FIGHTERS = 9;
@@ -52,7 +53,7 @@ export class EffectManager {
 
     /** A burst where a hit landed, sized by its damage (lights 8 to 13, heavies 16 to 25); heavies add a faint ring. */
     public spawnHitSpark(x: number, y: number, damage: number): void {
-        const size = Phaser.Math.Clamp(0.2 + damage * 0.028, 0.35, 0.95) * effects.SPARK_SIZE;
+        const size = Phaser.Math.Clamp(0.2 + damage * 0.028, 0.35, 0.95) * effects.SPARK_SIZE * fighterScale();
         const warmth = Phaser.Math.Clamp((damage - 8) / 16, 0, 1);
         const tint = Phaser.Display.Color.GetColor(255, Math.round(250 - 40 * warmth), Math.round(235 - 90 * warmth));
         this.flash(SPARK, x, y, {

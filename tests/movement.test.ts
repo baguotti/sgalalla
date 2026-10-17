@@ -13,6 +13,7 @@ import { createMatch, stepMatch, type MatchState } from '../shared/GameSim.ts';
 import { emptyInput, type FighterInput } from '../shared/FighterInput.ts';
 import type { FighterState } from '../shared/FighterState.ts';
 import { PhysicsConfig } from '../shared/PhysicsConfig.ts';
+import { STAGE_LAYOUTS } from '../shared/StageData.ts';
 
 /** Standing on the main stage (top at y = 870). */
 const GROUND_Y = 870 - PhysicsConfig.PLAYER_HEIGHT / 2;
@@ -306,10 +307,10 @@ test('gravity cancel: an attack out of an aerial spot dodge is the grounded move
     assert.ok(f.body.dodgeCooldownTimer > PhysicsConfig.LANDED_AIR_DODGE_COOLDOWN, `cooldown ${f.body.dodgeCooldownTimer}`);
 });
 
-/** Fighter 0 in the air against the left side of the main stage. */
+/** Fighter 0 in the air against the left side of the main stage (its wall's left face is at x 405.5). */
 function onWall(match: MatchState): FighterState {
     const f = match.fighters[0];
-    f.body.x = 370;
+    f.body.x = 405.5 - PhysicsConfig.PLAYER_WIDTH / 2 + 1;
     f.body.y = 1000;
     f.body.vy = 0;
     f.body.isGrounded = false;
@@ -410,7 +411,7 @@ test('stun never lasts past its limit', () => {
 
 test('a stunned fighter bounces off the floor and walls', () => {
     const floor = newMatch();
-    const f = stunned(floor, 0, 1500, 770);
+    const f = stunned(floor, 0, 1500, 870 - PhysicsConfig.PLAYER_HEIGHT / 2 - 10);
     f.hitStunTimer = 500;
     step(floor);
     assert.ok(f.body.vy < 0, `bounced up at ${f.body.vy}`);
@@ -419,8 +420,8 @@ test('a stunned fighter bounces off the floor and walls', () => {
     const wall = newMatch();
     const g = stunned(wall, 1500, 0, 1000);
     g.hitStunTimer = 500;
-    // Just left of the main stage's left side
-    g.body.x = 360;
+    // Just left of the main stage's left wall
+    g.body.x = 405.5 - PhysicsConfig.PLAYER_WIDTH / 2 - 10;
     step(wall);
     assert.ok(g.body.vx < 0, `bounced back at ${g.body.vx}`);
 });
@@ -517,23 +518,27 @@ test('timers last exactly their length in steps', () => {
     assert.equal(dodging, Math.round(PhysicsConfig.SPOT_DODGE_DURATION / SIM_STEP_MS));
 });
 
-test('running reaches its top speed in a few steps and stops as quickly; in the air, letting go eases off', () => {
+test('running reaches its top speed and slides to a stop as in Brawlhalla; in the air, letting go eases off', () => {
     // At the stage's right end, clear of the soft platform above
     const match = newMatch(1330, 500);
     const f = match.fighters[0];
     // Read fresh each time (an assertion would otherwise narrow the type to the value it checked)
     const speed = (): number => f.body.vx;
-    steps(match, 6, { moveRight: true });
-    assert.ok(speed() === PhysicsConfig.RUN_SPEED, `top speed after 6 steps (${speed()})`);
-    steps(match, 6);
-    assert.ok(Math.abs(speed()) < 1e-9, `stopped 6 steps after letting go (${speed()})`);
+    const stepsFor = (top: number, rate: number) => Math.ceil(top / (rate * SIM_STEP_MS / 1000));
+    const toTop = stepsFor(PhysicsConfig.RUN_SPEED, PhysicsConfig.GROUND_ACCEL);
+    assert.ok(toTop >= 15 && toTop <= 20, `about 17 steps to top speed (${toTop})`);
+    steps(match, toTop, { moveRight: true });
+    assert.ok(speed() === PhysicsConfig.RUN_SPEED, `top speed (${speed()})`);
+    steps(match, stepsFor(PhysicsConfig.RUN_SPEED, PhysicsConfig.GROUND_DECEL));
+    assert.ok(Math.abs(speed()) < 1e-9, `stopped (${speed()})`);
     jump(match);
-    steps(match, 11, { moveRight: true, jumpHeld: true });
+    steps(match, stepsFor(PhysicsConfig.AIR_SPEED, PhysicsConfig.AIR_ACCEL), { moveRight: true, jumpHeld: true });
     assert.ok(speed() === PhysicsConfig.AIR_SPEED, `air speed (${speed()})`);
-    steps(match, 6, { jumpHeld: true });
-    assert.ok(speed() > PhysicsConfig.AIR_SPEED * 0.3 && speed() < PhysicsConfig.AIR_SPEED * 0.7, `still drifting at ${speed().toFixed(0)} px/s a tenth of a second after letting go`);
-    steps(match, 8, { jumpHeld: true });
-    assert.ok(Math.abs(speed()) < 1e-9, 'stopped a quarter of a second after letting go');
+    const toStop = stepsFor(PhysicsConfig.AIR_SPEED, PhysicsConfig.AIR_DECEL);
+    steps(match, Math.round(toStop / 2), { jumpHeld: true });
+    assert.ok(speed() > PhysicsConfig.AIR_SPEED * 0.3 && speed() < PhysicsConfig.AIR_SPEED * 0.7, `still drifting at ${speed().toFixed(0)} px/s halfway`);
+    steps(match, toStop, { jumpHeld: true });
+    assert.ok(Math.abs(speed()) < 1e-9, 'stopped');
 });
 
 test('letting go of jump cuts a jump short, but not a dash jump or a recovery', () => {
@@ -668,4 +673,31 @@ test('down light true-combos into a jump and neutral air', () => {
     }
     assert.ok(target.damagePercent > damage, 'the neutral air hits');
     assert.equal(stunnedWhenHit, true, 'before the stun ends');
+});
+
+test('sizes and jumps match the Brawlhalla recordings, in fighter heights (H)', () => {
+    const H = PhysicsConfig.PLAYER_HEIGHT;
+    // The standard main platform is 9.5 H wide, as Brawlhalla's main stage against a legend
+    assert.ok(Math.abs(STAGE_LAYOUTS.standard.platforms[0].w / H - 9.5) < 0.1);
+    // A full jump rises about 1.95 H and peaks in about 27 frames; an air jump rises as high
+    const rise = (airJump: boolean) => {
+        const match = newMatch(500);
+        const f = match.fighters[0];
+        if (airJump) {
+            step(match, { jump: true, jumpHeld: true });
+            while (f.body.vy < 0) step(match, { jumpHeld: true });
+        }
+        const y0 = f.body.y;
+        step(match, { jump: true, jumpHeld: true });
+        let top = y0, apex = 0;
+        for (let i = 1; i < 60; i++) {
+            step(match, { jumpHeld: true });
+            if (f.body.y < top) { top = f.body.y; apex = i; }
+        }
+        return { height: (y0 - top) / H, apex };
+    };
+    const ground = rise(false);
+    const air = rise(true);
+    assert.ok(Math.abs(ground.height - 1.95) < 0.1 && Math.abs(ground.apex - 27) <= 2, `jump ${ground.height.toFixed(2)} H, apex ${ground.apex}`);
+    assert.ok(Math.abs(air.height - ground.height) < 0.1, `air jump ${air.height.toFixed(2)} H`);
 });

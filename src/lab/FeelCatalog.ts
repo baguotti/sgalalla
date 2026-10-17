@@ -146,6 +146,7 @@ export const COMBAT_GROUPS: Group<PhysicsKey>[] = [
         ['ATTACK_ACTIVE_FRICTION', 'Grip while hitting', 'share', 'Speed kept each half-step while a move is active.'],
         ['ATTACK_RECOVERY_FRICTION', 'Grip in recovery', 'share', 'Speed kept each half-step while a move ends.'],
         ['SLIDE_ATTACK_SPEED', 'Slide (down light)', 'px/s'],
+        ['SIDE_LIGHT_LUNGE_SPEED', 'Side light lunge', 'px/s'],
         ['SLIDE_ATTACK_DECELERATION', 'Slide slows', 'share', 'Speed kept each step while sliding.', [0.8, 1, 0.005]],
         ['RUN_ATTACK_SPEED_MULT', 'Run attack speed ×', 'times', 'Run attack slides at slide speed × this.', [0, 3, 0.05]],
         ['RUN_ATTACK_MIN_SPEED', 'Run attack from', 'share', 'The run attack comes out above this share of walk speed.'],

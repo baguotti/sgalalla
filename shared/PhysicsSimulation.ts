@@ -375,8 +375,8 @@ function handleDropHold(body: SimBody, input: SimInput): void {
 function handleJump(body: SimBody, input: SimInput, events: PhysicsEvent[]): void {
     if (body.isDodging || body.landingLagSteps > 0) return;
 
-    // Block during heavy attacks
-    if (body.isAttacking && body.attackType === ATTACK_TYPE_HEAVY) return;
+    // Attacks commit, as in Brawlhalla: no jumping until the move is over (the press waits in the buffer)
+    if (body.isAttacking) return;
 
     if (input.jumpBuffered) {
         events.push({ type: 'consume', input: 'jump' });

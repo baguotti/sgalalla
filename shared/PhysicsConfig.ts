@@ -2,45 +2,49 @@
  * Tuning constants for the simulation (shared/). Speeds are in pixels per
  * second, accelerations in pixels per second squared, durations and timers in
  * milliseconds; a "friction" multiplies the horizontal speed twice per step.
- * The fighters are 184 px tall (H) on a main stage 6.4 H wide: movement is sized
- * to it, as Brawlhalla's is to its stages: a run crosses the stage in 1.8 s, a
- * full jump rises 1.55 H, attacks carry the fighter a little, not across the
- * stage; launches glide along their angle and slow smoothly.
+ * Measured from Brawlhalla recordings, in legend heights (H): the fighters are
+ * 124 px tall (H) on a main stage 9.5 H wide, as Brawlhalla's legends on its
+ * stages. A run reaches 6.3 H/s in 17 frames and slides 0.7 H to a stop; air
+ * drift 5.2 H/s; every jump (ground or air) rises 1.95 H, peaking in 27 frames.
+ * Fighter-sized values (bodies, boxes, dashes) follow H; stage-sized ones
+ * (knockback, blast zones, the recovery's height) don't.
  */
 export const PhysicsConfig = {
-    // Gravity: jumps rise in about 0.35 s and land quickly (but not frantically)
-    GRAVITY: 4300,
+    // Gravity: 19.3 H/s², a jump peaks in 27 frames (0.45 s) and lands after 55
+    GRAVITY: 2388,
 
     // Moving: a top speed on the ground and in the air, reached and left at these rates
     // (px/s²); above the top speed (a dash's run-on) the speed eases down instead of stopping
-    RUN_SPEED: 680,
-    GROUND_ACCEL: 6800,
-    GROUND_DECEL: 6800,
-    GROUND_OVERSPEED_DECEL: 3000,
-    AIR_SPEED: 600,
-    AIR_ACCEL: 3600,
-    AIR_DECEL: 3000,
+    RUN_SPEED: 781,
+    GROUND_ACCEL: 2760,
+    GROUND_DECEL: 3124,
+    GROUND_OVERSPEED_DECEL: 6000,
+    AIR_SPEED: 645,
+    AIR_ACCEL: 1935,
+    AIR_DECEL: 1600,
     // An attack in the air drifts at this share of AIR_SPEED (faster momentum eases down to it at AIR_DECEL)
     AIR_ATTACK_DRIFT: 0.4,
-    SLIDE_ATTACK_SPEED: 1300,
+    SLIDE_ATTACK_SPEED: 2040,
     SLIDE_ATTACK_DECELERATION: 0.92,
+    // Side light lunges forward at this speed as its hitbox comes out (Brawlhalla's Unarmed side light: about 1.6 H)
+    SIDE_LIGHT_LUNGE_SPEED: 2990,
 
-    // Jump mechanics: a full jump rises 1.55 H, an air jump 1.3 H, a short hop 0.8 H
-    JUMP_FORCE: -1600,
-    SHORT_HOP_FORCE: -1180,
-    DOUBLE_JUMP_FORCE: -1480,
+    // Jump mechanics: a full jump and an air jump rise 1.95 H, a short hop about 1 H
+    JUMP_FORCE: -1095,
+    SHORT_HOP_FORCE: -775,
+    DOUBLE_JUMP_FORCE: -1095,
     MAX_JUMPS: 3,
 
     // Falling: gravity accelerates a fall up to these speeds
-    MAX_FALL_SPEED: 1450,
-    MAX_FAST_FALL_SPEED: 2080,
+    MAX_FALL_SPEED: 893,
+    MAX_FAST_FALL_SPEED: 1180,
     // Fast fall: holding down while descending; starts at least this fast
-    FAST_FALL_SPEED: 1260,
+    FAST_FALL_SPEED: 1000,
     // Above the terminal speed once a fast fall ends, the excess shrinks by this share per step
     FALL_SPEED_EASE: 0.85,
 
     // Recovery attack
-    RECOVERY_FORCE_Y: -2456,
+    RECOVERY_FORCE_Y: -1830,
     RECOVERY_FORCE_X: 550,
     RECOVERY_DURATION: 300,
     // A recovery used again before landing (or touching a wall) costs an air jump and has this share of the push
@@ -60,7 +64,7 @@ export const PhysicsConfig = {
     // Dodges are invincible: a spot dodge on the ground or in the air, or an 8-way dodge in the air
     SPOT_DODGE_DURATION: 300,
     AIR_DODGE_DURATION: 200,
-    AIR_DODGE_DISTANCE: 210,
+    AIR_DODGE_DISTANCE: 142,
     // Share of the vertical speed kept when a directional air dodge ends
     AIR_DODGE_END_SPEED: 0.3,
     DODGE_COOLDOWN: 1000,
@@ -70,14 +74,14 @@ export const PhysicsConfig = {
 
     // Dash: dodge + direction on the ground. Not invincible and no dodge cooldown;
     // a jump, attack or spot dodge cancels it
-    DASH_SPEED: 1200,
+    DASH_SPEED: 1170,
     DASH_DURATION: 150,
     DASH_REPEAT_DELAY: 130,
     // Jumping out of a dash: low and fast, coasting until it slows to about the top air drift speed
-    DASH_JUMP_FORCE: -1000,
-    DASH_JUMP_SPEED: 1050,
+    DASH_JUMP_FORCE: -610,
+    DASH_JUMP_SPEED: 1205,
     DASH_JUMP_AIR_FRICTION: 0.985,
-    DASH_MOMENTUM_MIN_SPEED: 420,
+    DASH_MOMENTUM_MIN_SPEED: 482,
 
     // Chase dodge: a directional dodge within the attack that hit or CHASE_DODGE_WINDOW after it.
     // Cancels the attack's end, costs no cooldown (at most MAX_AIR_CHASE_DODGES before landing),
@@ -85,7 +89,7 @@ export const PhysicsConfig = {
     CHASE_DODGE_WINDOW: 200,
     CHASE_DODGE_DURATION: 250,
     CHASE_DODGE_INVINCIBLE: 150,
-    CHASE_DODGE_SPEED: 1000,
+    CHASE_DODGE_SPEED: 674,
     MAX_AIR_CHASE_DODGES: 2,
     // Share of the chase dodge's speed an attack out of it keeps
     CHASE_ATTACK_SPEED_KEPT: 0.5,
@@ -109,7 +113,7 @@ export const PhysicsConfig = {
     LAUNCH_END_SPEED: 600,
     // A downward hit on a fighter standing on the floor pops it up with this share of the knockback, lifted this many px
     GROUNDED_SPIKE_BOUNCE: 0.3,
-    GROUNDED_SPIKE_LIFT: 10,
+    GROUNDED_SPIKE_LIFT: 7,
     // A stunned fighter hitting a floor or wall faster than this bounces off, keeping BOUNCE_KEEP of its speed
     BOUNCE_SPEED: 600,
     BOUNCE_KEEP: 0.8,
@@ -121,18 +125,18 @@ export const PhysicsConfig = {
     HITSTOP_MAX_STEPS: 8,
 
     // Player dimensions (the body, for collisions; a new match picks them up)
-    PLAYER_WIDTH: 120,
-    PLAYER_HEIGHT: 184,
+    PLAYER_WIDTH: 81,
+    PLAYER_HEIGHT: 124,
     // Hurtbox: what attacks hit and blast zones test, narrower and shorter than the body
-    HURTBOX_WIDTH: 46,
-    HURTBOX_HEIGHT: 174,
+    HURTBOX_WIDTH: 31,
+    HURTBOX_HEIGHT: 117,
 
     // Respawn: steps out of play after a KO, then invulnerable this long
     RESPAWN_DELAY_STEPS: 120,
     RESPAWN_INVULNERABILITY_MS: 1000,
 
-    // The run attack slides this much faster than the slide, and comes out above this share of RUN_SPEED
-    RUN_ATTACK_SPEED_MULT: 1.2,
+    // The run attack slides at the slide speed times this (about the side light's lunge, as in Brawlhalla), and comes out above this share of RUN_SPEED
+    RUN_ATTACK_SPEED_MULT: 0.85,
     RUN_ATTACK_MIN_SPEED: 0.8,
 
     // Ground pound: after its startup hang it falls at MAX_FALL_SPEED times FALL_MULT; landing keeps this share of the speed
@@ -146,22 +150,22 @@ export const PhysicsConfig = {
     // further out), a side ghost a little further forward, an up ghost a little higher. It travels
     // TRAVEL px (more with charge) over TRAVEL_MS, lives LIFETIME ms (more with charge) plus the fade,
     // and the hitbox follows it: a square of the 256 px ghost frame times HITBOX_SCALE
-    GHOST_OFFSET: 25,
-    NOCK_GHOST_OFFSET: 35,
-    GHOST_FORWARD: 15,
-    GHOST_LIFT: 15,
-    GHOST_TRAVEL: 110,
-    GHOST_TRAVEL_PER_CHARGE: 35,
+    GHOST_OFFSET: 17,
+    NOCK_GHOST_OFFSET: 24,
+    GHOST_FORWARD: 10,
+    GHOST_LIFT: 10,
+    GHOST_TRAVEL: 74,
+    GHOST_TRAVEL_PER_CHARGE: 24,
     GHOST_TRAVEL_MS: 300,
     GHOST_LIFETIME: 100,
     GHOST_LIFETIME_PER_CHARGE: 600,
     GHOST_FADE_MS: 200,
-    GHOST_HITBOX_SCALE: 0.65,
+    GHOST_HITBOX_SCALE: 0.438,
 
     // Wall mechanics
-    WALL_SLIDE_SPEED: 400,
-    WALL_JUMP_FORCE_X: 1600,
-    WALL_JUMP_FORCE_Y: -1470,
+    WALL_SLIDE_SPEED: 270,
+    WALL_JUMP_FORCE_X: 1078,
+    WALL_JUMP_FORCE_Y: -901,
     WALL_COYOTE_TIME: 200,
 
     // Speed kept each half-step in these states (moving is RUN_SPEED and AIR_SPEED above)
@@ -174,7 +178,7 @@ export const PhysicsConfig = {
     SHORT_HOP_VELOCITY_DAMP: 0.5,
 
     // The recovery move's hit (Brawlhalla's Unarmed numbers, stun in frames): a square round the fighter
-    RECOVERY_HITBOX_SIZE: 60,
+    RECOVERY_HITBOX_SIZE: 40,
     RECOVERY_DAMAGE: 15,
     RECOVERY_FIXED_FORCE: 55,
     RECOVERY_VARIABLE_FORCE: 40,
@@ -188,7 +192,7 @@ export const PhysicsConfig = {
     // Platform mechanics
     PLATFORM_DROP_NUDGE_Y: 1,
     PLATFORM_DROP_PUSH_Y: 100,
-    PLATFORM_SNAP_THRESHOLD: 45,
+    PLATFORM_SNAP_THRESHOLD: 30,
 
     // Dodge mechanics
     SPOT_DODGE_AERIAL_Y_DAMP: 0.2,
@@ -203,17 +207,17 @@ export const PhysicsConfig = {
     BOMB_GAP: 5000,
     BOMB_GAP_RANDOM: 5000,
     BOMB_LIFETIME: 15000,
-    BOMB_RADIUS: 22,
-    BOMB_PICKUP_RANGE: 50,
-    BOMB_THROW_SPEED_MIN: 1100,
-    BOMB_THROW_SPEED_MAX: 2300,
+    BOMB_RADIUS: 15,
+    BOMB_PICKUP_RANGE: 34,
+    BOMB_THROW_SPEED_MIN: 741,
+    BOMB_THROW_SPEED_MAX: 1550,
     BOMB_CHARGE_FULL: 800,
     BOMB_OVERCHARGE: 2000,
     BOMB_BOUNCE: 0.7,
-    BOMB_SAFE_SPEED: 500,
+    BOMB_SAFE_SPEED: 337,
     BOMB_GRACE_STEPS: 8,
     // Its explosion hurts every fighter this close (thrower included), launching them away from it
-    BOMB_BLAST_RADIUS: 150,
+    BOMB_BLAST_RADIUS: 101,
     BOMB_DAMAGE: 18,
     BOMB_FIXED_FORCE: 55,
     BOMB_VARIABLE_FORCE: 45,

@@ -1273,3 +1273,19 @@ Part 2
 - **[Change]** Protocol version 15.
 - **[S]** tsc (client, tests, server), 78 tests (new: light attack picks up instead of attacking, a charged throw faster than a tapped one, a diagonal throw, overcharge blowing up in the hand; the rollback players now also hold throw, so charging and overcharging stay in sync under rollback), build. In the browser (muted): a bomb close to going off, swollen and red in the hand; no errors.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Movement and sizes measured from Brawlhalla recordings (branch `experimental-branch`)
+- **[Research]** Riccardo recorded Brawlhalla's Training Mode at 60 fps (assets/_brawlhalla_refs: 3 jumps and a recovery at 50%, the rest zoomed 130%). The legend was tracked frame by frame (median background, difference, largest blob), and everything measured in legend heights (H), so the two zooms compare. Brawlhalla against ours:
+    - main stage 9.5 H wide (ours 6.4 H standard, 8.7 H Londra Grande): our fighters were too big for the stage, the cramped feeling;
+    - full jump 1.95 H, peak at 27 frames, 55 in the air, and air jumps as high (ours 1.55 H at 21 frames, air jumps 1.3 H): gravity 19.3 H/s², launch 8.7 H/s;
+    - run 6.3 H/s reached in about 17 frames, a stop sliding 0.7 H over 15 frames (ours 3.7 H/s in 6 frames, stopping dead);
+    - air drift 5.2 H/s, about 20 frames to reach it or stop; ground pound falling about 10 H/s;
+    - side light lunges 1.6 H after a still startup; down light slides 1.4 H; neutral light and air lights barely move.
+    The Power Viewer panel is cropped out of the zoomed clips, so frame data stays from the wiki.
+- **[Size]** Fighters are 124 px tall instead of 184 (0.674), Brawlhalla's proportion to the standard stage (9.5 H); their art is drawn at `fighterScale()` (physics height over the art's 184 px), ghosts and sparks too. Bodies, hurtboxes, every attack hitbox, ghosts, bombs, dodges and dashes shrink with them; knockback, blast zones and the recovery's height stay (they're stage-sized), so the KO table is unchanged (side sig 150/120%, lights 260–310%). The stage's wall boxes move out 19.5 px so a fighter sliding down a wall keeps its place against the art.
+- **[Movement]** Set from the measurements: run 781 px/s (17 frames to reach, 15 to stop), air 645 px/s, gravity 2388 px/s², every jump 1.95 H, fall 893 px/s (fast fall 1180), dash 2.65 H. Side light now lunges 1.6 H as its hitbox comes out (on the ground only); the down light slides 1.4 H; the run attack lunges like the side light.
+- **[Fix]** Attacks commit: no jumping until a move is over (the press waits in the buffer). A jump mid side light used to carry its lunge into the air and off the stage.
+- **[CPU]** Distances scaled to the new size; its recover checks now measure from the stage's top (it got stuck recovering once standing fighters' centres dropped below 800).
+- **[Change]** Protocol version 16; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 79 tests (new: sizes and jumps match the recordings: the stage 9.5 H, a jump 1.95 H peaking at about 27 frames, air jumps as high; the movement tests follow the new rates), build, KO table unchanged, true combos (down light into neutral light, side sig, jump + neutral air, 0–80%), headless CPU matches. In the browser (muted): the smaller fighters on Adria, no errors.
+

@@ -66,13 +66,14 @@ const STANDARD: SimStage = {
         // Top floating platform (drop-through)
         { x: 960, y: 470, w: 550, h: 20, isSoft: true },
     ],
+    // Placed so a fighter sliding down one keeps its centre just outside the art's edge
     walls: [
         // Main stage sides
-        { x: 435, y: 1140, w: 20, h: 500 },
-        { x: 1485, y: 1140, w: 20, h: 500 },
+        { x: 415.5, y: 1140, w: 20, h: 500 },
+        { x: 1504.5, y: 1140, w: 20, h: 500 },
         // Left platform inner and outer sides
-        { x: 125, y: 385, w: 20, h: 450 },
-        { x: -50, y: 500, w: 20, h: 680 },
+        { x: 144.5, y: 385, w: 20, h: 450 },
+        { x: -69.5, y: 500, w: 20, h: 680 },
     ],
     ceilings: [
         // Left platform underside
@@ -95,8 +96,8 @@ function mirrored<T extends SimRect>(r: T): T {
 /** The standard left pillar moved out with the main platform's edge, and its mirror on the right. */
 const GRANDE_PILLAR: SimPlatform = { x: 30 - GRANDE_WIDEN, y: 450, w: 315, h: 590, isSoft: false };
 const GRANDE_PILLAR_WALLS: SimRect[] = [
-    { x: 125 - GRANDE_WIDEN, y: 385, w: 20, h: 450 },
-    { x: -50 - GRANDE_WIDEN, y: 500, w: 20, h: 680 },
+    { x: 144.5 - GRANDE_WIDEN, y: 385, w: 20, h: 450 },
+    { x: -69.5 - GRANDE_WIDEN, y: 500, w: 20, h: 680 },
 ];
 const GRANDE_PILLAR_CEILING: SimRect = { x: 25 - GRANDE_WIDEN, y: 565, w: 170, h: 20 };
 
@@ -122,8 +123,8 @@ const GRANDE: SimStage = {
         { x: 1500, y: 630, w: 440, h: 20, isSoft: true },
     ],
     walls: [
-        { x: 435 - GRANDE_WIDEN, y: 1140, w: 20, h: 500 },
-        { x: 1485 + GRANDE_WIDEN, y: 1140, w: 20, h: 500 },
+        { x: 415.5 - GRANDE_WIDEN, y: 1140, w: 20, h: 500 },
+        { x: 1504.5 + GRANDE_WIDEN, y: 1140, w: 20, h: 500 },
         ...GRANDE_PILLAR_WALLS,
         ...GRANDE_PILLAR_WALLS.map(mirrored),
     ],

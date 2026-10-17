@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PhysicsConfig } from '../config/PhysicsConfig';
+import { fighterScale } from '../config/FighterScale';
 import { InputManager } from '../input/InputManager';
 import type { TouchController } from '../components/TouchController';
 import { AudioManager } from '../managers/AudioManager';
@@ -90,12 +91,12 @@ export class Player extends Phaser.GameObjects.Container {
         this.isTrainingDummy = config.isTrainingDummy ?? false;
         this.keyboardMapping = config.keyboardMapping ?? 'all';
 
-        this.sprite = scene.add.sprite(0, 0, this.character, `${this.character}_idle_000`);
+        this.sprite = scene.add.sprite(0, 0, this.character, `${this.character}_idle_000`).setScale(fighterScale());
         this.add(this.sprite);
         // Above the stage platforms (depth 0); ghosts sit at depth - 1
         this.setDepth(10);
 
-        this.nameTag = scene.add.text(0, -100, this.isAI ? `CPU ${this.playerId + 1}` : this.character.toUpperCase(), {
+        this.nameTag = scene.add.text(0, -PhysicsConfig.PLAYER_HEIGHT * 0.55, this.isAI ? `CPU ${this.playerId + 1}` : this.character.toUpperCase(), {
             fontSize: '18px',
             fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
@@ -296,7 +297,7 @@ export class Player extends Phaser.GameObjects.Container {
         // Signature charges fade in a ghost in front of the fighter
         if (!this.chargeGhost) this.chargeGhost = this.createChargeGhost();
         const facing = f.body.facingDirection;
-        this.chargeGhost.setScale(facing, 1);
+        this.chargeGhost.setScale(facing * fighterScale(), fighterScale());
         this.chargeGhost.setPosition(
             f.body.x + ghostOffset(this.character) * facing + (Math.random() - 0.5),
             f.body.y + (Math.random() - 0.5),
@@ -401,7 +402,7 @@ export class Player extends Phaser.GameObjects.Container {
         const sprite = this.effects().spawnGhost(ghost.startX, ghost.startY, char, `${char}_${kind}_sig_ghost_000`, `${char}_${kind}_sig_ghost`, ghost.facing, ghostStyle.opacity);
         if (!sprite) return;
 
-        const scale = char === 'nock' && ghost.vertical ? 1.2 : 1;
+        const scale = (char === 'nock' && ghost.vertical ? 1.2 : 1) * fighterScale();
         sprite.setDepth(this.depth - 1);
         sprite.setScale(ghost.facing * scale, scale);
         sprite.setAngle(0);
@@ -439,11 +440,11 @@ export class Player extends Phaser.GameObjects.Container {
         const sprite = this.effects().spawnGhost(this.x, this.y, char, `${char}_up_sig_ghost_000`, `${char}_up_sig_ghost`, facing, ghostStyle.opacity);
         if (!sprite) return;
 
-        const scale = char === 'nock' ? 1.2 : 1;
+        const scale = (char === 'nock' ? 1.2 : 1) * fighterScale();
         sprite.setDepth(this.depth - 1);
         sprite.setScale(facing * scale, scale);
         sprite.setAngle(0);
-        sprite.setPosition(this.x, this.y - 30);
+        sprite.setPosition(this.x, this.y - 30 * fighterScale());
         this.ignoreInUiCamera(sprite);
         const blurFx = this.addGhostFx(sprite);
         this.recoveryGhost = sprite;

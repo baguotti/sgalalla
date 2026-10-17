@@ -78,9 +78,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         ...NEUTRAL_LIGHT,
         knockbackAngle: 45,
-        hitboxWidth: 81,
-        hitboxHeight: 40,
-        hitboxOffsetX: 55,
+        hitboxWidth: 55,
+        hitboxHeight: 27,
+        hitboxOffsetX: 37,
         hitboxOffsetY: 0,
     },
     'light_side_grounded': {
@@ -89,9 +89,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         ...SIDE_LIGHT,
         knockbackAngle: 30,
-        hitboxWidth: 81,
-        hitboxHeight: 35,
-        hitboxOffsetX: 60,
+        hitboxWidth: 55,
+        hitboxHeight: 24,
+        hitboxOffsetX: 40,
         hitboxOffsetY: 0,
     },
     'light_down_grounded': {
@@ -100,10 +100,10 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         ...DOWN_LIGHT,
         knockbackAngle: 30, // Forward, like side light
-        hitboxWidth: 148, // 1.5x wider for slide (was 99)
-        hitboxHeight: 37, // 1.5x flatter (was 25)
-        hitboxOffsetX: 30,
-        hitboxOffsetY: 65, // Lower to feet (was 35)
+        hitboxWidth: 100,
+        hitboxHeight: 25,
+        hitboxOffsetX: 20,
+        hitboxOffsetY: 44,
     },
     'light_run_grounded': {
         type: AttackType.LIGHT,
@@ -112,9 +112,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         ...SIDE_LIGHT,
         knockbackAngle: 30, // Drift/Slide physics from Down Light
         // Hitbox covers attacker body + punch reach
-        hitboxWidth: 250, // Extended massively to catch enemies we slide past at close range
-        hitboxHeight: 70,
-        hitboxOffsetX: -30, // Shifted slightly backward to hit enemies we slide through
+        hitboxWidth: 168,
+        hitboxHeight: 47,
+        hitboxOffsetX: -20,
         hitboxOffsetY: 0,
     },
     'light_up_grounded': {
@@ -123,9 +123,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         ...NEUTRAL_LIGHT,
         knockbackAngle: 45,
-        hitboxWidth: 81,
-        hitboxHeight: 40,
-        hitboxOffsetX: 55,
+        hitboxWidth: 55,
+        hitboxHeight: 27,
+        hitboxOffsetX: 37,
         hitboxOffsetY: 0,
     },
 
@@ -136,9 +136,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: true,
         ...NEUTRAL_AIR,
         knockbackAngle: 45,
-        hitboxWidth: 81,
-        hitboxHeight: 40,
-        hitboxOffsetX: 50,
+        hitboxWidth: 55,
+        hitboxHeight: 27,
+        hitboxOffsetX: 34,
         hitboxOffsetY: 0,
         shouldStallInAir: true,
     },
@@ -148,9 +148,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: true,
         ...SIDE_AIR,
         knockbackAngle: 20,
-        hitboxWidth: 81,
-        hitboxHeight: 40,
-        hitboxOffsetX: 60,
+        hitboxWidth: 55,
+        hitboxHeight: 27,
+        hitboxOffsetX: 40,
         hitboxOffsetY: 0,
     },
     'light_down_aerial': {
@@ -159,10 +159,10 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: true,
         ...DOWN_AIR,
         knockbackAngle: 270,
-        hitboxWidth: 148, // 1.5x Cloned from Down Light (was 99)
-        hitboxHeight: 37, // 1.5x (was 25)
-        hitboxOffsetX: 30,
-        hitboxOffsetY: 65,
+        hitboxWidth: 100,
+        hitboxHeight: 25,
+        hitboxOffsetX: 20,
+        hitboxOffsetY: 44,
     },
     'light_up_aerial': {
         type: AttackType.LIGHT,
@@ -170,9 +170,9 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: true,
         ...NEUTRAL_AIR,
         knockbackAngle: 20, // Same as side air
-        hitboxWidth: 81,
-        hitboxHeight: 40,
-        hitboxOffsetX: 60,
+        hitboxWidth: 55,
+        hitboxHeight: 27,
+        hitboxOffsetX: 40,
         hitboxOffsetY: 0,
     },
 
@@ -183,10 +183,10 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         ...NEUTRAL_HEAVY,
         knockbackAngle: 80,
-        hitboxWidth: 100,
-        hitboxHeight: 90,
-        hitboxOffsetX: 20,
-        hitboxOffsetY: -40,
+        hitboxWidth: 67,
+        hitboxHeight: 61,
+        hitboxOffsetX: 13,
+        hitboxOffsetY: -27,
     },
     'heavy_side_grounded': {
         type: AttackType.HEAVY,
@@ -194,8 +194,8 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         ...SIDE_HEAVY,
         knockbackAngle: 4, // Changed from 5 to 4
-        hitboxWidth: 120,
-        hitboxHeight: 70,
+        hitboxWidth: 81,
+        hitboxHeight: 47,
         hitboxOffsetX: 0,
         hitboxOffsetY: 0,
     },
@@ -205,10 +205,10 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: false,
         ...NEUTRAL_HEAVY,
         knockbackAngle: 80,
-        hitboxWidth: 100,
-        hitboxHeight: 90,
-        hitboxOffsetX: 20,
-        hitboxOffsetY: -40,
+        hitboxWidth: 67,
+        hitboxHeight: 61,
+        hitboxOffsetX: 13,
+        hitboxOffsetY: -27,
     },
 
     // ========== AERIAL HEAVY ATTACK (the others are the recovery) ==========
@@ -218,10 +218,10 @@ export const AttackRegistry: Record<string, AttackData> = {
         isAerial: true,
         ...GROUND_POUND,
         knockbackAngle: 270,
-        hitboxWidth: 127,
-        hitboxHeight: 30,
+        hitboxWidth: 86,
+        hitboxHeight: 20,
         hitboxOffsetX: 0,
-        hitboxOffsetY: 92,
+        hitboxOffsetY: 62,
     },
 };
 
