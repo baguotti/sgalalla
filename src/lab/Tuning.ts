@@ -14,7 +14,7 @@ export type PhysicsKey = keyof typeof PhysicsConfig;
 /** The move fields the Lab tunes. */
 export const MOVE_FIELDS = [
     'damage', 'fixedForce', 'variableForce', 'knockbackAngle', 'stun',
-    'startup', 'active', 'recovery', 'recoveryMiss', 'cooldown', 'cooldownMiss',
+    'startup', 'active', 'recovery',
     'hitboxWidth', 'hitboxHeight', 'hitboxOffsetX', 'hitboxOffsetY', 'shouldStallInAir',
 ] as const satisfies readonly (keyof AttackData)[];
 export type MoveField = typeof MOVE_FIELDS[number];

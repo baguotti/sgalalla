@@ -622,57 +622,96 @@ test('a hit launches with Brawlhalla\'s force and stuns for the move\'s frames',
     assert.equal(target.hitStunTimer, move.stun * SIM_STEP_MS);
 });
 
-test('the cooldown stops only the same attack', () => {
+test('every move ends with the same short cooldown before any attack', () => {
     const match = newMatch(700, 1300);
     const f = match.fighters[0];
-    // A neutral light that misses, then its recovery
     step(match, { lightAttack: true, lightAttackHeld: true });
     while (f.isAttacking) step(match);
-    assert.ok(f.combat.attackCooldownTimer > 0);
-    step(match, { lightAttack: true, lightAttackHeld: true });
-    assert.equal(f.isAttacking, false, 'the same attack waits');
-    while (f.combat.attackCooldownTimer > 0) step(match);
-    step(match, { lightAttack: true, lightAttackHeld: true });
-    assert.equal(f.isAttacking, true, 'it comes out once the cooldown is over');
-    while (f.isAttacking) step(match);
-    // Another attack doesn't wait for this one's cooldown
-    assert.ok(f.combat.attackCooldownTimer > 0);
+    assert.equal(f.combat.attackCooldownTimer, PhysicsConfig.ATTACK_END_COOLDOWN);
     step(match, { lightAttack: true, lightAttackHeld: true, aimRight: true });
-    assert.equal(f.combat.attack?.key, 'light_side_grounded', 'another attack comes out at once');
+    assert.equal(f.isAttacking, false, 'another attack waits too');
+    // The press stays buffered and comes out once the cooldown is over
+    while (f.combat.attackCooldownTimer > 0) step(match, { aimRight: true });
+    assert.equal(f.combat.attack?.key, 'light_side_grounded');
 });
 
-test('the ground pound comes out on the press, and landing is its recovery', () => {
+test('a light attack can be jumped out of, and steered in its recovery; a heavy can\'t', () => {
+    const match = newMatch(700, 1300);
+    const f = match.fighters[0];
+    step(match, { lightAttack: true, lightAttackHeld: true, aimRight: true });
+    steps(match, 2);
+    step(match, { jump: true, jumpHeld: true });
+    assert.ok(f.body.vy < 0, 'jumped');
+    assert.ok(Math.abs(f.body.vx) <= PhysicsConfig.AIR_SPEED, 'the lunge doesn\'t carry into the air');
+
+    const match2 = newMatch(700, 1300);
+    const h = match2.fighters[0];
+    step(match2, { lightAttack: true, lightAttackHeld: true });
+    while (h.combat.attack?.phase !== AttackPhase.RECOVERY) step(match2);
+    const x = h.body.x;
+    steps(match2, 2, { moveRight: true });
+    assert.ok(h.body.x > x, 'steers in the recovery');
+
+    const match3 = newMatch(700, 1300);
+    const k = match3.fighters[0];
+    step(match3, { heavyAttack: true, heavyAttackHeld: true });
+    step(match3);
+    assert.ok(k.isAttacking);
+    step(match3, { jump: true, jumpHeld: true });
+    assert.ok(k.body.isGrounded, 'no jump out of a heavy');
+});
+
+test('the ground pound charges hanging in the air, then falls; landing is its pose', () => {
     const match = newMatch(500);
     const f = high(match);
     f.body.y = 300;
     step(match, { heavyAttack: true, heavyAttackHeld: true, aimDown: true });
+    assert.equal(f.combat.isCharging, true);
+    steps(match, 20, { heavyAttackHeld: true, aimDown: true });
+    assert.ok(f.body.y - 300 < 10, 'hangs while charging');
+    step(match, { aimDown: true });
     assert.equal(f.combat.isGroundPounding, true);
-    for (let i = 0; i < 120 && !f.body.isGrounded; i++) step(match, { heavyAttackHeld: true, aimDown: true });
+    for (let i = 0; i < 120 && !f.body.isGrounded; i++) step(match);
     step(match);
-    assert.equal(f.combat.isGroundPoundLanding, true);
-    assert.equal(f.combat.attack?.phase, AttackPhase.RECOVERY);
-    steps(match, AttackRegistry.heavy_down_aerial.recoveryMiss + 1);
     assert.equal(f.isAttacking, false);
+    assert.equal(f.combat.isGroundPoundLanding, true);
+    while (f.combat.attackCooldownTimer > 0) step(match);
     assert.equal(f.combat.isGroundPoundLanding, false);
 });
 
-test('down light true-combos into a jump and neutral air', () => {
-    const match = newMatch(700, 880);
-    const [attacker, target] = match.fighters;
-    step(match, { lightAttack: true, lightAttackHeld: true, aimDown: true });
-    for (let i = 0; i < 30 && !target.isHitStunned; i++) step(match);
-    assert.equal(target.isHitStunned, true, 'the slide hits');
-    while (attacker.isAttacking || attacker.hitstopSteps > 0) step(match);
-    const damage = target.damagePercent;
-    step(match, { jump: true, jumpHeld: true, moveRight: true });
-    step(match, { jumpHeld: true, moveRight: true });
-    let stunnedWhenHit = false;
-    for (let i = 0; i < 20 && target.damagePercent === damage; i++) {
-        stunnedWhenHit = target.isHitStunned;
-        step(match, { lightAttack: i === 0, lightAttackHeld: true, jumpHeld: true, moveRight: true });
+test('side heavy in the air is a charged signature; up and neutral are the recovery', () => {
+    const match = newMatch(500);
+    const f = high(match);
+    f.body.y = 300;
+    step(match, { heavyAttack: true, heavyAttackHeld: true, aimRight: true });
+    assert.equal(f.combat.isCharging, true);
+    step(match, { aimRight: true });
+    assert.equal(f.combat.attack?.key, 'heavy_side_aerial');
+
+    const m2 = newMatch(500);
+    const g = high(m2);
+    g.body.y = 300;
+    step(m2, { heavyAttack: true, heavyAttackHeld: true, aimUp: true });
+    assert.equal(g.body.isRecovering, true);
+});
+
+test('down light true-combos into a neutral light', () => {
+    for (const percent of [0, 80]) {
+        const match = newMatch(700, 880);
+        const [attacker, target] = match.fighters;
+        target.damagePercent = percent;
+        step(match, { lightAttack: true, lightAttackHeld: true, aimDown: true });
+        for (let i = 0; i < 30 && !target.isHitStunned; i++) step(match);
+        assert.equal(target.isHitStunned, true, 'the slide hits');
+        const damage = target.damagePercent;
+        let stunnedWhenHit = false;
+        for (let i = 0; i < 60 && target.damagePercent === damage; i++) {
+            stunnedWhenHit = target.isHitStunned;
+            step(match, { lightAttack: !attacker.isAttacking, lightAttackHeld: true });
+        }
+        assert.ok(target.damagePercent > damage, `the neutral light hits at ${percent}%`);
+        assert.equal(stunnedWhenHit, true, 'before the stun ends');
     }
-    assert.ok(target.damagePercent > damage, 'the neutral air hits');
-    assert.equal(stunnedWhenHit, true, 'before the stun ends');
 });
 
 test('sizes and jumps match the Brawlhalla recordings, in fighter heights (H)', () => {

@@ -338,10 +338,10 @@ function handleHorizontalMovement(body: SimBody, input: SimInput): Steer {
         return null;
     }
 
-    // Attacks own the movement to their end (the recovery is stuck, as in Brawlhalla), except light
-    // attacks in the air, which drift (slower: AIR_ATTACK_DRIFT)
+    // Heavies own the movement; light attacks hold still on the ground until their recovery, and
+    // drift in the air (slower: AIR_ATTACK_DRIFT)
     if (body.isAttacking) {
-        if (body.attackType === ATTACK_TYPE_HEAVY || body.isGrounded) {
+        if (body.attackType === ATTACK_TYPE_HEAVY || (body.isGrounded && body.attackPhase !== ATTACK_PHASE_RECOVERY)) {
             body.isRunning = false;
             return null;
         }
@@ -356,6 +356,8 @@ function handleHorizontalMovement(body: SimBody, input: SimInput): Steer {
 
     const steer = (input.moveRight ? 1 : 0) - (input.moveLeft ? 1 : 0);
     body.isRunning = body.isGrounded && steer !== 0 && !body.isAttacking;
+    // A light attack's recovery on the ground steers only when pushed; otherwise the move's friction stops it
+    if (body.isAttacking && body.isGrounded && steer === 0) return null;
     return steer as -1 | 0 | 1;
 }
 
@@ -375,14 +377,18 @@ function handleDropHold(body: SimBody, input: SimInput): void {
 function handleJump(body: SimBody, input: SimInput, events: PhysicsEvent[]): void {
     if (body.isDodging || body.landingLagSteps > 0) return;
 
-    // Attacks commit, as in Brawlhalla: no jumping until the move is over (the press waits in the buffer)
-    if (body.isAttacking) return;
+    // Heavies commit; a light attack can be jumped out of
+    if (body.isAttacking && body.attackType === ATTACK_TYPE_HEAVY) return;
 
     if (input.jumpBuffered) {
         events.push({ type: 'consume', input: 'jump' });
         // Platform Drop: Down + Jump while on a soft platform
         if (input.moveDown && body.currentPlatformIdx !== -1) handlePlatformDrop(body);
-        else performJump(body, events);
+        else {
+            // A lunge or slide doesn't carry into the air
+            if (body.isAttacking) body.vx = Math.max(-PhysicsConfig.AIR_SPEED, Math.min(body.vx, PhysicsConfig.AIR_SPEED));
+            performJump(body, events);
+        }
     }
 
     // Short hop: letting go of jump while a jump's rise has slowed past the cut-off cuts it short

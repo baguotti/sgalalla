@@ -348,7 +348,7 @@ class MovesPanel extends FeelPanel {
         const hitting = [row('damage'), row('fixedForce'), row('variableForce'), row('knockbackAngle'), row('stun')];
         const timing = [
             row('startup'), ...(move.groundPound ? [] : [row('active')]),
-            row('recovery'), row('recoveryMiss'), row('cooldown'), row('cooldownMiss'),
+            row('recovery'),
         ];
         const hitbox = move.signature ? [] : [row('hitboxWidth'), row('hitboxHeight'), row('hitboxOffsetX'), row('hitboxOffsetY')];
         const stall = toggleRow('Stalls in the air', () => moveValue(key, 'shouldStallInAir') as boolean,

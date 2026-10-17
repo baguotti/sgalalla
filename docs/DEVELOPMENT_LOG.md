@@ -1289,3 +1289,16 @@ Part 2
 - **[Change]** Protocol version 16; recordings re-baselined.
 - **[S]** tsc (client, tests, server), 79 tests (new: sizes and jumps match the recordings: the stage 9.5 H, a jump 1.95 H peaking at about 27 frames, air jumps as high; the movement tests follow the new rates), build, KO table unchanged, true combos (down light into neutral light, side sig, jump + neutral air, 0–80%), headless CPU matches. In the browser (muted): the smaller fighters on Adria, no errors.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Attacks work as on main again, with the new sizes and hits (branch `experimental-branch`)
+- **[Gameplay]** Riccardo preferred how attacking felt on main, so light and heavy attacks work that way again. The new sizes, movement, damage, knockback and stun stay:
+    - quick timing from main, in frames: lights 3/6/3, down light and run light 5/6/6, down air 6/6/8, signatures 2/18/12, side signature 5/18/18;
+    - every move ends with the same 0.1 s cooldown (`ATTACK_END_COOLDOWN`) before any attack. Gone: the per-move cooldowns, the shorter recovery after a hit, and a hit ending the active frames;
+    - heavies charge up to 1.5 s again;
+    - side heavy in the air is the aerial side signature again (charged); up and neutral heavy in the air are the recovery;
+    - the ground pound charges hanging in the air, then falls; its landing pose lasts as a cooldown;
+    - a light attack can be jumped out of, and steered in its recovery on the ground; heavies still commit. Jumping out clamps the speed to air speed, so a lunge or slide can't carry off the stage.
+- **[Tuning]** Distances re-measured under the shorter moves: side light lunge 2460 px/s (1.6 H), slide 2200 px/s (1.4 H). A light's recovery on the ground uses the move's friction unless steered, so lunges don't skid on.
+- **[Lab]** The move timing rows are startup, active and recovery; COMBAT has "Cooldown after a move".
+- **[Change]** Protocol version 17; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 81 tests (new: the cooldown applies to every attack and a buffered press comes out when it ends; jump out of a light without its lunge; steer in its recovery; no jump out of a heavy; the ground pound charges hanging; aerial side heavy vs recovery; down light true-combos into neutral light at 0 and 80%), KO table unchanged, headless CPU matches. Jump + neutral air after a down light no longer combos: the attacker is free while the target is still on the ground.

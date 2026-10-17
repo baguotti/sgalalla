@@ -24,10 +24,10 @@ export const PhysicsConfig = {
     AIR_DECEL: 1600,
     // An attack in the air drifts at this share of AIR_SPEED (faster momentum eases down to it at AIR_DECEL)
     AIR_ATTACK_DRIFT: 0.4,
-    SLIDE_ATTACK_SPEED: 2040,
+    SLIDE_ATTACK_SPEED: 2200,
     SLIDE_ATTACK_DECELERATION: 0.92,
     // Side light lunges forward at this speed as its hitbox comes out (Brawlhalla's Unarmed side light: about 1.6 H)
-    SIDE_LIGHT_LUNGE_SPEED: 2990,
+    SIDE_LIGHT_LUNGE_SPEED: 2460,
 
     // Jump mechanics: a full jump and an air jump rise 1.95 H, a short hop about 1 H
     JUMP_FORCE: -1095,
@@ -144,7 +144,10 @@ export const PhysicsConfig = {
     GROUND_POUND_LANDING_SPEED_KEPT: 0.5,
 
     // Heavy attacks charge while held, up to this long
-    CHARGE_MAX_TIME: 1000,
+    CHARGE_MAX_TIME: 1500,
+
+    // After any move, no attack can start for this long (ms)
+    ATTACK_END_COOLDOWN: 100,
 
     // Signature ghosts (heavy side, up and neutral): thrown from in front of the fighter (NOCK's
     // further out), a side ghost a little further forward, an up ghost a little higher. It travels
