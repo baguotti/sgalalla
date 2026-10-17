@@ -101,29 +101,31 @@ export const PhysicsConfig = {
     // Knockback, as in Brawlhalla: force = fixed + variable × (d/100 + d²/20000), d the target's damage after
     // the hit, and a full charge adds FULL_CHARGE_BONUS to a heavy's variable force and damage. Each unit of
     // force launches at this many px/s
-    FORCE_SCALE: 30,
+    FORCE_SCALE: 19,
     FULL_CHARGE_BONUS: 0.25,
     // A hit stuns for the move's stun frames, and on while the fighter still flies faster than this across
     // or upward, up to this much longer
-    STUN_FLYING_SPEED: 1000,
+    STUN_FLYING_SPEED: 630,
     STUN_EXTENSION_MAX: 1200,
-    // A launch slows by this much along its angle (px/s²), so it flies v²/2 far: little at low damage, far
-    // near a KO. Gravity pulls at this share of its strength, so the flight arcs
-    LAUNCH_DECEL: 13000,
-    HITSTUN_GRAVITY: 0.32,
-    // The launch carries on past the stun (the fighter can act and drift) until it slows below this
-    LAUNCH_END_SPEED: 600,
+    // A launch slows by LAUNCH_DECEL along its angle (px/s²), so it flies about v²/2 far: little at low
+    // damage, far near a KO. Below LAUNCH_EASE_SPEED (px/s) the slowing eases off with the speed, so it
+    // fades out; past the top of the arc only the sideways speed fades, LAUNCH_FALL_DRAG of it a second.
+    // Gravity pulls at HITSTUN_GRAVITY of its strength: comparable to the slowing, so the flight arcs
+    LAUNCH_DECEL: 5000,
+    LAUNCH_EASE_SPEED: 800,
+    LAUNCH_FALL_DRAG: 2.5,
+    HITSTUN_GRAVITY: 0.6,
     // A downward hit on a fighter standing on the floor pops it up with this share of the knockback, lifted this many px
     GROUNDED_SPIKE_BOUNCE: 0.3,
     GROUNDED_SPIKE_LIFT: 7,
     // A stunned fighter hitting a floor or wall faster than this bounces off, keeping BOUNCE_KEEP of its speed
-    BOUNCE_SPEED: 600,
+    BOUNCE_SPEED: 380,
     BOUNCE_KEEP: 0.8,
 
     // Hit pause: both fighters freeze on a hit, in steps: MIN, plus one per HITSTOP_SPEED_PER_STEP of knockback,
     // up to MAX. Light hits barely stop; hits that launch hard freeze for a beat
     HITSTOP_MIN_STEPS: 1,
-    HITSTOP_SPEED_PER_STEP: 900,
+    HITSTOP_SPEED_PER_STEP: 570,
     HITSTOP_MAX_STEPS: 8,
 
     // Player dimensions (the body, for collisions; a new match picks them up)

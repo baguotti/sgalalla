@@ -602,8 +602,8 @@ test('a launch slows by a steady amount along its angle, and carries on past the
     assert.ok(Math.abs(f.body.vx - expected) < 1e-6, `slows by a steady amount (${f.body.vx.toFixed(0)})`);
     assert.ok(Math.abs(f.body.vy / f.body.vx - -1000 / 3000) < 0.05, 'still along its angle');
 
-    // Out of stun but still fast, the launch carries on
-    Object.assign(f.body, { vx: 900, vy: -300 });
+    // Out of stun (flying too slowly to stretch it), the launch carries on
+    Object.assign(f.body, { vx: 500, vy: -200 });
     f.hitStunTimer = 1;
     step(match);
     assert.equal(f.isHitStunned, false, 'the stun is over');
@@ -613,7 +613,7 @@ test('a launch slows by a steady amount along its angle, and carries on past the
     assert.ok(f.body.vx < vx, 'still slowing');
 });
 
-test('a launch ends on a jump, dodge or recovery, and once it has slowed down', () => {
+test('a launch carries on through the fall, and ends on a jump or on landing', () => {
     const match = newMatch();
     const f = high(match);
     f.body.vx = 700;
@@ -621,10 +621,14 @@ test('a launch ends on a jump, dodge or recovery, and once it has slowed down', 
     step(match, { jump: true, jumpHeld: true });
     assert.equal(f.body.isLaunched, false, 'a jump ends it');
     f.body.isLaunched = true;
-    f.body.vx = PhysicsConfig.LAUNCH_END_SPEED - 50;
+    f.body.vx = 300;
     f.body.vy = 0;
+    steps(match, 10);
+    assert.equal(f.body.isLaunched, true, 'slow, falling: still flying');
+    assert.ok(f.body.vx > 150, `the sideways speed fades gently (${f.body.vx.toFixed(0)})`);
+    for (let i = 0; i < 200 && !f.body.isGrounded; i++) step(match);
     step(match);
-    assert.equal(f.body.isLaunched, false, 'slow enough: over');
+    assert.equal(f.body.isLaunched, false, 'landing ends it');
 });
 
 test('charging a heavy move all but stops the fighter, even holding a direction', () => {
@@ -774,7 +778,8 @@ test('down light true-combos into a neutral light', () => {
         let stunnedWhenHit = false;
         for (let i = 0; i < 60 && target.damagePercent === damage; i++) {
             stunnedWhenHit = target.isHitStunned;
-            step(match, { lightAttack: !attacker.isAttacking, lightAttackHeld: true });
+            // Stepping in after it, as a player would
+            step(match, { lightAttack: !attacker.isAttacking, lightAttackHeld: true, moveRight: !attacker.isAttacking });
         }
         assert.ok(target.damagePercent > damage, `the neutral light hits at ${percent}%`);
         assert.equal(stunnedWhenHit, true, 'before the stun ends');

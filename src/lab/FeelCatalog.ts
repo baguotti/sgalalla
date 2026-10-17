@@ -130,8 +130,9 @@ export const COMBAT_GROUPS: Group<PhysicsKey>[] = [
         ['STUN_FLYING_SPEED', 'Stun while flying faster than', 'px/s', 'After the move\'s stun frames, stun lasts while the fighter flies faster than this, across or up.'],
         ['STUN_EXTENSION_MAX', 'Stun runs on at most', 'ms'],
         ['LAUNCH_DECEL', 'Launch slows by', 'px/s²', 'A launch loses this much speed a second along its angle: it flies speed²/2 × this far, so soft hits barely push and hard hits fly.', [0, 30000, 100]],
+        ['LAUNCH_EASE_SPEED', 'Launch eases out below', 'px/s', 'Below this speed the slowing eases off with the speed, so a launch fades out instead of stopping dead.', [1, 5000, 10]],
+        ['LAUNCH_FALL_DRAG', 'Sideways fade in the fall', '', 'Past the top of the arc only the sideways speed fades, this share of it a second: the fall curves.', [0, 10, 0.1]],
         ['HITSTUN_GRAVITY', 'Gravity in a launch', 'share', 'Gravity pulls a launched fighter at this share of its strength, bending the flight into an arc.', [0, 1.5, 0.01]],
-        ['LAUNCH_END_SPEED', 'Launch ends below', 'px/s', 'The launch (its glide and lighter gravity) carries on past the stun until it slows below this, or the fighter lands, jumps, dodges or recovers.', [0, 3000, 10]],
     ]),
     group('BOUNCES', [
         ['BOUNCE_SPEED', 'Bounce faster than', 'px/s', 'A stunned fighter hitting a floor or wall faster than this bounces off.'],

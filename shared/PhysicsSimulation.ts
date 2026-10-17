@@ -665,9 +665,8 @@ export function interruptMovement(body: SimBody): void {
 
 function applyPhysics(body: SimBody, dt: number, steer: Steer): void {
     // A launch ends once the stun is over and the fighter stands on the ground (isGrounded is still the
-    // previous step's) or has slowed down; a stunned fighter slides on with it, even along the floor
-    if (body.isLaunched && !body.isHitStunned &&
-        (body.isGrounded || Math.hypot(body.vx, body.vy) < PhysicsConfig.LAUNCH_END_SPEED)) {
+    // previous step's), or on a jump, dodge or recovery; a stunned fighter slides on with it, even along the floor
+    if (body.isLaunched && !body.isHitStunned && body.isGrounded) {
         body.isLaunched = false;
     }
 
@@ -685,12 +684,17 @@ function applyPhysics(body: SimBody, dt: number, steer: Steer): void {
     }
 
     // A launch slows by a steady amount along its angle, as in Brawlhalla: soft hits barely push, and the
-    // flight grows with the square of the speed, so hard hits fly far (lighter gravity bends it into an arc).
-    // Math.sqrt, not Math.hypot: it rounds the same in every browser
+    // flight grows with the square of the speed, so hard hits fly far. Below LAUNCH_EASE_SPEED the slowing
+    // eases off with the speed, so the launch fades out instead of stopping dead. Past the top of the arc
+    // (falling, slower than a fall) the sideways speed only fades by LAUNCH_FALL_DRAG a second, and gravity
+    // bends the fall into a curve. Math.sqrt, not Math.hypot: it rounds the same in every browser
     if (body.isLaunched || body.isHitStunned) {
-        const speed = Math.sqrt(body.vx * body.vx + body.vy * body.vy);
-        if (speed > 0) {
-            const kept = Math.max(speed - PhysicsConfig.LAUNCH_DECEL * dt, 0) / speed;
+        if (body.vy >= 0 && body.vy <= PhysicsConfig.MAX_FALL_SPEED) {
+            body.vx *= Math.max(0, 1 - PhysicsConfig.LAUNCH_FALL_DRAG * dt);
+        } else {
+            const speed = Math.sqrt(body.vx * body.vx + body.vy * body.vy);
+            const decel = PhysicsConfig.LAUNCH_DECEL * Math.min(1, speed / PhysicsConfig.LAUNCH_EASE_SPEED);
+            const kept = Math.max(speed - decel * dt, 0) / speed;
             body.vx *= kept;
             body.vy *= kept;
         }

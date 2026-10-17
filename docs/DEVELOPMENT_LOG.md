@@ -1335,3 +1335,11 @@ Part 2
 - **[Change]** Protocol version 21; recordings re-baselined.
 - **[S]** tsc (client, tests, server), 86 tests (new: a charge keeps the way it faced as it started), build, KO table, headless CPU matches.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Launches fly in arcs (branch `experimental-branch`)
+- **[Feel]** A launched fighter used to shoot off in a straight line along the hit's angle and stop dead after a few frames, then drop: the launch slowed by 13000 px/s² while gravity pulled at only 760. Now launches are slower and longer (`FORCE_SCALE` 30 → 19, `LAUNCH_DECEL` 13000 → 5000) under stronger gravity (`HITSTUN_GRAVITY` 0.32 → 0.6), so the path curves; the slowing eases off below 800 px/s (`LAUNCH_EASE_SPEED`), so a launch fades out instead of stopping; past the top of the arc only the sideways speed fades (`LAUNCH_FALL_DRAG` 2.5 a second), so the fall curves on too. The launch now lasts until the fighter lands or acts (jump, dodge, recovery): it no longer ends at a speed (`LAUNCH_END_SPEED` is gone), where letting go in the air used to cut the sideways speed short.
+- **[Tuning]** Speed-based thresholds scaled with the slower launches (×0.63): stun extension above 630 px/s, hit pause per 570 px/s, bounces above 380 px/s, the camera kick and launch trails from 1650 px/s. KO table about the same (side light 310%, neutral and up light 270%, side sig 140%/110%, up and neutral sig 170%).
+- **[Lab]** COMBAT gets "Launch eases out below" and "Sideways fade in the fall".
+- **[Change]** Protocol version 22; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 86 tests (the launch tests follow the new model: a slow launch carries on through the fall and ends on landing; the down light follow-up steps in), build, KO table, true combos, headless CPU matches (the CPU's own off-stage ground pounds, there before, flagged separately). Trajectories plotted before and after; in the browser (muted), a neutral light at 100% arcs up, over and down.
+
