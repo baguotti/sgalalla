@@ -8,12 +8,15 @@
  */
 
 /** Bump whenever two builds can no longer play each other. */
-export const PROTOCOL_VERSION = 19;
+export const PROTOCOL_VERSION = 20;
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 5;
 /** People watching a match, besides its players. */
 export const MAX_SPECTATORS = 4;
+
+/** The stages multiplayer matches, local and online, can be played on (player 1 picks); the first is the default. */
+export const MULTIPLAYER_STAGES = ['adria_bg', 'londra_bg', 'londra_grande'] as const;
 
 export const NetEvent = {
     /** client → server `{ version }` */
@@ -26,6 +29,8 @@ export const NetEvent = {
     PICK: 'pick',
     /** client → server `{ character, rtt }` */
     READY: 'ready',
+    /** client (player 1) → server a MatchSettings: the stage (one of MULTIPLAYER_STAGES) and bombs on or off */
+    SETTINGS: 'settings',
     /** server → each player: a MatchStart */
     START: 'start',
     /** client → server: vote for a rematch */
@@ -59,6 +64,14 @@ export interface RoomState {
     you: number;
     /** In joining order; a player's index becomes their slot in the match. */
     players: RoomPlayer[];
+    /** What player 1 picked. */
+    settings: MatchSettings;
+}
+
+/** Player 1's choices for the match. */
+export interface MatchSettings {
+    stage: string;
+    bombs: boolean;
 }
 
 /** A player left mid-match: the last frame the server has their inputs for, and those final inputs from `first`. */
@@ -74,6 +87,7 @@ export interface WatchStart {
     seed: number;
     inputDelay: number;
     characters: string[];
+    settings: MatchSettings;
     left: { slot: number; lastFrame: number }[];
 }
 
@@ -88,6 +102,7 @@ export interface MatchStart {
     inputDelay: number;
     /** Character by slot; one per player. */
     characters: string[];
+    settings: MatchSettings;
     /** The receiving player's slot. */
     slot: number;
 }

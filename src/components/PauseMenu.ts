@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { AudioManager } from '../managers/AudioManager';
 import { MenuInput } from '../input/MenuInput';
 import { KeyboardMapping, keyCodeToLabel } from '../input/KeyboardMapping';
 
@@ -307,7 +308,7 @@ export class PauseMenu {
         this.mainSelectedIndex = 0;
 
         // Sound: Open (Player Ready -> Confirm Character)
-        this.scene.sound.play('ui_confirm_character', { volume: 0.5 });
+        AudioManager.getInstance().playSFX('ui_confirm_character', { volume: 0.5 });
 
         // The press that paused doesn't also act on the menu
         this.menuInput.holdEverything();
@@ -374,25 +375,25 @@ export class PauseMenu {
         for (const { action } of this.menuInput.poll()) {
             if (this.menuState === 'MAIN') {
                 if (action === 'up' || action === 'down') {
-                    this.scene.sound.play('ui_move_cursor', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('ui_move_cursor', { volume: 0.5 });
                     const step = action === 'up' ? -1 : 1;
                     this.mainSelectedIndex = (this.mainSelectedIndex + step + this.menuOptions.length) % this.menuOptions.length;
                     this.updateSelection();
                 } else if ((action === 'left' || action === 'right') && this.menuOptions[this.mainSelectedIndex].adjust) {
-                    this.scene.sound.play('ui_move_cursor', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('ui_move_cursor', { volume: 0.5 });
                     this.menuOptions[this.mainSelectedIndex].adjust!(action === 'left' ? -1 : 1);
                     this.refreshLabels();
                 } else if (action === 'confirm') {
                     this.selectOption();
                     return;
                 } else if (action === 'back' || action === 'start') {
-                    this.scene.sound.play('ui_back', { volume: 0.5 });
+                    AudioManager.getInstance().playSFX('ui_back', { volume: 0.5 });
                     this.executeOption(MenuOption.RESUME);
                     return;
                 }
             } else if (action === 'back' || action === 'confirm' || action === 'start') {
                 // The controls page: back to the main menu
-                this.scene.sound.play('ui_back', { volume: 0.5 });
+                AudioManager.getInstance().playSFX('ui_back', { volume: 0.5 });
                 this.menuState = 'MAIN';
                 this.hideControlsMenu();
                 this.showMainMenu();
@@ -414,7 +415,7 @@ export class PauseMenu {
     }
 
     private selectOption(): void {
-        this.scene.sound.play('ui_confirm', { volume: 0.5 });
+        AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
         const entry = this.menuOptions[this.mainSelectedIndex];
         if (entry.adjust) {
             entry.adjust(1);

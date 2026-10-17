@@ -26,13 +26,15 @@ const REPEAT_EVERY_MS = 110;
 /** The standard gamepad's Start button. */
 const START_BUTTON = 9;
 
-const KEYS: Record<Exclude<MenuAction, 'start'>, readonly number[]> = {
+const KEYS: Record<MenuAction, readonly number[]> = {
     up: [Phaser.Input.Keyboard.KeyCodes.UP, Phaser.Input.Keyboard.KeyCodes.W],
     down: [Phaser.Input.Keyboard.KeyCodes.DOWN, Phaser.Input.Keyboard.KeyCodes.S],
     left: [Phaser.Input.Keyboard.KeyCodes.LEFT, Phaser.Input.Keyboard.KeyCodes.A],
     right: [Phaser.Input.Keyboard.KeyCodes.RIGHT, Phaser.Input.Keyboard.KeyCodes.D],
     confirm: [Phaser.Input.Keyboard.KeyCodes.ENTER, Phaser.Input.Keyboard.KeyCodes.SPACE],
     back: [Phaser.Input.Keyboard.KeyCodes.ESC, Phaser.Input.Keyboard.KeyCodes.BACKSPACE],
+    // The keyboard's Start is P, the game's pause key
+    start: [Phaser.Input.Keyboard.KeyCodes.P],
 };
 
 /** One keyboard or gamepad: what it held last frame, and its held direction's repeat clock. */

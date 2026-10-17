@@ -334,7 +334,7 @@ export class Player extends Phaser.GameObjects.Container {
     private startChargeSounds(): void {
         const keys = this.character === 'pe' ? ['sfx_fight_charge', 'sfx_pe_charge'] : ['sfx_fight_charge'];
         for (const key of keys) {
-            const sound = this.scene.sound.add(key, { volume: 0.6, loop: true });
+            const sound = this.scene.sound.add(key, { volume: 0.6 * AudioManager.getInstance().getSFXVolume(), loop: true });
             sound.play();
             this.chargeSounds.push(sound);
         }

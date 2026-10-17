@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { AudioManager } from '../managers/AudioManager';
 import { KeyboardMapping, keyCodeToLabel } from '../input/KeyboardMapping';
 
 export class ControlsOverlay {
@@ -201,7 +202,7 @@ export class ControlsOverlay {
         if (!this.isVisible) {
             this.isVisible = true;
             this.container.setVisible(true);
-            this.scene.sound.play('ui_confirm', { volume: 0.5 });
+            AudioManager.getInstance().playSFX('ui_confirm', { volume: 0.5 });
         }
     }
 
@@ -209,7 +210,7 @@ export class ControlsOverlay {
         if (this.isVisible) {
             this.isVisible = false;
             this.container.setVisible(false);
-            this.scene.sound.play('ui_back', { volume: 0.5 });
+            AudioManager.getInstance().playSFX('ui_back', { volume: 0.5 });
         }
     }
 

@@ -57,8 +57,8 @@ export const PhysicsConfig = {
 
     // Platform drop-through
     PLATFORM_DROP_GRACE_PERIOD: 200,
-    // Holding down this many steps on a soft platform drops through it (a down attack comes out first)
-    DROP_HOLD_STEPS: 4,
+    // Holding down this many steps on a soft platform drops through it (0.2 s: time to press light for a down light first)
+    DROP_HOLD_STEPS: 12,
 
     // Landing from the air: steps with no jump, dodge or attack
     LANDING_LAG_STEPS: 4,

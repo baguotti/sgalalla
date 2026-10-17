@@ -307,10 +307,13 @@ test('gravity cancel: an attack out of an aerial spot dodge is the grounded move
     assert.ok(f.body.dodgeCooldownTimer > PhysicsConfig.LANDED_AIR_DODGE_COOLDOWN, `cooldown ${f.body.dodgeCooldownTimer}`);
 });
 
-/** Fighter 0 in the air against the left side of the main stage (its wall's left face is at x 405.5). */
+/** The left face of the main stage's left wall. */
+const MAIN_WALL_FACE = STAGE_LAYOUTS.standard.walls[0].x - STAGE_LAYOUTS.standard.walls[0].w / 2;
+
+/** Fighter 0 in the air against the left side of the main stage. */
 function onWall(match: MatchState): FighterState {
     const f = match.fighters[0];
-    f.body.x = 405.5 - PhysicsConfig.PLAYER_WIDTH / 2 + 1;
+    f.body.x = MAIN_WALL_FACE - PhysicsConfig.PLAYER_WIDTH / 2 + 1;
     f.body.y = 1000;
     f.body.vy = 0;
     f.body.isGrounded = false;
@@ -409,6 +412,22 @@ test('stun never lasts past its limit', () => {
     assert.equal(f.isHitStunned, false);
 });
 
+test('the pillar can\'t be entered from below: rising under it stops at its rock', () => {
+    // Under the left pillar's tip, its inner overhang and in between, rising fast
+    for (const x of [-20, 40, 110]) {
+        const match = newMatch(700, 1300);
+        const f = match.fighters[0];
+        f.body.x = x;
+        f.body.y = 950;
+        f.body.isGrounded = false;
+        for (let i = 0; i < 20; i++) {
+            f.body.vy = -1800;
+            step(match);
+        }
+        assert.ok(f.body.y - PhysicsConfig.PLAYER_HEIGHT / 2 >= 660, `stopped below the rock at x ${x} (top at ${(f.body.y - PhysicsConfig.PLAYER_HEIGHT / 2).toFixed(0)})`);
+    }
+});
+
 test('a stunned fighter bounces off the floor and walls', () => {
     const floor = newMatch();
     const f = stunned(floor, 0, 1500, 870 - PhysicsConfig.PLAYER_HEIGHT / 2 - 10);
@@ -421,7 +440,7 @@ test('a stunned fighter bounces off the floor and walls', () => {
     const g = stunned(wall, 1500, 0, 1000);
     g.hitStunTimer = 500;
     // Just left of the main stage's left wall
-    g.body.x = 405.5 - PhysicsConfig.PLAYER_WIDTH / 2 - 10;
+    g.body.x = MAIN_WALL_FACE - PhysicsConfig.PLAYER_WIDTH / 2 - 10;
     step(wall);
     assert.ok(g.body.vx < 0, `bounced back at ${g.body.vx}`);
 });
@@ -469,6 +488,17 @@ test('holding down drops through a soft platform; a quick tap does not', () => {
     const g = onSoftPlatform(hold);
     steps(hold, PhysicsConfig.DROP_HOLD_STEPS + 10, { moveDown: true });
     assert.ok(g.body.y > 460, `dropped through, at ${g.body.y}`);
+});
+
+test('a down light on a soft platform stays on it, even with down held after it', () => {
+    const match = newMatch();
+    const f = onSoftPlatform(match);
+    steps(match, 3, { moveDown: true });
+    step(match, { moveDown: true, aimDown: true, lightAttack: true, lightAttackHeld: true });
+    assert.equal(f.isAttacking, true, 'the down light comes out');
+    while (f.isAttacking) step(match, { moveDown: true, aimDown: true });
+    steps(match, PhysicsConfig.DROP_HOLD_STEPS - 1, { moveDown: true });
+    assert.notEqual(f.body.currentPlatformIdx, -1, 'still on a platform');
 });
 
 test('landing takes a moment before the next jump, dodge or attack', () => {

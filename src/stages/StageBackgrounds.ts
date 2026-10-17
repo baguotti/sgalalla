@@ -26,11 +26,6 @@ export const STAGES = {
 
 export type StageKey = keyof typeof STAGES;
 
-/** The stage online matches of this many players are played on. */
-export function onlineStage(players: number): StageKey {
-    return players >= 3 ? 'londra_grande' : 'adria_bg';
-}
-
 export const STAGE_KEYS = Object.keys(STAGES) as StageKey[];
 
 export function isStageKey(key: string | undefined): key is StageKey {

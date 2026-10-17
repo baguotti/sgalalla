@@ -9,7 +9,7 @@ import { InputDebugOverlay } from '../components/InputDebugOverlay';
 import { TouchController } from '../components/TouchController';
 import { PauseMenu, type LabMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
-import { freeStageBackgrounds, isStageKey, loadStageBackground, onlineStage, STAGES, type StageKey } from '../stages/StageBackgrounds';
+import { freeStageBackgrounds, isStageKey, loadStageBackground, STAGES, type StageKey } from '../stages/StageBackgrounds';
 import { freeLondraLayers, GRANDE_CLOUDS, grandeStageStyle, loadLondraLayers, LondraLayers } from '../stages/LondraLayers';
 import { createStage as createSharedStage } from '../stages/StageFactory';
 import { BombSprites } from '../effects/BombSprites';
@@ -58,6 +58,8 @@ export interface GameSceneData {
     mode?: 'versus' | 'training' | 'campaign' | 'online' | 'spectate';
     playerData?: PlayerSlot[];
     selectedMap?: string;
+    /** Bombs drop in this match (chosen in the lobby; never in the Lab or the campaign). */
+    bombs?: boolean;
     /** Campaign: a practice rematch against an island's opponent. */
     isTraining?: boolean;
     trainingOpponentIndex?: number;
@@ -195,6 +197,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private campaign: CampaignFlow | null = null;
 
     private currentStageBackground: StageKey = 'adria_bg';
+    private bombs = false;
 
     /** The stage is drawn from Londra's layers instead of a painting. */
     private get isLayered(): boolean {
@@ -215,13 +218,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.simClock = new FixedStepClock(this.mode === 'online' ? ONLINE_BACKLOG_STEPS : undefined);
 
         this.currentStageBackground = isStageKey(data.selectedMap) ? data.selectedMap : 'adria_bg';
+        this.bombs = data.bombs === true;
 
         this.online = null;
         this.spectator = null;
         if (this.mode === 'spectate') {
             const { client, watch, early } = data.watch!;
             this.spectator = new SpectatorMatch(client, watch, early);
-            this.currentStageBackground = onlineStage(watch.characters.length);
+            this.currentStageBackground = isStageKey(watch.settings.stage) ? watch.settings.stage : 'adria_bg';
+            this.bombs = watch.settings.bombs;
             // Every fighter is played by someone else
             this.playerData = watch.characters.map((character, playerId) => ({
                 playerId, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character, isRemote: true,
@@ -229,8 +234,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         } else if (this.mode === 'online') {
             const { client, start } = data.online!;
             this.online = new OnlineMatch(client, start);
-            // Three players or more get the big stage
-            this.currentStageBackground = onlineStage(start.characters.length);
+            // What player 1 picked in the lobby
+            this.currentStageBackground = isStageKey(start.settings.stage) ? start.settings.stage : 'adria_bg';
+            this.bombs = start.settings.bombs;
             // Our slot plays with keyboard or the first gamepad; the others play remotely
             this.playerData = start.characters.map((character, playerId) => ({
                 playerId,
@@ -837,8 +843,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     /** Starts a fresh match with the current fighters. */
     private startMatch(): void {
         const seed = this.online?.start.seed ?? this.spectator?.watch.seed ?? Math.floor(Math.random() * 0x100000000);
-        // Bombs drop in every match but the Lab's and the campaign's
-        this.match = createMatch(this.fighterSetups, seed, STAGES[this.currentStageBackground].layout, !this.isLab && !this.campaign);
+        // Bombs drop if the lobby turned them on (never in the Lab or the campaign)
+        this.match = createMatch(this.fighterSetups, seed, STAGES[this.currentStageBackground].layout, this.bombs && !this.isLab && !this.campaign);
         this.online?.begin(this.match);
         this.spectator?.begin(this.match);
         // Online frames can be simulated more than once, so only local matches are recorded

@@ -3,10 +3,15 @@ import { AudioManager } from '../managers/AudioManager';
 import { SMASH_COLORS } from '../ui/PlayerHUD';
 import { cardPositions, PlayerCard, type CardState } from '../ui/PlayerCard';
 import { MenuInput, type MenuAction } from '../input/MenuInput';
-import { STAGES, STAGE_KEYS, loadStagePreviews, previewKey } from '../stages/StageBackgrounds';
+import { STAGES, STAGE_KEYS, loadStagePreviews, previewKey, type StageKey } from '../stages/StageBackgrounds';
+import { MULTIPLAYER_STAGES } from '../../shared/NetProtocol';
 
 type CharacterType = 'fok' | 'dummy';
 
+
+/** The stage preview's box in the stage choice (the previews are 1000×838). */
+const PREVIEW_H = 280;
+const PREVIEW_W = Math.round(PREVIEW_H * 1000 / 838);
 
 export interface PlayerSelection {
     playerId: number;
@@ -45,9 +50,19 @@ export class LobbyScene extends Phaser.Scene {
         super({ key: 'LobbyScene' });
     }
 
+    /** Bombs in the match: player 1 turns them on or off with Start (P on the keyboard); off by default. */
+    private bombs = false;
+    private bombsText?: Phaser.GameObjects.Text;
+
+    /** The stages to pick from: versus has the multiplayer ones, training all of them. */
+    private get mapKeys(): readonly StageKey[] {
+        return this.mode === 'versus' ? MULTIPLAYER_STAGES : STAGE_KEYS;
+    }
+
     init(data: { mode?: 'versus' | 'training', inputType?: 'KEYBOARD' | 'GAMEPAD', gamepadIndex?: number | null, slots?: PlayerSelection[] } | null): void {
         this.selectionPhase = 'P1'; // Reset phase
         this.selectedMapIndex = 0;
+        this.bombs = false;
         const safeData = data || {};
         this._initData = safeData;
         void this._initData; // Silence linter
@@ -113,6 +128,14 @@ export class LobbyScene extends Phaser.Scene {
             color: '#8ab4f8',
             fontFamily: '"Pixeloid Sans"'
         }).setOrigin(0.5);
+
+        // Bombs on or off, above the instructions and over the stage choice
+        this.bombsText = this.mode === 'campaign' ? undefined : this.add.text(width / 2, height - 95, '', {
+            fontSize: '22px',
+            color: '#ffffff',
+            fontFamily: '"Pixeloid Sans"'
+        }).setOrigin(0.5).setDepth(101);
+        this.showBombs();
 
         // Add "Alive" pulse
         this.tweens.add({
@@ -211,7 +234,12 @@ export class LobbyScene extends Phaser.Scene {
         if (!this.canInput) return;
 
         for (const { action, pad } of presses) {
-            // Back, or a gamepad's Start, leaves
+            // Player 1's Start turns bombs on or off (not in the campaign, which has none)
+            if (action === 'start' && this.mode !== 'campaign') {
+                if (this.isPlayerOneDevice(pad)) this.toggleBombs();
+                continue;
+            }
+            // Back, or a gamepad's Start in the campaign, leaves
             if (action === 'back' || (action === 'start' && pad !== null)) {
                 AudioManager.getInstance().playSFX('ui_back', { volume: 0.5 });
                 this.scene.start('MainMenuScene');
@@ -279,7 +307,8 @@ export class LobbyScene extends Phaser.Scene {
                         playerData: joinedSlots,
                         mode: this.mode,
                         slotIndex: (this._initData as any)?.slotIndex ?? 0,
-                        selectedMap: STAGE_KEYS[this.selectedMapIndex]
+                        selectedMap: this.mapKeys[this.selectedMapIndex],
+                        bombs: this.bombs,
                     });
                 });
             }
@@ -346,7 +375,8 @@ export class LobbyScene extends Phaser.Scene {
             this.scene.start('GameScene', {
                 playerData: [this.slots[0], this.slots[1]],
                 mode: 'training',
-                selectedMap: STAGE_KEYS[this.selectedMapIndex]
+                selectedMap: this.mapKeys[this.selectedMapIndex],
+                bombs: this.bombs,
             });
         });
     }
@@ -397,19 +427,18 @@ export class LobbyScene extends Phaser.Scene {
         this.mapUIContainer.add(bg);
 
         // Title
-        const title = this.add.text(0, -160, 'SCEGLI LA MAPPA', {
+        const title = this.add.text(0, -200, 'SCEGLI LA MAPPA', {
             fontSize: '48px',
             fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
             color: '#ffffff'
         }).setOrigin(0.5);
 
-        this.mapPreview = this.add.image(0, 0, previewKey(STAGE_KEYS[this.selectedMapIndex]));
-        // Scale to fit a preview box (400x225 = 16:9)
-        const previewW = 500;
-        const previewH = 280;
-        const imgScale = Math.max(previewW / this.mapPreview.width, previewH / this.mapPreview.height);
-        this.mapPreview.setScale(imgScale);
+        this.mapPreview = this.add.image(0, 0, previewKey(this.mapKeys[this.selectedMapIndex]));
+        // The previews are 1000×838: the box has their shape
+        const previewW = PREVIEW_W;
+        const previewH = PREVIEW_H;
+        this.mapPreview.setDisplaySize(previewW, previewH);
 
         // Frame around preview
         const frame = this.add.graphics();
@@ -417,7 +446,7 @@ export class LobbyScene extends Phaser.Scene {
         frame.strokeRoundedRect(-previewW / 2, -previewH / 2, previewW, previewH, 8);
 
         // Map name
-        this.mapNameText = this.add.text(0, previewH / 2 + 30, STAGES[STAGE_KEYS[this.selectedMapIndex]].label, {
+        this.mapNameText = this.add.text(0, previewH / 2 + 30, STAGES[this.mapKeys[this.selectedMapIndex]].label, {
             fontSize: '36px',
             fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
@@ -456,19 +485,25 @@ export class LobbyScene extends Phaser.Scene {
         this.cards.forEach(c => c.setVisible(true));
     }
 
+    private toggleBombs(): void {
+        this.bombs = !this.bombs;
+        AudioManager.getInstance().playSFX('ui_change_character', { volume: 0.4 });
+        this.showBombs();
+    }
+
+    private showBombs(): void {
+        this.bombsText?.setText(`Bombe: ${this.bombs ? 'SÌ' : 'NO'}  [START/P]`);
+    }
+
     private changeMap(dir: number): void {
         AudioManager.getInstance().playSFX('ui_change_character', { volume: 0.4 });
-        this.selectedMapIndex = (this.selectedMapIndex + dir + STAGE_KEYS.length) % STAGE_KEYS.length;
+        this.selectedMapIndex = (this.selectedMapIndex + dir + this.mapKeys.length) % this.mapKeys.length;
         // Update preview
         if (this.mapPreview) {
-            this.mapPreview.setTexture(previewKey(STAGE_KEYS[this.selectedMapIndex]));
-            const previewW = 500;
-            const previewH = 280;
-            const imgScale = Math.max(previewW / this.mapPreview.width, previewH / this.mapPreview.height);
-            this.mapPreview.setScale(imgScale);
+            this.mapPreview.setTexture(previewKey(this.mapKeys[this.selectedMapIndex])).setDisplaySize(PREVIEW_W, PREVIEW_H);
         }
         if (this.mapNameText) {
-            this.mapNameText.setText(STAGES[STAGE_KEYS[this.selectedMapIndex]].label);
+            this.mapNameText.setText(STAGES[this.mapKeys[this.selectedMapIndex]].label);
         }
     }
 

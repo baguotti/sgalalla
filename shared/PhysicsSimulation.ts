@@ -365,11 +365,14 @@ function handleHorizontalMovement(body: SimBody, input: SimInput): Steer {
 //  JUMP
 // ═══════════════════════════════════════════════════════════════
 
-/** Holding down on a soft platform drops through it, after long enough for a down attack to come out instead. */
+/**
+ * Holding down on a soft platform drops through it, after long enough for a down attack to come out
+ * instead. The hold counts only while free: down still held out of an attack, dodge or charge starts over.
+ */
 function handleDropHold(body: SimBody, input: SimInput): void {
-    body.downHeldSteps = input.moveDown ? body.downHeldSteps + 1 : 0;
-    if (body.downHeldSteps >= PhysicsConfig.DROP_HOLD_STEPS && body.isGrounded && body.currentPlatformIdx !== -1 &&
-        !body.isAttacking && !body.isDodging && !body.isDashing && !body.isCharging) {
+    const busy = body.isAttacking || body.isDodging || body.isDashing || body.isCharging;
+    body.downHeldSteps = input.moveDown && !busy ? body.downHeldSteps + 1 : 0;
+    if (body.downHeldSteps >= PhysicsConfig.DROP_HOLD_STEPS && body.isGrounded && body.currentPlatformIdx !== -1) {
         handlePlatformDrop(body);
     }
 }

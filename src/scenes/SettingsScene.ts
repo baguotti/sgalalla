@@ -221,8 +221,8 @@ export class SettingsScene extends Phaser.Scene {
         if (!valText) return;
 
         let val = 0;
-        if (opt === 'MUSICA') val = this.audioManager.getMusicVolume();
-        if (opt === 'EFFETTI') val = this.audioManager.getSFXVolume();
+        if (opt === 'MUSICA') val = this.audioManager.getMusicLevel();
+        if (opt === 'EFFETTI') val = this.audioManager.getSFXLevel();
 
         const displayVal = Math.round(val * 10);
         valText.setText(`< ${displayVal} >`);
@@ -602,11 +602,11 @@ export class SettingsScene extends Phaser.Scene {
 
         const step = 0.1;
         if (opt === 'MUSICA') {
-            const current = this.audioManager.getMusicVolume();
-            this.audioManager.setMusicVolume(current + (dir * step));
+            const current = this.audioManager.getMusicLevel();
+            this.audioManager.setMusicVolume(Math.round((current + dir * step) * 10) / 10);
         } else if (opt === 'EFFETTI') {
-            const current = this.audioManager.getSFXVolume();
-            this.audioManager.setSFXVolume(current + (dir * step));
+            const current = this.audioManager.getSFXLevel();
+            this.audioManager.setSFXVolume(Math.round((current + dir * step) * 10) / 10);
             this.audioManager.playSFX('ui_menu_hover');
         }
         this.updateAudioValueDisplay(this.audioSelectedIndex, opt);
