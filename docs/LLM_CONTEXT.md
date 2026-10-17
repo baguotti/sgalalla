@@ -40,11 +40,11 @@ Changing gameplay means changing the simulation, and then:
 - **Hitstun** takes all control away for the move's stun frames, and longer while the fighter still flies fast; a hit gives a fighter out of jumps one back.
 
 ### Combat (experimental branch): Unarmed's hits, our own quick timing
-- Every move in `AttackData.ts` hits like Brawlhalla's Unarmed (brawlhalla.wiki.gg), every fighter on the same average stats: damage, fixed and variable force, stun (frames). A multi-hit string is one hit with the string's damage. The timing is the main branch's, quick: lights 3 frames of startup, 6 active, 3 of recovery (down light, run light and down air a little longer), signatures 2/18/12 (side 5/18/18), in frames (sim steps).
+- Every move in `AttackData.ts` hits like Brawlhalla's Unarmed (brawlhalla.wiki.gg), every fighter on the same average stats: fixed and variable force, stun (frames), and damage about 15% lower (bombs and the recovery too). A multi-hit string is one hit with the string's damage. The timing is the main branch's, quick: lights 3 frames of startup, 6 active, 3 of recovery (down light, run light and down air a little longer), signatures 2/18/12 (side 5/18/18), in frames (sim steps).
 - **Knockback** = (fixed + variable × (d/100 + d²/20000)) × `FORCE_SCALE` px/s, d the target's damage after the hit. Calibrated with `npm run balance`: heavies KO around 120–160%, lights from about 270%.
 - **Cooldown**: every move ends with `ATTACK_END_COOLDOWN` (0.1 s) before any attack; a press meanwhile waits in the buffer.
 - **Heavies** (the signatures) charge up to `CHARGE_MAX_TIME` (1.5 s) for up to `FULL_CHARGE_BONUS` more damage and variable force; the ghost comes out with the punch. A grounded down heavy is the side signature. In the air, up or neutral heavy is the recovery; side heavy is the aerial side signature (charged too).
-- A charge faces where the fighter points (left/right held), so the signature goes that way whichever way it was running.
+- A charge faces the way the fighter points (left/right) as heavy is pressed, so the signature goes that way whichever way it was running; it can't turn while charging.
 - **Ground pound** (down heavy in the air): charges hanging in the air in its pose, then hangs through its startup and falls until it lands; the landing pose lasts its recovery, as the cooldown.
 - **Hit pause**: `HITSTOP_MIN_STEPS` plus one step per `HITSTOP_SPEED_PER_STEP` of knockback: light hits barely stop, hard launches freeze for a beat.
 - True combos come from stun against recovery + cooldown + the next startup: down light into neutral light or the side signature at any damage, neutral light into side light at low damage.

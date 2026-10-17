@@ -9,7 +9,7 @@
 
 import { countDown, SIM_STEP_MS } from './FixedStepClock.js';
 import { AttackPhase, AttackRegistry, AttackType } from './AttackData.js';
-import { applyHit, cancelAttackForChaseDodge, findHit, handleCombatInput, isGroundPoundCharge, updateCombat, type Hit } from './Combat.js';
+import { applyHit, cancelAttackForChaseDodge, findHit, handleCombatInput, updateCombat, type Hit } from './Combat.js';
 import type { FighterInput } from './FighterInput.js';
 import {
     FIGHTER_STATES, changeState, consumeBuffered, createFighter, holdInputBuffer, isBuffered, isInPlay, updateInputBuffer, updateState,
@@ -247,20 +247,13 @@ function collideWalls(f: FighterState, layout: SimStage): void {
     f.isDodging = b.isDodging;
 }
 
-/** Facing follows movement, except while stunned, ground pounding or mid-attack; a charge faces where the fighter points. */
+/** Facing follows movement, except while stunned, ground pounding, charging (set as the charge starts) or mid-attack. */
 function updateFacing(f: FighterState): void {
     if (f.isHitStunned) return;
 
     const b = f.body;
     const combat = f.combat;
-    if (combat.isGroundPounding || combat.isGroundPoundLanding || isGroundPoundCharge(f)) return;
-
-    if (combat.isCharging) {
-        const input = f.input;
-        const point = (input.aimRight || input.moveRight ? 1 : 0) - (input.aimLeft || input.moveLeft ? 1 : 0);
-        if (point !== 0) b.facingDirection = point;
-        return;
-    }
+    if (combat.isGroundPounding || combat.isGroundPoundLanding || combat.isCharging) return;
 
     if (f.isAttacking && combat.attack && combat.attack.phase !== AttackPhase.RECOVERY) return;
 

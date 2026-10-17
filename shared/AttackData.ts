@@ -1,8 +1,8 @@
 /**
  * Attack definitions: pure data shared by the client and the simulation.
- * Damage, forces and stun are Brawlhalla's Unarmed numbers (brawlhalla.wiki.gg,
- * every fighter on the same average stats; forces in Brawlhalla's units, which
- * Combat scales). The timing is our own, quick: lights hit in 3 frames. Timings
+ * Forces and stun are Brawlhalla's Unarmed numbers (brawlhalla.wiki.gg, every
+ * fighter on the same average stats; forces in Brawlhalla's units, which Combat
+ * scales); damage is about 15% below Unarmed's, so damage builds up slower. The timing is our own, quick: lights hit in 3 frames. Timings
  * are in frames, which are sim steps (60 a second).
  */
 
@@ -55,16 +55,16 @@ export interface AttackData {
 type Hit = Pick<AttackData, 'damage' | 'fixedForce' | 'variableForce' | 'stun'>;
 type Timing = Pick<AttackData, 'startup' | 'active' | 'recovery'>;
 
-/** Unarmed's hits. A string (neutral light, neutral air) is one hit with the string's damage and its last hit's force. */
-const NEUTRAL_LIGHT: Hit = { damage: 12, fixedForce: 52, variableForce: 31, stun: 23 };
-const SIDE_LIGHT: Hit = { damage: 13, fixedForce: 75, variableForce: 18, stun: 18 };
-const DOWN_LIGHT: Hit = { damage: 8, fixedForce: 45, variableForce: 5, stun: 31 };
-const NEUTRAL_AIR: Hit = { damage: 11, fixedForce: 71, variableForce: 37, stun: 19 };
-const SIDE_AIR: Hit = { damage: 13, fixedForce: 45, variableForce: 38, stun: 14 };
-const DOWN_AIR: Hit = { damage: 10, fixedForce: 65, variableForce: 5, stun: 19 };
-const NEUTRAL_HEAVY: Hit = { damage: 20, fixedForce: 40, variableForce: 46, stun: 18 };
-const SIDE_HEAVY: Hit = { damage: 18, fixedForce: 45, variableForce: 55, stun: 18 };
-const GROUND_POUND: Hit = { damage: 17, fixedForce: 48, variableForce: 46, stun: 19 };
+/** Unarmed's hits (damage 15% lower). A string (neutral light, neutral air) is one hit with the string's damage and its last hit's force. */
+const NEUTRAL_LIGHT: Hit = { damage: 10, fixedForce: 52, variableForce: 31, stun: 23 };
+const SIDE_LIGHT: Hit = { damage: 11, fixedForce: 75, variableForce: 18, stun: 18 };
+const DOWN_LIGHT: Hit = { damage: 7, fixedForce: 45, variableForce: 5, stun: 31 };
+const NEUTRAL_AIR: Hit = { damage: 9, fixedForce: 71, variableForce: 37, stun: 19 };
+const SIDE_AIR: Hit = { damage: 11, fixedForce: 45, variableForce: 38, stun: 14 };
+const DOWN_AIR: Hit = { damage: 9, fixedForce: 65, variableForce: 5, stun: 19 };
+const NEUTRAL_HEAVY: Hit = { damage: 17, fixedForce: 40, variableForce: 46, stun: 18 };
+const SIDE_HEAVY: Hit = { damage: 15, fixedForce: 45, variableForce: 55, stun: 18 };
+const GROUND_POUND: Hit = { damage: 14, fixedForce: 48, variableForce: 46, stun: 19 };
 
 /** Timings: lights quick, slides and the down air a little slower, signatures long and active. */
 const LIGHT: Timing = { startup: 3, active: 6, recovery: 3 };

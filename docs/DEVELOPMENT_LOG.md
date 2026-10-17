@@ -1328,3 +1328,10 @@ Part 2
 - **[Change]** Protocol version 20; a recording re-baselined.
 - **[S]** tsc (client, tests, server), 85 tests (new: a down light on a soft platform stays on it with down held after it; rising fast under the pillar's tip, between and under its overhang stops below the rock; the wall tests read the wall from the layout), build. In the browser (muted): the wall slide hand on the rock (sprite edge 1509.8 against the rock face at 1510), bombs off unless turned on, the local stage choice with three stages and bombs, the online lobby with a simulated room (player 1's stage and bombs sent as SETTINGS).
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Charges keep their direction; damage 15% lower (branch `experimental-branch`)
+- **[Gameplay]** A charge faces the way the fighter points (left or right) as heavy is pressed and keeps it: what's held while charging no longer turns it.
+- **[Balance]** Damage about 15% lower on every move (lights 7–11, signatures 15–17, ground pound 14), bombs 15 and the recovery 13, so fighters' damage builds up slower. Forces are unchanged: KOs come at about the same damage (side sig 140%/120%, lights 270–310%), a few more hits in.
+- **[Change]** Protocol version 21; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 86 tests (new: a charge keeps the way it faced as it started), build, KO table, headless CPU matches.
+

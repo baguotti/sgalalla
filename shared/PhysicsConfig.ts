@@ -184,7 +184,7 @@ export const PhysicsConfig = {
 
     // The recovery move's hit (Brawlhalla's Unarmed numbers, stun in frames): a square round the fighter
     RECOVERY_HITBOX_SIZE: 40,
-    RECOVERY_DAMAGE: 15,
+    RECOVERY_DAMAGE: 13,
     RECOVERY_FIXED_FORCE: 55,
     RECOVERY_VARIABLE_FORCE: 40,
     RECOVERY_STUN: 25,
@@ -223,7 +223,7 @@ export const PhysicsConfig = {
     BOMB_GRACE_STEPS: 8,
     // Its explosion hurts every fighter this close (thrower included), launching them away from it
     BOMB_BLAST_RADIUS: 101,
-    BOMB_DAMAGE: 18,
+    BOMB_DAMAGE: 15,
     BOMB_FIXED_FORCE: 55,
     BOMB_VARIABLE_FORCE: 45,
     BOMB_STUN: 25,

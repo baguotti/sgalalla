@@ -722,6 +722,16 @@ test('a charge faces where the fighter points, not where it was running', () => 
     assert.equal(f.combat.attack?.facing, -1, 'the signature goes left');
 });
 
+test('a charge keeps the way it faced as it started, whatever is held after', () => {
+    const match = newMatch(900, 1450);
+    const f = match.fighters[0];
+    step(match, { heavyAttack: true, heavyAttackHeld: true, aimRight: true, moveRight: true });
+    steps(match, 10, { heavyAttackHeld: true, aimLeft: true, moveLeft: true });
+    assert.equal(f.body.facingDirection, 1);
+    step(match, { aimLeft: true });
+    assert.equal(f.combat.attack?.facing, 1, 'the signature goes right');
+});
+
 test('after a ground pound, jumping is no ground pound charge: facing follows movement again', () => {
     const match = newMatch(500);
     const f = high(match);

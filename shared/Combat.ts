@@ -228,6 +228,10 @@ export function handleCombatInput(f: FighterState, events: MatchEvent[]): void {
         c.isCharging = true;
         changeState(f, 'Charging');
         c.chargeTime = 0;
+        // The charge faces the way the fighter points as it presses, and keeps that way
+        const input = f.input;
+        const point = (input.aimRight || input.moveRight ? 1 : 0) - (input.aimLeft || input.moveLeft ? 1 : 0);
+        if (point !== 0) b.facingDirection = point;
         // A grounded down heavy charges the side signature; in the air it charges the ground pound
         c.chargeDirection = direction === AttackDirection.DOWN && !isAerial ? AttackDirection.SIDE : direction;
         return;
