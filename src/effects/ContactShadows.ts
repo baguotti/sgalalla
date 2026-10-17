@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { PhysicsConfig } from '../config/PhysicsConfig';
 import { isInPlay } from '../../shared/FighterState';
 import type { MatchState } from '../../shared/GameSim';
-import { STAGE_LAYOUT } from '../../shared/StageData';
+import { STAGE_LAYOUTS, type SimStage } from '../../shared/StageData';
 
 const TEXTURE = 'contact_shadow';
 const TEXTURE_SIZE = 64;
@@ -35,7 +35,7 @@ export class ContactShadows {
             const shadow = this.shadows[i] ?? this.createShadow();
             const body = fighter.body;
             const feetY = body.y + PhysicsConfig.PLAYER_HEIGHT / 2;
-            const floorY = isInPlay(fighter) ? floorBelow(body.x, feetY) : null;
+            const floorY = isInPlay(fighter) ? floorBelow(STAGE_LAYOUTS[match.stage], body.x, feetY) : null;
             const nearness = floorY === null ? 0 : 1 - Math.min((floorY - feetY) / FADE_HEIGHT, 1);
             shadow.setVisible(nearness > 0 && darkness > 0);
             if (floorY === null || nearness <= 0) continue;
@@ -61,9 +61,9 @@ export class ContactShadows {
 }
 
 /** The top of the highest platform under `x` at or below the feet, or null over the void. */
-function floorBelow(x: number, feetY: number): number | null {
+function floorBelow(layout: SimStage, x: number, feetY: number): number | null {
     let floor: number | null = null;
-    for (const platform of STAGE_LAYOUT.platforms) {
+    for (const platform of layout.platforms) {
         const top = platform.y - platform.h / 2;
         if (Math.abs(x - platform.x) <= platform.w / 2 && top >= feetY - 2 && (floor === null || top < floor)) floor = top;
     }

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PhysicsConfig } from '../config/PhysicsConfig';
+import { fighterScale } from '../config/FighterScale';
 import { InputManager } from '../input/InputManager';
 import type { TouchController } from '../components/TouchController';
 import { AudioManager } from '../managers/AudioManager';
@@ -8,7 +9,7 @@ import { PlayerAI } from './player/PlayerAI';
 import { ghostStyle } from '../effects/GhostStyle';
 import { effects } from '../config/EffectConfig';
 import { AttackDirection, AttackRegistry, AttackType } from '../../shared/AttackData';
-import { currentDamage } from '../../shared/Combat';
+import { currentDamage, isGroundPoundCharge } from '../../shared/Combat';
 import { emptyInput, type FighterInput } from '../../shared/FighterInput';
 import { isInPlay, type FighterState, type GhostHitbox } from '../../shared/FighterState';
 import { SIM_STEP_MS } from '../../shared/FixedStepClock';
@@ -90,12 +91,12 @@ export class Player extends Phaser.GameObjects.Container {
         this.isTrainingDummy = config.isTrainingDummy ?? false;
         this.keyboardMapping = config.keyboardMapping ?? 'all';
 
-        this.sprite = scene.add.sprite(0, 0, this.character, `${this.character}_idle_000`);
+        this.sprite = scene.add.sprite(0, 0, this.character, `${this.character}_idle_000`).setScale(fighterScale());
         this.add(this.sprite);
         // Above the stage platforms (depth 0); ghosts sit at depth - 1
         this.setDepth(10);
 
-        this.nameTag = scene.add.text(0, -100, this.isAI ? `CPU ${this.playerId + 1}` : this.character.toUpperCase(), {
+        this.nameTag = scene.add.text(0, -PhysicsConfig.PLAYER_HEIGHT * 0.55, this.isAI ? `CPU ${this.playerId + 1}` : this.character.toUpperCase(), {
             fontSize: '18px',
             fontFamily: '"Pixeloid Sans"',
             fontStyle: 'bold',
@@ -228,6 +229,7 @@ export class Player extends Phaser.GameObjects.Container {
         // The run cycle speeds up with running speed
         this.sprite.anims.timeScale = key === 'run' && f.body.isRunning ? 0.8 + Math.abs(f.body.vx) / 3000 : 1;
 
+        // A ground pound's charge holds its first frame
         if (this.pose === null && isGroundPoundCharge(f)) {
             this.sprite.setFrame(`${this.character}_ground_pound_000`);
         }
@@ -301,11 +303,10 @@ export class Player extends Phaser.GameObjects.Container {
             this.shakeSprite(chargePercent * 2.5);
             return;
         }
-
         // Signature charges fade in a ghost in front of the fighter
         if (!this.chargeGhost) this.chargeGhost = this.createChargeGhost();
         const facing = f.body.facingDirection;
-        this.chargeGhost.setScale(facing, 1);
+        this.chargeGhost.setScale(facing * fighterScale(), fighterScale());
         this.chargeGhost.setPosition(
             f.body.x + ghostOffset(this.character) * facing + (Math.random() - 0.5),
             f.body.y + (Math.random() - 0.5),
@@ -333,7 +334,7 @@ export class Player extends Phaser.GameObjects.Container {
     private startChargeSounds(): void {
         const keys = this.character === 'pe' ? ['sfx_fight_charge', 'sfx_pe_charge'] : ['sfx_fight_charge'];
         for (const key of keys) {
-            const sound = this.scene.sound.add(key, { volume: 0.6, loop: true });
+            const sound = this.scene.sound.add(key, { volume: 0.6 * AudioManager.getInstance().getSFXVolume(), loop: true });
             sound.play();
             this.chargeSounds.push(sound);
         }
@@ -356,7 +357,7 @@ export class Player extends Phaser.GameObjects.Container {
         this.chargeSounds = [];
     }
 
-    /** Dust on landing and at a dash's start, a ring on an air jump, afterimages while dashing or chase dodging. */
+    /** Dust on landing and at a dash's start, a ring on an air jump, afterimages while dashing, chase dodging or flying from a big hit. */
     private updateMotionEffects(f: FighterState, inPlay: boolean, deltaMs: number): void {
         const b = f.body;
         if (inPlay) {
@@ -368,7 +369,8 @@ export class Player extends Phaser.GameObjects.Container {
             if (f.state === 'Dash' && this.lastState !== 'Dash') fx.spawnDust(b.x, feet, 0.7, b.dodgeDirection);
             if (!b.isGrounded && b.jumpsRemaining < this.lastJumps) fx.spawnJumpRing(b.x, feet);
 
-            if (f.state === 'Dash' || b.isChaseDodging) {
+            const flying = b.isLaunched && f.hitstopSteps === 0 && Math.hypot(b.vx, b.vy) > effects.LAUNCH_TRAIL_SPEED;
+            if (f.state === 'Dash' || b.isChaseDodging || flying) {
                 this.afterimageMs -= deltaMs;
                 if (this.afterimageMs <= 0) {
                     fx.spawnAfterimage(this.sprite, this.x + this.sprite.x, this.y + this.sprite.y);
@@ -409,7 +411,7 @@ export class Player extends Phaser.GameObjects.Container {
         const sprite = this.effects().spawnGhost(ghost.startX, ghost.startY, char, `${char}_${kind}_sig_ghost_000`, `${char}_${kind}_sig_ghost`, ghost.facing, ghostStyle.opacity);
         if (!sprite) return;
 
-        const scale = char === 'nock' && ghost.vertical ? 1.2 : 1;
+        const scale = (char === 'nock' && ghost.vertical ? 1.2 : 1) * fighterScale();
         sprite.setDepth(this.depth - 1);
         sprite.setScale(ghost.facing * scale, scale);
         sprite.setAngle(0);
@@ -447,11 +449,11 @@ export class Player extends Phaser.GameObjects.Container {
         const sprite = this.effects().spawnGhost(this.x, this.y, char, `${char}_up_sig_ghost_000`, `${char}_up_sig_ghost`, facing, ghostStyle.opacity);
         if (!sprite) return;
 
-        const scale = char === 'nock' ? 1.2 : 1;
+        const scale = (char === 'nock' ? 1.2 : 1) * fighterScale();
         sprite.setDepth(this.depth - 1);
         sprite.setScale(facing * scale, scale);
         sprite.setAngle(0);
-        sprite.setPosition(this.x, this.y - 30);
+        sprite.setPosition(this.x, this.y - 30 * fighterScale());
         this.ignoreInUiCamera(sprite);
         const blurFx = this.addGhostFx(sprite);
         this.recoveryGhost = sprite;
@@ -549,11 +551,6 @@ export class Player extends Phaser.GameObjects.Container {
         this.damageLabel?.destroy();
         super.destroy(fromScene);
     }
-}
-
-function isGroundPoundCharge(f: FighterState): boolean {
-    const c = f.combat;
-    return c.isCharging && c.chargeDirection === AttackDirection.DOWN && !f.body.isGrounded;
 }
 
 /** Signature ghosts start this far in front of the fighter. */

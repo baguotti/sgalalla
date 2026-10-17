@@ -1,9 +1,16 @@
 import Phaser from 'phaser';
 
+/** At the top level, music and effects play at this share of full volume. */
+const MAX_GAIN = 0.7;
+
+/**
+ * Music and effects volumes. Each is a level from 0 to 1 (shown 0 to 10 in the
+ * settings); sounds play at MAX_GAIN × level², so the low levels are truly quiet.
+ */
 export class AudioManager {
     private static instance: AudioManager;
-    private musicVolume: number = 0.8;
-    private sfxVolume: number = 1.0;
+    private musicVolume: number = 0.5;
+    private sfxVolume: number = 0.5;
     private scene: Phaser.Scene | null = null;
 
     private constructor() { }
@@ -37,11 +44,23 @@ export class AudioManager {
         }
     }
 
+    /** The music's gain: what to play it at. */
     public getMusicVolume(): number {
+        return MAX_GAIN * this.musicVolume * this.musicVolume;
+    }
+
+    /** The effects' gain: what to play them at. */
+    public getSFXVolume(): number {
+        return MAX_GAIN * this.sfxVolume * this.sfxVolume;
+    }
+
+    /** The music's level, 0 to 1, as the settings show it. */
+    public getMusicLevel(): number {
         return this.musicVolume;
     }
 
-    public getSFXVolume(): number {
+    /** The effects' level, 0 to 1. */
+    public getSFXLevel(): number {
         return this.sfxVolume;
     }
 
@@ -65,7 +84,7 @@ export class AudioManager {
             // Simple approach: Update playing instance. Interactions with GameScene ducking 
             // might need the GameScene to query this manager.
             if (music instanceof Phaser.Sound.WebAudioSound || music instanceof Phaser.Sound.HTML5AudioSound) {
-                (music as any).setVolume(this.musicVolume);
+                (music as any).setVolume(this.getMusicVolume());
             }
         }
     }
@@ -98,7 +117,7 @@ export class AudioManager {
         const finalConfig: Phaser.Types.Sound.SoundConfig = {
             ...config,
             detune,
-            volume: (config.volume || 1) * this.sfxVolume
+            volume: (config.volume || 1) * this.getSFXVolume()
         };
 
         try {

@@ -33,10 +33,10 @@ function random(seed: number): () => number {
     };
 }
 
-/** Directions and held buttons (bits 0-7, 9, 11, 13, 15 of packInput). */
-const HELD_BITS = 0xAAFF;
-/** Jump, light, heavy and dodge presses. */
-const PRESS_BITS = [8, 10, 12, 14];
+/** Directions and held buttons (bits 0-7, 9, 11, 13, 15 and 19, throw, of packInput). */
+const HELD_BITS = 0xAAFF | (1 << 19);
+/** Jump, light, heavy, dodge and throw (bombs) presses. */
+const PRESS_BITS = [8, 10, 12, 14, 18];
 
 /** Button mashing: a new held mask every 10 frames, plus random presses. */
 function masher(seed: number): () => number {
@@ -261,6 +261,36 @@ test('a player who falls out of sync is caught by the checksums', () => {
     for (const { session } of peers) {
         assert.ok(session.desyncFrame > 180 && session.desyncFrame <= 300, `desync seen at ${session.desyncFrame}`);
     }
+});
+
+test('a player whose game stalls for a fifth of a second doesn\'t freeze the others', () => {
+    const fighters = FIGHTERS.slice(0, 2);
+    const sessions = fighters.map((_, slot) => new RollbackSession(5, slot, 2, 2, createMatch(fighters, 5)));
+    const samples = [masher(1), masher(2)];
+    const confirmed = sessions.map(session => {
+        const sums = new Map<number, number>();
+        session.onConfirmed = (frame, state) => sums.set(frame, matchChecksum(state));
+        return sums;
+    });
+    const inFlight: { at: number; to: number; bytes: Uint8Array }[] = [];
+    for (let tick = 0; tick < 900; tick++) {
+        const now = tick * FRAME_MS;
+        sessions.forEach((session, slot) => {
+            // Player 2's game stalls for 12 frames (no steps, no packets), then catches up 4 steps a frame
+            if (slot === 1 && tick >= 300 && tick < 312) return;
+            for (let steps = 0; steps < 4 && session.frame <= tick && session.step(samples[slot], []); steps++);
+            inFlight.push({ at: now + 30, to: 1 - slot, bytes: session.buildPacket() });
+        });
+        for (let i = inFlight.length - 1; i >= 0; i--) {
+            if (inFlight[i].at > now) continue;
+            sessions[inFlight[i].to].receivePacket(inFlight[i].bytes);
+            inFlight.splice(i, 1);
+        }
+    }
+    assert.equal(sessions[0].waits, 0, 'player 1 never froze');
+    assert.ok(sessions[0].maxRollbackDepth > 8, `it rolled back further instead (${sessions[0].maxRollbackDepth} frames)`);
+    for (const [frame, sum] of confirmed[1]) if (confirmed[0].has(frame)) assert.equal(confirmed[0].get(frame), sum, `frame ${frame}`);
+    assert.ok(Math.abs(sessions[0].frame - sessions[1].frame) <= 2, 'level again');
 });
 
 test('a packet from the previous match is ignored after a rematch', () => {

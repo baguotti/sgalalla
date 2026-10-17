@@ -1,8 +1,10 @@
 /**
  * Attack definitions: pure data shared by the client and the simulation.
- * Durations are in milliseconds.
+ * Forces and stun are Brawlhalla's Unarmed numbers (brawlhalla.wiki.gg, every
+ * fighter on the same average stats; forces in Brawlhalla's units, which Combat
+ * scales); damage is about 15% below Unarmed's, so damage builds up slower. The timing is our own, quick: lights hit in 3 frames. Timings
+ * are in frames, which are sim steps (60 a second).
  */
-import { PhysicsConfig } from './PhysicsConfig.js';
 
 export const AttackType = {
     LIGHT: 'light',
@@ -31,15 +33,17 @@ export interface AttackData {
     type: AttackType;
     direction: AttackDirection;
     isAerial: boolean;
-    /** Signatures (heavy side, up, neutral) and the ground pound take their damage from PhysicsConfig instead. */
     damage: number;
-    /** Knockback every hit gives, and how much more per point of the target's damage. */
-    baseKnockback: number;
-    knockbackGrowth: number;
+    /** Knockback: the fixed force is the same at any damage, the variable force grows with the target's damage (and the charge). */
+    fixedForce: number;
+    variableForce: number;
     knockbackAngle: number; // Angle in degrees (0 = right, 90 = up)
-    startupDuration: number;
-    activeDuration: number;
-    recoveryDuration: number;
+    /** Frames the target can't act after the hit (longer while it still flies fast). */
+    stun: number;
+    /** Frames: before the hitbox, with the hitbox out, and after it (every move then ends with ATTACK_END_COOLDOWN). */
+    startup: number;
+    active: number;
+    recovery: number;
     /** The hitbox, centred this far from the fighter's centre (x forward). Signatures hit where their ghost is instead. */
     hitboxWidth: number;
     hitboxHeight: number;
@@ -48,6 +52,30 @@ export interface AttackData {
     shouldStallInAir?: boolean; // If true, apply gravity dampening
 }
 
+type Hit = Pick<AttackData, 'damage' | 'fixedForce' | 'variableForce' | 'stun'>;
+type Timing = Pick<AttackData, 'startup' | 'active' | 'recovery'>;
+
+/** Unarmed's hits (damage 15% lower). A string (neutral light, neutral air) is one hit with the string's damage and its last hit's force. */
+const NEUTRAL_LIGHT: Hit = { damage: 10, fixedForce: 52, variableForce: 31, stun: 23 };
+const SIDE_LIGHT: Hit = { damage: 11, fixedForce: 75, variableForce: 18, stun: 18 };
+const DOWN_LIGHT: Hit = { damage: 7, fixedForce: 45, variableForce: 5, stun: 31 };
+const NEUTRAL_AIR: Hit = { damage: 9, fixedForce: 71, variableForce: 37, stun: 19 };
+const SIDE_AIR: Hit = { damage: 11, fixedForce: 45, variableForce: 38, stun: 14 };
+const DOWN_AIR: Hit = { damage: 9, fixedForce: 65, variableForce: 5, stun: 19 };
+const NEUTRAL_HEAVY: Hit = { damage: 17, fixedForce: 40, variableForce: 46, stun: 18 };
+const SIDE_HEAVY: Hit = { damage: 15, fixedForce: 45, variableForce: 55, stun: 18 };
+const GROUND_POUND: Hit = { damage: 14, fixedForce: 48, variableForce: 46, stun: 19 };
+
+/** Timings: lights quick, slides and the down air a little slower, signatures long and active. */
+const LIGHT: Timing = { startup: 3, active: 6, recovery: 3 };
+const SLIDE: Timing = { startup: 5, active: 6, recovery: 6 };
+const DOWN_AIR_TIMING: Timing = { startup: 6, active: 6, recovery: 8 };
+const SIGNATURE: Timing = { startup: 2, active: 18, recovery: 12 };
+const SIDE_SIGNATURE: Timing = { startup: 5, active: 18, recovery: 18 };
+/** Hangs through its startup, then falls until it lands (no active time or recovery: landing ends it). */
+/** Hangs through its startup, falls until it lands; the landing pose lasts its recovery. */
+const GROUND_POUND_TIMING: Timing = { startup: 6, active: 0, recovery: 6 };
+
 // Attack data definitions for all attack types
 export const AttackRegistry: Record<string, AttackData> = {
     // ========== GROUNDED LIGHT ATTACKS ==========
@@ -55,81 +83,61 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.LIGHT,
         direction: AttackDirection.NEUTRAL,
         isAerial: false,
-        damage: 4,
-        baseKnockback: 180,
-        knockbackGrowth: 4,
+        ...NEUTRAL_LIGHT,
+        ...LIGHT,
         knockbackAngle: 45,
-        startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
-        activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 81,
-        hitboxHeight: 40,
-        hitboxOffsetX: 55,
+        hitboxWidth: 55,
+        hitboxHeight: 27,
+        hitboxOffsetX: 37,
         hitboxOffsetY: 0,
     },
     'light_side_grounded': {
         type: AttackType.LIGHT,
         direction: AttackDirection.SIDE,
         isAerial: false,
-        damage: 4,
-        baseKnockback: 250,
-        knockbackGrowth: 7,
-        knockbackAngle: 270,
-        startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
-        activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 81,
-        hitboxHeight: 35,
-        hitboxOffsetX: 60,
+        ...SIDE_LIGHT,
+        ...LIGHT,
+        knockbackAngle: 30,
+        hitboxWidth: 55,
+        hitboxHeight: 24,
+        hitboxOffsetX: 40,
         hitboxOffsetY: 0,
     },
     'light_down_grounded': {
         type: AttackType.LIGHT,
         direction: AttackDirection.DOWN,
         isAerial: false,
-        damage: 4,
-        baseKnockback: 180,
-        knockbackGrowth: 5, // Slightly less than side light
-        knockbackAngle: 30, // Changed from 80 (Now sends forward like side light)
-        startupDuration: PhysicsConfig.LIGHT_STARTUP_MS + 30,
-        activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS + 50,
-        hitboxWidth: 148, // 1.5x wider for slide (was 99)
-        hitboxHeight: 37, // 1.5x flatter (was 25)
-        hitboxOffsetX: 30,
-        hitboxOffsetY: 65, // Lower to feet (was 35)
+        ...DOWN_LIGHT,
+        ...SLIDE,
+        knockbackAngle: 30, // Forward, like side light
+        hitboxWidth: 100,
+        hitboxHeight: 25,
+        hitboxOffsetX: 20,
+        hitboxOffsetY: 44,
     },
     'light_run_grounded': {
         type: AttackType.LIGHT,
         direction: AttackDirection.RUN,
         isAerial: false,
-        damage: 4,
-        baseKnockback: 180,
-        knockbackGrowth: 5,
+        ...SIDE_LIGHT,
+        ...SLIDE,
         knockbackAngle: 30, // Drift/Slide physics from Down Light
-        startupDuration: PhysicsConfig.LIGHT_STARTUP_MS + 30,
-        activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS + 50,
         // Hitbox covers attacker body + punch reach
-        hitboxWidth: 250, // Extended massively to catch enemies we slide past at close range
-        hitboxHeight: 70,
-        hitboxOffsetX: -30, // Shifted slightly backward to hit enemies we slide through
+        hitboxWidth: 168,
+        hitboxHeight: 47,
+        hitboxOffsetX: -20,
         hitboxOffsetY: 0,
     },
     'light_up_grounded': {
         type: AttackType.LIGHT,
         direction: AttackDirection.UP,
         isAerial: false,
-        damage: 4,
-        baseKnockback: 180,
-        knockbackGrowth: 4,
+        ...NEUTRAL_LIGHT,
+        ...LIGHT,
         knockbackAngle: 45,
-        startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
-        activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 81,
-        hitboxHeight: 40,
-        hitboxOffsetX: 55,
+        hitboxWidth: 55,
+        hitboxHeight: 27,
+        hitboxOffsetX: 37,
         hitboxOffsetY: 0,
     },
 
@@ -138,16 +146,12 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.LIGHT,
         direction: AttackDirection.NEUTRAL,
         isAerial: true,
-        damage: 4,
-        baseKnockback: 180,
-        knockbackGrowth: 4,
+        ...NEUTRAL_AIR,
+        ...LIGHT,
         knockbackAngle: 45,
-        startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
-        activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 81,
-        hitboxHeight: 40,
-        hitboxOffsetX: 50,
+        hitboxWidth: 55,
+        hitboxHeight: 27,
+        hitboxOffsetX: 34,
         hitboxOffsetY: 0,
         shouldStallInAir: true,
     },
@@ -155,48 +159,36 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.LIGHT,
         direction: AttackDirection.SIDE,
         isAerial: true,
-        damage: 5,
-        baseKnockback: 180,
-        knockbackGrowth: 4,
+        ...SIDE_AIR,
+        ...LIGHT,
         knockbackAngle: 20,
-        startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
-        activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 81,
-        hitboxHeight: 40,
-        hitboxOffsetX: 60,
+        hitboxWidth: 55,
+        hitboxHeight: 27,
+        hitboxOffsetX: 40,
         hitboxOffsetY: 0,
     },
     'light_down_aerial': {
         type: AttackType.LIGHT,
         direction: AttackDirection.DOWN,
         isAerial: true,
-        damage: 6,
-        baseKnockback: 200,
-        knockbackGrowth: 6, // Spike strength
+        ...DOWN_AIR,
+        ...DOWN_AIR_TIMING,
         knockbackAngle: 270,
-        startupDuration: PhysicsConfig.LIGHT_STARTUP_MS + 50,
-        activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS + 80,
-        hitboxWidth: 148, // 1.5x Cloned from Down Light (was 99)
-        hitboxHeight: 37, // 1.5x (was 25)
-        hitboxOffsetX: 30,
-        hitboxOffsetY: 65,
+        hitboxWidth: 100,
+        hitboxHeight: 25,
+        hitboxOffsetX: 20,
+        hitboxOffsetY: 44,
     },
     'light_up_aerial': {
         type: AttackType.LIGHT,
         direction: AttackDirection.UP,
         isAerial: true,
-        damage: 5,
-        baseKnockback: 180,
-        knockbackGrowth: 4,
+        ...NEUTRAL_AIR,
+        ...LIGHT,
         knockbackAngle: 20, // Same as side air
-        startupDuration: PhysicsConfig.LIGHT_STARTUP_MS,
-        activeDuration: PhysicsConfig.LIGHT_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.LIGHT_RECOVERY_MS,
-        hitboxWidth: 81,
-        hitboxHeight: 40,
-        hitboxOffsetX: 60,
+        hitboxWidth: 55,
+        hitboxHeight: 27,
+        hitboxOffsetX: 40,
         hitboxOffsetY: 0,
     },
 
@@ -205,132 +197,63 @@ export const AttackRegistry: Record<string, AttackData> = {
         type: AttackType.HEAVY,
         direction: AttackDirection.NEUTRAL,
         isAerial: false,
-        damage: 6,
-        baseKnockback: 250, // Heavy Base
-        knockbackGrowth: 3.6,
+        ...NEUTRAL_HEAVY,
+        ...SIGNATURE,
         knockbackAngle: 80,
-        startupDuration: PhysicsConfig.HEAVY_STARTUP_MS,
-        activeDuration: PhysicsConfig.HEAVY_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_MS,
-        hitboxWidth: 100,
-        hitboxHeight: 90,
-        hitboxOffsetX: 20,
-        hitboxOffsetY: -40,
+        hitboxWidth: 67,
+        hitboxHeight: 61,
+        hitboxOffsetX: 13,
+        hitboxOffsetY: -27,
     },
     'heavy_side_grounded': {
         type: AttackType.HEAVY,
         direction: AttackDirection.SIDE,
         isAerial: false,
-        damage: 8,
-        baseKnockback: 300,
-        knockbackGrowth: 10.5,
+        ...SIDE_HEAVY,
+        ...SIDE_SIGNATURE,
         knockbackAngle: 4, // Changed from 5 to 4
-        startupDuration: PhysicsConfig.HEAVY_STARTUP_MS + 50,
-        activeDuration: PhysicsConfig.HEAVY_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_MS + 100,
-        hitboxWidth: 120,
-        hitboxHeight: 70,
+        hitboxWidth: 81,
+        hitboxHeight: 47,
         hitboxOffsetX: 0,
         hitboxOffsetY: 0,
     },
-    'heavy_down_grounded': {
-        type: AttackType.HEAVY,
-        direction: AttackDirection.DOWN,
-        isAerial: false,
-        damage: 8,
-        baseKnockback: 145,
-        knockbackGrowth: 3.6,
-        knockbackAngle: 85,
-        startupDuration: PhysicsConfig.HEAVY_STARTUP_MS + 30,
-        activeDuration: PhysicsConfig.HEAVY_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_MS + 80,
-        hitboxWidth: 127,
-        hitboxHeight: 30,
-        hitboxOffsetX: 0,
-        hitboxOffsetY: 92,
-    },
-
     'heavy_up_grounded': {
         type: AttackType.HEAVY,
         direction: AttackDirection.UP,
         isAerial: false,
-        damage: 6,
-        baseKnockback: 145,
-        knockbackGrowth: 3.6,
+        ...NEUTRAL_HEAVY,
+        ...SIGNATURE,
         knockbackAngle: 80,
-        startupDuration: PhysicsConfig.HEAVY_STARTUP_MS,
-        activeDuration: PhysicsConfig.HEAVY_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_MS,
-        hitboxWidth: 100,
-        hitboxHeight: 90,
-        hitboxOffsetX: 20,
-        hitboxOffsetY: -40,
+        hitboxWidth: 67,
+        hitboxHeight: 61,
+        hitboxOffsetX: 13,
+        hitboxOffsetY: -27,
     },
 
-    // ========== AERIAL HEAVY ATTACKS ==========
-    'heavy_neutral_aerial': {
-        type: AttackType.HEAVY,
-        direction: AttackDirection.NEUTRAL,
-        isAerial: true,
-        damage: 6,
-        baseKnockback: 240,
-        knockbackGrowth: 8,
-        knockbackAngle: 50,
-        startupDuration: PhysicsConfig.HEAVY_STARTUP_MS,
-        activeDuration: PhysicsConfig.HEAVY_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_MS,
-        hitboxWidth: 100,
-        hitboxHeight: 80,
-        hitboxOffsetX: 30,
-        hitboxOffsetY: 0,
-    },
+    // ========== AERIAL HEAVY ATTACKS (neutral and up are the recovery) ==========
     'heavy_side_aerial': {
         type: AttackType.HEAVY,
         direction: AttackDirection.SIDE,
         isAerial: true,
-        damage: 7,
-        baseKnockback: 280,
-        knockbackGrowth: 9,
-        knockbackAngle: 4, // Changed from 0 to 4
-        startupDuration: PhysicsConfig.HEAVY_STARTUP_MS,
-        activeDuration: PhysicsConfig.HEAVY_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_MS,
-        hitboxWidth: 110,
-        hitboxHeight: 60,
-        hitboxOffsetX: 40,
+        ...SIDE_HEAVY,
+        ...SIGNATURE,
+        knockbackAngle: 4,
+        hitboxWidth: 74,
+        hitboxHeight: 40,
+        hitboxOffsetX: 27,
         hitboxOffsetY: 0,
     },
     'heavy_down_aerial': {
         type: AttackType.HEAVY,
         direction: AttackDirection.DOWN,
         isAerial: true,
-        damage: 8,
-        baseKnockback: 160,
-        knockbackGrowth: 4,
+        ...GROUND_POUND,
+        ...GROUND_POUND_TIMING,
         knockbackAngle: 270,
-        startupDuration: PhysicsConfig.GROUND_POUND_STARTUP,
-        activeDuration: 500,
-        recoveryDuration: 150,
-        hitboxWidth: 127,
-        hitboxHeight: 30,
+        hitboxWidth: 86,
+        hitboxHeight: 20,
         hitboxOffsetX: 0,
-        hitboxOffsetY: 92,
-    },
-    'heavy_up_aerial': {
-        type: AttackType.HEAVY,
-        direction: AttackDirection.UP,
-        isAerial: true,
-        damage: 8,
-        baseKnockback: 145,
-        knockbackGrowth: 3.6,
-        knockbackAngle: 90,
-        startupDuration: PhysicsConfig.HEAVY_STARTUP_MS,
-        activeDuration: PhysicsConfig.HEAVY_ACTIVE_MS,
-        recoveryDuration: PhysicsConfig.HEAVY_RECOVERY_MS,
-        hitboxWidth: 90,
-        hitboxHeight: 70,
-        hitboxOffsetX: 0,
-        hitboxOffsetY: -40,
+        hitboxOffsetY: 62,
     },
 };
 

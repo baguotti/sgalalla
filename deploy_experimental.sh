@@ -1,6 +1,6 @@
 #!/bin/bash
 # Deploy the experimental version to the droplet, next to the release:
-#   site          http://138.68.126.112:8080  (/var/www/sgalalla-experimental)
+#   site          http://138.68.126.112:8081  (/var/www/sgalalla-experimental; 8080 is DERAPATE's)
 #   game server   port 9209, PM2 process "geckos-experimental" (~/sgalalla-experimental)
 # The release (port 80, game server 9208) is left alone.
 # Run on your LOCAL machine, from experimental-branch with everything committed.
@@ -59,11 +59,12 @@ else
 fi
 pm2 save
 ufw allow $SERVER_PORT/tcp > /dev/null
+ufw allow 8081/tcp > /dev/null
 
-echo "=== Serving the site on port 8080 ==="
+echo "=== Serving the site on port 8081 ==="
 cat > /etc/nginx/sites-available/sgalalla-experimental << EOF
 server {
-    listen 8080;
+    listen 8081;
     server_name _;
 
     root $SITE_PATH;
@@ -90,4 +91,4 @@ ENDSSH
 
 ssh $SSH_OPTS -O exit root@$DROPLET_IP 2> /dev/null || true
 echo ""
-echo "=== Experimental version live at http://$DROPLET_IP:8080 ==="
+echo "=== Experimental version live at http://$DROPLET_IP:8081 ==="

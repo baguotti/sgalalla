@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Player, type PlayerConfig } from '../entities/Player';
 import { MatchHUD, SMASH_COLORS } from '../ui/PlayerHUD';
+import { OffscreenBubbles } from '../ui/OffscreenBubbles';
 import { GamepadPresses } from '../input/GamepadPresses';
 import { MenuInput } from '../input/MenuInput';
 import { DebugOverlay } from '../components/DebugOverlay';
@@ -8,11 +9,10 @@ import { InputDebugOverlay } from '../components/InputDebugOverlay';
 import { TouchController } from '../components/TouchController';
 import { PauseMenu, type LabMenu } from '../components/PauseMenu';
 import { ControlsOverlay } from '../components/ControlsOverlay';
-import { MapConfig, ZOOM_SETTINGS } from '../config/MapConfig';
-import type { ZoomLevel } from '../config/MapConfig';
-import { freeStageBackgrounds, isStageKey, loadStageBackground, type StageKey } from '../stages/StageBackgrounds';
-import { freeLondraLayers, loadLondraLayers, LondraLayers } from '../stages/LondraLayers';
+import { freeStageBackgrounds, isStageKey, loadStageBackground, STAGES, type StageKey } from '../stages/StageBackgrounds';
+import { freeLondraLayers, GRANDE_CLOUDS, grandeStageStyle, loadLondraLayers, LondraLayers } from '../stages/LondraLayers';
 import { createStage as createSharedStage } from '../stages/StageFactory';
+import { BombSprites } from '../effects/BombSprites';
 import { ContactShadows, DEFAULT_SHADOW_DARKNESS } from '../effects/ContactShadows';
 import { EffectManager } from '../effects/EffectManager';
 import { effects } from '../config/EffectConfig';
@@ -29,12 +29,13 @@ import { ALL_CHARACTERS } from '../config/CharacterConfig';
 import { AttackRegistry, AttackType } from '../../shared/AttackData';
 import type { FighterInput } from '../../shared/FighterInput';
 import { isInPlay, type FighterSetup } from '../../shared/FighterState';
-import { FixedStepClock } from '../../shared/FixedStepClock';
+import { PhysicsConfig } from '../../shared/PhysicsConfig';
+import { FixedStepClock, ONLINE_BACKLOG_STEPS } from '../../shared/FixedStepClock';
 import { addFighter, createMatch, stepMatch, type MatchState } from '../../shared/GameSim';
 import type { MatchEvent } from '../../shared/MatchEvents';
 import { NetEvent, type MatchStart, type PlayerLeft, type WatchInputs, type WatchStart } from '../../shared/NetProtocol';
 import { SpectatorMatch } from '../network/SpectatorMatch';
-import { STAGE_LAYOUT, type SimRect } from '../../shared/StageData';
+import { STAGE_LAYOUTS, type SimRect, type SimStage } from '../../shared/StageData';
 
 import { CampaignFlow } from './CampaignFlow';
 import type { GameSceneInterface } from './GameSceneInterface';
@@ -57,6 +58,8 @@ export interface GameSceneData {
     mode?: 'versus' | 'training' | 'campaign' | 'online' | 'spectate';
     playerData?: PlayerSlot[];
     selectedMap?: string;
+    /** Bombs drop in this match (chosen in the lobby; never in the Lab or the campaign). */
+    bombs?: boolean;
     /** Campaign: a practice rematch against an island's opponent. */
     isTraining?: boolean;
     trainingOpponentIndex?: number;
@@ -71,6 +74,9 @@ export interface GameSceneData {
 /** Standard gamepad button indices. */
 const GAMEPAD_SELECT = 8;
 const GAMEPAD_START = 9;
+
+/** The camera frames every fighter in play with this much room round them, zoomed within these limits (and the stage's camera bounds). */
+const CAMERA_FRAMING = { padX: 250, padY: 100, minZoom: 0.5, maxZoom: 1.5 };
 
 /** The Studio Lab's whole-stage view: centre and zoom showing every platform with room round them for lights. */
 const STAGE_VIEW = { x: 900, y: 620, zoom: 0.62 };
@@ -95,13 +101,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     public uiCamera!: Phaser.Cameras.Scene2D.Camera;
 
-    private readonly currentZoomLevel: ZoomLevel = 'CLOSE';
-
     // The match simulation advances in fixed 60 Hz steps, whatever the display refresh rate.
     // players[i] draws and drives match.fighters[i].
     private match!: MatchState;
     private fighterSetups: FighterSetup[] = [];
-    private readonly simClock = new FixedStepClock();
+    private simClock = new FixedStepClock();
     private readonly stepInputs: FighterInput[] = [];
     private readonly stepEvents: MatchEvent[] = [];
     /** Cutscenes hold the match still. */
@@ -130,8 +134,11 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private stageView = false;
     /** The camera's centre before any kick, eased towards the fighters; null until the first camera move. */
     private cameraCentre: { x: number; y: number } | null = null;
+    /** Fighters outside the view, as bubbles at the screen's edge. */
+    private offscreenBubbles: OffscreenBubbles | null = null;
     private readonly cameraKick = { x: 0, y: 0 };
     private contactShadows: ContactShadows | null = null;
+    private bombSprites: BombSprites | null = null;
 
     // Pause menu
     private isPaused: boolean = false;
@@ -157,7 +164,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
 
     preload(): void {
         this.loadCharacterAssets();
-        if (this.isLab) {
+        if (this.isLab || this.isLayered) {
             freeStageBackgrounds(this);
             loadLondraLayers(this);
         } else {
@@ -190,20 +197,36 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private campaign: CampaignFlow | null = null;
 
     private currentStageBackground: StageKey = 'adria_bg';
+    private bombs = false;
+
+    /** The stage is drawn from Londra's layers instead of a painting. */
+    private get isLayered(): boolean {
+        return STAGES[this.currentStageBackground].image === null;
+    }
+
+    /** The stage's collision layout. */
+    private get layout(): SimStage {
+        return STAGE_LAYOUTS[STAGES[this.currentStageBackground].layout];
+    }
 
     init(data: GameSceneData): void {
         this.mode = data.mode || 'versus';
         this.isLab = data.lab === true;
         // Only the Lab plays with tuned settings: every other match, online above all, uses the defaults
         if (!this.isLab) resetTuning();
+        // Online, time lost to a stalled frame is caught up, so the others don't wait for us
+        this.simClock = new FixedStepClock(this.mode === 'online' ? ONLINE_BACKLOG_STEPS : undefined);
 
         this.currentStageBackground = isStageKey(data.selectedMap) ? data.selectedMap : 'adria_bg';
+        this.bombs = data.bombs === true;
 
         this.online = null;
         this.spectator = null;
         if (this.mode === 'spectate') {
             const { client, watch, early } = data.watch!;
             this.spectator = new SpectatorMatch(client, watch, early);
+            this.currentStageBackground = isStageKey(watch.settings.stage) ? watch.settings.stage : 'adria_bg';
+            this.bombs = watch.settings.bombs;
             // Every fighter is played by someone else
             this.playerData = watch.characters.map((character, playerId) => ({
                 playerId, joined: true, ready: true, input: { type: 'KEYBOARD', gamepadIndex: null }, character, isRemote: true,
@@ -211,6 +234,9 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         } else if (this.mode === 'online') {
             const { client, start } = data.online!;
             this.online = new OnlineMatch(client, start);
+            // What player 1 picked in the lobby
+            this.currentStageBackground = isStageKey(start.settings.stage) ? start.settings.stage : 'adria_bg';
+            this.bombs = start.settings.bombs;
             // Our slot plays with keyboard or the first gamepad; the others play remotely
             this.playerData = start.characters.map((character, playerId) => ({
                 playerId,
@@ -351,6 +377,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     { x: 960, y: 200 },
                     { x: 960, y: 400 }
                 ];
+            } else if (STAGES[this.currentStageBackground].layout === 'grande') {
+                // Spread over the wide main platform and its soft platforms
+                this.spawnPoints = [
+                    { x: 420, y: 300 }, { x: 1500, y: 300 }, { x: 760, y: 200 },
+                    { x: 1160, y: 200 }, { x: 960, y: 100 }, { x: 260, y: 400 },
+                ];
             } else {
                 this.spawnPoints = spawnPoints;
             }
@@ -382,7 +414,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 const touch = pData.playerId === this.localPlayerId() ? this.touchController : undefined;
                 const player = new Player(this, this.match.fighters[i], config, touch);
 
-                const color = this.campaign?.indicatorColor(pData.playerId) ?? this.PLAYER_COLORS[pData.playerId] ?? 0xffffff;
+                const color = this.colorOf(player);
                 player.setColor(color);
 
                 this.players.push(player);
@@ -392,7 +424,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                     const tri = this.add.graphics();
                     tri.fillStyle(color, 0.5);
                     tri.fillTriangle(-6, -6, 6, -6, 0, 6); // Downward-pointing
-                    tri.setPosition(0, -120); // Above nameTag (y=-100)
+                    tri.setPosition(0, -PhysicsConfig.PLAYER_HEIGHT * 0.65); // Above the name tag
                     player.add(tri);
                     this.tweens.add({
                         targets: tri,
@@ -412,6 +444,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             this.configureCameraExclusions();
 
             this.contactShadows = new ContactShadows(this, [this.uiCamera]);
+            this.bombSprites = new BombSprites(this, this.uiCamera);
+            this.createBubbles();
             this.stageView = false;
             this.cameraCentre = null;
             this.cameraKick.x = this.cameraKick.y = 0;
@@ -583,7 +617,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     private createStage(): void {
         const stage = createSharedStage(this, this.currentStageBackground, !this.isLab);
         this.backgroundImage = stage.background;
-        this.londraLayers = this.isLab ? new LondraLayers(this) : null;
+        this.londraLayers = this.isLab ? new LondraLayers(this) : this.isLayered ? new LondraLayers(this, grandeStageStyle(), GRANDE_CLOUDS) : null;
         this.stageTextures = [...stage.platformTextures];
 
         this.campaign?.drain([stage.background, ...stage.platformTextures]);
@@ -697,25 +731,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             }
         }
 
-        // Handle Training Toggle (T)
+        // T: every CPU switches between fighting and standing still as a dummy (together); without one, a dummy joins
         if (Phaser.Input.Keyboard.JustDown(this.trainingToggleKey) && !this.online) {
-            // Find all AI players
-            const aiPlayers = this.players.filter(p => p.isAI);
-
-            if (aiPlayers.length > 0) {
-                // Determine target state based on the first AI (sync them all)
-                // If first one is dummy, ALL become active. If first is active, ALL become dummy.
-                const targetIsDummy = !aiPlayers[0].isTrainingDummy;
-
-                aiPlayers.forEach(p => {
-                    p.isTrainingDummy = targetIsDummy;
-
-                    // Show floating text feedback for each
-                    p.isTrainingDummy = targetIsDummy;
-                    // No floaty text needed, debug overlay shows state
-                });
+            const cpus = this.players.filter(p => p.isAI);
+            if (cpus.length > 0) {
+                const dummy = !cpus[0].isTrainingDummy;
+                for (const p of cpus) p.isTrainingDummy = dummy;
             } else {
-                // If no AI exists (e.g. 1v1 human match, or just P1), spawn a dummy
                 this.spawnTrainingDummy();
             }
         }
@@ -733,6 +755,7 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         }
         this.online?.flush();
         this.players.forEach(p => p.render(this.match, delta));
+        this.bombSprites?.update(this.match);
         this.contactShadows?.update(this.match, this.lighting?.look.shadow ?? DEFAULT_SHADOW_DARKNESS);
         if (this.lighting) {
             for (const p of this.players) this.lighting.setGrounded(p.spriteObject, this.match.fighters[p.fighterIndex].body.isGrounded);
@@ -743,18 +766,15 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // 60 Hz, moving it on the frames in between makes fighters judder against it
         const cameraMoves = this.isCutscene ? 1 : steps;
         for (let i = 0; i < cameraMoves; i++) this.updateCamera();
+        this.offscreenBubbles?.update(this.match, this.cameras.main);
 
         // Debug overlay: P1's movement and attack state, and the network stats online
         if (this.players.length > 0) {
-            // Always show the first player
-            const fighter = this.match.fighters[0];
-            const attack = fighter.combat.attack;
-            const attackData = attack ? AttackRegistry[attack.key] : null;
-            const attackInfo = attack && attackData
-                ? `${attackData.type} ${attackData.direction} (${attack.phase})`
-                : 'None';
-
             if (this.debugVisible) {
+                const fighter = this.match.fighters[0];
+                const attack = fighter.combat.attack;
+                const data = attack ? AttackRegistry[attack.key] : null;
+                const attackInfo = attack && data ? `${data.type} ${data.direction} (${attack.phase})` : 'None';
                 this.debugOverlay.update(
                     fighter.body.vx,
                     fighter.body.vy,
@@ -823,7 +843,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
     /** Starts a fresh match with the current fighters. */
     private startMatch(): void {
         const seed = this.online?.start.seed ?? this.spectator?.watch.seed ?? Math.floor(Math.random() * 0x100000000);
-        this.match = createMatch(this.fighterSetups, seed);
+        // Bombs drop if the lobby turned them on (never in the Lab or the campaign)
+        this.match = createMatch(this.fighterSetups, seed, STAGES[this.currentStageBackground].layout, this.bombs && !this.isLab && !this.campaign);
         this.online?.begin(this.match);
         this.spectator?.begin(this.match);
         // Online frames can be simulated more than once, so only local matches are recorded
@@ -855,6 +876,12 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
                 break;
             case 'respawn':
                 this.showRespawnFlash(event.x, event.y);
+                break;
+            case 'explosion':
+                this.bombSprites?.explode(event.x, event.y);
+                this.cameras.main.shake(effects.KO_SHAKE_MS, effects.KO_SHAKE * 0.7);
+                this.lighting?.flash('ko', event.x, event.y);
+                audio.playSFX('sfx_bomb_explode', { volume: 0.7 });
                 break;
         }
     }
@@ -889,15 +916,51 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // A short, punchy shake and a slight zoom in, which the camera eases back out of
         this.cameras.main.shake(effects.KO_SHAKE_MS, effects.KO_SHAKE);
         this.cameras.main.zoom *= effects.KO_ZOOM_PUNCH;
-        const impactX = Phaser.Math.Clamp(x, MapConfig.BLAST_ZONE_LEFT + 100, MapConfig.BLAST_ZONE_RIGHT - 100);
-        const impactY = Phaser.Math.Clamp(y, MapConfig.BLAST_ZONE_TOP + 100, MapConfig.BLAST_ZONE_BOTTOM - 100);
+        const zone = this.layout.blastZones;
+        const impactX = Phaser.Math.Clamp(x, zone.left + 100, zone.right - 100);
+        const impactY = Phaser.Math.Clamp(y, zone.top + 100, zone.bottom - 100);
         this.lighting?.flash('ko', impactX, impactY);
+        this.showKnockOutBurst(index, x, y);
 
         const audio = AudioManager.getInstance();
         audio.playSFX('sfx_death', { volume: 0.8 });
         audio.playSFX(Math.random() > 0.5 ? 'sfx_death_crowd_1' : 'sfx_death_crowd_2', { volume: 0.5 });
 
         this.campaign?.onKnockOut(index);
+    }
+
+    /** Bubbles for every fighter (again when one joins). */
+    private createBubbles(): void {
+        this.offscreenBubbles?.destroy();
+        const byFighter = [...this.players].sort((a, b) => a.fighterIndex - b.fighterIndex);
+        this.offscreenBubbles = new OffscreenBubbles(this, byFighter.map(p => ({ character: p.character, color: this.colorOf(p) })), this.cameras.main);
+    }
+
+    /** A fighter's colour: its HUD and indicator colour. */
+    private colorOf(player: Player): number {
+        return this.campaign?.indicatorColor(player.playerId) ?? this.PLAYER_COLORS[player.playerId] ?? 0xffffff;
+    }
+
+    /** Brawlhalla's KO: a burst in the fighter's colour at the screen's edge where it left. */
+    private showKnockOutBurst(index: number, x: number, y: number): void {
+        const cam = this.cameras.main;
+        const view = cam.worldView;
+        const player = this.players.find(p => p.fighterIndex === index);
+        const burst = this.add.container(
+            Phaser.Math.Clamp((x - view.x) * cam.zoom, 0, cam.width),
+            Phaser.Math.Clamp((y - view.y) * cam.zoom, 0, cam.height),
+        ).setDepth(950);
+        const rays = this.add.graphics().fillStyle(0xffffff, 0.9);
+        for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            const side = (dx: number) => [Math.cos(angle + dx) * 60, Math.sin(angle + dx) * 60] as const;
+            const [ax, ay] = side(-0.12);
+            const [bx, by] = side(0.12);
+            rays.fillTriangle(ax, ay, bx, by, Math.cos(angle) * (i % 2 ? 230 : 320), Math.sin(angle) * (i % 2 ? 230 : 320));
+        }
+        burst.add([this.add.circle(0, 0, 170, player ? this.colorOf(player) : 0xffffff, 0.6), rays, this.add.circle(0, 0, 75, 0xffffff)]);
+        cam.ignore(burst);
+        this.tweens.add({ targets: burst, scale: { from: 0.4, to: 1.4 }, alpha: { from: 1, to: 0 }, duration: 450, ease: 'Cubic.easeOut', onComplete: () => burst.destroy() });
     }
 
     private showRespawnFlash(x: number, y: number): void {
@@ -929,10 +992,8 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             if (!isInPlay(this.match.fighters[p.fighterIndex])) return false;
 
             // Check bounds (using slightly tighter bounds than actual kill box)
-            return p.x > MapConfig.BLAST_ZONE_LEFT + 50 &&
-                p.x < MapConfig.BLAST_ZONE_RIGHT - 50 &&
-                p.y < MapConfig.BLAST_ZONE_BOTTOM - 50 &&
-                p.y > MapConfig.BLAST_ZONE_TOP + 50;
+            const zone = this.layout.blastZones;
+            return p.x > zone.left + 50 && p.x < zone.right - 50 && p.y < zone.bottom - 50 && p.y > zone.top + 50;
         });
 
         if (targets.length === 0) return;
@@ -948,22 +1009,23 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
 
-        // Viewport padding based on zoom level
-        const settings = ZOOM_SETTINGS[this.currentZoomLevel];
-        const padX = settings.padX;
-        const padY = settings.padY;
+        const { padX, padY, minZoom, maxZoom } = CAMERA_FRAMING;
+        const zoomX = this.scale.width / ((maxX - minX) + padX * 2);
+        const zoomY = this.scale.height / ((maxY - minY) + padY * 2);
 
-        const width = (maxX - minX) + padX * 2;
-        const height = (maxY - minY) + padY * 2;
-
-        const zoomX = this.scale.width / width;
-        const zoomY = this.scale.height / height;
-
-        // Clamp zoom
-        const targetZoom = Phaser.Math.Clamp(Math.min(zoomX, zoomY), settings.minZoom, settings.maxZoom);
+        // Never further out than the stage's camera bounds allow (Brawlhalla: fighters beyond show as bubbles)
+        const bounds = this.layout.camera;
+        const widest = Math.max(this.scale.width / (bounds.right - bounds.left), this.scale.height / (bounds.bottom - bounds.top));
+        const targetZoom = Phaser.Math.Clamp(Math.min(zoomX, zoomY), Math.max(minZoom, widest), maxZoom);
 
         cam.zoom = Phaser.Math.Linear(cam.zoom, targetZoom, 0.1);
-        this.moveCameraTowards(centerX, centerY);
+        // ...and the view stays inside them
+        const halfW = this.scale.width / cam.zoom / 2;
+        const halfH = this.scale.height / cam.zoom / 2;
+        this.moveCameraTowards(
+            Phaser.Math.Clamp(centerX, bounds.left + halfW, bounds.right - halfW),
+            Phaser.Math.Clamp(centerY, bounds.top + halfH, bounds.bottom - halfH),
+        );
     }
 
     /** Eases the camera's centre towards (x, y), plus what's left of the last hit's kick. Once per step. */
@@ -1055,12 +1117,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.fighterSetups.push(setup);
         const fighter = addFighter(this.match, setup);
         const player = new Player(this, fighter, { playerId, character, isAI: true, isTrainingDummy: true });
-        player.setColor(this.PLAYER_COLORS[playerId] || 0xffffff);
+        player.setColor(this.colorOf(player));
 
         this.players.push(player);
         this.uiCamera.ignore(player);
         this.lighting?.add(player.spriteObject, 'fighter');
         this.addPlayerToHUD(player);
+        this.createBubbles();
     }
 
     /** Back from a scene launched over this one (settings, dialogue): the pause menu comes back if it was up. */
@@ -1102,6 +1165,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         this.setLabTime(1, false);
         this.contactShadows?.destroy();
         this.contactShadows = null;
+        this.bombSprites?.destroy();
+        this.bombSprites = null;
+        this.offscreenBubbles?.destroy();
+        this.offscreenBubbles = null;
 
         this.input.keyboard?.removeAllKeys();
         this.input.keyboard?.resetKeys();
@@ -1407,12 +1474,13 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
         // Collision as the simulation sees it (shared/StageData.ts)
         let side = 0;
         let top = 0;
-        STAGE_LAYOUT.platforms.forEach((p, index) => {
+        const layout = this.layout;
+        layout.platforms.forEach((p, index) => {
             if (p.isSoft) this.drawDebugRect(p, 0xffff00, `TOP #${++top}`);
             else this.drawDebugRect(p, 0x00ff00, index === 0 ? 'MAIN #0' : `SIDE #${++side}`);
         });
-        STAGE_LAYOUT.walls.forEach((w, index) => this.drawDebugRect(w, 0xff0000, `WALL #${index + 1}`));
-        STAGE_LAYOUT.ceilings.forEach((c, index) => this.drawDebugRect(c, 0xff8800, `CEILING #${index + 1}`));
+        layout.walls.forEach((w, index) => this.drawDebugRect(w, 0xff0000, `WALL #${index + 1}`));
+        layout.ceilings.forEach((c, index) => this.drawDebugRect(c, 0xff8800, `CEILING #${index + 1}`));
     }
 
     private drawDebugRect(r: SimRect, color: number, name: string): void {

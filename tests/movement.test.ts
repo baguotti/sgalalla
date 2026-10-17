@@ -1,17 +1,19 @@
 /**
- * Movement rules taken from Brawlhalla: falling, fast fall, dash and dash
- * jump, dodges and their cooldowns, chase dodge, gravity cancel, walls, and
- * what a hit does to the fighter who takes it.
+ * Movement rules taken from Brawlhalla: quick starts and stops, momentum in
+ * the air, short hops, falling, fast fall, dash and dash jump, dodges and
+ * their cooldowns, chase dodge, gravity cancel, walls, and what a hit does to
+ * the fighter who takes it (a launch that glides and outlasts the stun).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AttackPhase } from '../shared/AttackData.ts';
-import { checkHit } from '../shared/Combat.ts';
+import { AttackPhase, AttackRegistry } from '../shared/AttackData.ts';
+import { applyHit, findHit, isGroundPoundCharge } from '../shared/Combat.ts';
 import { countDown, SIM_STEP_MS } from '../shared/FixedStepClock.ts';
 import { createMatch, stepMatch, type MatchState } from '../shared/GameSim.ts';
 import { emptyInput, type FighterInput } from '../shared/FighterInput.ts';
 import type { FighterState } from '../shared/FighterState.ts';
 import { PhysicsConfig } from '../shared/PhysicsConfig.ts';
+import { STAGE_LAYOUTS } from '../shared/StageData.ts';
 
 /** Standing on the main stage (top at y = 870). */
 const GROUND_Y = 870 - PhysicsConfig.PLAYER_HEIGHT / 2;
@@ -148,7 +150,7 @@ test('a jump out of a dash is low, fast and carries on further', () => {
     }
 
     assert.ok(GROUND_Y - top < (GROUND_Y - plainTop) * 0.6, `dash jump height ${GROUND_Y - top}, jump ${GROUND_Y - plainTop}`);
-    assert.ok(dashJumpDistance > 350, `dash jump covers ${dashJumpDistance} px`);
+    assert.ok(dashJumpDistance > 1.5 * PhysicsConfig.PLAYER_HEIGHT, `dash jump covers ${dashJumpDistance} px`);
 });
 
 test('a dodge on the ground without a direction is an invincible spot dodge with the ground cooldown', () => {
@@ -227,9 +229,21 @@ test('a hit gives a fighter out of jumps one back', () => {
     attacker.combat.attack = { key: 'light_neutral_grounded', phase: AttackPhase.ACTIVE, phaseTimer: 0, facing: 1 };
     attacker.isAttacking = true;
     Object.assign(attacker.combat.hitbox, { active: true, x: target.body.x, y: target.body.y, w: 50, h: 50 });
-    checkHit(attacker, target, []);
+    applyHit(findHit(attacker, target)!, []);
     assert.equal(target.isHitStunned, true);
     assert.equal(target.body.jumpsRemaining, 1);
+});
+
+test('two fighters hitting each other on the same step both get hit, whatever their slots', () => {
+    const match = newMatch(700, 780);
+    const [a, b] = match.fighters;
+    a.body.facingDirection = 1;
+    b.body.facingDirection = -1;
+    step(match, { lightAttack: true, lightAttackHeld: true }, { lightAttack: true, lightAttackHeld: true });
+    for (let i = 0; i < 10 && !a.isHitStunned && !b.isHitStunned; i++) step(match);
+    assert.equal(a.isHitStunned, true, 'fighter 1 hit');
+    assert.equal(b.isHitStunned, true, 'fighter 2 hit');
+    assert.equal(a.damagePercent, b.damagePercent);
 });
 
 test('a hit opens a chase dodge: it cancels the attack, costs no cooldown, and is invincible only at first', () => {
@@ -293,10 +307,13 @@ test('gravity cancel: an attack out of an aerial spot dodge is the grounded move
     assert.ok(f.body.dodgeCooldownTimer > PhysicsConfig.LANDED_AIR_DODGE_COOLDOWN, `cooldown ${f.body.dodgeCooldownTimer}`);
 });
 
+/** The left face of the main stage's left wall. */
+const MAIN_WALL_FACE = STAGE_LAYOUTS.standard.walls[0].x - STAGE_LAYOUTS.standard.walls[0].w / 2;
+
 /** Fighter 0 in the air against the left side of the main stage. */
 function onWall(match: MatchState): FighterState {
     const f = match.fighters[0];
-    f.body.x = 370;
+    f.body.x = MAIN_WALL_FACE - PhysicsConfig.PLAYER_WIDTH / 2 + 1;
     f.body.y = 1000;
     f.body.vy = 0;
     f.body.isGrounded = false;
@@ -331,9 +348,11 @@ test('a hit freezes both fighters for a moment, longer for harder hits', () => {
     const match = newMatch(700, 780);
     const [attacker, target] = match.fighters;
     landLight(match);
-    const expected = PhysicsConfig.HITSTOP_MIN_STEPS + Math.round(4 * PhysicsConfig.HITSTOP_PER_DAMAGE);
+    const hitstopFor = (knockback: number) => Math.min(PhysicsConfig.HITSTOP_MAX_STEPS,
+        PhysicsConfig.HITSTOP_MIN_STEPS + Math.floor(knockback / PhysicsConfig.HITSTOP_SPEED_PER_STEP));
+    const expected = target.hitstopSteps;
     assert.equal(attacker.hitstopSteps, expected);
-    assert.equal(target.hitstopSteps, expected);
+    assert.ok(expected >= PhysicsConfig.HITSTOP_MIN_STEPS && expected <= 3, `a light hit barely stops (${expected})`);
 
     // Frozen: the knockback waits, the attack doesn't advance, and the stun doesn't count down
     const at = { x: target.body.x, y: target.body.y, stun: target.hitStunTimer, phase: attacker.combat.attack?.phaseTimer };
@@ -344,10 +363,8 @@ test('a hit freezes both fighters for a moment, longer for harder hits', () => {
     assert.equal(target.hitstopSteps, 0);
     assert.notEqual(target.body.x, at.x, 'flying once it ends');
 
-    // A signature hit lands harder, so it freezes longer
-    const heavy = Math.min(PhysicsConfig.HITSTOP_MAX_STEPS,
-        PhysicsConfig.HITSTOP_MIN_STEPS + Math.round(PhysicsConfig.SIDE_SIG_MAX_DAMAGE * PhysicsConfig.HITSTOP_PER_DAMAGE));
-    assert.ok(heavy > expected);
+    // A hit launching at KO speed freezes longer
+    assert.ok(hitstopFor(6000) > expected);
 });
 
 test('presses during hit-stop wait for it to end', () => {
@@ -389,15 +406,31 @@ test('stun lasts while flying fast across, not while falling', () => {
 test('stun never lasts past its limit', () => {
     const match = newMatch();
     const f = stunned(match, 0, -3000, 300);
-    f.hitStunTimer = PhysicsConfig.HIT_STUN_DURATION - PhysicsConfig.MAX_HIT_STUN + 1;
+    f.hitStunTimer = -PhysicsConfig.STUN_EXTENSION_MAX + 1;
     f.body.vy = -3000;
     step(match);
     assert.equal(f.isHitStunned, false);
 });
 
+test('the pillar can\'t be entered from below: rising under it stops at its rock', () => {
+    // Under the left pillar's tip, its inner overhang and in between, rising fast
+    for (const x of [-20, 40, 110]) {
+        const match = newMatch(700, 1300);
+        const f = match.fighters[0];
+        f.body.x = x;
+        f.body.y = 950;
+        f.body.isGrounded = false;
+        for (let i = 0; i < 20; i++) {
+            f.body.vy = -1800;
+            step(match);
+        }
+        assert.ok(f.body.y - PhysicsConfig.PLAYER_HEIGHT / 2 >= 660, `stopped below the rock at x ${x} (top at ${(f.body.y - PhysicsConfig.PLAYER_HEIGHT / 2).toFixed(0)})`);
+    }
+});
+
 test('a stunned fighter bounces off the floor and walls', () => {
     const floor = newMatch();
-    const f = stunned(floor, 0, 1500, 770);
+    const f = stunned(floor, 0, 1500, 870 - PhysicsConfig.PLAYER_HEIGHT / 2 - 10);
     f.hitStunTimer = 500;
     step(floor);
     assert.ok(f.body.vy < 0, `bounced up at ${f.body.vy}`);
@@ -406,8 +439,8 @@ test('a stunned fighter bounces off the floor and walls', () => {
     const wall = newMatch();
     const g = stunned(wall, 1500, 0, 1000);
     g.hitStunTimer = 500;
-    // Just left of the main stage's left side
-    g.body.x = 360;
+    // Just left of the main stage's left wall
+    g.body.x = MAIN_WALL_FACE - PhysicsConfig.PLAYER_WIDTH / 2 - 10;
     step(wall);
     assert.ok(g.body.vx < 0, `bounced back at ${g.body.vx}`);
 });
@@ -457,6 +490,17 @@ test('holding down drops through a soft platform; a quick tap does not', () => {
     assert.ok(g.body.y > 460, `dropped through, at ${g.body.y}`);
 });
 
+test('a down light on a soft platform stays on it, even with down held after it', () => {
+    const match = newMatch();
+    const f = onSoftPlatform(match);
+    steps(match, 3, { moveDown: true });
+    step(match, { moveDown: true, aimDown: true, lightAttack: true, lightAttackHeld: true });
+    assert.equal(f.isAttacking, true, 'the down light comes out');
+    while (f.isAttacking) step(match, { moveDown: true, aimDown: true });
+    steps(match, PhysicsConfig.DROP_HOLD_STEPS - 1, { moveDown: true });
+    assert.notEqual(f.body.currentPlatformIdx, -1, 'still on a platform');
+});
+
 test('landing takes a moment before the next jump, dodge or attack', () => {
     const match = newMatch();
     const f = match.fighters[0];
@@ -475,7 +519,7 @@ test('jumping up into a platform from below stops under it, without a shove side
     const f = match.fighters[0];
     // Under the left platform, whose underside is at y 575
     Object.assign(f.body, { x: 40, y: 760, vx: 0, vy: -900, isGrounded: false });
-    steps(match, 12);
+    steps(match, 16);
     assert.equal(f.body.x, 40, 'no shove');
     assert.ok(f.body.y - PhysicsConfig.PLAYER_HEIGHT / 2 >= 575, `stopped below, head at ${f.body.y - PhysicsConfig.PLAYER_HEIGHT / 2}`);
     assert.ok(f.body.vy >= 0, 'falling again');
@@ -502,4 +546,269 @@ test('timers last exactly their length in steps', () => {
         step(match);
     }
     assert.equal(dodging, Math.round(PhysicsConfig.SPOT_DODGE_DURATION / SIM_STEP_MS));
+});
+
+test('running builds up quickly and stops almost dead, as on main; in the air, letting go eases off', () => {
+    const match = newMatch(400, 1500);
+    const f = match.fighters[0];
+    // Read fresh each time (an assertion would otherwise narrow the type to the value it checked)
+    const speed = (): number => f.body.vx;
+    const stepsFor = (top: number, rate: number) => Math.ceil(top / (rate * SIM_STEP_MS / 1000));
+    steps(match, 12, { moveRight: true });
+    assert.ok(speed() > PhysicsConfig.RUN_SPEED * 0.8, `most of the run speed in 12 steps (${speed().toFixed(0)})`);
+    steps(match, 40, { moveRight: true });
+    assert.ok(Math.abs(speed() - PhysicsConfig.RUN_SPEED) < 1, `settles at the run speed (${speed().toFixed(0)})`);
+    const x = f.body.x;
+    steps(match, 8);
+    assert.equal(speed(), 0, 'stopped');
+    assert.ok(f.body.x - x < 15, `slid ${(f.body.x - x).toFixed(1)} px`);
+    jump(match);
+    steps(match, stepsFor(PhysicsConfig.AIR_SPEED, PhysicsConfig.AIR_ACCEL), { moveRight: true, jumpHeld: true });
+    assert.ok(speed() === PhysicsConfig.AIR_SPEED, `air speed (${speed()})`);
+    const toStop = stepsFor(PhysicsConfig.AIR_SPEED, PhysicsConfig.AIR_DECEL);
+    steps(match, Math.round(toStop / 2), { jumpHeld: true });
+    assert.ok(speed() > PhysicsConfig.AIR_SPEED * 0.3 && speed() < PhysicsConfig.AIR_SPEED * 0.7, `still drifting at ${speed().toFixed(0)} px/s halfway`);
+    steps(match, toStop, { jumpHeld: true });
+    assert.ok(Math.abs(speed()) < 1e-9, 'stopped');
+});
+
+test('letting go of jump cuts a jump short, but not a dash jump or a recovery', () => {
+    const full = newMatch();
+    step(full, { jump: true, jumpHeld: true });
+    steps(full, 30, { jumpHeld: true });
+    const hop = newMatch();
+    step(hop, { jump: true, jumpHeld: true });
+    steps(hop, 30);
+    assert.ok(hop.fighters[0].body.y > full.fighters[0].body.y + 80, 'the short hop is lower');
+
+    const dash = newMatch();
+    step(dash, { dodge: true, dodgeHeld: true, moveRight: true });
+    step(dash, { jump: true, jumpHeld: true });
+    const rising = dash.fighters[0].body.vy;
+    step(dash);
+    assert.ok(dash.fighters[0].body.vy < rising * 0.8, 'the dash jump keeps rising: no cut');
+    assert.ok(dash.fighters[0].body.vy < 0);
+});
+
+test('a launch slows by a steady amount along its angle, and carries on past the stun', () => {
+    const match = newMatch();
+    const f = high(match);
+    Object.assign(f.body, { vx: 3000, vy: -1000, isLaunched: true });
+    f.isHitStunned = true;
+    f.hitStunTimer = 18 * SIM_STEP_MS;
+    step(match);
+    const lost = PhysicsConfig.LAUNCH_DECEL * SIM_STEP_MS / 1000;
+    const expected = 3000 * (1 - lost / Math.sqrt(3000 * 3000 + 1000 * 1000));
+    assert.ok(Math.abs(f.body.vx - expected) < 1e-6, `slows by a steady amount (${f.body.vx.toFixed(0)})`);
+    assert.ok(Math.abs(f.body.vy / f.body.vx - -1000 / 3000) < 0.05, 'still along its angle');
+
+    // Out of stun (flying too slowly to stretch it), the launch carries on
+    Object.assign(f.body, { vx: 500, vy: -200 });
+    f.hitStunTimer = 1;
+    step(match);
+    assert.equal(f.isHitStunned, false, 'the stun is over');
+    assert.equal(f.body.isLaunched, true, 'the launch still carries');
+    const vx = f.body.vx;
+    step(match);
+    assert.ok(f.body.vx < vx, 'still slowing');
+});
+
+test('a launch carries on through the fall, and ends on a jump or on landing', () => {
+    const match = newMatch();
+    const f = high(match);
+    f.body.vx = 700;
+    f.body.isLaunched = true;
+    step(match, { jump: true, jumpHeld: true });
+    assert.equal(f.body.isLaunched, false, 'a jump ends it');
+    f.body.isLaunched = true;
+    f.body.vx = 300;
+    f.body.vy = 0;
+    steps(match, 10);
+    assert.equal(f.body.isLaunched, true, 'slow, falling: still flying');
+    assert.ok(f.body.vx > 150, `the sideways speed fades gently (${f.body.vx.toFixed(0)})`);
+    for (let i = 0; i < 200 && !f.body.isGrounded; i++) step(match);
+    step(match);
+    assert.equal(f.body.isLaunched, false, 'landing ends it');
+});
+
+test('charging a heavy move all but stops the fighter, even holding a direction', () => {
+    const match = newMatch(500, 1450);
+    const f = match.fighters[0];
+    steps(match, 10, { moveRight: true });
+    const x = f.body.x;
+    step(match, { heavyAttack: true, heavyAttackHeld: true, moveRight: true, aimRight: true });
+    steps(match, 40, { heavyAttackHeld: true, moveRight: true, aimRight: true });
+    assert.equal(f.combat.isCharging, true);
+    assert.ok(f.body.x - x < 30, `moved ${(f.body.x - x).toFixed(0)} px while charging`);
+    assert.ok(Math.abs(f.body.vx) < 1, 'standing still');
+});
+
+// ─── Brawlhalla's Unarmed rules ───
+
+test('a hit launches with Brawlhalla\'s force and stuns for the move\'s frames', () => {
+    const match = newMatch(700, 780);
+    const target = match.fighters[1];
+    target.damagePercent = 100;
+    landLight(match);
+    const move = AttackRegistry.light_neutral_grounded;
+    const d = 100 + move.damage;
+    const force = move.fixedForce + move.variableForce * (d / 100 + (d * d) / 20000);
+    assert.ok(Math.abs(Math.hypot(target.body.vx, target.body.vy) - force * PhysicsConfig.FORCE_SCALE) < 1e-6);
+    assert.equal(target.hitStunTimer, move.stun * SIM_STEP_MS);
+});
+
+test('every move ends with the same short cooldown before any attack', () => {
+    const match = newMatch(700, 1300);
+    const f = match.fighters[0];
+    step(match, { lightAttack: true, lightAttackHeld: true });
+    while (f.isAttacking) step(match);
+    assert.equal(f.combat.attackCooldownTimer, PhysicsConfig.ATTACK_END_COOLDOWN);
+    step(match, { lightAttack: true, lightAttackHeld: true, aimRight: true });
+    assert.equal(f.isAttacking, false, 'another attack waits too');
+    // The press stays buffered and comes out once the cooldown is over
+    while (f.combat.attackCooldownTimer > 0) step(match, { aimRight: true });
+    assert.equal(f.combat.attack?.key, 'light_side_grounded');
+});
+
+test('a light attack can be jumped out of, and steered in its recovery; a heavy can\'t', () => {
+    const match = newMatch(700, 1300);
+    const f = match.fighters[0];
+    step(match, { lightAttack: true, lightAttackHeld: true, aimRight: true });
+    steps(match, 2);
+    step(match, { jump: true, jumpHeld: true });
+    assert.ok(f.body.vy < 0, 'jumped');
+    assert.ok(Math.abs(f.body.vx) <= PhysicsConfig.AIR_SPEED, 'the lunge doesn\'t carry into the air');
+
+    const match2 = newMatch(700, 1300);
+    const h = match2.fighters[0];
+    step(match2, { lightAttack: true, lightAttackHeld: true });
+    while (h.combat.attack?.phase !== AttackPhase.RECOVERY) step(match2);
+    const x = h.body.x;
+    steps(match2, 2, { moveRight: true });
+    assert.ok(h.body.x > x, 'steers in the recovery');
+
+    const match3 = newMatch(700, 1300);
+    const k = match3.fighters[0];
+    step(match3, { heavyAttack: true, heavyAttackHeld: true });
+    step(match3);
+    assert.ok(k.isAttacking);
+    step(match3, { jump: true, jumpHeld: true });
+    assert.ok(k.body.isGrounded, 'no jump out of a heavy');
+});
+
+test('the ground pound charges hanging in the air, then falls; landing is its pose', () => {
+    const match = newMatch(500);
+    const f = high(match);
+    f.body.y = 300;
+    step(match, { heavyAttack: true, heavyAttackHeld: true, aimDown: true });
+    assert.equal(f.combat.isCharging, true);
+    steps(match, 20, { heavyAttackHeld: true, aimDown: true });
+    assert.ok(f.body.y - 300 < 10, 'hangs while charging');
+    step(match, { aimDown: true });
+    assert.equal(f.combat.isGroundPounding, true);
+    for (let i = 0; i < 120 && !f.body.isGrounded; i++) step(match);
+    step(match);
+    assert.equal(f.isAttacking, false);
+    assert.equal(f.combat.isGroundPoundLanding, true);
+    while (f.combat.attackCooldownTimer > 0) step(match);
+    assert.equal(f.combat.isGroundPoundLanding, false);
+});
+
+test('a charge faces where the fighter points, not where it was running', () => {
+    const match = newMatch(900, 1450);
+    const f = match.fighters[0];
+    steps(match, 20, { moveRight: true });
+    step(match, { heavyAttack: true, heavyAttackHeld: true, aimLeft: true, moveLeft: true });
+    steps(match, 10, { heavyAttackHeld: true, aimLeft: true, moveLeft: true });
+    assert.equal(f.body.facingDirection, -1);
+    step(match, { aimLeft: true });
+    assert.equal(f.combat.attack?.key, 'heavy_side_grounded');
+    assert.equal(f.combat.attack?.facing, -1, 'the signature goes left');
+});
+
+test('a charge keeps the way it faced as it started, whatever is held after', () => {
+    const match = newMatch(900, 1450);
+    const f = match.fighters[0];
+    step(match, { heavyAttack: true, heavyAttackHeld: true, aimRight: true, moveRight: true });
+    steps(match, 10, { heavyAttackHeld: true, aimLeft: true, moveLeft: true });
+    assert.equal(f.body.facingDirection, 1);
+    step(match, { aimLeft: true });
+    assert.equal(f.combat.attack?.facing, 1, 'the signature goes right');
+});
+
+test('after a ground pound, jumping is no ground pound charge: facing follows movement again', () => {
+    const match = newMatch(500);
+    const f = high(match);
+    f.body.y = 300;
+    step(match, { heavyAttack: true, heavyAttackHeld: true, aimDown: true });
+    step(match, { aimDown: true });
+    for (let i = 0; i < 120 && !f.body.isGrounded; i++) step(match);
+    steps(match, 20);
+    step(match, { jump: true, jumpHeld: true, moveLeft: true });
+    steps(match, 10, { jumpHeld: true, moveLeft: true });
+    assert.equal(isGroundPoundCharge(f), false);
+    assert.equal(f.body.facingDirection, -1);
+});
+
+test('side heavy in the air is a charged signature; up and neutral are the recovery', () => {
+    const match = newMatch(500);
+    const f = high(match);
+    f.body.y = 300;
+    step(match, { heavyAttack: true, heavyAttackHeld: true, aimRight: true });
+    assert.equal(f.combat.isCharging, true);
+    step(match, { aimRight: true });
+    assert.equal(f.combat.attack?.key, 'heavy_side_aerial');
+
+    const m2 = newMatch(500);
+    const g = high(m2);
+    g.body.y = 300;
+    step(m2, { heavyAttack: true, heavyAttackHeld: true, aimUp: true });
+    assert.equal(g.body.isRecovering, true);
+});
+
+test('down light true-combos into a neutral light', () => {
+    for (const percent of [0, 80]) {
+        const match = newMatch(700, 880);
+        const [attacker, target] = match.fighters;
+        target.damagePercent = percent;
+        step(match, { lightAttack: true, lightAttackHeld: true, aimDown: true });
+        for (let i = 0; i < 30 && !target.isHitStunned; i++) step(match);
+        assert.equal(target.isHitStunned, true, 'the slide hits');
+        const damage = target.damagePercent;
+        let stunnedWhenHit = false;
+        for (let i = 0; i < 60 && target.damagePercent === damage; i++) {
+            stunnedWhenHit = target.isHitStunned;
+            // Stepping in after it, as a player would
+            step(match, { lightAttack: !attacker.isAttacking, lightAttackHeld: true, moveRight: !attacker.isAttacking });
+        }
+        assert.ok(target.damagePercent > damage, `the neutral light hits at ${percent}%`);
+        assert.equal(stunnedWhenHit, true, 'before the stun ends');
+    }
+});
+
+test('sizes and jumps match the Brawlhalla recordings, in fighter heights (H)', () => {
+    const H = PhysicsConfig.PLAYER_HEIGHT;
+    // The standard main platform is 9.5 H wide, as Brawlhalla's main stage against a legend
+    assert.ok(Math.abs(STAGE_LAYOUTS.standard.platforms[0].w / H - 9.5) < 0.1);
+    // A full jump rises about 1.95 H and peaks in about 27 frames; an air jump rises as high
+    const rise = (airJump: boolean) => {
+        const match = newMatch(500);
+        const f = match.fighters[0];
+        if (airJump) {
+            step(match, { jump: true, jumpHeld: true });
+            while (f.body.vy < 0) step(match, { jumpHeld: true });
+        }
+        const y0 = f.body.y;
+        step(match, { jump: true, jumpHeld: true });
+        let top = y0, apex = 0;
+        for (let i = 1; i < 60; i++) {
+            step(match, { jumpHeld: true });
+            if (f.body.y < top) { top = f.body.y; apex = i; }
+        }
+        return { height: (y0 - top) / H, apex };
+    };
+    const ground = rise(false);
+    const air = rise(true);
+    assert.ok(Math.abs(ground.height - 1.95) < 0.1 && Math.abs(ground.apex - 27) <= 2, `jump ${ground.height.toFixed(2)} H, apex ${ground.apex}`);
+    assert.ok(Math.abs(air.height - ground.height) < 0.1, `air jump ${air.height.toFixed(2)} H`);
 });

@@ -3,9 +3,9 @@ import { NetEvent, PROTOCOL_VERSION } from '../../shared/NetProtocol';
 
 type NetEventName = typeof NetEvent[keyof typeof NetEvent];
 
-/** The release's game server; the experimental site (port 8080 on the droplet) has its own on 9209. */
+/** The release's game server; the experimental site (port 8081 on the droplet) has its own on 9209. */
 const SERVER_PORT = 9208;
-const EXPERIMENTAL_SITE_PORT = '8080';
+const EXPERIMENTAL_SITE_PORT = '8081';
 const EXPERIMENTAL_SERVER_PORT = 9209;
 const PING_INTERVAL_MS = 500;
 const SERVER_EVENTS = [

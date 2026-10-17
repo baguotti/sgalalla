@@ -32,17 +32,17 @@ test('changes show in the settings and come back as differences only', () => {
 test('reset puts every value back, new knockback angles included', () => {
     resetTuning();
     const physics = { ...PhysicsConfig };
-    const move = { ...AttackRegistry.heavy_side_aerial };
+    const move = { ...AttackRegistry.heavy_side_grounded };
     const angles = Object.keys(KNOCKBACK_DIRECTIONS).length;
     setPhysics('GRAVITY', 1);
     setPhysics('RECOVERY_KNOCKBACK_ANGLE', 33);
-    setMoveValue('heavy_side_aerial', 'knockbackAngle', 61);
-    setMoveValue('heavy_side_aerial', 'shouldStallInAir', true);
+    setMoveValue('heavy_side_grounded', 'knockbackAngle', 61);
+    setMoveValue('heavy_side_grounded', 'shouldStallInAir', true);
     assert.ok(61 in KNOCKBACK_DIRECTIONS && 33 in KNOCKBACK_DIRECTIONS, 'a new angle gets a direction');
 
     resetTuning();
     assert.deepEqual({ ...PhysicsConfig }, physics);
-    assert.deepEqual({ ...AttackRegistry.heavy_side_aerial }, move);
+    assert.deepEqual({ ...AttackRegistry.heavy_side_grounded }, move);
     assert.equal(Object.keys(KNOCKBACK_DIRECTIONS).length, angles);
     assert.equal(isDefaultTuning(), true);
 });

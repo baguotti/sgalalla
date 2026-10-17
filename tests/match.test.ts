@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createMatch, stepMatch, type MatchState } from '../shared/GameSim.ts';
 import { emptyInput } from '../shared/FighterInput.ts';
 import { isInPlay } from '../shared/FighterState.ts';
-import { STAGE_LAYOUT } from '../shared/StageData.ts';
+import { STAGE_LAYOUTS } from '../shared/StageData.ts';
 
 const noInput = [emptyInput(), emptyInput()];
 
@@ -20,7 +20,7 @@ function run(match: MatchState, steps: number): void {
 
 /** Moves fighter `id` past the left blast zone. */
 function launch(match: MatchState, id: number): void {
-    match.fighters[id].body.x = STAGE_LAYOUT.blastZones.left - 200;
+    match.fighters[id].body.x = STAGE_LAYOUTS[match.stage].blastZones.left - 200;
 }
 
 /** KOs fighter `id` and runs until it is back in play: the KO step, then 120 more. */
@@ -94,3 +94,19 @@ test('a double KO on the last lives is a draw', () => {
     assert.equal(match.isOver, true);
     assert.equal(match.winnerId, -1);
 });
+
+test('Londra Grande: a wider floor, and blast zones further out', () => {
+    const fighters = [{ character: 'fok', x: 250, y: 600 }, { character: 'fok', x: 1700, y: 600 }];
+    const grande = createMatch(fighters, 1, 'grande');
+    const standard = createMatch(fighters, 1);
+    run(grande, 60);
+    run(standard, 60);
+    // x 250 and 1700 are past the standard main platform's edges (370 and 1550), not Londra Grande's (160 and 1760)
+    assert.ok(grande.fighters.every(f => f.body.isGrounded && f.body.y < 900), 'standing on the wide main platform');
+    assert.ok(standard.fighters.every(f => !f.body.isGrounded), 'falling off the standard one');
+    // Further out than the standard blast zone's edge, but inside Londra Grande's
+    grande.fighters[0].body.x = STAGE_LAYOUTS.standard.blastZones.left - 100;
+    run(grande, 1);
+    assert.equal(grande.fighters[0].lives, 3);
+});
+

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { effects } from '../config/EffectConfig';
+import { fighterScale } from '../config/FighterScale';
 
 /** Depths: dust, rings and afterimages just behind the fighters (10), sparks in front of them. */
 const BEHIND_FIGHTERS = 9;
@@ -50,10 +51,10 @@ export class EffectManager {
         ghost.preFX?.clear();
     }
 
-    /** A burst where a hit landed, sized by its damage; heavier hits add a faint ring. */
+    /** A burst where a hit landed, sized by its damage (lights 8 to 13, heavies 16 to 25); heavies add a faint ring. */
     public spawnHitSpark(x: number, y: number, damage: number): void {
-        const size = Phaser.Math.Clamp(0.3 + damage * 0.03, 0.35, 0.95) * effects.SPARK_SIZE;
-        const warmth = Phaser.Math.Clamp((damage - 4) / 14, 0, 1);
+        const size = Phaser.Math.Clamp(0.2 + damage * 0.028, 0.35, 0.95) * effects.SPARK_SIZE * fighterScale();
+        const warmth = Phaser.Math.Clamp((damage - 8) / 16, 0, 1);
         const tint = Phaser.Display.Color.GetColor(255, Math.round(250 - 40 * warmth), Math.round(235 - 90 * warmth));
         this.flash(SPARK, x, y, {
             depth: IN_FRONT, tint, alpha: 0.9, blend: Phaser.BlendModes.ADD,

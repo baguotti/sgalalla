@@ -94,10 +94,25 @@ export function defaultStageStyle(): LayeredStageStyle {
     };
 }
 
+/** Londra Grande: the island as big as in Londra's painting, just above the top platform; clouds drifting slowly right. */
+export function grandeStageStyle(): LayeredStageStyle {
+    const style = defaultStageStyle();
+    Object.assign(style.elements.island, { y: -40, scale: 1.05 });
+    style.elements.backClouds.drift = 6;
+    style.elements.frontClouds.drift = 9;
+    return style;
+}
+
 type CloudPiece = 'cumulus_big' | 'cumulus_low' | 'cumulus_flat' | 'tower' | 'puff';
 
 /** A cloud: piece, canvas position of its top-left, size against the piece as painted, mirrored. */
 type Cloud = [piece: CloudPiece, x: number, y: number, scale: number, flip?: boolean];
+
+/** The clouds behind the island and in front of it (behind the platforms and fighters). */
+export interface CloudLayout {
+    back: readonly Cloud[];
+    front: readonly Cloud[];
+}
 
 /** Laid out after the painting: behind the island above its rocks, in front of the waterfall below. */
 const BACK_CLOUDS: Cloud[] = [
@@ -124,6 +139,38 @@ const FRONT_CLOUDS: Cloud[] = [
     ['cumulus_big', 7100, 5800, 0.75, true],
     ['cumulus_flat', -800, 6664, 1],
 ];
+const PAINTING_CLOUDS: CloudLayout = { back: BACK_CLOUDS, front: FRONT_CLOUDS };
+
+/** A cloud placed by its world top-left instead of the canvas's. */
+function cloudAt(piece: CloudPiece, worldX: number, worldY: number, scale: number, flip?: boolean): Cloud {
+    return [piece, CANVAS_WIDTH / 2 + (worldX - CENTRE_X) / WORLD_PER_PIXEL, CANVAS_HEIGHT / 2 + (worldY - CENTRE_Y) / WORLD_PER_PIXEL, scale, flip];
+}
+
+/**
+ * Londra Grande's clouds: smaller and fewer than the painting's. Behind the
+ * island, a few in the upper sky and two peeking out from its sides; in front,
+ * two that just touch its rocks and a few low round the stage, never over the
+ * middle where the fighting is.
+ */
+export const GRANDE_CLOUDS: CloudLayout = {
+    back: [
+        cloudAt('cumulus_big', -380, -400, 0.55),
+        cloudAt('cumulus_flat', 1680, -330, 0.6, true),
+        cloudAt('cumulus_low', 230, 150, 0.6),
+        cloudAt('tower', 1290, 110, 0.6, true),
+        cloudAt('puff', 2330, 230, 0.6),
+        cloudAt('cumulus_flat', -760, 280, 0.55),
+    ],
+    front: [
+        cloudAt('cumulus_low', 300, 330, 0.5),
+        cloudAt('puff', 1430, 300, 0.55, true),
+        cloudAt('cumulus_flat', -520, 640, 0.6),
+        cloudAt('cumulus_big', 1980, 700, 0.5, true),
+        cloudAt('tower', -200, 1060, 0.55),
+        cloudAt('cumulus_low', 2240, 1100, 0.55),
+    ],
+};
+
 /** The layout repeats every canvas width, three times across; drifting clouds wrap round. */
 const REPEATS = [-1, 0, 1];
 const REPEAT_SPAN = REPEATS.length * CANVAS_WIDTH * WORLD_PER_PIXEL;
@@ -167,13 +214,13 @@ export class LondraLayers {
     private readonly depths = new Map<StageElementId, number>();
     private elapsed = 0;
 
-    constructor(scene: Phaser.Scene, style: LayeredStageStyle = defaultStageStyle()) {
+    constructor(scene: Phaser.Scene, style: LayeredStageStyle = defaultStageStyle(), clouds: CloudLayout = PAINTING_CLOUDS) {
         this.style = style;
         this.skyTexture = scene.textures.exists(SKY)
             ? scene.textures.get(SKY) as Phaser.Textures.CanvasTexture
             : scene.textures.createCanvas(SKY, 4, 1024)!;
         this.sky = scene.add.image(CENTRE_X, 0, SKY);
-        this.clouds = { backClouds: placeClouds(scene, BACK_CLOUDS), frontClouds: placeClouds(scene, FRONT_CLOUDS) };
+        this.clouds = { backClouds: placeClouds(scene, clouds.back), frontClouds: placeClouds(scene, clouds.front) };
         this.island = scene.add.image(0, 0, ISLAND);
         this.redrawSky();
         this.apply();

@@ -39,6 +39,7 @@ export function updateCombat(f: FighterState, events: MatchEvent[]): void {
 
     if (c.attackCooldownTimer > 0) {
         c.attackCooldownTimer = countDown(c.attackCooldownTimer);
+        // The ground pound's landing pose lasts as long as its cooldown
         if (c.attackCooldownTimer <= 0) c.isGroundPoundLanding = false;
     }
 
@@ -67,11 +68,17 @@ function updateCharge(f: FighterState, events: MatchEvent[]): void {
         executeChargedAttack(f, events);
         return;
     }
-    // A ground pound charge hangs in the air
-    if (c.chargeDirection === AttackDirection.DOWN && !f.body.isGrounded) {
+    // A ground pound's charge hangs in the air
+    if (isGroundPoundCharge(f)) {
         f.body.vx = 0;
         f.body.vy = 0;
     }
+}
+
+/** Charging a ground pound: a down heavy charging in the air (it hangs there). */
+export function isGroundPoundCharge(f: FighterState): boolean {
+    const c = f.combat;
+    return c.isCharging && c.chargeDirection === AttackDirection.DOWN && !f.body.isGrounded && !c.gravityCancel;
 }
 
 function updateAttack(f: FighterState, events: MatchEvent[]): void {
@@ -84,8 +91,9 @@ function updateAttack(f: FighterState, events: MatchEvent[]): void {
     }
 
     if (c.isGroundPounding) {
-        if (c.groundPoundStartupTimer > 0) {
-            c.groundPoundStartupTimer = countDown(c.groundPoundStartupTimer);
+        // It hangs through its startup, then falls until it lands
+        if (attack.phase === AttackPhase.STARTUP) {
+            advanceAttack(f);
             b.vx = 0;
             b.vy = 0;
             return;
@@ -100,17 +108,22 @@ function updateAttack(f: FighterState, events: MatchEvent[]): void {
     }
 
     const complete = advanceAttack(f);
+    // The side light lunges as it punches (its startup holds still, as in Brawlhalla)
+    if (attack.key === 'light_side_grounded' && attack.phase === AttackPhase.ACTIVE && attack.phaseTimer === 0 && b.isGrounded) {
+        b.vx = attack.facing * PhysicsConfig.SIDE_LIGHT_LUNGE_SPEED;
+    }
+
+    // A signature's ghost comes out with the punch, and hits where it is
+    if (spawnsGhost(f)) {
+        if (attack.phase === AttackPhase.ACTIVE) spawnGhost(f, events);
+    } else {
+        clearGhost(f);
+    }
 
     if (attack.phase === AttackPhase.ACTIVE) {
         updateHitbox(f);
     } else {
         c.hitbox.active = false;
-    }
-
-    if (spawnsGhost(f)) {
-        spawnGhost(f, events);
-    } else {
-        clearGhost(f);
     }
 
     if (complete) {
@@ -123,26 +136,26 @@ function updateAttack(f: FighterState, events: MatchEvent[]): void {
     }
 }
 
-/** Advances the attack's phase timer; returns true when the attack is over. */
+/** Advances the attack's phase timer (in frames); returns true when the attack is over. */
 function advanceAttack(f: FighterState): boolean {
     const attack = f.combat.attack!;
     const data = AttackRegistry[attack.key];
-    attack.phaseTimer += SIM_STEP_MS;
+    attack.phaseTimer++;
     switch (attack.phase) {
         case AttackPhase.STARTUP:
-            if (attack.phaseTimer >= data.startupDuration) {
+            if (attack.phaseTimer >= data.startup) {
                 attack.phase = AttackPhase.ACTIVE;
                 attack.phaseTimer = 0;
             }
             break;
         case AttackPhase.ACTIVE:
-            if (attack.phaseTimer >= data.activeDuration) {
+            if (attack.phaseTimer >= data.active) {
                 attack.phase = AttackPhase.RECOVERY;
                 attack.phaseTimer = 0;
             }
             break;
         case AttackPhase.RECOVERY:
-            if (attack.phaseTimer >= data.recoveryDuration) {
+            if (attack.phaseTimer >= data.recovery) {
                 attack.phase = AttackPhase.NONE;
                 return true;
             }
@@ -159,12 +172,11 @@ export function handleCombatInput(f: FighterState, events: MatchEvent[]): void {
     const b = f.body;
 
     if (c.isGroundPounding) return;
-
-    if (c.isCharging && c.chargeDirection === AttackDirection.DOWN && !b.isGrounded) {
+    if (isGroundPoundCharge(f)) {
         b.vx = 0;
         b.vy = 0;
     }
-
+    // Every move ends with a short cooldown before the next one
     if (c.attackCooldownTimer > 0 || b.landingLagSteps > 0) return;
     if (f.isHitStunned || f.isAttacking) return;
 
@@ -187,24 +199,23 @@ export function handleCombatInput(f: FighterState, events: MatchEvent[]): void {
     const isAerial = !b.isGrounded && !c.gravityCancel;
 
     if (lightRequested) {
-        consumeBuffered(f, 'lightAttack');
         const direction = inputDirection(f);
         // Out of a chase dodge it's the aimed attack, not the running one
-        const isRunSpeed = Math.abs(b.vx) > PhysicsConfig.MAX_SPEED * PhysicsConfig.RUN_ATTACK_MIN_SPEED;
-        if ((b.isRunning || isRunSpeed) && b.isGrounded && direction !== AttackDirection.DOWN && !fromChaseDodge) {
-            startAttack(f, 'light_run_grounded', events);
-        } else {
-            startAttack(f, attackKey(AttackType.LIGHT, direction, isAerial), events);
-        }
+        const isRunSpeed = Math.abs(b.vx) > PhysicsConfig.RUN_SPEED * PhysicsConfig.RUN_ATTACK_MIN_SPEED;
+        const key = (b.isRunning || isRunSpeed) && b.isGrounded && direction !== AttackDirection.DOWN && !fromChaseDodge
+            ? 'light_run_grounded'
+            : attackKey(AttackType.LIGHT, direction, isAerial);
+        consumeBuffered(f, 'lightAttack');
+        startAttack(f, key, events);
         return;
     }
 
     if (heavyRequested) {
-        consumeBuffered(f, 'heavyAttack');
         const direction = inputDirection(f);
+        consumeBuffered(f, 'heavyAttack');
 
         // Up or neutral heavy in the air is the recovery move
-        if ((direction === AttackDirection.UP || direction === AttackDirection.NEUTRAL) && isAerial) {
+        if (isAerial && (direction === AttackDirection.UP || direction === AttackDirection.NEUTRAL)) {
             c.hitTargets = 0;
             recoveryEvents.length = 0;
             if (startRecovery(b, recoveryEvents)) {
@@ -217,7 +228,11 @@ export function handleCombatInput(f: FighterState, events: MatchEvent[]): void {
         c.isCharging = true;
         changeState(f, 'Charging');
         c.chargeTime = 0;
-        // A grounded down heavy charges the side signature
+        // The charge faces the way the fighter points as it presses, and keeps that way
+        const input = f.input;
+        const point = (input.aimRight || input.moveRight ? 1 : 0) - (input.aimLeft || input.moveLeft ? 1 : 0);
+        if (point !== 0) b.facingDirection = point;
+        // A grounded down heavy charges the side signature; in the air it charges the ground pound
         c.chargeDirection = direction === AttackDirection.DOWN && !isAerial ? AttackDirection.SIDE : direction;
         return;
     }
@@ -263,84 +278,65 @@ function startAttack(f: FighterState, key: string, events: MatchEvent[]): void {
     } else if (key === 'light_run_grounded') {
         f.body.vx = facing * (PhysicsConfig.SLIDE_ATTACK_SPEED * PhysicsConfig.RUN_ATTACK_SPEED_MULT);
     }
-
-    if (spawnsGhost(f)) spawnGhost(f, events);
-}
-
-function startChargedAttack(f: FighterState, key: string, events: MatchEvent[]): void {
-    beginAttack(f, key);
-    events.push({ type: 'attack', fighter: f.id, key, charged: true });
-    if (spawnsGhost(f)) spawnGhost(f, events);
-    f.combat.attackCooldownTimer = AttackRegistry[key].recoveryDuration;
 }
 
 function executeChargedAttack(f: FighterState, events: MatchEvent[]): void {
     const c = f.combat;
-    const direction = c.chargeDirection;
     const isAerial = !f.body.isGrounded && !c.gravityCancel;
-    const chargePercent = Math.min(c.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
+    const groundPound = isGroundPoundCharge(f);
+    // Side is the only heavy with its own aerial move; up and neutral in the air are the recovery
+    // (a ground pound charge that somehow touched down is the side signature)
+    const direction = c.chargeDirection === AttackDirection.DOWN && !groundPound ? AttackDirection.SIDE : c.chargeDirection;
+    const key = attackKey(AttackType.HEAVY, direction, isAerial && (groundPound || direction === AttackDirection.SIDE));
     c.lastChargeTime = c.chargeTime;
-
-    if (direction === AttackDirection.DOWN && isAerial) {
-        clearCharge(f);
-        startGroundPound(f, chargePercent);
+    clearCharge(f);
+    if (groundPound) {
+        startGroundPound(f, key);
         return;
     }
-
-    startChargedAttack(f, attackKey(AttackType.HEAVY, direction, isAerial), events);
-    clearCharge(f);
+    beginAttack(f, key);
+    events.push({ type: 'attack', fighter: f.id, key, charged: true });
 }
 
-function startGroundPound(f: FighterState, chargePercent: number): void {
+function startGroundPound(f: FighterState, key: string): void {
     const c = f.combat;
     c.isGroundPounding = true;
-    c.groundPoundChargeRatio = chargePercent;
-    c.groundPoundStartupTimer = PhysicsConfig.GROUND_POUND_STARTUP;
     f.body.vx = 0;
     f.body.vy = 0;
-
-    c.attack = {
-        key: attackKey(AttackType.HEAVY, AttackDirection.DOWN, true),
-        phase: AttackPhase.STARTUP,
-        phaseTimer: 0,
-        facing: f.body.facingDirection,
-    };
+    c.attack = { key, phase: AttackPhase.STARTUP, phaseTimer: 0, facing: f.body.facingDirection };
     f.isAttacking = true;
     changeState(f, 'GroundPound');
     c.hitTargets = 0;
 }
 
+/** Landing ends the ground pound: its landing pose lasts its recovery, as a cooldown. */
+function endGroundPound(f: FighterState, events: MatchEvent[]): void {
+    const c = f.combat;
+    if (c.hitTargets === 0) events.push({ type: 'groundPoundMiss', fighter: f.id });
+    const recovery = AttackRegistry[c.attack!.key].recovery;
+    endAttack(f);
+    c.isGroundPoundLanding = true;
+    c.attackCooldownTimer = recovery * SIM_STEP_MS;
+    f.body.vx *= PhysicsConfig.GROUND_POUND_LANDING_SPEED_KEPT;
+}
+
 function endAttack(f: FighterState): void {
     const c = f.combat;
+    c.attackCooldownTimer = PhysicsConfig.ATTACK_END_COOLDOWN;
     f.isAttacking = false;
     c.isGroundPounding = false;
+    c.isGroundPoundLanding = false;
     c.attack = null;
     c.hitbox.active = false;
     c.gravityCancel = false;
     clearGhost(f);
     clearCharge(f);
-
-    // Fok's charged side signature leaves a longer, punishable recovery
-    if (f.character === 'fok' && c.lastChargeTime > 0) {
-        const chargeRatio = Math.min(c.lastChargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
-        c.attackCooldownTimer = PhysicsConfig.ATTACK_END_COOLDOWN + (chargeRatio * PhysicsConfig.FOK_CHARGE_COOLDOWN);
-    } else {
-        c.attackCooldownTimer = PhysicsConfig.ATTACK_END_COOLDOWN;
-    }
     c.lastChargeTime = 0;
 }
 
-function endGroundPound(f: FighterState, events: MatchEvent[]): void {
-    const c = f.combat;
-    if (c.hitTargets === 0) events.push({ type: 'groundPoundMiss', fighter: f.id });
-    f.isAttacking = false;
-    c.isGroundPounding = false;
-    c.isGroundPoundLanding = true;
-    c.attack = null;
-    c.hitbox.active = false;
-    c.gravityCancel = false;
-    c.attackCooldownTimer = PhysicsConfig.GROUND_POUND_STARTUP;
-    if (f.body.isGrounded) f.body.vx *= PhysicsConfig.GROUND_POUND_LANDING_SPEED_KEPT;
+/** A heavy's charge, 0 to 1. */
+function chargeRatio(f: FighterState): number {
+    return Math.min(f.combat.lastChargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
 }
 
 function clearCharge(f: FighterState): void {
@@ -424,13 +420,13 @@ function spawnGhost(f: FighterState, events: MatchEvent[]): void {
         startX += (PhysicsConfig.GHOST_FORWARD * facing);
     }
 
-    const chargeRatio = Math.min(c.lastChargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
+    const charge = chargeRatio(f);
     c.ghost = {
         age: 0,
-        lifetime: PhysicsConfig.GHOST_LIFETIME + (chargeRatio * PhysicsConfig.GHOST_LIFETIME_PER_CHARGE) + PhysicsConfig.GHOST_FADE_MS,
+        lifetime: PhysicsConfig.GHOST_LIFETIME + (charge * PhysicsConfig.GHOST_LIFETIME_PER_CHARGE) + PhysicsConfig.GHOST_FADE_MS,
         startX,
         startY,
-        travel: PhysicsConfig.GHOST_TRAVEL + (chargeRatio * PhysicsConfig.GHOST_TRAVEL_PER_CHARGE),
+        travel: PhysicsConfig.GHOST_TRAVEL + (charge * PhysicsConfig.GHOST_TRAVEL_PER_CHARGE),
         facing,
         vertical,
     };
@@ -457,124 +453,148 @@ function ghostPosition(g: GhostHitbox): [number, number] {
 
 // ─── Hits ───
 
-/** Attacker's hitbox against the target's hurtbox. */
-export function checkHit(attacker: FighterState, target: FighterState, events: MatchEvent[]): void {
+/** A hit found this step: everything it does, worked out before any hit of the step lands. */
+export interface Hit {
+    attacker: FighterState;
+    target: FighterState;
+    attackKey: string | null;
+    damage: number;
+    knockbackX: number;
+    knockbackY: number;
+    stun: number;
+    hitstop: number;
+    /** A spike on a grounded target, turned into a pop-up: the target is lifted off the floor. */
+    popUp: boolean;
+    /** Where it landed: the hitbox's middle, within the target's hurtbox. */
+    x: number;
+    y: number;
+}
+
+/**
+ * The attacker's hitbox against the target's hurtbox: the hit, or null. Every
+ * hit of a step is found first and applied after (applyHit), so two fighters
+ * hitting each other on the same step both get hit, whatever their slots.
+ */
+export function findHit(attacker: FighterState, target: FighterState): Hit | null {
     const c = attacker.combat;
     const targetBit = 1 << target.id;
-    if (c.hitTargets & targetBit) return;
-    if (!c.attack && !attacker.body.isRecovering) return;
+    if (c.hitTargets & targetBit) return null;
+    if (!c.attack && !attacker.body.isRecovering) return null;
 
     const hitbox = c.hitbox;
-    if (!hitbox.active) return;
+    if (!hitbox.active || hitbox.w <= 0 || hitbox.h <= 0) return null;
 
     // Inclusive overlap, as Phaser's RectangleToRectangle
     const left = hitbox.x - hitbox.w / 2;
     const top = hitbox.y - hitbox.h / 2;
     const hurtW = PhysicsConfig.HURTBOX_WIDTH;
     const hurtH = PhysicsConfig.HURTBOX_HEIGHT;
-    const targetLeft = target.body.x - hurtW / 2;
-    const targetTop = target.body.y - hurtH / 2;
-    if (hitbox.w <= 0 || hitbox.h <= 0) return;
+    const tb = target.body;
+    const targetLeft = tb.x - hurtW / 2;
+    const targetTop = tb.y - hurtH / 2;
     if (left + hitbox.w < targetLeft || top + hitbox.h < targetTop ||
-        left > targetLeft + hurtW || top > targetTop + hurtH) return;
+        left > targetLeft + hurtW || top > targetTop + hurtH) return null;
 
     c.hitTargets |= targetBit;
-    if (target.body.isInvincible || target.isInvulnerable) return;
+    if (tb.isInvincible || target.isInvulnerable) return null;
 
-    applyHit(attacker, target, events);
+    let fixedForce: number;
+    let variableForce: number;
+    let angle: number;
+    let stun: number;
+    if (c.attack) {
+        const data = AttackRegistry[c.attack.key];
+        fixedForce = data.fixedForce;
+        variableForce = data.variableForce * chargeBonus(attacker);
+        angle = data.knockbackAngle;
+        stun = data.stun;
+    } else {
+        fixedForce = PhysicsConfig.RECOVERY_FIXED_FORCE;
+        variableForce = PhysicsConfig.RECOVERY_VARIABLE_FORCE;
+        angle = PhysicsConfig.RECOVERY_KNOCKBACK_ANGLE;
+        stun = PhysicsConfig.RECOVERY_STUN;
+    }
+    const damage = currentDamage(attacker);
+
+    const knockback = knockbackSpeed(fixedForce, variableForce, target.damagePercent + damage);
+    const [cos, sin] = KNOCKBACK_DIRECTIONS[angle];
+    let knockbackY = -sin * knockback;
+    // Spiking a grounded target pops it up
+    const popUp = tb.isGrounded && knockbackY > 0;
+    if (popUp) knockbackY *= -PhysicsConfig.GROUNDED_SPIKE_BOUNCE;
+
+    return {
+        attacker, target, attackKey: c.attack?.key ?? null, damage,
+        knockbackX: cos * knockback * attacker.body.facingDirection, knockbackY, stun, popUp,
+        hitstop: hitstopFor(knockback),
+        x: Math.min(Math.max(hitbox.x, targetLeft), targetLeft + hurtW),
+        y: Math.min(Math.max(hitbox.y, targetTop), targetTop + hurtH),
+    };
+}
+
+/** Brawlhalla's force, in px/s: the variable part grows with the target's damage after the hit, steeply past red. */
+export function knockbackSpeed(fixedForce: number, variableForce: number, damageAfter: number): number {
+    const d = Math.min(damageAfter, PhysicsConfig.MAX_DAMAGE);
+    return (fixedForce + variableForce * (d / 100 + (d * d) / 20000)) * PhysicsConfig.FORCE_SCALE;
+}
+
+/** Hit pause in steps: a moment, longer for hits that launch harder. */
+export function hitstopFor(knockback: number): number {
+    return Math.min(PhysicsConfig.HITSTOP_MAX_STEPS, PhysicsConfig.HITSTOP_MIN_STEPS + Math.floor(knockback / PhysicsConfig.HITSTOP_SPEED_PER_STEP));
 }
 
 /** Damage the fighter's current move deals. */
 export function currentDamage(f: FighterState): number {
     const c = f.combat;
     if (!c.attack) return f.body.isRecovering ? PhysicsConfig.RECOVERY_DAMAGE : 0;
-
-    let damage = AttackRegistry[c.attack.key].damage;
-    if (spawnsGhost(f)) {
-        // Signature damage scales with charge
-        const chargeRatio = Math.min(c.lastChargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
-        damage = PhysicsConfig.SIDE_SIG_MIN_DAMAGE + (chargeRatio * (PhysicsConfig.SIDE_SIG_MAX_DAMAGE - PhysicsConfig.SIDE_SIG_MIN_DAMAGE));
-    }
-    if (c.isGroundPounding) {
-        const { GROUND_POUND_MIN_DAMAGE: min, GROUND_POUND_MAX_DAMAGE: max } = PhysicsConfig;
-        damage = min + (c.groundPoundChargeRatio * (max - min));
-    }
-    return Math.floor(damage);
+    return Math.floor(AttackRegistry[c.attack.key].damage * chargeBonus(f));
 }
 
-function applyHit(attacker: FighterState, target: FighterState, events: MatchEvent[]): void {
-    const c = attacker.combat;
-    let damage: number;
-    let baseKnockback: number;
-    let knockbackGrowth: number;
-    let angle: number;
+/** A charged heavy deals more damage and variable force: up to FULL_CHARGE_BONUS more at full charge. */
+function chargeBonus(f: FighterState): number {
+    return 1 + chargeRatio(f) * PhysicsConfig.FULL_CHARGE_BONUS;
+}
 
-    if (c.attack) {
-        const data = AttackRegistry[c.attack.key];
-        damage = currentDamage(attacker);
-        baseKnockback = data.baseKnockback;
-        knockbackGrowth = data.knockbackGrowth;
-        angle = data.knockbackAngle;
-
-        if (data.type === AttackType.HEAVY && data.direction === AttackDirection.SIDE) {
-            // A fully charged side signature knocks back harder
-            const chargeRatio = Math.min(c.lastChargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
-            baseKnockback = baseKnockback * (1.0 + (chargeRatio * PhysicsConfig.SIDE_SIG_KNOCKBACK_BONUS));
-            knockbackGrowth = knockbackGrowth * (1.0 + (chargeRatio * PhysicsConfig.SIDE_SIG_GROWTH_BONUS));
-        }
-        if (c.isGroundPounding) {
-            baseKnockback = baseKnockback * (1.0 + (c.groundPoundChargeRatio * PhysicsConfig.GROUND_POUND_KNOCKBACK_BONUS));
-            knockbackGrowth = knockbackGrowth * (1.0 + (c.groundPoundChargeRatio * PhysicsConfig.GROUND_POUND_GROWTH_BONUS));
-        }
-    } else {
-        damage = PhysicsConfig.RECOVERY_DAMAGE;
-        baseKnockback = PhysicsConfig.RECOVERY_BASE_KNOCKBACK;
-        knockbackGrowth = PhysicsConfig.RECOVERY_KNOCKBACK_GROWTH;
-        angle = PhysicsConfig.RECOVERY_KNOCKBACK_ANGLE;
-    }
-
-    const knockback = baseKnockback + knockbackGrowth * PhysicsConfig.GLOBAL_KNOCKBACK_SCALING * (target.damagePercent + damage);
-    const [cos, sin] = KNOCKBACK_DIRECTIONS[angle];
-    const knockbackX = cos * knockback * attacker.body.facingDirection;
-    let knockbackY = -sin * knockback;
-
+/** Lands a hit found by findHit. */
+export function applyHit(hit: Hit, events: MatchEvent[]): void {
+    const { attacker, target } = hit;
     const tb = target.body;
-    // Spiking a grounded target pops it up
-    if (tb.isGrounded && knockbackY > 0) {
-        knockbackY *= -PhysicsConfig.GROUNDED_SPIKE_BOUNCE;
-        tb.y -= PhysicsConfig.GROUNDED_SPIKE_LIFT;
+    if (hit.popUp) tb.y -= PhysicsConfig.GROUNDED_SPIKE_LIFT;
+    launchFighter(target, hit.damage, hit.knockbackX, hit.knockbackY, hit.stun, hit.hitstop);
+    // Hitting restarts the wall slip count too
+    attacker.body.airActionCounter = 0;
+
+    // An attacker hit back on the same step (a trade) is stunned: its move is over
+    const c = attacker.combat;
+    if (!attacker.isHitStunned) {
+        // The attacker can chase: a directional dodge until a moment after this attack ends
+        c.chaseDodgeTimer = remainingAttackTime(attacker) + PhysicsConfig.CHASE_DODGE_WINDOW;
     }
 
+    attacker.hitstopSteps = Math.max(attacker.hitstopSteps, hit.hitstop);
+
+    events.push({
+        type: 'hit', attacker: attacker.id, target: target.id, attackKey: hit.attackKey,
+        x: hit.x, y: hit.y, damage: hit.damage, knockbackX: tb.vx, knockbackY: tb.vy,
+    });
+}
+
+/** What any hit does to its target (a move's or an explosion's): damage, the launch, stun and hit pause. */
+export function launchFighter(target: FighterState, damage: number, knockbackX: number, knockbackY: number, stun: number, hitstop: number): void {
+    const tb = target.body;
     target.damagePercent = Math.min(target.damagePercent + damage, PhysicsConfig.MAX_DAMAGE);
     interruptMovement(tb);
     tb.vx = knockbackX;
     tb.vy = knockbackY;
+    tb.isLaunched = true;
+    tb.isJumpRising = false;
     target.isHitStunned = true;
-    target.hitStunTimer = PhysicsConfig.HIT_STUN_DURATION;
+    target.hitStunTimer = stun * SIM_STEP_MS;
     changeState(target, 'HitStun');
-
-    // Hitting or being hit restarts the wall slip count; a target out of jumps gets one back
-    tb.airActionCounter = 0;
-    attacker.body.airActionCounter = 0;
-    if (tb.jumpsRemaining === 0) tb.jumpsRemaining = 1;
-
-    // The attacker can chase: a directional dodge until a moment after this attack ends
-    c.chaseDodgeTimer = remainingAttackTime(attacker) + PhysicsConfig.CHASE_DODGE_WINDOW;
-
-    // Both freeze for a moment, longer for harder hits
-    const hitstop = Math.min(PhysicsConfig.HITSTOP_MAX_STEPS,
-        PhysicsConfig.HITSTOP_MIN_STEPS + Math.round(damage * PhysicsConfig.HITSTOP_PER_DAMAGE));
-    attacker.hitstopSteps = Math.max(attacker.hitstopSteps, hitstop);
     target.hitstopSteps = Math.max(target.hitstopSteps, hitstop);
-
-    // Where the hit landed: the hitbox's middle, within the target's hurtbox
-    const hitbox = c.hitbox;
-    events.push({
-        type: 'hit', attacker: attacker.id, target: target.id, attackKey: c.attack?.key ?? null,
-        x: Math.min(Math.max(hitbox.x, tb.x - PhysicsConfig.HURTBOX_WIDTH / 2), tb.x + PhysicsConfig.HURTBOX_WIDTH / 2),
-        y: Math.min(Math.max(hitbox.y, tb.y - PhysicsConfig.HURTBOX_HEIGHT / 2), tb.y + PhysicsConfig.HURTBOX_HEIGHT / 2),
-        damage, knockbackX: tb.vx, knockbackY: tb.vy,
-    });
+    // Being hit restarts the wall slip count; a target out of jumps gets one back
+    tb.airActionCounter = 0;
+    if (tb.jumpsRemaining === 0) tb.jumpsRemaining = 1;
 }
 
 /** Time left in the fighter's current move, in ms. */
@@ -582,11 +602,11 @@ function remainingAttackTime(f: FighterState): number {
     const attack = f.combat.attack;
     if (!attack) return f.body.isRecovering ? f.body.recoveryTimer : 0;
     const data = AttackRegistry[attack.key];
+    const recovery = data.recovery;
     switch (attack.phase) {
-        case AttackPhase.STARTUP: return data.startupDuration - attack.phaseTimer + data.activeDuration + data.recoveryDuration;
-        case AttackPhase.ACTIVE: return data.activeDuration - attack.phaseTimer + data.recoveryDuration;
-        case AttackPhase.RECOVERY: return data.recoveryDuration - attack.phaseTimer;
+        case AttackPhase.STARTUP: return (data.startup - attack.phaseTimer + data.active + recovery) * SIM_STEP_MS;
+        case AttackPhase.ACTIVE: return (data.active - attack.phaseTimer + recovery) * SIM_STEP_MS;
+        case AttackPhase.RECOVERY: return (recovery - attack.phaseTimer) * SIM_STEP_MS;
         default: return 0;
     }
 }
-

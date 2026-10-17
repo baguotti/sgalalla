@@ -83,8 +83,10 @@ export class AnimationHelpers {
         scene.load.audio('sfx_pe_sig', 'assets/audio/sfx_pe_sig.wav');
         scene.load.audio('sfx_pe_charge', 'assets/audio/sfx_pe_charge.mp3');
 
-        // --- Misc: the ground pound's thud when it hits nothing ---
+        // --- Misc: the ground pound's thud when it hits nothing, a bomb going off ---
         scene.load.audio('sfx_chest_drop', 'assets/audio/sfx/misc/chest_drop.wav');
+        scene.load.audio('sfx_bomb_explode', 'assets/audio/sfx/misc/bomb_explode.aac');
+        scene.load.image('fx_explosion', 'assets/images/fx/explosion.png');
     }
 
     /**

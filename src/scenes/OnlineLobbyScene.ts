@@ -5,15 +5,18 @@ import { AudioManager } from '../managers/AudioManager';
 import { NetClient } from '../network/NetClient';
 import { cardPositions, PlayerCard } from '../ui/PlayerCard';
 import { SMASH_COLORS } from '../ui/PlayerHUD';
-import { MAX_PLAYERS, MIN_PLAYERS, NetEvent, type MatchStart, type RoomState, type WatchInputs, type WatchStart } from '../../shared/NetProtocol';
+import { isStageKey, loadStagePreviews, previewKey, STAGES } from '../stages/StageBackgrounds';
+import { MAX_PLAYERS, MIN_PLAYERS, NetEvent, MULTIPLAYER_STAGES, type MatchStart, type RoomState, type WatchInputs, type WatchStart } from '../../shared/NetProtocol';
 
 type Phase = 'connecting' | 'picking' | 'ready' | 'closed';
 
 /**
  * Online lobby: connects to the server, which puts the player in a room of up
- * to 4. Everyone picks a character and gets ready; the match starts once all
- * the players in the room (at least 2) are ready. Laid out like BOTTE IN
- * LOCALE: a card per player slot, the fighter they're picking on it.
+ * to 5. Everyone picks a character and gets ready; player 1 also picks the
+ * stage (up and down, among MULTIPLAYER_STAGES) and bombs (Start: off by
+ * default). The match starts once all the
+ * players in the room (at least 2) are ready. Laid out like BOTTE IN LOCALE:
+ * a card per player slot, the fighter they're picking on it, the stage below.
  */
 export class OnlineLobbyScene extends Phaser.Scene {
     private client!: NetClient;
@@ -24,6 +27,8 @@ export class OnlineLobbyScene extends Phaser.Scene {
     private statusText!: Phaser.GameObjects.Text;
     private hintText!: Phaser.GameObjects.Text;
     private cards: PlayerCard[] = [];
+    private stagePreview!: Phaser.GameObjects.Image;
+    private stageText!: Phaser.GameObjects.Text;
 
     constructor() {
         super({ key: 'OnlineLobbyScene' });
@@ -34,6 +39,7 @@ export class OnlineLobbyScene extends Phaser.Scene {
         this.load.audio('ui_change_character', 'assets/audio/ui/ui_change_character.wav');
         this.load.audio('ui_confirm_character', 'assets/audio/ui/ui_confirm_character.wav');
         this.load.audio('ui_back', 'assets/audio/ui/ui_back.wav');
+        loadStagePreviews(this);
     }
 
     create(): void {
@@ -48,6 +54,9 @@ export class OnlineLobbyScene extends Phaser.Scene {
         this.hintText = this.add.text(width / 2, height - 50, '', { fontSize: '20px', color: '#8ab4f8', fontFamily: font }).setOrigin(0.5);
         this.tweens.add({ targets: this.hintText, alpha: 0.5, duration: 800, yoyo: true, repeat: -1 });
         this.cards = cardPositions(width, MAX_PLAYERS).map((x, slot) => new PlayerCard(this, x, centerY + 40, `P${slot + 1}`, SMASH_COLORS[slot % SMASH_COLORS.length]));
+        // The stage, below the cards
+        this.stagePreview = this.add.image(width / 2, centerY + 285, previewKey(MULTIPLAYER_STAGES[0])).setVisible(false);
+        this.stageText = this.add.text(width / 2, centerY + 370, '', { fontSize: '22px', color: '#ffffff', fontFamily: font, align: 'center' }).setOrigin(0.5, 0);
         this.setHint('Esci: [ESC] o [GAMEPAD B]');
 
         this.phase = 'connecting';
@@ -88,6 +97,9 @@ export class OnlineLobbyScene extends Phaser.Scene {
 
         if (action === 'left') this.cycleCharacter(-1);
         else if (action === 'right') this.cycleCharacter(1);
+        else if (action === 'up') this.cycleStage(-1);
+        else if (action === 'down') this.cycleStage(1);
+        else if (action === 'start') this.toggleBombs();
         else if (action === 'confirm') this.confirm();
     }
 
@@ -98,7 +110,7 @@ export class OnlineLobbyScene extends Phaser.Scene {
         this.room = room;
         if (joined) {
             this.phase = 'picking';
-            this.setHint('Scegli: [◀ ▶]  |  Pronto: [SPAZIO/INVIO] o [GAMEPAD A]  |  Esci: [ESC]');
+            this.setPickingHint();
             this.cycleCharacter(0);
         } else if (room.players.length > others) {
             AudioManager.getInstance().playSFX('ui_player_found', { volume: 0.5 });
@@ -110,6 +122,9 @@ export class OnlineLobbyScene extends Phaser.Scene {
         const room = this.room;
         if (!room) return;
         this.showCards();
+        this.showStage();
+        // Becoming player 1 (the first one left) brings the stage choice
+        if (this.phase === 'picking') this.setPickingHint();
 
         const count = room.players.length;
         if (this.phase === 'ready') {
@@ -138,6 +153,39 @@ export class OnlineLobbyScene extends Phaser.Scene {
                 card.show({ kind: 'fighter', character: player.character, ready: player.ready, choosing: false, text: player.ready ? undefined : 'Sceglie...', textColour: '#888888' });
             }
         });
+    }
+
+    /** What player 1 picked: the stage's preview and name (arrows for player 1 while picking), and bombs. */
+    private showStage(): void {
+        const settings = this.room?.settings;
+        if (!settings || !isStageKey(settings.stage)) return;
+        const preview = this.stagePreview.setTexture(previewKey(settings.stage)).setVisible(true);
+        preview.setScale(150 / preview.height);
+        const choosing = this.room!.you === 0 && this.phase === 'picking';
+        const label = STAGES[settings.stage].label;
+        const bombs = `Bombe: ${settings.bombs ? 'SÌ' : 'NO'}`;
+        this.stageText.setText(choosing ? `▲  ${label}  ▼\n${bombs}` : `${label}\n${bombs}${this.room!.you === 0 ? '' : '  (sceglie P1)'}`);
+    }
+
+    private cycleStage(step: number): void {
+        const settings = this.room?.you === 0 ? this.room.settings : null;
+        if (!settings) return;
+        const index = Math.max(0, MULTIPLAYER_STAGES.findIndex(s => s === settings.stage));
+        const stage = MULTIPLAYER_STAGES[(index + step + MULTIPLAYER_STAGES.length) % MULTIPLAYER_STAGES.length];
+        this.client.send(NetEvent.SETTINGS, { ...settings, stage });
+        AudioManager.getInstance().playSFX('ui_change_character', { volume: 0.4 });
+    }
+
+    private toggleBombs(): void {
+        const settings = this.room?.you === 0 ? this.room.settings : null;
+        if (!settings) return;
+        this.client.send(NetEvent.SETTINGS, { ...settings, bombs: !settings.bombs });
+        AudioManager.getInstance().playSFX('ui_change_character', { volume: 0.4 });
+    }
+
+    private setPickingHint(): void {
+        const settings = this.room?.you === 0 ? 'Mappa: [▲ ▼]  |  Bombe: [START/P]  |  ' : '';
+        this.setHint(`Scegli: [◀ ▶]  |  ${settings}Pronto: [SPAZIO/INVIO] o [A]  |  Esci: [ESC]`);
     }
 
     private cycleCharacter(step: number): void {

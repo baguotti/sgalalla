@@ -29,6 +29,7 @@ export interface GamepadState {
     dodge: boolean;
     dodgeHeld: boolean; // For running (trigger held)
     throw: boolean;
+    throwHeld: boolean;
     pause: boolean; // START button for pause menu
     taunt: boolean; // R3 button for taunt
     defeat: boolean; // Not officially mapped to gamepad
@@ -146,6 +147,7 @@ export class GamepadInput {
             dodge: false,
             dodgeHeld: false,
             throw: false,
+            throwHeld: false,
             pause: false,
             taunt: false,
             defeat: false,
@@ -236,6 +238,7 @@ export class GamepadInput {
 
         // Throw — map to light attack for Joy-Con (same button, context-dependent in game)
         state.throw = state.lightAttack;
+        state.throwHeld = state.lightAttackHeld;
 
         this.previousState = { ...state };
         this.cacheButtonStates(gamepad);
@@ -357,6 +360,7 @@ export class GamepadInput {
         // Throw (Right Bumper/RB) — always RB, not rebindable
         const rbPressed = gamepad.buttons[XBOX_BUTTONS.RB]?.pressed || false;
         state.throw = rbPressed && !this.wasButtonPressed(XBOX_BUTTONS.RB);
+        state.throwHeld = rbPressed;
 
         // Pause (START button) — always START, not rebindable
         const startPressed = gamepad.buttons[XBOX_BUTTONS.START]?.pressed || false;

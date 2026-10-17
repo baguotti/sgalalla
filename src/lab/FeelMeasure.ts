@@ -7,7 +7,7 @@ import { SIM_STEP_MS } from '../../shared/FixedStepClock';
 import { emptyInput, type FighterInput } from '../../shared/FighterInput';
 import { createMatch, stepMatch, type MatchState } from '../../shared/GameSim';
 import { PhysicsConfig } from '../../shared/PhysicsConfig';
-import { STAGE_LAYOUT } from '../../shared/StageData';
+import { STAGE_LAYOUTS } from '../../shared/StageData';
 
 export interface Measurements {
     jumpHeight: number;
@@ -37,7 +37,7 @@ export function measure(): Measurements {
 
 /** Two fighters standing apart on the main stage, settled: the first near its left end, clear of the platform above. */
 function standing(): MatchState {
-    const main = STAGE_LAYOUT.platforms[0];
+    const main = STAGE_LAYOUTS.standard.platforms[0];
     const y = main.y - main.h / 2 - PhysicsConfig.PLAYER_HEIGHT / 2;
     const left = main.x - main.w / 2;
     const match = createMatch([{ character: 'fok', x: left + 90, y }, { character: 'fok', x: left + main.w - 60, y }], 1);

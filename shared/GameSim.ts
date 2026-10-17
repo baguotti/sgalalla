@@ -9,7 +9,7 @@
 
 import { countDown, SIM_STEP_MS } from './FixedStepClock.js';
 import { AttackPhase, AttackRegistry, AttackType } from './AttackData.js';
-import { cancelAttackForChaseDodge, checkHit, handleCombatInput, updateCombat } from './Combat.js';
+import { applyHit, cancelAttackForChaseDodge, findHit, handleCombatInput, updateCombat, type Hit } from './Combat.js';
 import type { FighterInput } from './FighterInput.js';
 import {
     FIGHTER_STATES, changeState, consumeBuffered, createFighter, holdInputBuffer, isBuffered, isInPlay, updateInputBuffer, updateState,
@@ -23,7 +23,9 @@ import {
     ATTACK_PHASE_NONE, ATTACK_PHASE_STARTUP, ATTACK_PHASE_ACTIVE, ATTACK_PHASE_RECOVERY,
     ATTACK_TYPE_NONE, ATTACK_TYPE_LIGHT, ATTACK_TYPE_HEAVY,
 } from './PhysicsSimulation.js';
-import { STAGE_LAYOUT } from './StageData.js';
+import { createBombs, pickUpBombs, updateBombs, type Bombs } from './Bombs.js';
+import { randomInt } from './Random.js';
+import { STAGE_LAYOUTS, type SimStage, type StageLayoutId } from './StageData.js';
 import { hashString } from './StateHash.js';
 
 const STEP_S = SIM_STEP_MS / 1000;
@@ -48,10 +50,16 @@ export interface MatchState {
     isOver: boolean;
     /** The last fighter with lives left; -1 for a draw or while the match runs. */
     winnerId: number;
+    /** The stage's collision layout (STAGE_LAYOUTS). */
+    stage: StageLayoutId;
+    /** Bombs dropping in (shared/Bombs.ts), or null for a match without them. */
+    bombs: Bombs | null;
 }
 
-export function createMatch(fighters: readonly FighterSetup[], seed: number): MatchState {
+export function createMatch(fighters: readonly FighterSetup[], seed: number, stage: StageLayoutId = 'standard', bombs = true): MatchState {
     return {
+        stage,
+        bombs: bombs ? createBombs() : null,
         frame: 0,
         fighters: fighters.map((setup, id) => createFighter(id, setup)),
         rng: seed | 0,
@@ -91,7 +99,11 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[], ev
         updateFacing(f);
     }
 
-    for (const f of moving) collidePlatforms(f, events);
+    const layout = STAGE_LAYOUTS[match.stage];
+    for (const f of moving) collidePlatforms(f, layout, events);
+
+    // Bombs in reach are picked up before a light attack can come out
+    pickUpBombs(match);
 
     for (const f of moving) {
         updateState(f);
@@ -100,13 +112,19 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[], ev
         updateTimers(f);
     }
 
-    for (const f of moving) collideWalls(f);
+    for (const f of moving) collideWalls(f, layout);
 
+    // Every hit is found before any lands, so a trade hits both fighters
+    hits.length = 0;
     for (const attacker of moving) {
         for (const target of fighters) {
-            if (attacker !== target) checkHit(attacker, target, events);
+            const hit = attacker !== target ? findHit(attacker, target) : null;
+            if (hit) hits.push(hit);
         }
     }
+    for (const hit of hits) applyHit(hit, events);
+
+    updateBombs(match, layout, events);
 
     checkBlastZones(match, fighters, events);
 
@@ -143,7 +161,8 @@ export function placeFighter(match: MatchState, id: number, x: number, y: number
 
 // ─── Movement ───
 
-// Reused every step: the physics' input and the events it reports
+// Reused every step: the hits found, the physics' input and the events it reports
+const hits: Hit[] = [];
 const physicsInput: PhysicsInput = {
     moveLeft: false, moveRight: false, moveDown: false, moveUp: false,
     jumpBuffered: false, jumpHeld: false, dodgeBuffered: false, chaseDodgeReady: false,
@@ -203,9 +222,9 @@ function handlePhysicsEvents(f: FighterState, physicsEvents: readonly PhysicsEve
     }
 }
 
-function collidePlatforms(f: FighterState, events: MatchEvent[]): void {
+function collidePlatforms(f: FighterState, layout: SimStage, events: MatchEvent[]): void {
     const b = f.body;
-    const platforms = STAGE_LAYOUT.platforms;
+    const platforms = layout.platforms;
     physicsEvents.length = 0;
     for (let i = 0; i < platforms.length; i++) {
         const p = platforms[i];
@@ -216,26 +235,25 @@ function collidePlatforms(f: FighterState, events: MatchEvent[]): void {
     f.isDodging = b.isDodging;
 }
 
-function collideWalls(f: FighterState): void {
+function collideWalls(f: FighterState, layout: SimStage): void {
     const b = f.body;
     resetWallState(b);
-    for (const w of STAGE_LAYOUT.walls) {
+    for (const w of layout.walls) {
         checkSingleWallCollision(b, w.x, w.y, w.w, w.h);
     }
-    for (const c of STAGE_LAYOUT.ceilings) {
+    for (const c of layout.ceilings) {
         checkSingleCeilingCollision(b, c.x, c.y, c.w, c.h);
     }
     f.isDodging = b.isDodging;
 }
 
-/** Facing follows movement, except while stunned, ground pounding or mid-attack. */
+/** Facing follows movement, except while stunned, ground pounding, charging (set as the charge starts) or mid-attack. */
 function updateFacing(f: FighterState): void {
     if (f.isHitStunned) return;
 
     const b = f.body;
     const combat = f.combat;
-    const isGroundPoundCharge = combat.isCharging && combat.chargeDirection === 'down' && !b.isGrounded;
-    if (combat.isGroundPounding || combat.isGroundPoundLanding || isGroundPoundCharge) return;
+    if (combat.isGroundPounding || combat.isGroundPoundLanding || combat.isCharging) return;
 
     if (f.isAttacking && combat.attack && combat.attack.phase !== AttackPhase.RECOVERY) return;
 
@@ -249,13 +267,13 @@ function updateFacing(f: FighterState): void {
 }
 
 function updateTimers(f: FighterState): void {
-    f.hitStunTimer = countDown(f.hitStunTimer);
-    if (f.hitStunTimer <= 0 && f.isHitStunned) {
-        // Still flying fast across or upward: the stun goes on, up to its limit (falling doesn't count)
+    if (f.isHitStunned) {
+        f.hitStunTimer = countDown(f.hitStunTimer);
+        // Past the move's stun, it goes on while the fighter still flies fast across or upward, up to its
+        // limit (falling doesn't count)
         const b = f.body;
         const flying = Math.abs(b.vx) > PhysicsConfig.STUN_FLYING_SPEED || b.vy < -PhysicsConfig.STUN_FLYING_SPEED;
-        const overLimit = f.hitStunTimer <= PhysicsConfig.HIT_STUN_DURATION - PhysicsConfig.MAX_HIT_STUN;
-        if (!flying || overLimit) f.isHitStunned = false;
+        if (f.hitStunTimer <= 0 && (!flying || f.hitStunTimer <= -PhysicsConfig.STUN_EXTENSION_MAX)) f.isHitStunned = false;
     }
 
     if (f.invulnerabilityTimer > 0) {
@@ -273,7 +291,7 @@ function updateTimers(f: FighterState): void {
 
 /** A fighter whose hurtbox crosses a blast zone edge loses a life. */
 function checkBlastZones(match: MatchState, fighters: readonly FighterState[], events: MatchEvent[]): void {
-    const zone = STAGE_LAYOUT.blastZones;
+    const zone = STAGE_LAYOUTS[match.stage].blastZones;
     let eliminated = false;
 
     for (const f of fighters) {
@@ -332,14 +350,6 @@ function respawn(match: MatchState, f: FighterState): void {
     f.koImmunitySteps = KO_IMMUNITY_STEPS;
 }
 
-/** Uniform integer in [min, max] from the match's seeded generator (mulberry32). */
-function randomInt(match: MatchState, min: number, max: number): number {
-    const a = match.rng = (match.rng + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), a | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return min + ((t ^ (t >>> 14)) >>> 0) % (max - min + 1);
-}
-
 // ─── Comparing runs ───
 
 /**
@@ -360,7 +370,7 @@ export const PARITY_FIELDS = [
     'fastFalling', 'recovering', 'recoveryAvailable', 'recoveryTimer', 'running', 'state',
     'damage', 'lives', 'hitStunned', 'hitStunTimer', 'invulnerable', 'invulnerabilityTimer',
     'attacking', 'attackKey', 'attackPhase', 'attackPhaseTimer', 'attackCooldownTimer',
-    'charging', 'chargeTime', 'groundPounding', 'groundPoundStartupTimer', 'groundPoundLanding',
+    'charging', 'chargeTime', 'groundPounding', 'groundPoundLanding',
 ] as const;
 
 /** A fighter's parity values, in PARITY_FIELDS order. */
@@ -377,6 +387,6 @@ export function fighterParityValues(f: FighterState): number[] {
         n(f.isAttacking), c.attack ? ATTACK_KEYS.indexOf(c.attack.key) : -1,
         c.attack ? ATTACK_PHASES.indexOf(c.attack.phase) : -1, c.attack?.phaseTimer ?? 0,
         c.attackCooldownTimer, n(c.isCharging), c.chargeTime,
-        n(c.isGroundPounding), c.groundPoundStartupTimer, n(c.isGroundPoundLanding),
+        n(c.isGroundPounding), n(c.isGroundPoundLanding),
     ];
 }

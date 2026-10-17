@@ -14,14 +14,16 @@ export type MatchEvent =
     /** A signature attack threw its ghost; a copy of the ghost as spawned. */
     | { type: 'ghost'; fighter: number; ghost: GhostHitbox }
     /**
-     * `attackKey` is null for a hit with the recovery move. Where it landed
+     * `attackKey` is null for a hit with the recovery move or a bomb's explosion. Where it landed
      * (x, y), the damage it did, and the knockback it gave (px/s).
      */
     | { type: 'hit'; attacker: number; target: number; attackKey: string | null; x: number; y: number; damage: number; knockbackX: number; knockbackY: number }
     | { type: 'groundPoundMiss'; fighter: number }
     /** Position is where the fighter left the stage. */
     | { type: 'ko'; fighter: number; x: number; y: number }
-    | { type: 'respawn'; fighter: number; x: number; y: number };
+    | { type: 'respawn'; fighter: number; x: number; y: number }
+    /** A bomb went off there; its 'hit' events follow. */
+    | { type: 'explosion'; x: number; y: number };
 
 /** Forwards the sounds among a fighter's physics events. */
 export function pushPhysicsSounds(events: MatchEvent[], fighter: number, physicsEvents: readonly PhysicsEvent[]): void {

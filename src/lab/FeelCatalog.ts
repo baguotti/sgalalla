@@ -33,13 +33,10 @@ function group<K extends string>(title: string, rows: Row<K>[]): Group<K> {
 
 export const MOVEMENT_GROUPS: Group<PhysicsKey>[] = [
     group('GROUND', [
-        ['MOVE_ACCEL', 'Acceleration', 'px/s²', 'How fast walking and running build up speed.'],
-        ['MAX_SPEED', 'Walk speed', 'px/s', 'Top walking speed; running multiplies it.'],
-        ['RUN_SPEED_MULT', 'Run speed ×', 'times', 'Running top speed = walk speed × this.', [1, 4, 0.05]],
-        ['RUN_ACCEL_MULT', 'Run acceleration ×', 'times', undefined, [0, 3, 0.05]],
-        ['FRICTION', 'Stopping grip', 'share', 'Speed kept each half-step when you let go on the ground: lower stops sooner.'],
-        ['RUN_FRICTION', 'Running grip', 'share', 'Speed kept each half-step while running.'],
-        ['HIGH_SPEED_THRESHOLD_MULT', 'High speed ×', 'times', 'Above walk speed × this, a fighter counts as moving fast.', [0, 3, 0.05]],
+        ['RUN_SPEED', 'Run speed', 'px/s', 'Top speed holding a direction on the ground.', [0, 3000, 10]],
+        ['RUN_FRICTION', 'Run build-up', 'share', 'Speed kept each half-step while running: lower starts and turns quicker.', [0.5, 0.99, 0.01]],
+        ['STOP_FRICTION', 'Stopping', 'share', 'Speed kept each half-step letting go: lower stops deader.', [0, 0.99, 0.01]],
+        ['GROUND_OVERSPEED_DECEL', 'Easing down from a dash', 'px/s²', 'Above the run speed (a dash\'s run-on) the speed eases down at this rate.', [0, 30000, 100]],
     ]),
     group('JUMPS', [
         ['JUMP_FORCE', 'Jump', 'px/s', 'Take-off speed of a full jump (negative is up).', [-2500, 0, 10]],
@@ -50,14 +47,17 @@ export const MOVEMENT_GROUPS: Group<PhysicsKey>[] = [
         ['LANDING_LAG_STEPS', 'Landing lag', 'steps', 'After landing from the air: no jump, dodge or attack for this many steps.', [0, 20, 1]],
     ]),
     group('GRAVITY AND FALLING', [
-        ['GRAVITY', 'Gravity', 'px/s²'],
+        ['GRAVITY', 'Gravity', 'px/s²', undefined, [0, 12000, 50]],
         ['MAX_FALL_SPEED', 'Fall speed', 'px/s', 'Gravity speeds a fall up to this.'],
         ['FAST_FALL_SPEED', 'Fast fall start', 'px/s', 'Holding down while falling starts at least this fast.'],
         ['MAX_FAST_FALL_SPEED', 'Fast fall speed', 'px/s', 'A fast fall speeds up to this.'],
         ['FALL_SPEED_EASE', 'Fall ease-back', 'share', 'After a fast fall, speed over the fall speed shrinks by this share each step.'],
     ]),
     group('AIR', [
-        ['AIR_FRICTION', 'Air drift grip', 'share', 'Horizontal speed kept each half-step in the air.'],
+        ['AIR_SPEED', 'Air speed', 'px/s', 'Top drift speed holding a direction in the air.', [0, 3000, 10]],
+        ['AIR_ACCEL', 'Air control', 'px/s²', 'How fast drifting builds up or turns round in the air.', [0, 40000, 100]],
+        ['AIR_DECEL', 'Air momentum', 'px/s²', 'How fast drift (and anything faster, like the end of a launch) slows when you let go: lower keeps momentum.', [0, 20000, 50]],
+        ['AIR_ATTACK_DRIFT', 'Drift while attacking', 'share', 'An attack in the air drifts at this share of the air speed.', [0, 1, 0.01]],
         ['AERIAL_STALL_GRAVITY_DAMP', 'Air attack stall: fall', 'share', 'Moves that stall in the air keep this share of the fall speed.'],
         ['AERIAL_STALL_HORIZONTAL_DAMP', 'Air attack stall: drift', 'share', 'Moves that stall in the air keep this share of the drift.'],
     ]),
@@ -67,7 +67,6 @@ export const MOVEMENT_GROUPS: Group<PhysicsKey>[] = [
         ['AIR_DODGE_DURATION', 'Air dodge', 'ms', 'Directional dodge in the air.'],
         ['AIR_DODGE_DISTANCE', 'Air dodge distance', 'px'],
         ['AIR_DODGE_END_SPEED', 'Air dodge end speed', 'share', 'Vertical speed kept when a directional air dodge ends.'],
-        ['AIR_DODGE_VERTICAL_DAMP', 'Air dodge vertical', 'share', 'Share of the dodge speed used up and down.'],
         ['DODGE_COOLDOWN', 'Dodge cooldown', 'ms', 'After a spot dodge.'],
         ['AIR_DODGE_COOLDOWN', 'Air dodge cooldown', 'ms', 'Until landing, after an air dodge.'],
         ['LANDED_AIR_DODGE_COOLDOWN', 'Landed air dodge cooldown', 'ms', 'Landing after an air dodge: the dodge is back this long after it ended.'],
@@ -121,16 +120,19 @@ export const MOVEMENT_GROUPS: Group<PhysicsKey>[] = [
 
 export const COMBAT_GROUPS: Group<PhysicsKey>[] = [
     group('KNOCKBACK', [
-        ['GLOBAL_KNOCKBACK_SCALING', 'Knockback growth ×', 'times', 'Every move: knockback = base + growth × this × (target damage + hit damage).', [0, 15, 0.1]],
+        ['FORCE_SCALE', 'px/s per force', 'px/s', 'Knockback = (fixed + variable × (d/100 + d²/20000)) × this, d the target\'s damage after the hit.', [0, 80, 0.5]],
+        ['FULL_CHARGE_BONUS', 'Full charge +', 'share', 'A fully charged heavy: this share more damage and variable force.', [0, 1, 0.01]],
         ['MAX_DAMAGE', 'Most damage', '%'],
         ['GROUNDED_SPIKE_BOUNCE', 'Spike on ground: pop-up', 'share', 'A downward hit on a grounded fighter pops it up with this share of the knockback.'],
         ['GROUNDED_SPIKE_LIFT', 'Spike on ground: lift', 'px'],
     ]),
     group('STUN', [
-        ['HIT_STUN_DURATION', 'Hitstun', 'ms', 'No control after a hit, at least this long.'],
-        ['STUN_FLYING_SPEED', 'Stun while flying faster than', 'px/s', 'Stun lasts while the fighter flies faster than this, across or up.'],
-        ['MAX_HIT_STUN', 'Longest stun', 'ms'],
-        ['HITSTUN_FRICTION', 'Air grip in stun', 'share'],
+        ['STUN_FLYING_SPEED', 'Stun while flying faster than', 'px/s', 'After the move\'s stun frames, stun lasts while the fighter flies faster than this, across or up.'],
+        ['STUN_EXTENSION_MAX', 'Stun runs on at most', 'ms'],
+        ['LAUNCH_DECEL', 'Launch slows by', 'px/s²', 'A launch loses this much speed a second along its angle: it flies speed²/2 × this far, so soft hits barely push and hard hits fly.', [0, 30000, 100]],
+        ['LAUNCH_EASE_SPEED', 'Launch eases out below', 'px/s', 'Below this speed the slowing eases off with the speed, so a launch fades out instead of stopping dead.', [1, 5000, 10]],
+        ['LAUNCH_FALL_DRAG', 'Sideways fade in the fall', '', 'Past the top of the arc only the sideways speed fades, this share of it a second: the fall curves.', [0, 10, 0.1]],
+        ['HITSTUN_GRAVITY', 'Gravity in a launch', 'share', 'Gravity pulls a launched fighter at this share of its strength, bending the flight into an arc.', [0, 1.5, 0.01]],
     ]),
     group('BOUNCES', [
         ['BOUNCE_SPEED', 'Bounce faster than', 'px/s', 'A stunned fighter hitting a floor or wall faster than this bounces off.'],
@@ -138,29 +140,23 @@ export const COMBAT_GROUPS: Group<PhysicsKey>[] = [
     ]),
     group('HIT-STOP', [
         ['HITSTOP_MIN_STEPS', 'Shortest', 'steps', 'Both fighters freeze on every hit: this many steps…', [0, 20, 1]],
-        ['HITSTOP_PER_DAMAGE', 'Per damage', 'steps', '…plus this many per point of damage…', [0, 2, 0.05]],
+        ['HITSTOP_SPEED_PER_STEP', 'One more per', 'px/s', '…plus one step per this much knockback…', [100, 5000, 50]],
         ['HITSTOP_MAX_STEPS', 'Longest', 'steps', '…up to this.', [0, 30, 1]],
     ]),
     group('ATTACKING', [
         ['ATTACK_ACTIVE_FRICTION', 'Grip while hitting', 'share', 'Speed kept each half-step while a move is active.'],
         ['ATTACK_RECOVERY_FRICTION', 'Grip in recovery', 'share', 'Speed kept each half-step while a move ends.'],
-        ['ATTACK_END_COOLDOWN', 'Cooldown after a move', 'ms'],
         ['SLIDE_ATTACK_SPEED', 'Slide (down light)', 'px/s'],
+        ['SIDE_LIGHT_LUNGE_SPEED', 'Side light lunge', 'px/s'],
         ['SLIDE_ATTACK_DECELERATION', 'Slide slows', 'share', 'Speed kept each step while sliding.', [0.8, 1, 0.005]],
         ['RUN_ATTACK_SPEED_MULT', 'Run attack speed ×', 'times', 'Run attack slides at slide speed × this.', [0, 3, 0.05]],
         ['RUN_ATTACK_MIN_SPEED', 'Run attack from', 'share', 'The run attack comes out above this share of walk speed.'],
     ]),
     group('CHARGE', [
         ['CHARGE_MAX_TIME', 'Full charge', 'ms', 'Heavies charge while held; at full charge they go by themselves.'],
+        ['ATTACK_END_COOLDOWN', 'Cooldown after a move', 'ms', 'After any move, no attack can start for this long.'],
         ['CHARGE_FRICTION', 'Grip while charging', 'share'],
         ['CHARGE_GRAVITY_CANCEL', 'Charging in the air: fall', 'share'],
-        ['FOK_CHARGE_COOLDOWN', 'Fok: extra cooldown', 'ms', 'Fok\'s charged moves: extra cooldown at full charge.'],
-    ]),
-    group('SIGNATURES', [
-        ['SIDE_SIG_MIN_DAMAGE', 'Damage, no charge', '%', 'Heavy side, up and neutral.'],
-        ['SIDE_SIG_MAX_DAMAGE', 'Damage, full charge', '%'],
-        ['SIDE_SIG_KNOCKBACK_BONUS', 'Side: base knockback +', 'share', 'A fully charged side signature: base knockback this share more.', [0, 3, 0.05]],
-        ['SIDE_SIG_GROWTH_BONUS', 'Side: growth +', 'share', 'A fully charged side signature: growth this share more.', [0, 3, 0.05]],
     ]),
     group('GHOSTS', [
         ['GHOST_OFFSET', 'Starts in front', 'px', 'Where a signature ghost appears, in front of the fighter.', [-200, 300, 1]],
@@ -176,20 +172,36 @@ export const COMBAT_GROUPS: Group<PhysicsKey>[] = [
         ['GHOST_HITBOX_SCALE', 'Hitbox size', 'share', 'The hitbox is a square: the 256 px ghost frame × this.', [0, 2, 0.01]],
     ]),
     group('GROUND POUND', [
-        ['GROUND_POUND_STARTUP', 'Hang before falling', 'ms'],
-        ['GROUND_POUND_FALL_MULT', 'Fall speed ×', 'times', 'Falls at fall speed × this.', [0.5, 4, 0.05]],
-        ['GROUND_POUND_MIN_DAMAGE', 'Damage, no charge', '%'],
-        ['GROUND_POUND_MAX_DAMAGE', 'Damage, full charge', '%'],
-        ['GROUND_POUND_KNOCKBACK_BONUS', 'Base knockback +, full charge', 'share', undefined, [0, 3, 0.05]],
-        ['GROUND_POUND_GROWTH_BONUS', 'Growth +, full charge', 'share', undefined, [0, 3, 0.05]],
+        ['GROUND_POUND_FALL_MULT', 'Fall speed ×', 'times', 'After its startup hang, falls at fall speed × this.', [0.5, 4, 0.05]],
         ['GROUND_POUND_LANDING_SPEED_KEPT', 'Landing keeps speed', 'share'],
     ]),
     group('RECOVERY HIT', [
         ['RECOVERY_DAMAGE', 'Damage', '%'],
-        ['RECOVERY_BASE_KNOCKBACK', 'Base knockback', 'px/s'],
-        ['RECOVERY_KNOCKBACK_GROWTH', 'Knockback growth', '', undefined, [0, 30, 0.1]],
+        ['RECOVERY_FIXED_FORCE', 'Fixed force', '', 'The same at any damage.', [0, 200, 1]],
+        ['RECOVERY_VARIABLE_FORCE', 'Variable force', '', 'Grows with the target\'s damage.', [0, 200, 1]],
+        ['RECOVERY_STUN', 'Stun', 'steps', undefined, [0, 60, 1]],
         ['RECOVERY_KNOCKBACK_ANGLE', 'Knockback angle', 'deg', '0 forward, 90 up, 270 down.', [0, 359, 1]],
         ['RECOVERY_HITBOX_SIZE', 'Hitbox size', 'px', 'A square round the fighter.'],
+    ]),
+    group('BOMBS', [
+        ['BOMB_FIRST', 'First drops after', 'ms'],
+        ['BOMB_GAP', 'Next one after', 'ms', 'After a bomb is gone, the next drops this long after…'],
+        ['BOMB_GAP_RANDOM', '…plus up to', 'ms'],
+        ['BOMB_LIFETIME', 'Loose bomb lasts', 'ms'],
+        ['BOMB_RADIUS', 'Size (radius)', 'px'],
+        ['BOMB_PICKUP_RANGE', 'Pick up within', 'px', 'How far past the hurtbox light attack or throw reaches a bomb.'],
+        ['BOMB_THROW_SPEED_MIN', 'Throw speed, tapped', 'px/s'],
+        ['BOMB_THROW_SPEED_MAX', 'Throw speed, charged', 'px/s'],
+        ['BOMB_CHARGE_FULL', 'Full charge after', 'ms'],
+        ['BOMB_OVERCHARGE', 'Goes off in the hand after', 'ms', 'Charging a throw longer than this blows the bomb up on its holder.'],
+        ['BOMB_BOUNCE', 'Bounce keeps', 'share'],
+        ['BOMB_SAFE_SPEED', 'Safe again below', 'px/s', 'A thrown bomb slower than this stops being armed.'],
+        ['BOMB_GRACE_STEPS', 'Passes through for', 'steps', 'After a throw, the bomb goes through everyone for this long.', [0, 30, 1]],
+        ['BOMB_BLAST_RADIUS', 'Blast radius', 'px'],
+        ['BOMB_DAMAGE', 'Damage', '%'],
+        ['BOMB_FIXED_FORCE', 'Fixed force', '', undefined, [0, 200, 1]],
+        ['BOMB_VARIABLE_FORCE', 'Variable force', '', undefined, [0, 200, 1]],
+        ['BOMB_STUN', 'Stun', 'steps', undefined, [0, 60, 1]],
     ]),
     group('RESPAWN', [
         ['RESPAWN_DELAY_STEPS', 'Out after a KO', 'steps', undefined, [0, 300, 1]],
@@ -198,9 +210,7 @@ export const COMBAT_GROUPS: Group<PhysicsKey>[] = [
 ];
 
 /** Settings that only seed other values when the game loads: changing them live would do nothing. */
-export const HIDDEN_PHYSICS: readonly PhysicsKey[] = [
-    'LIGHT_STARTUP_MS', 'LIGHT_ACTIVE_MS', 'LIGHT_RECOVERY_MS', 'HEAVY_STARTUP_MS', 'HEAVY_ACTIVE_MS', 'HEAVY_RECOVERY_MS',
-];
+export const HIDDEN_PHYSICS: readonly PhysicsKey[] = [];
 
 export const EFFECT_GROUPS: Group<EffectKey>[] = [
     group('CAMERA KICK', [
@@ -224,6 +234,7 @@ export const EFFECT_GROUPS: Group<EffectKey>[] = [
         ['JUMP_RING_OPACITY', 'Air jump ring ×', 'times', undefined, [0, 3, 0.05]],
         ['AFTERIMAGE_OPACITY', 'Afterimages ×', 'times', undefined, [0, 3, 0.05]],
         ['AFTERIMAGE_EVERY_MS', 'Afterimage every', 'ms', undefined, [10, 200, 1]],
+        ['LAUNCH_TRAIL_SPEED', 'Launch trail faster than', 'px/s', 'A fighter launched faster than this leaves afterimages behind.', [0, 5000, 50]],
     ]),
 ];
 
@@ -232,9 +243,9 @@ export const EFFECT_GROUPS: Group<EffectKey>[] = [
 export interface MoveInfo {
     key: string;
     label: string;
-    /** Signatures hit where their ghost is: damage from SIGNATURES, hitbox from GHOSTS. */
+    /** Signatures hit where their ghost is: hitbox from GHOSTS. */
     signature?: boolean;
-    /** The ground pound: damage from GROUND POUND, and its own timing. */
+    /** The ground pound: falls until it lands instead of an active time. */
     groundPound?: boolean;
 }
 
@@ -251,20 +262,18 @@ export const MOVES: MoveInfo[] = [
     { key: 'heavy_side_grounded', label: 'Side signature', signature: true },
     { key: 'heavy_up_grounded', label: 'Up signature', signature: true },
     { key: 'heavy_neutral_grounded', label: 'Neutral signature', signature: true },
-    { key: 'heavy_side_aerial', label: 'Side signature (air)', signature: true },
-    { key: 'heavy_up_aerial', label: 'Up signature (air)', signature: true },
-    { key: 'heavy_neutral_aerial', label: 'Neutral signature (air)', signature: true },
     { key: 'heavy_down_aerial', label: 'Ground pound', groundPound: true },
 ];
 
 export const MOVE_SETTINGS: Record<Exclude<MoveField, 'shouldStallInAir'>, Setting<MoveField>> = {
     damage: { key: 'damage', label: 'Damage', unit: '%', range: [0, 40, 1] },
-    baseKnockback: { key: 'baseKnockback', label: 'Base knockback', unit: 'px/s', range: [0, 1500, 5], hint: 'Knockback at 0%.' },
-    knockbackGrowth: { key: 'knockbackGrowth', label: 'Knockback growth', unit: '', range: [0, 30, 0.1], hint: 'Extra knockback per % of the target, times the global growth.' },
+    fixedForce: { key: 'fixedForce', label: 'Fixed force', unit: '', range: [0, 200, 1], hint: 'The same at any damage (× COMBAT › KNOCKBACK px/s per force).' },
+    variableForce: { key: 'variableForce', label: 'Variable force', unit: '', range: [0, 200, 1], hint: 'Grows with the target\'s damage: × (d/100 + d²/20000).' },
+    stun: { key: 'stun', label: 'Stun', unit: 'steps', range: [0, 60, 1], hint: 'The target can\'t act this many steps (longer while it flies fast).' },
     knockbackAngle: { key: 'knockbackAngle', label: 'Angle', unit: 'deg', range: [0, 359, 1], hint: '0 forward, 90 up, 270 down.' },
-    startupDuration: { key: 'startupDuration', label: 'Startup', unit: 'ms', range: [0, 800, 1], hint: 'Before the hitbox comes out.' },
-    activeDuration: { key: 'activeDuration', label: 'Active', unit: 'ms', range: [0, 1000, 1], hint: 'The hitbox is out.' },
-    recoveryDuration: { key: 'recoveryDuration', label: 'Recovery', unit: 'ms', range: [0, 1000, 1], hint: 'After the hitbox, before the next action.' },
+    startup: { key: 'startup', label: 'Startup', unit: 'steps', range: [0, 60, 1], hint: 'Before the hitbox comes out.' },
+    active: { key: 'active', label: 'Active', unit: 'steps', range: [0, 60, 1], hint: 'The hitbox is out.' },
+    recovery: { key: 'recovery', label: 'Recovery', unit: 'steps', range: [0, 60, 1], hint: 'Stuck after the hitbox (the ground pound: its landing pose). Every move then has COMBAT › Cooldown after a move.' },
     hitboxWidth: { key: 'hitboxWidth', label: 'Hitbox width', unit: 'px', range: [0, 400, 1] },
     hitboxHeight: { key: 'hitboxHeight', label: 'Hitbox height', unit: 'px', range: [0, 400, 1] },
     hitboxOffsetX: { key: 'hitboxOffsetX', label: 'Hitbox forward', unit: 'px', range: [-250, 250, 1], hint: 'From the fighter\'s centre, forward.' },

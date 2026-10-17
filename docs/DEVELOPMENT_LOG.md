@@ -1164,6 +1164,182 @@ Part 2
 - **[Shared]** What only DERAPATE needed is undone: the lit shader's falloff scale, rim offsets and cones, the exported glow textures, the narrower atmosphere settings type, and the Studio Lab's exported windowed view with a top-band setting. The atmosphere pass still skips its rays pass when there are no rays.
 
 ------------------------------------------------------------------------------------------------------------------------------------
-### [2026-10-15] v3.1.4 (branch `main`): the release catches up
-- **[Release]** `main` takes everything from `experimental-branch` up to v3.1.4e (merged with its exact contents): the movement and feel passes, the online lobby with up to 5 players, leaving mid-match and spectators (protocol 8), the layered Londra, contact shadows, the deep cleans. DERAPATE isn't in it (it's its own project now).
-- **[Menu]** The release's menu hides CAMPAGNA and STUDIO LAB (and CORSA, as before): ALLENAMENTO, BOTTE IN LOCALE, BOTTE IN REMOTO, IMPOSTAZIONI. Their code stays, unreachable, so the branches only differ by the menu.
+### [2026-10-15] Experimental site on port 8081 (branch `experimental-branch`)
+- **[Deploy]** The experimental build moves to http://138.68.126.112:8081 (8080 is DERAPATE's now): `deploy_experimental.sh` serves it there and opens the port; the client picks the experimental game server (9209) when the page is on 8081.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-15] Brawlhalla feel pass: movement, jumps, launches (branch `experimental-branch`)
+- **[Investigation]** Measured with the simulation, in fighter heights (H, 184 px). Before:
+    - The ground took 0.3 s to reach full speed (top speed was the balance of push against drag).
+    - The full jump was low and floaty (1.3 H, top at 0.47 s); air drift was slow (2.7 H/s).
+    - Launches lost only their sideways speed, about 10% a step: a side signature at 120% burst at 38 H/s, stopped dead sideways after 0.4 s at 5.4 H, then dropped straight down. Vertical launches weren't slowed at all, so the two behaved differently. That was the clumsy "thrown around" feel.
+- **[Feel]** **Movement**: a top speed on the ground (1000 px/s) and in the air (900 px/s), reached in 3 steps on the ground and about 8 in the air; ground stops take 4 steps; letting go in the air keeps the momentum (about half a second to drift to a stop). Light attacks in the air no longer kill the drift. Dashes and directional dodges keep their exact speed.
+- **[Feel]** **Jumps**: gravity 2200 → 5300. A full jump rises 2.0 H with its top at 0.37 s (0.77 s in the air), an air jump about 1.8 H, a short hop about 1.25 H. Every other vertical force is rescaled to keep its height (recovery, wall jump, dash jump), and the fall speeds are 1600 (fast fall 1400 to 2300). Letting go of jump now cuts only a jump's rise: it used to cut dash jumps, recoveries and launches too.
+- **[Feel]** **Launches**:
+    - The whole knockback speed slows together (0.948 a step across, 0.995 rising, so upward launches float up longer, the top blast zone being further), under a tenth of gravity. A hit glides along its angle and slows smoothly: the same side signature now goes 1.9 H in 0.1 s, 5 H by 0.4 s and 6.5 H by 1 s.
+    - The launch outlasts the stun: control comes back mid-flight, and the fighter can drift against it, until it lands, jumps, dodges, recovers or slows below 600 px/s.
+    - Knockback growth ×5 → ×2.9, calibrated with `npm run balance` so the KO percentages stay close to before (side sig, full charge 130 → 120%; up 130 → 140%; lights 190–280%).
+- **[Feel]** **Weight**: heavy moves add 2 steps of hit-stop (most 11); fighters launched faster than 1400 px/s leave a trail of afterimages.
+- **[Lab]** FEEL panels: GROUND (run speed, speeding up, stopping, easing down from a dash), AIR (air speed, control, momentum), STUN (launch glide, glide rising, gravity in a launch, launch ends below), HIT-STOP (heavy moves add), EFFECTS (launch trail).
+- **[Change]** Protocol version 9 (simulation rules changed); the recordings re-baselined with `npm run replays:update`.
+- **[S]** tsc (client and server), 59 tests (new: quick starts and stops with air momentum, short hop only for jumps, a launch gliding along its angle past the stun, how a launch ends), build. In the browser (muted): a side signature on the dummy at 120% lands with a heavier freeze and glides off smoothly (128, 169, 144, 122 px per 50 ms) with its trail; no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-15] Feel pass, calmer; charging stops the fighter again (branch `experimental-branch`)
+- **[Feel]** Movement was a touch too quick and frantic:
+    - Run speed 1000 → 880 px/s, reached in 6 steps (was 3), stops in 6 (was 4); air speed 900 → 780, gentler air control.
+    - Gravity 5300 → 4600: jumps keep their heights (full 2.0 H, air about 1.8 H) but take 0.4 s to the top. Every vertical force rescaled to match; fall speeds 1500 (fast fall 1300 to 2150).
+- **[Fix]** **Charging a heavy move** all but stops the fighter again, as before the feel pass: a fighter charging isn't attacking yet, so steering had taken over. Now charging takes steering away and the charge's grip holds it (15 px from a full run, in the air it hangs).
+- **[Balance]** Knockback growth ×2.9 → ×2.8 for the new movement: KO percentages within 20 of the original table (side sig, full charge 120%, up 140%, neutral 130%, lights 190–280%).
+- **[S]** tsc (client and server), 60 tests (new: charging stops the fighter), replays re-baselined, build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] v3.1.5e: Brawlhalla's Unarmed rules (branch `experimental-branch`)
+- **[Research]** Brawlhalla's Unarmed frame data and combat rules from brawlhalla.wiki.gg (Unarmed, Attacks, Movement, Stats). Every fighter gets the same average stats, so Dexterity, Strength and Defense don't exist; recovery uses the middle of the Dexterity range. No public numbers exist for hit pause.
+- **[Combat]** **Frame data**: every move has Unarmed's damage, fixed and variable force, stun, and startup, active, recovery (hit / miss) and cooldown (hit / miss), in frames. Lights are slower to come out (5–13 frames) and stick longer after a miss; heavies take 16–20 frames. A multi-hit string (neutral light, neutral air) is one hit with its total damage, and a hit ends the move's active frames, as the string's last hit would.
+- **[Combat]** **Knockback** is Brawlhalla's: (fixed + variable × (d/100 + d²/20000)) × 30 px/s, d the target's damage after the hit. **Stun** is the move's frames (14–31), longer while flying fast. Replaces base + growth × 2.8 × damage and the fixed 300 ms stun.
+- **[Combat]** **Cooldown** stops only the same attack (other moves come out at once): Brawlhalla's strings. The global 100 ms cooldown after every move and Fok's charged-move cooldown are gone.
+- **[Combat]** **Heavies**: charge up to 1 s for up to 25% more damage and variable force (replaces the signature and ground pound charge bonuses); no cooldown; the signature ghost comes out with the punch, not at the press. In the air, side heavy is the recovery, as in Brawlhalla (the aerial signatures are gone).
+- **[Combat]** **Ground pound**: comes out on the press (no charge), hangs 17 frames, falls, and the landing is its recovery (20 frames on a hit, 8 on a miss), in the landing pose.
+- **[Feel]** **Launches** lose a steady 13000 px/s² along their angle (Brawlhalla's Defense rule) instead of a share each step: the flight grows with the square of the speed, so a jab at 0% pushes about 65 px and a hit near a KO flies far. Launch gravity 0.1 → 0.3.
+- **[Feel]** **Hit pause**: 1 step plus 1 per 900 px/s of knockback, up to 8: about 2 steps on a light hit, 7 on a KO hit (was 3 to 11 by damage).
+- **[Balance]** Side light sends forward (30°) instead of popping up. KO table (`npm run balance`): side sig 150% tapped, 120% charged; up and neutral sig 160%; neutral and up light 270%; side light 310%. True combos (stun beats recovery + next startup): down light into side signature or jump + neutral air (0–80%), neutral light into side light (0–40%).
+- **[CPU]** The CPU dodges with a lower chance each step of an attack's startup (0.2 → 0.08), since startups are longer: it still dodges about half the attacks. CPU against CPU now plays out 3 stocks in about 2–2.5 minutes (before: no KOs in 3 minutes).
+- **[Lab]** MOVES edits each move's frame data and forces; KNOCKBACK (px/s per force, full charge bonus), STUN (launch slows by), HIT-STOP (one more step per) follow the new settings.
+- **[Change]** Protocol version 10; recordings re-baselined with `npm run replays:update`.
+- **[S]** tsc (client, tests, server), 64 tests (new: Brawlhalla's force and stun frames, cooldown stops only the same attack, ground pound on press with landing recovery, down light true-combos into jump + neutral air; a launch slowing by a steady amount), build, KO table, headless CPU matches. Progress tracked at https://claude.ai/artifact/UafLwcZWuFZ5mccwsshy3E.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] v3.1.6e: movement sized to the stage (branch `experimental-branch`)
+- **[Investigation]** Feedback: jumps too high, movement carries too far, air lights travel like crazy. No public raw physics numbers exist for Brawlhalla (they're in its encrypted game files), so movement was measured against our own stage in fighter heights (H, 184 px). The stage: main platform 6.4 H wide, soft platform 2.2 H above it, blast zones 7.6 H past the edges and 10 H above. Before: full jump 2.0 H, run 4.8 H/s (the stage in 1.4 s), air drift 4.2 H/s with 1.1 H of momentum after letting go, air lights carrying 2.1–3.1 H (side air 39 frames at full air speed), dash 2.8 H. The stage stays (its collision matches the art, and knockback is fine); movement is fitted to it.
+- **[Feel]** Jumps: gravity 4600 → 4300, full jump 1.55 H (apex in 21 steps), air jump 1.3 H, short hop 0.8 H; the soft platform still takes a jump and an air jump. Recovery, wall jump and dash jump keep their heights; launch gravity keeps its strength (0.32), so knockback and the KO table are unchanged.
+- **[Feel]** Run 880 → 680 px/s (the stage in 1.8 s), air 780 → 600 px/s; letting go in the air stops in 12 steps (0.3 H, was 1.1 H). Dash 2.0 H, slide (down light) 0.65 H, run light 1 H.
+- **[Feel]** Attacks: in the air they drift at 40% of the air speed (`AIR_ATTACK_DRIFT`): air lights carry 0.6–0.75 H. On the ground an attack owns the movement to its end (Brawlhalla's recovery is stuck): an air light that lands no longer runs off during its recovery.
+- **[CPU]** Recovering, the CPU jumps at once below the stage top (lower jumps punished its random spacing).
+- **[Change]** Protocol version 11; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 64 tests (movement tests follow the new sizes), build, KO table unchanged, true combos unchanged (down light into side sig or jump + neutral air, 0–80%), headless CPU matches.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] Online: a bad connection no longer freezes the others (branch `experimental-branch`)
+- **[Investigation]** A three-player match (London, Sicily, Venice) lagged for London when Venice's connection was poor. The cost of a frame is small (a step 2 µs, saving the state 18 µs, an 8-frame rollback 0.2 ms), so CPU wasn't it. A headless simulator of the relay with each player's latency, jitter, loss, network spikes and stalled frames reproduced it: plain high ping is hidden by rollback, but Venice's 250 ms spikes or 12-frame stalls froze London and Sicily 6–15% of the time, in bursts of up to 13 frames, while Venice barely noticed. Two causes: the others hit the 8-frame rollback limit and waited, and a stalled player's lost time was dropped (Phaser's catch-up cap), leaving them behind, so the others had to wait more and skip frames.
+- **[Online]** Rollback window 8 → 16 frames: a spike or stall makes the others roll back further instead of freezing.
+- **[Online]** The online clock keeps the time a stalled frame lost (up to 1 s) and catches it up, 4 steps a frame, instead of dropping it: whoever stalled gets level again. Local play still drops it (no fast-forward after switching windows).
+- **[Online]** Saving each frame's state uses a plain-data copy, 3× faster than structuredClone (6 µs instead of 18). Packets go once per simulated frame, so 120 Hz displays no longer send twice as many.
+- **[Online]** The network overlay shows each other player's lag (how many frames behind their inputs arrive) and packet loss, to see who the slow connection is.
+- **[Result]** Simulated with Venice's spikes and stalls: London and Sicily frozen 14.5% → 5.2% of the time, and the freezes are now single skipped frames (longest burst 13 → 9 frames with both at once, 1 frame with either alone). Good connections are unchanged.
+- **[S]** tsc (client, tests, server), 66 tests (new: a player whose game stalls for a fifth of a second doesn't freeze the others, which fails with the old 8-frame window; the online clock catches up after a stall), build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] Londra Grande: a bigger stage for 4 players (branch `experimental-branch`)
+- **[Stage]** Londra Grande, a new stage beside the others, made from Londra's art: the main platform 1600 px wide instead of 1180 (the two mirrored London halves moved apart by 210 px each; they still overlap, so no seam shows), a pillar on each side as far from the edge as the standard one, the standard top platform and two lower, smaller soft platforms a jump up, so four fighters spread over three levels. Blast zones move out with the edges: a KO takes the same flight from the ledge.
+- **[Stage]** Drawn from Londra's layers (engine sky, drifting clouds behind and in front, the island with its waterfall), not the 9862 px painting: about 21 MB of graphics memory instead of 330. The island sits further back and higher than in the painting, so its rocks don't hang behind the top platform; its waterfall falls behind it towards the main stage. A preview for the map select, rendered from the stage.
+- **[Simulation]** Each match keeps its collision layout (`MatchState.stage`: `standard` or `grande`); collisions, blast zones, the CPU's idea of the stage, contact shadows, the camera and the debug view read it. Protocol version 12.
+- **[Online]** Matches of 3 or more players play on Londra Grande, 2 players on Adria as before; spectators follow the same rule.
+- **[S]** tsc (client, tests, server), 67 tests (new: Londra Grande's wider floor and further blast zones), build, a headless free-for-all of 4 CPUs on it (about 2.5 minutes, 150+ hits, 10 KOs). In the browser (muted): 4 CPUs on Londra Grande, collision boxes over the art, no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] Brawlhalla's KO camera, and a pass for bugs and clean-ups (branch `experimental-branch`)
+- **[Camera]** As in Brawlhalla, the camera never shows past the stage's camera bounds (300 px inside the blast zones; it used to chase a launched fighter out to the blast zone, showing empty space beyond the art). A fighter in play outside the view shows as a bubble at the screen's edge: their portrait in their colour, pointing at them, smaller the further away (`ui/OffscreenBubbles.ts`). A KO bursts in the fighter's colour at the screen's edge where they left (there was only a shake outside the Lab). Respawns drop in above the stage as before.
+- **[Fix]** Trades: two fighters hitting each other on the same step now both get hit. Hits applied one at a time let the lower slot's hit cancel the other's attack, so fighter 1 (online, whoever joined first) always won trades. Every hit of a step is now found first and applied after.
+- **[Fix]** Effects followed the old damage scale: every light hit (now 8 to 13 damage) drew the heavy-hit spark ring, kicked the camera and left a launch trail. Sparks now size from Unarmed's damages, the ring starts at 16 damage, and the camera kick and launch trail at 2600 px/s.
+- **[Fix]** A training dummy joining mid-match got no off-screen bubble and a different colour lookup; the bubbles are freed when the scene shuts down.
+- **[Server]** Input packets are relayed only from a seated player in a running match, for that match and their own slot: a spectator's or a forged packet (another player's slot) is dropped.
+- **[Clean-up]** The hitstun timer counts only while stunned. Removed `MapConfig` (blast zones live with the stage layouts; the zoom presets were never switched), the unused `AIR_DODGE_VERTICAL_DAMP` setting and its Lab slider, a duplicated line in the training toggle, and the debug readout's work while hidden.
+- **[Change]** Protocol version 13; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 68 tests (new: a trade hits both fighters), build, KO table unchanged. In the browser (muted): a fighter far off stage shows as a bubble while the camera stays inside the bounds; a KO bursts at the screen's edge; no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] Londra Grande: bigger island, calmer clouds (branch `experimental-branch`)
+- **[Stage]** The floating island is as big as in Londra's painting (it was shrunk to 0.8 and pushed far up), sitting just above the top platform with its waterfall behind it.
+- **[Stage]** Its own cloud layout (`GRANDE_CLOUDS`) instead of the painting's: smaller pieces (0.5 to 0.6 of their painted size) and fewer; behind the island, a few in the upper sky and two peeking out from its sides; in front of it, two that just touch its rocks and a few low round the stage, away from the middle. Both layers drift slowly left to right (6 and 9 px/s). The map-select preview is rendered again.
+- **[S]** tsc, 68 tests, build; in the browser (muted), Londra Grande beside Londra, no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] Bombs, as Brawlhalla's Bouncy Bomb (branch `experimental-branch`)
+- **[Research]** Brawlhalla's Bouncy Bomb gadget: it drops in now and then and despawns after 15 s; you pick it up and throw it with the throw button; thrown it turns red and explodes on contact with any fighter, the thrower included, after a short grace period; it bounces off walls and turns blue (safe) once it loses momentum; a well-timed throw press catches it; a fighter hit while holding a gadget drops it. The wiki gives no numbers, so damage, force and blast size are our own. The old bomb (Matter.js, removed in the netcode rebuild) was not reused.
+- **[Gameplay]** `shared/Bombs.ts`, in the simulation (deterministic, so online rollback and replays keep it): the first bomb drops 15 s in over the main platform, the next 5 to 10 s after one is gone, one at a time (two with 4 fighters or more). Throw (H, gamepad RB) picks up a bomb within reach and throws it: up, down, or forward 15° up, at 1900 px/s. Armed, it passes through everyone for 8 steps, then explodes on touching a fighter: 18 damage, force 55 fixed + 45 variable, 25 frames of stun, launching everyone within 150 px up and away at 50°. It bounces keeping 70% of its speed and is safe once a bounce leaves it under 500 px/s. Off in the Lab and the campaign. All settings in PhysicsConfig (BOMB_*) and the Lab's COMBAT › BOMBS.
+- **[Input]** A throw button: `FighterInput.throw` (a new input bit, appended), buffered like the others; H on the keyboard (rebindable in Settings), RB on gamepads. The F1 controls list shows it (and now says recovery is B + ↑ on a gamepad, not RB).
+- **[Visuals]** Bombs drawn in code: round, with a fuse and a band, blue when safe, red when armed, rolling as they move, held in the hand, blinking before a loose one is gone. Explosions: the explosion sprite from the art folder, a shake, the old chest's explosion sound.
+- **[Clean-up]** Combat's knockback formula, hit pause and the launch of a hit target are shared functions now (`knockbackSpeed`, `hitstopFor`, `launchFighter`), used by moves and explosions alike; the match's seeded random numbers live in `shared/Random.ts`.
+- **[Change]** Protocol version 14; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 75 tests (new: tests/bombs.test.ts, drops, pick up and throw, an explosion on the fighter it touches launching them up and away, the thrower hurt by their own bomb, a catch, dropping it when hit, safe after slowing, no bombs when off; the rollback players now also press throw, so bombs are kept in sync under rollback), build, KO table unchanged. In the browser (muted): a bomb held, thrown and exploding on the other fighter; no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-16] Bombs: picked up with light attack, charged throws, overcharge (branch `experimental-branch`)
+- **[Gameplay]** As in Brawlhalla (whose default controls pick items up with light attack too), light attack picks up a bomb within reach instead of attacking, and catches a thrown one; the throw button still does. Holding a bomb, light attack attacks as usual.
+- **[Gameplay]** Throws charge like a heavy: holding throw charges, letting go throws, from 1100 px/s tapped to 2300 px/s after 0.8 s, in 8 directions aimed as you let go (up, down, the four diagonals at 45°, forward 15° up). Held past 2 s, the bomb goes off in the hand, on its holder and anyone near.
+- **[Visuals]** A charging bomb swells and flickers red and blue, faster as it nears going off.
+- **[Input]** A `throwHeld` input bit (appended); H held on the keyboard, RB held on gamepads.
+- **[Change]** Protocol version 15.
+- **[S]** tsc (client, tests, server), 78 tests (new: light attack picks up instead of attacking, a charged throw faster than a tapped one, a diagonal throw, overcharge blowing up in the hand; the rollback players now also hold throw, so charging and overcharging stay in sync under rollback), build. In the browser (muted): a bomb close to going off, swollen and red in the hand; no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Movement and sizes measured from Brawlhalla recordings (branch `experimental-branch`)
+- **[Research]** Riccardo recorded Brawlhalla's Training Mode at 60 fps (assets/_brawlhalla_refs: 3 jumps and a recovery at 50%, the rest zoomed 130%). The legend was tracked frame by frame (median background, difference, largest blob), and everything measured in legend heights (H), so the two zooms compare. Brawlhalla against ours:
+    - main stage 9.5 H wide (ours 6.4 H standard, 8.7 H Londra Grande): our fighters were too big for the stage, the cramped feeling;
+    - full jump 1.95 H, peak at 27 frames, 55 in the air, and air jumps as high (ours 1.55 H at 21 frames, air jumps 1.3 H): gravity 19.3 H/s², launch 8.7 H/s;
+    - run 6.3 H/s reached in about 17 frames, a stop sliding 0.7 H over 15 frames (ours 3.7 H/s in 6 frames, stopping dead);
+    - air drift 5.2 H/s, about 20 frames to reach it or stop; ground pound falling about 10 H/s;
+    - side light lunges 1.6 H after a still startup; down light slides 1.4 H; neutral light and air lights barely move.
+    The Power Viewer panel is cropped out of the zoomed clips, so frame data stays from the wiki.
+- **[Size]** Fighters are 124 px tall instead of 184 (0.674), Brawlhalla's proportion to the standard stage (9.5 H); their art is drawn at `fighterScale()` (physics height over the art's 184 px), ghosts and sparks too. Bodies, hurtboxes, every attack hitbox, ghosts, bombs, dodges and dashes shrink with them; knockback, blast zones and the recovery's height stay (they're stage-sized), so the KO table is unchanged (side sig 150/120%, lights 260–310%). The stage's wall boxes move out 19.5 px so a fighter sliding down a wall keeps its place against the art.
+- **[Movement]** Set from the measurements: run 781 px/s (17 frames to reach, 15 to stop), air 645 px/s, gravity 2388 px/s², every jump 1.95 H, fall 893 px/s (fast fall 1180), dash 2.65 H. Side light now lunges 1.6 H as its hitbox comes out (on the ground only); the down light slides 1.4 H; the run attack lunges like the side light.
+- **[Fix]** Attacks commit: no jumping until a move is over (the press waits in the buffer). A jump mid side light used to carry its lunge into the air and off the stage.
+- **[CPU]** Distances scaled to the new size; its recover checks now measure from the stage's top (it got stuck recovering once standing fighters' centres dropped below 800).
+- **[Change]** Protocol version 16; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 79 tests (new: sizes and jumps match the recordings: the stage 9.5 H, a jump 1.95 H peaking at about 27 frames, air jumps as high; the movement tests follow the new rates), build, KO table unchanged, true combos (down light into neutral light, side sig, jump + neutral air, 0–80%), headless CPU matches. In the browser (muted): the smaller fighters on Adria, no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Attacks work as on main again, with the new sizes and hits (branch `experimental-branch`)
+- **[Gameplay]** Riccardo preferred how attacking felt on main, so light and heavy attacks work that way again. The new sizes, movement, damage, knockback and stun stay:
+    - quick timing from main, in frames: lights 3/6/3, down light and run light 5/6/6, down air 6/6/8, signatures 2/18/12, side signature 5/18/18;
+    - every move ends with the same 0.1 s cooldown (`ATTACK_END_COOLDOWN`) before any attack. Gone: the per-move cooldowns, the shorter recovery after a hit, and a hit ending the active frames;
+    - heavies charge up to 1.5 s again;
+    - side heavy in the air is the aerial side signature again (charged); up and neutral heavy in the air are the recovery;
+    - the ground pound charges hanging in the air, then falls; its landing pose lasts as a cooldown;
+    - a light attack can be jumped out of, and steered in its recovery on the ground; heavies still commit. Jumping out clamps the speed to air speed, so a lunge or slide can't carry off the stage.
+- **[Tuning]** Distances re-measured under the shorter moves: side light lunge 2460 px/s (1.6 H), slide 2200 px/s (1.4 H). A light's recovery on the ground uses the move's friction unless steered, so lunges don't skid on.
+- **[Lab]** The move timing rows are startup, active and recovery; COMBAT has "Cooldown after a move".
+- **[Change]** Protocol version 17; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 81 tests (new: the cooldown applies to every attack and a buffered press comes out when it ends; jump out of a light without its lunge; steer in its recovery; no jump out of a heavy; the ground pound charges hanging; aerial side heavy vs recovery; down light true-combos into neutral light at 0 and 80%), KO table unchanged, headless CPU matches. Jump + neutral air after a down light no longer combos: the attacker is free while the target is still on the ground.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Main's running, the ground pound's charge pose, charges facing where you point (branch `experimental-branch`)
+- **[Gameplay]** Running is main's again; the Brawlhalla-measured run felt soapy. Holding a direction builds the speed keeping 0.93 of it each half-step, settling at 832 px/s (most of it in about 12 frames). Letting go keeps 0.6, stopping in a few frames within a few pixels (Brawlhalla's slid 0.7 H). Turning round is as quick. Air movement, dashes and the easing down from a dash's run-on are unchanged. `RUN_FRICTION`/`STOP_FRICTION` replace `GROUND_ACCEL`/`GROUND_DECEL`.
+- **[Gameplay]** A charge faces where the fighter points, as on main: running right and charging with left held charges, and throws the side signature, to the left.
+- **[Visuals]** Charging a ground pound shows its pose (the ground pound frame, shaking as it charges), as on main.
+- **[Change]** Protocol version 18; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 82 tests (new: a charge facing where the fighter points; the run test follows main's model), KO table unchanged, headless CPU matches. In the browser (muted, inputs fed to the player's input): the ground pound charge pose, and a left charge after running right.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Fix: the ground pound pose showing outside the ground pound (branch `experimental-branch`)
+- **[Fix]** After a ground pound, jumps, falls and down lights showed the ground pound sprite, and facing stopped following movement in the air: the "charging a ground pound" check looked at the last charge's direction without checking that a charge was going on. It now does.
+- **[Change]** Protocol version 19 (facing in the air is simulation); the ground pound recording re-baselined.
+- **[S]** tsc (client, tests, server), 83 tests (new: after a ground pound, a jump isn't a ground pound charge and faces the way it moves), build. In the browser (muted): the charge shows the ground pound frame; a jump and a down light after it don't.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Platforms, walls and pillars fitted to the art, stage and bombs choice, quieter audio (branch `experimental-branch`)
+- **[Fix]** Down on a soft platform no longer drops you before a down light: the hold to drop is 0.2 s (was 4 frames), and it counts only while free, so down still held out of a down light (or a dodge or charge) starts over instead of dropping at once.
+- **[Fix]** Wall slides: fighters had their hands in the air beside the rock. The walls are placed from the textures' outlines now, so the hand is on the rock: the main stage's sides 11 px in, the pillar's outer side 18 px in, its inner side 9 px.
+- **[Fix]** The pillars (Adria and Londra's left one, both on Londra Grande) could be entered from below: their underside was a single ceiling at y 565, well inside the rock, which hangs down to a tip at about y 800. Five undersides now step up the tapering rock, and the walls follow its sides.
+- **[Feat]** Online, player 1 picks the stage in the lobby (up/down: Adria, Londra, Londra Grande), shown with its preview to everyone; it used to be chosen by the number of players. Local versus offers the same three; training keeps every stage. The stage choice's previews keep their shape (they were cropped to 16:9 and spilled over the title).
+- **[Feat]** Bombs are off by default. Player 1 turns them on or off with Start (P on the keyboard) in the local and online lobbies; the choice shows at the bottom (local) or under the stage (online). Online, the stage and bombs travel together (`MatchSettings`: SETTINGS from player 1, in the room state, MatchStart and WatchStart). The menus' keyboard Start is P.
+- **[Audio]** Quieter: volumes are levels 0 to 10 played at 0.7 × level² of full volume (level 1 is now 1.4%, was 10%), and both default to 5. The UI sounds that skipped the effects volume (pause menu, controls overlay, the loading screen's) and the charge sounds now follow it.
+- **[Change]** Protocol version 20; a recording re-baselined.
+- **[S]** tsc (client, tests, server), 85 tests (new: a down light on a soft platform stays on it with down held after it; rising fast under the pillar's tip, between and under its overhang stops below the rock; the wall tests read the wall from the layout), build. In the browser (muted): the wall slide hand on the rock (sprite edge 1509.8 against the rock face at 1510), bombs off unless turned on, the local stage choice with three stages and bombs, the online lobby with a simulated room (player 1's stage and bombs sent as SETTINGS).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Charges keep their direction; damage 15% lower (branch `experimental-branch`)
+- **[Gameplay]** A charge faces the way the fighter points (left or right) as heavy is pressed and keeps it: what's held while charging no longer turns it.
+- **[Balance]** Damage about 15% lower on every move (lights 7–11, signatures 15–17, ground pound 14), bombs 15 and the recovery 13, so fighters' damage builds up slower. Forces are unchanged: KOs come at about the same damage (side sig 140%/120%, lights 270–310%), a few more hits in.
+- **[Change]** Protocol version 21; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 86 tests (new: a charge keeps the way it faced as it started), build, KO table, headless CPU matches.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Launches fly in arcs (branch `experimental-branch`)
+- **[Feel]** A launched fighter used to shoot off in a straight line along the hit's angle and stop dead after a few frames, then drop: the launch slowed by 13000 px/s² while gravity pulled at only 760. Now launches are slower and longer (`FORCE_SCALE` 30 → 19, `LAUNCH_DECEL` 13000 → 5000) under stronger gravity (`HITSTUN_GRAVITY` 0.32 → 0.6), so the path curves; the slowing eases off below 800 px/s (`LAUNCH_EASE_SPEED`), so a launch fades out instead of stopping; past the top of the arc only the sideways speed fades (`LAUNCH_FALL_DRAG` 2.5 a second), so the fall curves on too. The launch now lasts until the fighter lands or acts (jump, dodge, recovery): it no longer ends at a speed (`LAUNCH_END_SPEED` is gone), where letting go in the air used to cut the sideways speed short.
+- **[Tuning]** Speed-based thresholds scaled with the slower launches (×0.63): stun extension above 630 px/s, hit pause per 570 px/s, bounces above 380 px/s, the camera kick and launch trails from 1650 px/s. KO table about the same (side light 310%, neutral and up light 270%, side sig 140%/110%, up and neutral sig 170%).
+- **[Lab]** COMBAT gets "Launch eases out below" and "Sideways fade in the fall".
+- **[Change]** Protocol version 22; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 86 tests (the launch tests follow the new model: a slow launch carries on through the fall and ends on landing; the down light follow-up steps in), build, KO table, true combos, headless CPU matches (the CPU's own off-stage ground pounds, there before, flagged separately). Trajectories plotted before and after; in the browser (muted), a neutral light at 100% arcs up, over and down.
+

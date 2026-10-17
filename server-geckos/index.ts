@@ -17,8 +17,8 @@
 import geckos, { type GeckosServer, type ServerChannel } from '@geckos.io/server';
 import http from 'http';
 import {
-    MAX_PLAYERS, MAX_SPECTATORS, MIN_PLAYERS, NetEvent, PROTOCOL_VERSION, decodeInputPacket, inputDelayFor,
-    type MatchStart, type RoomState, type WatchInputs, type WatchStart,
+    MAX_PLAYERS, MAX_SPECTATORS, MIN_PLAYERS, NetEvent, MULTIPLAYER_STAGES, PROTOCOL_VERSION, decodeInputPacket, inputDelayFor,
+    type InputPacket, type MatchSettings, type MatchStart, type RoomState, type WatchInputs, type WatchStart,
 } from '../shared/NetProtocol.js';
 
 /** When a player leaves, the others get up to this many of their final inputs (10 s), more than anyone can be missing. */
@@ -67,6 +67,8 @@ interface Room {
     spectators: Spectator[];
     /** Set once the match starts; the room then takes no new players. */
     start: Omit<MatchStart, 'slot'> | null;
+    /** What player 1 picked: the stage (one of MULTIPLAYER_STAGES) and bombs. */
+    settings: MatchSettings;
     version: number;
 }
 
@@ -166,6 +168,16 @@ io.onConnection((channel: ServerChannel) => {
         sendRoom(room);
     });
 
+    // Player 1 picks the stage and bombs, until the match starts
+    channel.on(NetEvent.SETTINGS, (data) => {
+        const room = roomsByChannel.get(channel.id!);
+        const { stage, bombs } = (data ?? {}) as { stage?: unknown; bombs?: unknown };
+        if (!room || room.start || room.seats[0]?.channel !== channel) return;
+        if (!MULTIPLAYER_STAGES.some(s => s === stage) || typeof bombs !== 'boolean') return;
+        room.settings = { stage: stage as string, bombs };
+        sendRoom(room);
+    });
+
     channel.on(NetEvent.READY, (data) => {
         const room = roomsByChannel.get(channel.id!);
         const character = characterFrom(data);
@@ -195,17 +207,19 @@ io.onConnection((channel: ServerChannel) => {
         startRematchIfAgreed(room);
     });
 
-    // Input packets go to everyone else in the room still playing; the server keeps the inputs too
-    channel.onRaw((packet) => {
+    // A player's input packets for the match on go to everyone else still playing; the server keeps
+    // the inputs too. Anything else (a spectator's, another match's, one claiming another slot) is dropped
+    channel.onRaw((raw) => {
         const room = roomsByChannel.get(channel.id!);
-        if (!room) return;
-        const seat = seatOf(room, channel);
-        if (seat && room.start) {
-            seat.heardAt = Date.now();
-            record(seat, room.start.seed, packet);
-        }
+        const slot = room ? room.seats.findIndex(s => s.channel === channel) : -1;
+        if (!room?.start || slot < 0 || room.seats[slot].left) return;
+        const packet = decodeInputPacket(toBytes(raw));
+        if (!packet || packet.match !== room.start.seed || packet.slot !== slot) return;
+        const seat = room.seats[slot];
+        seat.heardAt = Date.now();
+        record(seat, packet);
         for (const other of room.seats) {
-            if (other.channel !== channel && !other.left) other.channel.raw.emit(packet);
+            if (other !== seat && !other.left) other.channel.raw.emit(raw);
         }
     });
 
@@ -224,7 +238,7 @@ function join(channel: ServerChannel): void {
         watch(playing, channel);
         return;
     }
-    if (!openRoom) openRoom = { seats: [], spectators: [], start: null, version: 0 };
+    if (!openRoom) openRoom = { seats: [], spectators: [], start: null, settings: { stage: MULTIPLAYER_STAGES[0], bombs: false }, version: 0 };
     const room = openRoom;
     room.seats.push({ channel, character: 'fok', ready: false, rtt: 0, wantsRematch: false, left: false, inputs: [], next: 0, heardAt: 0 });
     roomsByChannel.set(channel.id!, room);
@@ -239,7 +253,7 @@ function watch(room: Room, channel: ServerChannel): void {
     room.spectators.push({ channel, sent: room.seats.map(() => start.inputDelay), booked: false, character: 'fok' });
     roomsByChannel.set(channel.id!, room);
     const left = room.seats.flatMap((seat, slot) => seat.left ? [{ slot, lastFrame: seat.next - 1 }] : []);
-    const message: WatchStart = { seed: start.seed, inputDelay: start.inputDelay, characters: start.characters, left };
+    const message: WatchStart = { seed: start.seed, inputDelay: start.inputDelay, characters: start.characters, settings: start.settings, left };
     channel.emit(NetEvent.WATCH, message, reliable);
     tellSpectatorCount(room);
     console.log(`[Server] Someone is watching a match (${room.spectators.length} watching)`);
@@ -333,6 +347,7 @@ function startIfReady(room: Room): void {
         seed: randomSeed(),
         inputDelay: inputDelayFor(room.seats.map(s => s.rtt)),
         characters: room.seats.map(s => s.character),
+        settings: room.settings,
     });
 }
 
@@ -354,12 +369,14 @@ function startRematchIfAgreed(room: Room): void {
     startMatch(room, { ...room.start, seed: randomSeed(), characters: room.seats.map(s => s.character) });
 }
 
+function toBytes(raw: unknown): Uint8Array {
+    if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
+    if (ArrayBuffer.isView(raw)) return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+    return new Uint8Array(0);
+}
+
 /** Keeps a copy of the inputs in a player's packet for this match. */
-function record(seat: Seat, match: number, raw: unknown): void {
-    const bytes = raw instanceof ArrayBuffer ? new Uint8Array(raw)
-        : ArrayBuffer.isView(raw) ? new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength) : null;
-    const packet = bytes && decodeInputPacket(bytes);
-    if (!packet || packet.match !== match) return;
+function record(seat: Seat, packet: InputPacket): void {
     packet.inputs.forEach((mask, i) => {
         const frame = packet.first + i;
         if (frame >= seat.next && seat.inputs[frame] === undefined) seat.inputs[frame] = mask;
@@ -390,7 +407,7 @@ function sendRoom(room: Room): void {
     room.version++;
     const players = room.seats.map(s => ({ character: s.character, ready: s.ready }));
     room.seats.forEach((seat, you) => {
-        const state: RoomState = { version: room.version, you, players };
+        const state: RoomState = { version: room.version, you, players, settings: room.settings };
         seat.channel.emit(NetEvent.ROOM, state, reliable);
     });
 }

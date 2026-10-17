@@ -1,6 +1,7 @@
 import { emptyInput, type FighterInput } from '../../../shared/FighterInput';
 import { isInPlay, type FighterState } from '../../../shared/FighterState';
 import type { MatchState } from '../../../shared/GameSim';
+import { STAGE_LAYOUTS } from '../../../shared/StageData';
 
 type AIState = 'IDLE' | 'CHASE' | 'SPACING' | 'ATTACK' | 'DEFEND' | 'RECOVER';
 
@@ -14,6 +15,10 @@ export class PlayerAI {
     private readonly input: FighterInput = emptyInput();
     private self!: FighterState;
     private target: FighterState | null = null;
+    /** The main platform's edges, a little beyond (further out and low means recover), and its top. */
+    private stageLeft = 200;
+    private stageRight = 1720;
+    private stageTop = 870;
 
     constructor(fighterIndex: number) {
         this.fighterIndex = fighterIndex;
@@ -22,6 +27,10 @@ export class PlayerAI {
     public update(match: MatchState, delta: number): FighterInput {
         Object.assign(this.input, emptyInput());
         this.self = match.fighters[this.fighterIndex];
+        const main = STAGE_LAYOUTS[match.stage].platforms[0];
+        this.stageLeft = main.x - main.w / 2 - 115;
+        this.stageRight = main.x + main.w / 2 + 115;
+        this.stageTop = main.y - main.h / 2;
         this.findTarget(match);
 
         if (this.reactionTimer > 0) {
@@ -59,23 +68,21 @@ export class PlayerAI {
         const self = this.self.body;
 
         // Survival first: off-stage and falling means recover
-        const stageLeft = 200;
-        const stageRight = 1720;
-        const stageBottom = 900;
-        if (self.y > stageBottom || (self.y > 600 && (self.x < stageLeft || self.x > stageRight))) {
+        const { stageLeft, stageRight, stageTop } = this;
+        if (self.y > stageTop + 30 || (self.y > stageTop - 270 && (self.x < stageLeft || self.x > stageRight))) {
             if (this.state !== 'RECOVER') this.enterState('RECOVER');
             return;
         }
 
         // Back on safe ground
-        if (this.state === 'RECOVER' && self.isGrounded && self.y < 800 && self.x > stageLeft && self.x < stageRight) {
+        if (this.state === 'RECOVER' && self.isGrounded && self.y < stageTop && self.x > stageLeft && self.x < stageRight) {
             this.enterState('CHASE');
             return;
         }
 
-        // Sometimes react to a close attacker
+        // Sometimes react to a close attacker: a chance each step of its startup, so about half the attacks
         if (this.target && this.target.isAttacking && this.state !== 'DEFEND' && this.state !== 'RECOVER') {
-            if (this.distanceToTarget() < 200 && this.reactionTimer <= 0 && Math.random() < 0.2) {
+            if (this.distanceToTarget() < 135 && this.reactionTimer <= 0 && Math.random() < 0.08) {
                 this.enterState('DEFEND');
                 this.reactionTimer = 500;
                 return;
@@ -100,9 +107,9 @@ export class PlayerAI {
         }
 
         const dist = this.distanceToTarget();
-        if (dist > 400) {
+        if (dist > 270) {
             this.enterState('CHASE');
-        } else if (dist < 80) {
+        } else if (dist < 54) {
             this.enterState('ATTACK');
         } else {
             const rand = Math.random();
@@ -136,8 +143,8 @@ export class PlayerAI {
             const dy = target.y - self.y;
             input.aimRight = dx > 0;
             input.aimLeft = dx < 0;
-            input.aimUp = dy < -50;
-            input.aimDown = dy > 50;
+            input.aimUp = dy < -34;
+            input.aimDown = dy > 34;
         }
 
         switch (this.state) {
@@ -154,7 +161,7 @@ export class PlayerAI {
                 input.dodgeHeld = true;
 
                 // Jump up to a higher target, or over whatever stops us
-                if (dy < -100 && self.isGrounded) {
+                if (dy < -67 && self.isGrounded) {
                     input.jump = true;
                     input.jumpHeld = true;
                 }
@@ -166,8 +173,8 @@ export class PlayerAI {
 
             case 'SPACING': {
                 if (!target) break;
-                // Back off when closer than 150
-                if (Math.abs(target.x - self.x) < 150) {
+                // Back off when closer than 100
+                if (Math.abs(target.x - self.x) < 100) {
                     const retreat = self.x < target.x ? -1 : 1;
                     input.moveLeft = retreat === -1;
                     input.moveRight = retreat === 1;
@@ -182,10 +189,10 @@ export class PlayerAI {
             case 'ATTACK': {
                 if (!target) break;
                 const dy = target.y - self.y;
-                if (dy < -80) {
+                if (dy < -54) {
                     input.aimUp = true;
                     input.lightAttack = true;
-                } else if (dy > 80 && !self.isGrounded) {
+                } else if (dy > 54 && !self.isGrounded) {
                     // Ground pound onto a target below
                     input.aimDown = true;
                     input.heavyAttack = true;
@@ -206,9 +213,9 @@ export class PlayerAI {
 
                 if (self.vy > 0) {
                     if (self.jumpsRemaining > 0) {
-                        // Spread the jumps out
-                        if (Math.random() < 0.1) input.jump = true;
-                    } else if (self.y > 600) {
+                        // Spread the jumps out, but jump at once below the stage top
+                        if (self.y > this.stageTop - 170 || Math.random() < 0.1) input.jump = true;
+                    } else if (self.y > this.stageTop - 270) {
                         input.aimUp = true;
                         input.heavyAttack = true;
                     }

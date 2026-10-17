@@ -110,7 +110,7 @@ export class PreloadScene extends Phaser.Scene {
                 this.sound.play('global_music_loop', { loop: true, volume: audioManager.getMusicVolume() });
             }
 
-            this.sound.play('ui_player_found', { volume: 0.5 });
+            AudioManager.getInstance().playSFX('ui_player_found', { volume: 0.5 });
             this.scene.start('MainMenuScene');
         };
 

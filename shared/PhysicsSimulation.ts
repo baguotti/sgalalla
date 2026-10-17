@@ -103,6 +103,12 @@ export interface SimBody {
     // Running (derived during handleMovement)
     isRunning: boolean;
 
+    // Flying from a hit: the launch glides and arcs (see applyPhysics) past the stun, until the
+    // fighter lands, jumps, dodges, recovers or slows down
+    isLaunched: boolean;
+    // Rising from a ground or air jump: letting go of jump cuts the rise short (a short hop)
+    isJumpRising: boolean;
+
     // Facing
     facingDirection: number;   // -1 or 1
 
@@ -181,6 +187,8 @@ export function createBody(x: number, y: number, facingDirection: number): SimBo
         shouldStallInAir: false,
 
         isRunning: false,
+        isLaunched: false,
+        isJumpRising: false,
         facingDirection,
     };
 }
@@ -220,21 +228,23 @@ export function stepPhysics(body: SimBody, input: SimInput, dt: number, events: 
 
     // ── Mechanics ──
     // Stunned fighters have no control until the stun ends
+    let steer: Steer = null;
     if (!body.isHitStunned) {
         handleWallMechanics(body, input);
-        handleHorizontalMovement(body, input);
+        steer = handleHorizontalMovement(body, input);
         handleDropHold(body, input);
         handleJump(body, input, events);
         handleFastFall(body, input);
         handleDodgeInput(body, input, events);
     }
 
-    // Directional dodges in the air float
-    body.ay = body.isDodging && !body.isSpotDodging && !body.isGrounded ? 0 : PhysicsConfig.GRAVITY;
+    // Directional dodges in the air float; a launch arcs under lighter gravity
+    body.ay = body.isDodging && !body.isSpotDodging && !body.isGrounded ? 0
+        : body.isLaunched ? PhysicsConfig.GRAVITY * PhysicsConfig.HITSTUN_GRAVITY : PhysicsConfig.GRAVITY;
 
     // ── Physics integration ──
     // Ends with isGrounded false: the platform collisions that follow set it again on landing
-    applyPhysics(body, dt);
+    applyPhysics(body, dt, steer);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -316,19 +326,24 @@ function handleWallMechanics(body: SimBody, input: SimInput): void {
 //  HORIZONTAL MOVEMENT
 // ═══════════════════════════════════════════════════════════════
 
-function handleHorizontalMovement(body: SimBody, input: SimInput): void {
-    if (body.isWallSliding) return;
-    // Dodges and dashes set their own speed
-    if (body.isDodging || body.isDashing) return;
+/** Which way the fighter steers this step (0: lets go), or null when something else moves it (an attack, dash, dodge, wall, dash coast). */
+type Steer = -1 | 0 | 1 | null;
 
-    // Prevent movement during attack startup and active frames
+function handleHorizontalMovement(body: SimBody, input: SimInput): Steer {
+    if (body.isWallSliding) return null;
+    // Dodges and dashes set their own speed; charging a heavy move all but stops the fighter (CHARGE_FRICTION)
+    if (body.isDodging || body.isDashing) return null;
+    if (body.isCharging) {
+        body.isRunning = false;
+        return null;
+    }
+
+    // Heavies own the movement; light attacks hold still on the ground until their recovery, and
+    // drift in the air (slower: AIR_ATTACK_DRIFT)
     if (body.isAttacking) {
-        if (body.attackType === ATTACK_TYPE_HEAVY) {
+        if (body.attackType === ATTACK_TYPE_HEAVY || (body.isGrounded && body.attackPhase !== ATTACK_PHASE_RECOVERY)) {
             body.isRunning = false;
-            return;
-        }
-        if (body.attackPhase !== ATTACK_PHASE_RECOVERY) {
-            return; // Lock during STARTUP and ACTIVE for light attacks
+            return null;
         }
     }
 
@@ -336,34 +351,28 @@ function handleHorizontalMovement(body: SimBody, input: SimInput): void {
     if (body.hasDashMomentum) {
         const against = body.vx > 0 ? input.moveLeft : input.moveRight;
         if (against || Math.abs(body.vx) < PhysicsConfig.DASH_MOMENTUM_MIN_SPEED) body.hasDashMomentum = false;
-        else return;
+        else return null;
     }
 
-    // Run mechanic: default movement is RUN
-    const isMoving = input.moveLeft || input.moveRight;
-    body.isRunning = body.isGrounded && isMoving && !body.isAttacking;
-
-    let accel = PhysicsConfig.MOVE_ACCEL;
-    if (body.isRunning) {
-        accel *= PhysicsConfig.RUN_ACCEL_MULT;
-    }
-
-    let moveForce = 0;
-    if (input.moveLeft) moveForce -= accel;
-    if (input.moveRight) moveForce += accel;
-
-    body.ax += moveForce;
+    const steer = (input.moveRight ? 1 : 0) - (input.moveLeft ? 1 : 0);
+    body.isRunning = body.isGrounded && steer !== 0 && !body.isAttacking;
+    // A light attack's recovery on the ground steers only when pushed; otherwise the move's friction stops it
+    if (body.isAttacking && body.isGrounded && steer === 0) return null;
+    return steer as -1 | 0 | 1;
 }
 
 // ═══════════════════════════════════════════════════════════════
 //  JUMP
 // ═══════════════════════════════════════════════════════════════
 
-/** Holding down on a soft platform drops through it, after long enough for a down attack to come out instead. */
+/**
+ * Holding down on a soft platform drops through it, after long enough for a down attack to come out
+ * instead. The hold counts only while free: down still held out of an attack, dodge or charge starts over.
+ */
 function handleDropHold(body: SimBody, input: SimInput): void {
-    body.downHeldSteps = input.moveDown ? body.downHeldSteps + 1 : 0;
-    if (body.downHeldSteps >= PhysicsConfig.DROP_HOLD_STEPS && body.isGrounded && body.currentPlatformIdx !== -1 &&
-        !body.isAttacking && !body.isDodging && !body.isDashing && !body.isCharging) {
+    const busy = body.isAttacking || body.isDodging || body.isDashing || body.isCharging;
+    body.downHeldSteps = input.moveDown && !busy ? body.downHeldSteps + 1 : 0;
+    if (body.downHeldSteps >= PhysicsConfig.DROP_HOLD_STEPS && body.isGrounded && body.currentPlatformIdx !== -1) {
         handlePlatformDrop(body);
     }
 }
@@ -371,18 +380,24 @@ function handleDropHold(body: SimBody, input: SimInput): void {
 function handleJump(body: SimBody, input: SimInput, events: PhysicsEvent[]): void {
     if (body.isDodging || body.landingLagSteps > 0) return;
 
-    // Block during heavy attacks
+    // Heavies commit; a light attack can be jumped out of
     if (body.isAttacking && body.attackType === ATTACK_TYPE_HEAVY) return;
 
     if (input.jumpBuffered) {
         events.push({ type: 'consume', input: 'jump' });
         // Platform Drop: Down + Jump while on a soft platform
         if (input.moveDown && body.currentPlatformIdx !== -1) handlePlatformDrop(body);
-        else performJump(body, events);
+        else {
+            // A lunge or slide doesn't carry into the air
+            if (body.isAttacking) body.vx = Math.max(-PhysicsConfig.AIR_SPEED, Math.min(body.vx, PhysicsConfig.AIR_SPEED));
+            performJump(body, events);
+        }
     }
 
-    // Short Hop: releasing jump while ascending slowly → dampen
-    if (!input.jumpHeld && body.vy < 0 && body.vy > PhysicsConfig.SHORT_HOP_FORCE) {
+    // Short hop: letting go of jump while a jump's rise has slowed past the cut-off cuts it short
+    // (only a jump's: not a dash jump, wall jump, recovery or launch)
+    if (body.vy >= 0) body.isJumpRising = false;
+    if (body.isJumpRising && !input.jumpHeld && body.vy > PhysicsConfig.SHORT_HOP_FORCE) {
         body.vy *= PhysicsConfig.SHORT_HOP_VELOCITY_DAMP;
     }
 }
@@ -400,6 +415,8 @@ function handlePlatformDrop(body: SimBody): void {
 
 function performJump(body: SimBody, events: PhysicsEvent[]): void {
     body.isFastFalling = false;
+    body.isLaunched = false;
+    body.isJumpRising = false;
 
     // Wall Jump (current wall or coyote time)
     if (!body.isGrounded && (body.isWallSliding || body.lastWallTouchTimer > 0) && !isWallSlipping(body)) {
@@ -423,6 +440,7 @@ function performJump(body: SimBody, events: PhysicsEvent[]): void {
     if (body.isGrounded) {
         body.vy = PhysicsConfig.JUMP_FORCE;
         body.isGrounded = false;
+        body.isJumpRising = true;
         events.push({ type: 'sfx', key: 'sfx_jump_1', volume: 0.5 });
         return;
     }
@@ -430,6 +448,7 @@ function performJump(body: SimBody, events: PhysicsEvent[]): void {
     // Air Jump (double/triple jump)
     if (body.jumpsRemaining > 0) {
         body.vy = PhysicsConfig.DOUBLE_JUMP_FORCE;
+        body.isJumpRising = true;
         body.jumpsRemaining--;
         body.airActionCounter++;
         body.hasDashMomentum = false;
@@ -527,6 +546,8 @@ export function endDash(body: SimBody): void {
 
 /** A spot dodge, or in the air a dodge in any of 8 directions. */
 function startDodge(body: SimBody, dx: number, dy: number, events: PhysicsEvent[]): void {
+    body.isLaunched = false;
+    body.isJumpRising = false;
     beginDodge(body);
 
     if (dx === 0 && dy === 0) {
@@ -642,24 +663,41 @@ export function interruptMovement(body: SimBody): void {
 //  PHYSICS INTEGRATION (applyPhysics)
 // ═══════════════════════════════════════════════════════════════
 
-function applyPhysics(body: SimBody, dt: number): void {
-    // ── Acceleration → Velocity ──
+function applyPhysics(body: SimBody, dt: number, steer: Steer): void {
+    // A launch ends once the stun is over and the fighter stands on the ground (isGrounded is still the
+    // previous step's), or on a jump, dodge or recovery; a stunned fighter slides on with it, even along the floor
+    if (body.isLaunched && !body.isHitStunned && body.isGrounded) {
+        body.isLaunched = false;
+    }
 
-    let maxSpeedCheck = PhysicsConfig.MAX_SPEED;
-    if (body.isRunning) maxSpeedCheck *= PhysicsConfig.RUN_SPEED_MULT;
-
-    // Soft cap: don't add acceleration if already exceeding max speed in that direction
-    if (!body.isDodging && !body.isHitStunned) {
-        const movingSameDir = Math.sign(body.ax) === Math.sign(body.vx);
-        const overSpeed = Math.abs(body.vx) > maxSpeedCheck;
-
-        if (movingSameDir && overSpeed) {
-            // Don't add acceleration, let friction reduce speed
-        } else {
-            body.vx += body.ax * dt;
-        }
-    } else {
+    // ── Horizontal speed ──
+    // Dashes and directional dodges keep their exact speed (one that started this step too, after steering was read)
+    if (body.isDashing || (body.isDodging && !body.isSpotDodging)) steer = null;
+    if (body.isLaunched) {
+        // Out of stun, the fighter can drift against the launch (or along it below the air speed), not cancel it
+        if (steer && (Math.sign(body.vx) !== steer || Math.abs(body.vx) < PhysicsConfig.AIR_SPEED)) steerTowards(body, steer, dt);
+    } else if (steer !== null) {
+        steerTowards(body, steer, dt);
+    } else if (!body.isHitStunned) {
         body.vx += body.ax * dt;
+        applyStateFriction(body, dt);
+    }
+
+    // A launch slows by a steady amount along its angle, as in Brawlhalla: soft hits barely push, and the
+    // flight grows with the square of the speed, so hard hits fly far. Below LAUNCH_EASE_SPEED the slowing
+    // eases off with the speed, so the launch fades out instead of stopping dead. Past the top of the arc
+    // (falling, slower than a fall) the sideways speed only fades by LAUNCH_FALL_DRAG a second, and gravity
+    // bends the fall into a curve. Math.sqrt, not Math.hypot: it rounds the same in every browser
+    if (body.isLaunched || body.isHitStunned) {
+        if (body.vy >= 0 && body.vy <= PhysicsConfig.MAX_FALL_SPEED) {
+            body.vx *= Math.max(0, 1 - PhysicsConfig.LAUNCH_FALL_DRAG * dt);
+        } else {
+            const speed = Math.sqrt(body.vx * body.vx + body.vy * body.vy);
+            const decel = PhysicsConfig.LAUNCH_DECEL * Math.min(1, speed / PhysicsConfig.LAUNCH_EASE_SPEED);
+            const kept = Math.max(speed - decel * dt, 0) / speed;
+            body.vx *= kept;
+            body.vy *= kept;
+        }
     }
 
     // Gravity accelerates a fall up to its terminal speed. Faster falls (knockback, ground pound)
@@ -667,69 +705,16 @@ function applyPhysics(body: SimBody, dt: number): void {
     const maxFall = body.isFastFalling ? PhysicsConfig.MAX_FAST_FALL_SPEED : PhysicsConfig.MAX_FALL_SPEED;
     if (body.vy < maxFall) {
         body.vy = Math.min(body.vy + body.ay * dt, maxFall);
-    } else if (!body.isHitStunned && !body.isAttacking) {
+    } else if (!body.isHitStunned && !body.isLaunched && !body.isAttacking) {
         body.vy = maxFall + (body.vy - maxFall) * PhysicsConfig.FALL_SPEED_EASE;
     }
 
-    // ── Friction ──
-    // isGrounded is still the previous step's value here
-
-    let friction: number = body.isGrounded ? PhysicsConfig.FRICTION
-        : body.hasDashMomentum ? PhysicsConfig.DASH_JUMP_AIR_FRICTION : PhysicsConfig.AIR_FRICTION;
-
-    // Dynamic friction
-    const isHighSpeed = Math.abs(body.vx) > PhysicsConfig.MAX_SPEED * PhysicsConfig.HIGH_SPEED_THRESHOLD_MULT;
-
-    if (body.isRunning || (isHighSpeed && body.isGrounded)) {
-        friction = PhysicsConfig.RUN_FRICTION;
-    }
-
-    // Charge friction
-    if (body.isCharging) {
-        friction = PhysicsConfig.CHARGE_FRICTION;
-        if (!body.isGrounded) {
-            body.vy *= PhysicsConfig.CHARGE_GRAVITY_CANCEL;
-        }
-    }
-    else if (body.isAttacking) {
-        if (body.attackPhase === ATTACK_PHASE_RECOVERY) {
-            friction = PhysicsConfig.ATTACK_RECOVERY_FRICTION;
-        } else {
-            friction = PhysicsConfig.ATTACK_ACTIVE_FRICTION;
-            // Aerial stall for flurry attacks
-            if (!body.isGrounded && body.shouldStallInAir) {
-                body.vy *= PhysicsConfig.AERIAL_STALL_GRAVITY_DAMP;
-                body.vx *= PhysicsConfig.AERIAL_STALL_HORIZONTAL_DAMP;
-            }
-        }
-    }
-    else if (body.isHitStunned) {
-        friction = PhysicsConfig.HITSTUN_FRICTION;
-    }
-
-    // Dashes and directional dodges keep their exact speed
-    if (body.isDashing || (body.isDodging && !body.isSpotDodging)) {
-        friction = 1.0;
-    }
-
-    // Friction is applied twice per step: every speed in PhysicsConfig is tuned around it
-    body.vx *= friction;
-    body.vx *= friction;
-
-    // ── Speed Clamp ──
-
-    let maxSpeed = PhysicsConfig.MAX_SPEED;
-    if (body.isRunning) {
-        maxSpeed *= PhysicsConfig.RUN_SPEED_MULT;
-    }
-
-    if (!body.isDodging && !body.isHitStunned) {
-        if (Math.abs(body.vx) > maxSpeed) {
-            // Overspeeding (e.g. post-dash): let friction reduce, don't clamp
-            // But don't accelerate further (already handled above)
-        } else {
-            body.vx = clamp(body.vx, -maxSpeed, maxSpeed);
-        }
+    // Charging in the air hangs; moves that stall in the air hang while they hit
+    if (body.isCharging && !body.isGrounded) {
+        body.vy *= PhysicsConfig.CHARGE_GRAVITY_CANCEL;
+    } else if (body.isAttacking && !body.isCharging && body.attackPhase !== ATTACK_PHASE_RECOVERY && !body.isGrounded && body.shouldStallInAir) {
+        body.vy *= PhysicsConfig.AERIAL_STALL_GRAVITY_DAMP;
+        body.vx *= PhysicsConfig.AERIAL_STALL_HORIZONTAL_DAMP;
     }
 
     // ── Position Update ──
@@ -917,6 +902,8 @@ export function startRecovery(body: SimBody, events: PhysicsEvent[]): boolean {
     if (exhausted && body.jumpsRemaining <= 0) return false;
 
     body.isRecovering = true;
+    body.isLaunched = false;
+    body.isJumpRising = false;
     if (exhausted) body.jumpsRemaining--;
     body.recoveryAvailable = false;
     body.recoveryTimer = PhysicsConfig.RECOVERY_DURATION;
@@ -938,6 +925,48 @@ export function startRecovery(body: SimBody, events: PhysicsEvent[]): boolean {
 //  UTILITY
 // ═══════════════════════════════════════════════════════════════
 
-function clamp(value: number, min: number, max: number): number {
-    return Math.max(min, Math.min(max, value));
+/**
+ * Free movement: towards the top speed the way the fighter steers (or towards
+ * a stop when it lets go), at the ground's or the air's rates. Turning round
+ * accelerates the other way; above the top speed the way it's going (a dash's
+ * run-on, the end of a launch) it eases down instead of stopping.
+ * isGrounded is still the previous step's value here.
+ */
+function steerTowards(body: SimBody, steer: -1 | 0 | 1, dt: number): void {
+    const ground = body.isGrounded;
+    // An attack in the air drifts slower: the move carries the fighter a little, not across the stage
+    const top = ground ? PhysicsConfig.RUN_SPEED
+        : body.isAttacking ? PhysicsConfig.AIR_SPEED * PhysicsConfig.AIR_ATTACK_DRIFT : PhysicsConfig.AIR_SPEED;
+    const overSpeed = Math.abs(body.vx) > top && (steer === 0 || Math.sign(body.vx) === steer);
+    if (ground && !overSpeed) {
+        // Main's run: push, then keep a share of the speed twice; the push settles the run at RUN_SPEED
+        const kept = steer === 0 ? PhysicsConfig.STOP_FRICTION : PhysicsConfig.RUN_FRICTION;
+        const keptSq = PhysicsConfig.RUN_FRICTION * PhysicsConfig.RUN_FRICTION;
+        const push = top * (1 - keptSq) / keptSq;
+        body.vx = (body.vx + steer * push) * kept * kept;
+        if (Math.abs(body.vx) < 1) body.vx = 0;
+        return;
+    }
+    let rate: number;
+    if (overSpeed) rate = ground ? PhysicsConfig.GROUND_OVERSPEED_DECEL : PhysicsConfig.AIR_DECEL;
+    else rate = steer === 0 ? PhysicsConfig.AIR_DECEL : PhysicsConfig.AIR_ACCEL;
+    const target = overSpeed ? Math.sign(body.vx) * top : steer * top;
+    const change = rate * dt;
+    body.vx = body.vx < target ? Math.min(body.vx + change, target) : Math.max(body.vx - change, target);
+}
+
+/**
+ * Speed kept twice a step when something other than steering moves the
+ * fighter: charging, an attack coming out or ending, a dash jump's coast
+ * (dashes and directional dodges keep their exact speed). Anything else on
+ * the ground (a spot dodge) stops as letting go does.
+ */
+function applyStateFriction(body: SimBody, dt: number): void {
+    if (body.isDashing || (body.isDodging && !body.isSpotDodging)) return;
+    let friction = 1;
+    if (body.isCharging) friction = PhysicsConfig.CHARGE_FRICTION;
+    else if (body.isAttacking) friction = body.attackPhase === ATTACK_PHASE_RECOVERY ? PhysicsConfig.ATTACK_RECOVERY_FRICTION : PhysicsConfig.ATTACK_ACTIVE_FRICTION;
+    else if (body.hasDashMomentum) friction = PhysicsConfig.DASH_JUMP_AIR_FRICTION;
+    else if (body.isGrounded) return steerTowards(body, 0, dt);
+    body.vx *= friction * friction;
 }

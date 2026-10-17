@@ -3,6 +3,7 @@ import { packInput, type FighterInput } from '../../shared/FighterInput';
 import type { MatchState } from '../../shared/GameSim';
 import type { MatchEvent } from '../../shared/MatchEvents';
 import type { MatchStart, PlayerLeft } from '../../shared/NetProtocol';
+import { SIM_STEP_MS } from '../../shared/FixedStepClock';
 import { RollbackSession } from '../../shared/Rollback';
 
 /**
@@ -16,6 +17,8 @@ export class OnlineMatch {
 
     private session: RollbackSession | null = null;
     private desyncReported = false;
+    private lastSentFrame = -1;
+    private lastSentAt = 0;
 
     constructor(client: NetClient, start: MatchStart) {
         this.client = client;
@@ -68,10 +71,18 @@ export class OnlineMatch {
         return this.session!.step(() => packInput(readLocal()), events);
     }
 
-    /** Sends every input someone hasn't confirmed. Once per rendered frame, also after the match ends. */
+    /**
+     * Sends every input someone hasn't confirmed: called once per rendered frame, also after the
+     * match ends. It sends once per simulated frame, or at the step rate while none is simulated,
+     * so a 120 Hz display doesn't send twice as much.
+     */
     flush(): void {
         const session = this.session;
         if (!session) return;
+        const now = performance.now();
+        if (session.frame === this.lastSentFrame && now - this.lastSentAt < SIM_STEP_MS * 0.75) return;
+        this.lastSentFrame = session.frame;
+        this.lastSentAt = now;
         this.client.sendPacket(session.buildPacket());
         if (session.desyncFrame >= 0 && !this.desyncReported) {
             this.desyncReported = true;
@@ -83,8 +94,9 @@ export class OnlineMatch {
     stats(): string {
         const s = this.session;
         if (!s) return '';
-        const loss = Math.round(s.packetLoss * 100);
         const sync = s.desyncFrame < 0 ? 'SYNC OK' : `DESYNC @${s.desyncFrame}`;
-        return `DLY ${s.inputDelay}f  RB ${s.lastRollbackDepth}/${s.maxRollbackDepth}  WAIT ${s.waits}  SKIP ${s.skips}  LOSS ${loss}%  ${sync}`;
+        // Each other player: how many frames behind their inputs arrive, and their lost packets
+        const peers = s.peerStats().map(p => `P${p.slot + 1} ${p.behind}f ${Math.round(p.loss * 100)}%`).join('  ');
+        return `DLY ${s.inputDelay}f  RB ${s.lastRollbackDepth}/${s.maxRollbackDepth}  WAIT ${s.waits}  SKIP ${s.skips}  ${sync}  |  ${peers}`;
     }
 }
