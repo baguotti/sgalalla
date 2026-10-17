@@ -1311,3 +1311,9 @@ Part 2
 - **[Change]** Protocol version 18; recordings re-baselined.
 - **[S]** tsc (client, tests, server), 82 tests (new: a charge facing where the fighter points; the run test follows main's model), KO table unchanged, headless CPU matches. In the browser (muted, inputs fed to the player's input): the ground pound charge pose, and a left charge after running right.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Fix: the ground pound pose showing outside the ground pound (branch `experimental-branch`)
+- **[Fix]** After a ground pound, jumps, falls and down lights showed the ground pound sprite, and facing stopped following movement in the air: the "charging a ground pound" check looked at the last charge's direction without checking that a charge was going on. It now does.
+- **[Change]** Protocol version 19 (facing in the air is simulation); the ground pound recording re-baselined.
+- **[S]** tsc (client, tests, server), 83 tests (new: after a ground pound, a jump isn't a ground pound charge and faces the way it moves), build. In the browser (muted): the charge shows the ground pound frame; a jump and a down light after it don't.
+

@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AttackPhase, AttackRegistry } from '../shared/AttackData.ts';
-import { applyHit, findHit } from '../shared/Combat.ts';
+import { applyHit, findHit, isGroundPoundCharge } from '../shared/Combat.ts';
 import { countDown, SIM_STEP_MS } from '../shared/FixedStepClock.ts';
 import { createMatch, stepMatch, type MatchState } from '../shared/GameSim.ts';
 import { emptyInput, type FighterInput } from '../shared/FighterInput.ts';
@@ -690,6 +690,20 @@ test('a charge faces where the fighter points, not where it was running', () => 
     step(match, { aimLeft: true });
     assert.equal(f.combat.attack?.key, 'heavy_side_grounded');
     assert.equal(f.combat.attack?.facing, -1, 'the signature goes left');
+});
+
+test('after a ground pound, jumping is no ground pound charge: facing follows movement again', () => {
+    const match = newMatch(500);
+    const f = high(match);
+    f.body.y = 300;
+    step(match, { heavyAttack: true, heavyAttackHeld: true, aimDown: true });
+    step(match, { aimDown: true });
+    for (let i = 0; i < 120 && !f.body.isGrounded; i++) step(match);
+    steps(match, 20);
+    step(match, { jump: true, jumpHeld: true, moveLeft: true });
+    steps(match, 10, { jumpHeld: true, moveLeft: true });
+    assert.equal(isGroundPoundCharge(f), false);
+    assert.equal(f.body.facingDirection, -1);
 });
 
 test('side heavy in the air is a charged signature; up and neutral are the recovery', () => {

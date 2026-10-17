@@ -77,7 +77,8 @@ function updateCharge(f: FighterState, events: MatchEvent[]): void {
 
 /** Charging a ground pound: a down heavy charging in the air (it hangs there). */
 export function isGroundPoundCharge(f: FighterState): boolean {
-    return f.combat.chargeDirection === AttackDirection.DOWN && !f.body.isGrounded && !f.combat.gravityCancel;
+    const c = f.combat;
+    return c.isCharging && c.chargeDirection === AttackDirection.DOWN && !f.body.isGrounded && !c.gravityCancel;
 }
 
 function updateAttack(f: FighterState, events: MatchEvent[]): void {
@@ -171,7 +172,7 @@ export function handleCombatInput(f: FighterState, events: MatchEvent[]): void {
     const b = f.body;
 
     if (c.isGroundPounding) return;
-    if (c.isCharging && isGroundPoundCharge(f)) {
+    if (isGroundPoundCharge(f)) {
         b.vx = 0;
         b.vy = 0;
     }
