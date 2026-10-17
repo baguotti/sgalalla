@@ -1343,3 +1343,9 @@ Part 2
 - **[Change]** Protocol version 22; recordings re-baselined.
 - **[S]** tsc (client, tests, server), 86 tests (the launch tests follow the new model: a slow launch carries on through the fall and ends on landing; the down light follow-up steps in), build, KO table, true combos, headless CPU matches (the CPU's own off-stage ground pounds, there before, flagged separately). Trajectories plotted before and after; in the browser (muted), a neutral light at 100% arcs up, over and down.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] v3.1.6 - Release (branch `main`)
+- **[Release]** `main` takes `experimental-branch` as it is up to the launch arcs (exact-tree merge): Brawlhalla-measured sizes and movement with main's running and attack input, Unarmed hits (damage 15% lower), bombs (off by default, player 1 turns them on with Start), Londra Grande and the online stage choice (Adria, Londra, Londra Grande), walls and pillars fitted to the art, launches in arcs, quieter audio, protocol 22.
+- **[Menu]** As before, the release hides CAMPAGNA, STUDIO LAB and CORSA.
+- **[S]** tsc (client, tests, server), 86 tests, build.
+
