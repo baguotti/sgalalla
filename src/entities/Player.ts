@@ -9,7 +9,7 @@ import { PlayerAI } from './player/PlayerAI';
 import { ghostStyle } from '../effects/GhostStyle';
 import { effects } from '../config/EffectConfig';
 import { AttackDirection, AttackRegistry, AttackType } from '../../shared/AttackData';
-import { currentDamage } from '../../shared/Combat';
+import { currentDamage, isGroundPoundCharge } from '../../shared/Combat';
 import { emptyInput, type FighterInput } from '../../shared/FighterInput';
 import { isInPlay, type FighterState, type GhostHitbox } from '../../shared/FighterState';
 import { SIM_STEP_MS } from '../../shared/FixedStepClock';
@@ -218,7 +218,7 @@ export class Player extends Phaser.GameObjects.Container {
         const c = f.combat;
         const facing = f.body.facingDirection;
         // The ground pound frames are drawn facing the other way
-        const groundPoundPose = c.isGroundPounding || c.isGroundPoundLanding;
+        const groundPoundPose = c.isGroundPounding || c.isGroundPoundLanding || isGroundPoundCharge(f);
         this.sprite.setFlipX(groundPoundPose ? facing > 0 : facing < 0);
     }
 
@@ -228,6 +228,11 @@ export class Player extends Phaser.GameObjects.Container {
 
         // The run cycle speeds up with running speed
         this.sprite.anims.timeScale = key === 'run' && f.body.isRunning ? 0.8 + Math.abs(f.body.vx) / 3000 : 1;
+
+        // A ground pound's charge holds its first frame
+        if (this.pose === null && isGroundPoundCharge(f)) {
+            this.sprite.setFrame(`${this.character}_ground_pound_000`);
+        }
     }
 
     private updateAlpha(f: FighterState): void {
@@ -294,6 +299,10 @@ export class Player extends Phaser.GameObjects.Container {
         if (!charging) return;
 
         const chargePercent = Math.min(c.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
+        if (isGroundPoundCharge(f)) {
+            this.shakeSprite(chargePercent * 2.5);
+            return;
+        }
         // Signature charges fade in a ghost in front of the fighter
         if (!this.chargeGhost) this.chargeGhost = this.createChargeGhost();
         const facing = f.body.facingDirection;

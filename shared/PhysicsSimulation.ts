@@ -931,10 +931,18 @@ function steerTowards(body: SimBody, steer: -1 | 0 | 1, dt: number): void {
     const top = ground ? PhysicsConfig.RUN_SPEED
         : body.isAttacking ? PhysicsConfig.AIR_SPEED * PhysicsConfig.AIR_ATTACK_DRIFT : PhysicsConfig.AIR_SPEED;
     const overSpeed = Math.abs(body.vx) > top && (steer === 0 || Math.sign(body.vx) === steer);
+    if (ground && !overSpeed) {
+        // Main's run: push, then keep a share of the speed twice; the push settles the run at RUN_SPEED
+        const kept = steer === 0 ? PhysicsConfig.STOP_FRICTION : PhysicsConfig.RUN_FRICTION;
+        const keptSq = PhysicsConfig.RUN_FRICTION * PhysicsConfig.RUN_FRICTION;
+        const push = top * (1 - keptSq) / keptSq;
+        body.vx = (body.vx + steer * push) * kept * kept;
+        if (Math.abs(body.vx) < 1) body.vx = 0;
+        return;
+    }
     let rate: number;
     if (overSpeed) rate = ground ? PhysicsConfig.GROUND_OVERSPEED_DECEL : PhysicsConfig.AIR_DECEL;
-    else if (steer === 0) rate = ground ? PhysicsConfig.GROUND_DECEL : PhysicsConfig.AIR_DECEL;
-    else rate = ground ? PhysicsConfig.GROUND_ACCEL : PhysicsConfig.AIR_ACCEL;
+    else rate = steer === 0 ? PhysicsConfig.AIR_DECEL : PhysicsConfig.AIR_ACCEL;
     const target = overSpeed ? Math.sign(body.vx) * top : steer * top;
     const change = rate * dt;
     body.vx = body.vx < target ? Math.min(body.vx + change, target) : Math.max(body.vx - change, target);

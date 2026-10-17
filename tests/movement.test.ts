@@ -518,19 +518,20 @@ test('timers last exactly their length in steps', () => {
     assert.equal(dodging, Math.round(PhysicsConfig.SPOT_DODGE_DURATION / SIM_STEP_MS));
 });
 
-test('running reaches its top speed and slides to a stop as in Brawlhalla; in the air, letting go eases off', () => {
-    // At the stage's right end, clear of the soft platform above
-    const match = newMatch(1330, 500);
+test('running builds up quickly and stops almost dead, as on main; in the air, letting go eases off', () => {
+    const match = newMatch(400, 1500);
     const f = match.fighters[0];
     // Read fresh each time (an assertion would otherwise narrow the type to the value it checked)
     const speed = (): number => f.body.vx;
     const stepsFor = (top: number, rate: number) => Math.ceil(top / (rate * SIM_STEP_MS / 1000));
-    const toTop = stepsFor(PhysicsConfig.RUN_SPEED, PhysicsConfig.GROUND_ACCEL);
-    assert.ok(toTop >= 15 && toTop <= 20, `about 17 steps to top speed (${toTop})`);
-    steps(match, toTop, { moveRight: true });
-    assert.ok(speed() === PhysicsConfig.RUN_SPEED, `top speed (${speed()})`);
-    steps(match, stepsFor(PhysicsConfig.RUN_SPEED, PhysicsConfig.GROUND_DECEL));
-    assert.ok(Math.abs(speed()) < 1e-9, `stopped (${speed()})`);
+    steps(match, 12, { moveRight: true });
+    assert.ok(speed() > PhysicsConfig.RUN_SPEED * 0.8, `most of the run speed in 12 steps (${speed().toFixed(0)})`);
+    steps(match, 40, { moveRight: true });
+    assert.ok(Math.abs(speed() - PhysicsConfig.RUN_SPEED) < 1, `settles at the run speed (${speed().toFixed(0)})`);
+    const x = f.body.x;
+    steps(match, 8);
+    assert.equal(speed(), 0, 'stopped');
+    assert.ok(f.body.x - x < 15, `slid ${(f.body.x - x).toFixed(1)} px`);
     jump(match);
     steps(match, stepsFor(PhysicsConfig.AIR_SPEED, PhysicsConfig.AIR_ACCEL), { moveRight: true, jumpHeld: true });
     assert.ok(speed() === PhysicsConfig.AIR_SPEED, `air speed (${speed()})`);
@@ -677,6 +678,18 @@ test('the ground pound charges hanging in the air, then falls; landing is its po
     assert.equal(f.combat.isGroundPoundLanding, true);
     while (f.combat.attackCooldownTimer > 0) step(match);
     assert.equal(f.combat.isGroundPoundLanding, false);
+});
+
+test('a charge faces where the fighter points, not where it was running', () => {
+    const match = newMatch(900, 1450);
+    const f = match.fighters[0];
+    steps(match, 20, { moveRight: true });
+    step(match, { heavyAttack: true, heavyAttackHeld: true, aimLeft: true, moveLeft: true });
+    steps(match, 10, { heavyAttackHeld: true, aimLeft: true, moveLeft: true });
+    assert.equal(f.body.facingDirection, -1);
+    step(match, { aimLeft: true });
+    assert.equal(f.combat.attack?.key, 'heavy_side_grounded');
+    assert.equal(f.combat.attack?.facing, -1, 'the signature goes left');
 });
 
 test('side heavy in the air is a charged signature; up and neutral are the recovery', () => {

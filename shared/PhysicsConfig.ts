@@ -13,12 +13,14 @@ export const PhysicsConfig = {
     // Gravity: 19.3 H/s², a jump peaks in 27 frames (0.45 s) and lands after 55
     GRAVITY: 2388,
 
-    // Moving: a top speed on the ground and in the air, reached and left at these rates
-    // (px/s²); above the top speed (a dash's run-on) the speed eases down instead of stopping
-    RUN_SPEED: 781,
-    GROUND_ACCEL: 2760,
-    GROUND_DECEL: 3124,
+    // Running, as on main: holding a direction, the speed keeps RUN_FRICTION each half-step as it builds
+    // towards RUN_SPEED (quick to start and turn); letting go it keeps STOP_FRICTION (all but a dead stop).
+    // Above RUN_SPEED (a dash's run-on) it eases down at GROUND_OVERSPEED_DECEL (px/s²) instead
+    RUN_SPEED: 832,
+    RUN_FRICTION: 0.93,
+    STOP_FRICTION: 0.6,
     GROUND_OVERSPEED_DECEL: 6000,
+    // In the air: a top speed, reached and left at these rates (px/s²)
     AIR_SPEED: 645,
     AIR_ACCEL: 1935,
     AIR_DECEL: 1600,

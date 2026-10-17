@@ -1302,3 +1302,12 @@ Part 2
 - **[Lab]** The move timing rows are startup, active and recovery; COMBAT has "Cooldown after a move".
 - **[Change]** Protocol version 17; recordings re-baselined.
 - **[S]** tsc (client, tests, server), 81 tests (new: the cooldown applies to every attack and a buffered press comes out when it ends; jump out of a light without its lunge; steer in its recovery; no jump out of a heavy; the ground pound charges hanging; aerial side heavy vs recovery; down light true-combos into neutral light at 0 and 80%), KO table unchanged, headless CPU matches. Jump + neutral air after a down light no longer combos: the attacker is free while the target is still on the ground.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-17] Main's running, the ground pound's charge pose, charges facing where you point (branch `experimental-branch`)
+- **[Gameplay]** Running is main's again; the Brawlhalla-measured run felt soapy. Holding a direction builds the speed keeping 0.93 of it each half-step, settling at 832 px/s (most of it in about 12 frames). Letting go keeps 0.6, stopping in a few frames within a few pixels (Brawlhalla's slid 0.7 H). Turning round is as quick. Air movement, dashes and the easing down from a dash's run-on are unchanged. `RUN_FRICTION`/`STOP_FRICTION` replace `GROUND_ACCEL`/`GROUND_DECEL`.
+- **[Gameplay]** A charge faces where the fighter points, as on main: running right and charging with left held charges, and throws the side signature, to the left.
+- **[Visuals]** Charging a ground pound shows its pose (the ground pound frame, shaking as it charges), as on main.
+- **[Change]** Protocol version 18; recordings re-baselined.
+- **[S]** tsc (client, tests, server), 82 tests (new: a charge facing where the fighter points; the run test follows main's model), KO table unchanged, headless CPU matches. In the browser (muted, inputs fed to the player's input): the ground pound charge pose, and a left charge after running right.
+

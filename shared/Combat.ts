@@ -69,13 +69,14 @@ function updateCharge(f: FighterState, events: MatchEvent[]): void {
         return;
     }
     // A ground pound's charge hangs in the air
-    if (chargesGroundPound(f)) {
+    if (isGroundPoundCharge(f)) {
         f.body.vx = 0;
         f.body.vy = 0;
     }
 }
 
-function chargesGroundPound(f: FighterState): boolean {
+/** Charging a ground pound: a down heavy charging in the air (it hangs there). */
+export function isGroundPoundCharge(f: FighterState): boolean {
     return f.combat.chargeDirection === AttackDirection.DOWN && !f.body.isGrounded && !f.combat.gravityCancel;
 }
 
@@ -170,7 +171,7 @@ export function handleCombatInput(f: FighterState, events: MatchEvent[]): void {
     const b = f.body;
 
     if (c.isGroundPounding) return;
-    if (c.isCharging && chargesGroundPound(f)) {
+    if (c.isCharging && isGroundPoundCharge(f)) {
         b.vx = 0;
         b.vy = 0;
     }
@@ -277,7 +278,7 @@ function startAttack(f: FighterState, key: string, events: MatchEvent[]): void {
 function executeChargedAttack(f: FighterState, events: MatchEvent[]): void {
     const c = f.combat;
     const isAerial = !f.body.isGrounded && !c.gravityCancel;
-    const groundPound = chargesGroundPound(f);
+    const groundPound = isGroundPoundCharge(f);
     // Side is the only heavy with its own aerial move; up and neutral in the air are the recovery
     // (a ground pound charge that somehow touched down is the side signature)
     const direction = c.chargeDirection === AttackDirection.DOWN && !groundPound ? AttackDirection.SIDE : c.chargeDirection;

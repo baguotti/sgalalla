@@ -34,8 +34,8 @@ function group<K extends string>(title: string, rows: Row<K>[]): Group<K> {
 export const MOVEMENT_GROUPS: Group<PhysicsKey>[] = [
     group('GROUND', [
         ['RUN_SPEED', 'Run speed', 'px/s', 'Top speed holding a direction on the ground.', [0, 3000, 10]],
-        ['GROUND_ACCEL', 'Speeding up', 'px/s²', 'How fast the run speed builds up (and turning round).', [0, 60000, 100]],
-        ['GROUND_DECEL', 'Stopping', 'px/s²', 'How fast the fighter stops letting go.', [0, 60000, 100]],
+        ['RUN_FRICTION', 'Run build-up', 'share', 'Speed kept each half-step while running: lower starts and turns quicker.', [0.5, 0.99, 0.01]],
+        ['STOP_FRICTION', 'Stopping', 'share', 'Speed kept each half-step letting go: lower stops deader.', [0, 0.99, 0.01]],
         ['GROUND_OVERSPEED_DECEL', 'Easing down from a dash', 'px/s²', 'Above the run speed (a dash\'s run-on) the speed eases down at this rate.', [0, 30000, 100]],
     ]),
     group('JUMPS', [
