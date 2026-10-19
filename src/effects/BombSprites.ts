@@ -4,8 +4,7 @@ import { SIM_STEP_MS } from '../../shared/FixedStepClock';
 import type { MatchState } from '../../shared/GameSim';
 import { PhysicsConfig } from '../../shared/PhysicsConfig';
 
-const SAFE = 'fx_bomb_safe_16';
-const ARMED = 'fx_bomb_armed_16';
+const BOMB = 'fx_bomb_16';
 /** Behind the fighters (10) while loose, in front while held. */
 const LOOSE_DEPTH = 9;
 const HELD_DEPTH = 11;
@@ -13,10 +12,9 @@ const HELD_DEPTH = 11;
 const BLINK_STEPS = Math.round(2500 / SIM_STEP_MS);
 
 /**
- * Draws the match's bombs (shared/Bombs.ts): blue while safe, red while
- * armed, rolling as they move, blinking before a loose one is gone, swelling
- * and flickering faster while a throw charges towards going off; and their
- * explosions.
+ * Draws the match's bombs (shared/Bombs.ts): rolling as they move, blinking
+ * before a loose one is gone, swelling while a throw charges towards going off;
+ * and their explosions.
  */
 export class BombSprites {
     private readonly scene: Phaser.Scene;
@@ -58,15 +56,14 @@ export class BombSprites {
     private draw(bomb: BombState): void {
         let sprite = this.sprites.get(bomb.id);
         if (!sprite) {
-            sprite = this.scene.add.image(bomb.x, bomb.y, SAFE).setOrigin(ORIGIN_X, ORIGIN_Y);
+            sprite = this.scene.add.image(bomb.x, bomb.y, BOMB).setOrigin(ORIGIN_X, ORIGIN_Y);
             this.hideFrom.ignore(sprite);
             this.sprites.set(bomb.id, sprite);
         }
         const held = bomb.holder >= 0;
-        // Charging: red and blue in turn, faster and bigger as it nears going off
+        // Charging: bigger as it nears going off
         const danger = bomb.charge >= 0 ? Math.min(bomb.charge / PhysicsConfig.BOMB_OVERCHARGE, 1) : 0;
-        const flicker = bomb.charge >= 0 && Math.floor(bomb.charge / (220 - 180 * danger)) % 2 === 1;
-        sprite.setPosition(bomb.x, bomb.y).setTexture(bomb.armed || flicker ? ARMED : SAFE)
+        sprite.setPosition(bomb.x, bomb.y)
             .setScale(pixelScale() * (1 + 0.35 * danger)).setDepth(held ? HELD_DEPTH : LOOSE_DEPTH);
         // Rolls the way it moves; upright in a hand
         if (held) sprite.setRotation(0);
@@ -76,10 +73,7 @@ export class BombSprites {
     }
 }
 
-/**
- * The bomb as 16-bit pixel art: a round shell with a highlight, a coloured band (blue safe,
- * red armed), a cap, a fuse and its spark. One character per pixel; the ball is 14 px across.
- */
+/** The bomb as 16-bit pixel art: a round shell with a highlight, a cap, a fuse and its spark. One character per pixel; the ball is 14 px across. */
 const PIXELS = [
     '........OSO.....',
     '.........S......',
@@ -91,8 +85,8 @@ const PIXELS = [
     '..KMLWWMMMMDDK..',
     '..KMLWMMMMMDDK..',
     '.KMLLMMMMMMDDDK.',
-    '.KBBBBBBBBBBbbK.',
-    '.KbbbbbbbbbbbbK.',
+    '.KMLMMMMMMMMDDK.',
+    '.KMMMMMMMMMDDDK.',
     '.KDMMMMMMMMDDDK.',
     '..KDMMMMMMDDDK..',
     '..KDDMMMMDDDDK..',
@@ -114,20 +108,17 @@ function pixelScale(): number {
 }
 
 function createTextures(scene: Phaser.Scene): void {
-    for (const [key, band, bandShade] of [[SAFE, 0x3f86ff, 0x2350b0], [ARMED, 0xf0383e, 0x9c1c24]] as const) {
-        if (scene.textures.exists(key)) continue;
-        const colours: Record<string, number> = { ...SHELL, B: band, b: bandShade };
-        const canvas = scene.textures.createCanvas(key, PIXELS[0].length, PIXELS.length);
-        if (!canvas) continue;
-        const ctx = canvas.getContext();
-        PIXELS.forEach((row, y) => [...row].forEach((ch, x) => {
-            const colour = colours[ch];
-            if (colour === undefined) return;
-            ctx.fillStyle = '#' + colour.toString(16).padStart(6, '0');
-            ctx.fillRect(x, y, 1, 1);
-        }));
-        canvas.refresh();
-        // Hard pixels when scaled up
-        canvas.setFilter(Phaser.Textures.FilterMode.NEAREST);
-    }
+    if (scene.textures.exists(BOMB)) return;
+    const canvas = scene.textures.createCanvas(BOMB, PIXELS[0].length, PIXELS.length);
+    if (!canvas) return;
+    const ctx = canvas.getContext();
+    PIXELS.forEach((row, y) => [...row].forEach((ch, x) => {
+        const colour = SHELL[ch];
+        if (colour === undefined) return;
+        ctx.fillStyle = '#' + colour.toString(16).padStart(6, '0');
+        ctx.fillRect(x, y, 1, 1);
+    }));
+    canvas.refresh();
+    // Hard pixels when scaled up
+    canvas.setFilter(Phaser.Textures.FilterMode.NEAREST);
 }

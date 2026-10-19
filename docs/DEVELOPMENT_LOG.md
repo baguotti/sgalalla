@@ -1367,4 +1367,5 @@ Part 2
 - **[Visuals]** The bomb is 16-bit pixel art now: a shaded shell with a highlight, a blue (safe) or red (armed) band, a cap, a fuse and a spark, drawn from a 16×18 pixel map with hard pixels.
 - **[Change]** Protocol version 25.
 - **[S]** tsc (client, tests, server), 91 tests (new: an armed bomb goes off beside a fighter, within the art but off the hurtbox), build. In the browser (muted): the new bombs on the stage; the sprite checked at 12×.
+- **[Visuals]** Follow-up: the band is gone, just the bomb (one texture, armed or safe; a charging bomb swells instead of flickering red and blue).
 
