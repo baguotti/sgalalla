@@ -147,7 +147,7 @@ function stepBomb(match: Arena, bomb: BombState, layout: SimStage, events: Match
 
     if (bomb.graceSteps > 0) {
         bomb.graceSteps--;
-    } else if (bomb.armed && match.fighters.some(f => isHittable(f) && distanceToHurtbox(bomb, f) <= PhysicsConfig.BOMB_RADIUS)) {
+    } else if (bomb.armed && match.fighters.some(f => isHittable(f) && distanceToHurtbox(bomb, f) <= PhysicsConfig.BOMB_HIT_RANGE)) {
         explode(match, bomb, events);
         return false;
     }

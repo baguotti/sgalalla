@@ -192,6 +192,7 @@ export const COMBAT_GROUPS: Group<PhysicsKey>[] = [
         ['BOMB_GAP_RANDOM', '…plus up to', 'ms'],
         ['BOMB_LIFETIME', 'Loose bomb lasts', 'ms'],
         ['BOMB_RADIUS', 'Size (radius)', 'px'],
+        ['BOMB_HIT_RANGE', 'Hits within', 'px', 'An armed bomb goes off this close to a fighter\'s hurtbox (narrower than the art).', [0, 120, 1]],
         ['BOMB_PICKUP_RANGE', 'Pick up within', 'px', 'How far past the hurtbox light attack or throw reaches a bomb.'],
         ['BOMB_THROW_SPEED_MIN', 'Throw speed, tapped', 'px/s'],
         ['BOMB_THROW_SPEED_MAX', 'Throw speed, charged', 'px/s'],

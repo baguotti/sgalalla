@@ -220,7 +220,9 @@ export const PhysicsConfig = {
     BOMB_GAP_RANDOM: 5000,
     BOMB_LIFETIME: 15000,
     BOMB_RADIUS: 15,
-    BOMB_PICKUP_RANGE: 34,
+    // An armed bomb goes off within this much of a fighter's hurtbox (the hurtbox is narrower than the art)
+    BOMB_HIT_RANGE: 34,
+    BOMB_PICKUP_RANGE: 50,
     BOMB_THROW_SPEED_MIN: 900,
     BOMB_THROW_SPEED_MAX: 2100,
     BOMB_CHARGE_FULL: 1000,
@@ -230,9 +232,9 @@ export const PhysicsConfig = {
     BOMB_SAFE_SPEED: 337,
     BOMB_GRACE_STEPS: 8,
     // Its explosion hurts every fighter this close (thrower included), launching them away from it
-    BOMB_BLAST_RADIUS: 101,
-    BOMB_DAMAGE: 15,
-    BOMB_FIXED_FORCE: 55,
-    BOMB_VARIABLE_FORCE: 45,
+    BOMB_BLAST_RADIUS: 150,
+    BOMB_DAMAGE: 22,
+    BOMB_FIXED_FORCE: 62,
+    BOMB_VARIABLE_FORCE: 52,
     BOMB_STUN: 25,
 } as const;

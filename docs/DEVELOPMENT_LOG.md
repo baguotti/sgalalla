@@ -1360,3 +1360,11 @@ Part 2
 - **[Change]** Protocol version 24.
 - **[S]** tsc (client, tests, server), 90 tests (new: light and heavy charge a throw instead of attacking and hold the fighter; a thrown bomb flies almost straight; a full-charge throw goes straight ahead), build. In the browser (muted): a bomb picked up with light, charged with heavy (charging pose, no attack), thrown straight at 2100 px/s, dropping 19 px over 665 px, hitting the dummy; no errors.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-19] Bombs: bigger hit, more damage, bigger blast, 16-bit look (branch `experimental-branch`)
+- **[Gameplay]** A thrown bomb goes off within 34 px of a fighter's hurtbox (`BOMB_HIT_RANGE`): it used to need to touch the hurtbox, 31 px wide against an 81 px fighter, so hits that looked like hits flew past. Picking up and catching reach 50 px (was 34), more than the hit range, so a slow throw can still be caught.
+- **[Balance]** Bomb damage 15 → 22, forces 55/45 → 62/52, blast radius 101 → 150 px (the explosion drawn to match).
+- **[Visuals]** The bomb is 16-bit pixel art now: a shaded shell with a highlight, a blue (safe) or red (armed) band, a cap, a fuse and a spark, drawn from a 16×18 pixel map with hard pixels.
+- **[Change]** Protocol version 25.
+- **[S]** tsc (client, tests, server), 91 tests (new: an armed bomb goes off beside a fighter, within the art but off the hurtbox), build. In the browser (muted): the new bombs on the stage; the sprite checked at 12×.
+

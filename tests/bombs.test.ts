@@ -98,6 +98,18 @@ test('a thrown bomb flies almost straight', () => {
     assert.ok(bomb.y - y0 < flown * 0.15, `drops only a little (${(bomb.y - y0).toFixed(0)} px)`);
 });
 
+test('an armed bomb goes off near a fighter, not only on the narrow hurtbox', () => {
+    const match = newMatch(700, 1100);
+    const b = match.fighters[1];
+    // Level with the fighter, beside the hurtbox but within the art
+    const gap = PhysicsConfig.BOMB_HIT_RANGE - 4;
+    const bomb = placeBomb(match, b.body.x - PhysicsConfig.HURTBOX_WIDTH / 2 - gap, b.body.y);
+    Object.assign(bomb, { armed: true, thrower: 0, vx: 0, vy: 0 });
+    step(match);
+    assert.equal(match.bombs!.list.length, 0, 'gone off');
+    assert.equal(b.damagePercent, PhysicsConfig.BOMB_DAMAGE);
+});
+
 test('a thrown bomb can be caught with throw', () => {
     const match = newMatch(700, 1000);
     const b = match.fighters[1];
