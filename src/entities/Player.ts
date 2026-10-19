@@ -178,10 +178,11 @@ export class Player extends Phaser.GameObjects.Container {
         this.setPosition(f.body.x, f.body.y);
         this.setVisible(inPlay || this.pose !== null);
 
-        this.updateCharge(f, inPlay);
+        const throwCharge = match.bombs?.list.find(b => b.holder === f.id && b.charge >= 0)?.charge ?? -1;
+        this.updateCharge(f, inPlay, throwCharge);
         this.updateRecoveryGhost(f, inPlay);
         this.updateFacing(f);
-        this.updateAnimation(f);
+        this.updateAnimation(f, throwCharge >= 0);
         this.updateHitstop(f);
         this.updateMotionEffects(f, inPlay, deltaMs);
         this.updateAlpha(f);
@@ -222,8 +223,8 @@ export class Player extends Phaser.GameObjects.Container {
         this.sprite.setFlipX(groundPoundPose ? facing > 0 : facing < 0);
     }
 
-    private updateAnimation(f: FighterState): void {
-        const key = this.pose ?? animationFor(f);
+    private updateAnimation(f: FighterState, chargingThrow: boolean): void {
+        const key = this.pose ?? (chargingThrow ? 'charging' : animationFor(f));
         this.playAnim(key);
 
         // The run cycle speeds up with running speed
@@ -288,15 +289,26 @@ export class Player extends Phaser.GameObjects.Container {
 
     // ─── Charge ───
 
-    private updateCharge(f: FighterState, inPlay: boolean): void {
+    /** `throwCharge`: a bomb throw's charge so far (ms), or -1. */
+    private updateCharge(f: FighterState, inPlay: boolean, throwCharge: number): void {
         const c = f.combat;
-        const charging = inPlay && c.isCharging;
+        const charging = inPlay && (c.isCharging || throwCharge >= 0);
         if (charging !== this.isCharging) {
             this.isCharging = charging;
             if (charging) this.startChargeSounds();
             else this.endCharge();
         }
         if (!charging) return;
+
+        // A bomb throw: shaking harder as it charges; once full, flashing white, faster as it nears going off
+        if (throwCharge >= 0) {
+            this.shakeSprite(Math.min(throwCharge / PhysicsConfig.BOMB_CHARGE_FULL, 1) * 2);
+            const past = (throwCharge - PhysicsConfig.BOMB_CHARGE_FULL) / (PhysicsConfig.BOMB_OVERCHARGE - PhysicsConfig.BOMB_CHARGE_FULL);
+            const flash = past >= 0 && Math.floor(throwCharge / (160 - 120 * past)) % 2 === 0;
+            if (flash) this.sprite.setTintFill(0xffffff);
+            else if (this.damageFlashMs <= 0) this.sprite.clearTint();
+            return;
+        }
 
         const chargePercent = Math.min(c.chargeTime / PhysicsConfig.CHARGE_MAX_TIME, 1);
         if (isGroundPoundCharge(f)) {
@@ -341,6 +353,7 @@ export class Player extends Phaser.GameObjects.Container {
     }
 
     private endCharge(): void {
+        if (this.damageFlashMs <= 0) this.sprite.clearTint();
         this.chargeGhost?.destroy();
         this.chargeGhost = null;
         this.chargeBlurFx = null;

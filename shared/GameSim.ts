@@ -23,7 +23,7 @@ import {
     ATTACK_PHASE_NONE, ATTACK_PHASE_STARTUP, ATTACK_PHASE_ACTIVE, ATTACK_PHASE_RECOVERY,
     ATTACK_TYPE_NONE, ATTACK_TYPE_LIGHT, ATTACK_TYPE_HEAVY,
 } from './PhysicsSimulation.js';
-import { createBombs, pickUpBombs, updateBombs, type Bombs } from './Bombs.js';
+import { bombPresses, createBombs, isChargingThrow, updateBombs, type Bombs } from './Bombs.js';
 import { randomInt } from './Random.js';
 import { STAGE_LAYOUTS, type SimStage, type StageLayoutId } from './StageData.js';
 import { hashString } from './StateHash.js';
@@ -95,20 +95,20 @@ export function stepMatch(match: MatchState, inputs: readonly FighterInput[], ev
 
     for (const f of moving) {
         updateInputBuffer(f);
-        stepFighterPhysics(f, events);
+        stepFighterPhysics(f, isChargingThrow(match, f), events);
         updateFacing(f);
     }
 
     const layout = STAGE_LAYOUTS[match.stage];
     for (const f of moving) collidePlatforms(f, layout, events);
 
-    // Bombs in reach are picked up before a light attack can come out
-    pickUpBombs(match);
+    // Holding a bomb, an attack charges a throw; in reach, light attack picks one up: before attacks can come out
+    bombPresses(match);
 
     for (const f of moving) {
         updateState(f);
         updateCombat(f, events);
-        if (!COMBAT_BLOCKED_STATES.has(f.state)) handleCombatInput(f, events);
+        if (!COMBAT_BLOCKED_STATES.has(f.state) && !isChargingThrow(match, f)) handleCombatInput(f, events);
         updateTimers(f);
     }
 
@@ -169,14 +169,15 @@ const physicsInput: PhysicsInput = {
 };
 const physicsEvents: PhysicsEvent[] = [];
 
-function stepFighterPhysics(f: FighterState, events: MatchEvent[]): void {
+/** `chargingThrow`: charging a bomb throw, which holds the fighter as a heavy's charge does. */
+function stepFighterPhysics(f: FighterState, chargingThrow: boolean, events: MatchEvent[]): void {
     const b = f.body;
     const combat = f.combat;
 
     // Combat state the physics reads
     b.isAttacking = f.isAttacking;
     b.isHitStunned = f.isHitStunned;
-    b.isCharging = combat.isCharging;
+    b.isCharging = combat.isCharging || chargingThrow;
     const attack = combat.attack;
     if (attack) {
         const data = AttackRegistry[attack.key];
@@ -253,7 +254,7 @@ function updateFacing(f: FighterState): void {
 
     const b = f.body;
     const combat = f.combat;
-    if (combat.isGroundPounding || combat.isGroundPoundLanding || combat.isCharging) return;
+    if (combat.isGroundPounding || combat.isGroundPoundLanding || b.isCharging) return;
 
     if (f.isAttacking && combat.attack && combat.attack.phase !== AttackPhase.RECOVERY) return;
 

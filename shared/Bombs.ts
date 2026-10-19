@@ -1,15 +1,18 @@
 /**
- * Bombs, as Brawlhalla's Bouncy Bomb gadget (settings: PhysicsConfig BOMB_*).
+ * Bombs (settings: PhysicsConfig BOMB_*), Brawlhalla's Bouncy Bomb with our
+ * old throw: charged like a heavy attack.
  *
  * One drops from the sky over the main platform now and then. A fighter
  * pressing light attack or throw within reach of a loose bomb picks it up (a
- * thrown one too: a catch), instead of attacking. Holding throw charges a throw
- * and letting go throws it, faster the longer the charge, in any of 8
- * directions; charged too long, it goes off in the hand. Thrown, it's armed:
- * after a short grace period it explodes on touching any fighter, its thrower
- * included, hurting everyone near. It bounces off the stage, and a bounce that
- * leaves it slow makes it safe again. A fighter hit while holding one drops
- * it. A loose bomb is gone after a while, and one past the blast zones at once.
+ * thrown one too: a catch), instead of attacking. Holding one, any attack
+ * (light, heavy, or throw) starts charging a throw instead: the fighter all
+ * but stops, as charging a heavy, and letting go throws it, faster the longer
+ * the charge, in any of 8 directions. Charged too long, it goes off in the hand.
+ * Thrown, it's armed and flies almost straight (light gravity): after a short
+ * grace period it explodes on touching any fighter, its thrower included,
+ * hurting everyone near. It bounces off the stage, and a bounce that leaves it
+ * slow makes it safe again (falling normally). A fighter hit while holding one
+ * drops it. A loose bomb is gone after a while, and one past the blast zones at once.
  */
 
 import { hitstopFor, KNOCKBACK_DIRECTIONS, knockbackSpeed, launchFighter, liftAtHighDamage } from './Combat.js';
@@ -60,8 +63,7 @@ interface Arena {
 }
 
 const STEP_S = SIM_STEP_MS / 1000;
-/** Throw directions (cos, sin, up positive): forward goes a little up (15°), diagonals at 45°. */
-const FORWARD = [0.9659258262890683, 0.25881904510252074] as const;
+/** Throw directions: forward is straight ahead, diagonals at 45°. */
 const DIAGONAL = 0.7071067811865476;
 /** Explosions launch up and away at this angle (a KNOCKBACK_DIRECTIONS entry). */
 const BLAST_ANGLE = 50;
@@ -91,13 +93,27 @@ export function updateBombs(match: Arena, layout: SimStage, events: MatchEvent[]
 }
 
 /**
- * Pick-ups, before the fighters' attacks: a fighter free to act pressing light
- * attack or throw within reach of a loose bomb takes it instead of attacking
- * (one bomb each). Run before the step's combat input.
+ * Bomb presses, before the fighters' attacks (run before the step's combat
+ * input): a fighter holding a bomb who presses light, heavy or throw starts
+ * charging a throw; one free to act pressing light or throw within reach of a
+ * loose bomb takes it (one bomb each). Either instead of attacking.
  */
-export function pickUpBombs(match: Arena): void {
+export function bombPresses(match: Arena): void {
     const bombs = match.bombs;
     if (!bombs) return;
+    for (const bomb of bombs.list) {
+        if (bomb.holder < 0 || bomb.charge >= 0) continue;
+        const holder = match.fighters[bomb.holder];
+        if (!isInPlay(holder) || holder.isHitStunned || holder.isAttacking || holder.combat.isCharging) continue;
+        const press = (['lightAttack', 'heavyAttack', 'throw'] as const).find(action => isBuffered(holder, action));
+        if (!press) continue;
+        consumeBuffered(holder, press);
+        bomb.charge = 0;
+        // As a heavy's charge: it faces the way the fighter points as it presses
+        const { aimLeft, aimRight, moveLeft, moveRight } = holder.input;
+        const point = (aimRight || moveRight ? 1 : 0) - (aimLeft || moveLeft ? 1 : 0);
+        if (point !== 0) holder.body.facingDirection = point;
+    }
     for (const bomb of bombs.list) {
         if (bomb.holder >= 0) continue;
         for (const f of match.fighters) {
@@ -138,17 +154,17 @@ function stepBomb(match: Arena, bomb: BombState, layout: SimStage, events: Match
     return bomb.armed || --bomb.lifeSteps > 0;
 }
 
-/** In the hand: throw starts a charge, letting go throws; charged too long, it goes off. False once it has. */
+/** The fighter is charging a throw of the bomb they hold. */
+export function isChargingThrow(match: Arena, f: FighterState): boolean {
+    return match.bombs?.list.some(b => b.holder === f.id && b.charge >= 0) ?? false;
+}
+
+/** In the hand: a charge goes on while the attack that started it is held; letting go throws. Charged too long, it goes off. False once it has. */
 function hold(match: Arena, bomb: BombState, holder: FighterState, events: MatchEvent[]): boolean {
     carry(bomb, holder);
-    if (bomb.charge < 0) {
-        if (isBuffered(holder, 'throw')) {
-            consumeBuffered(holder, 'throw');
-            bomb.charge = 0;
-        }
-        return true;
-    }
-    if (holder.input.throwHeld) {
+    if (bomb.charge < 0) return true;
+    const { lightAttackHeld, heavyAttackHeld, throwHeld } = holder.input;
+    if (lightAttackHeld || heavyAttackHeld || throwHeld) {
         bomb.charge += SIM_STEP_MS;
         if (bomb.charge < PhysicsConfig.BOMB_OVERCHARGE) return true;
         bomb.thrower = holder.id;
@@ -168,7 +184,7 @@ function carry(bomb: BombState, holder: FighterState): void {
     bomb.vy = b.vy;
 }
 
-/** Faster the longer the charge, the way the thrower aims as they let go: up, down, a diagonal, or forward. */
+/** Faster the longer the charge, the way the thrower aims as they let go: up, down, a diagonal, or straight ahead. */
 function throwBomb(bomb: BombState, thrower: FighterState): void {
     const { aimUp, aimDown, aimLeft, aimRight } = thrower.input;
     const charge = Math.min(bomb.charge / PhysicsConfig.BOMB_CHARGE_FULL, 1);
@@ -176,8 +192,8 @@ function throwBomb(bomb: BombState, thrower: FighterState): void {
     const vertical = aimUp === aimDown ? 0 : aimUp ? 1 : -1;
     const side = aimLeft === aimRight ? 0 : aimRight ? 1 : -1;
     const facing = side || thrower.body.facingDirection;
-    // Straight up or down without a side; a diagonal with one; forward and a little up otherwise
-    const [x, y] = vertical === 0 ? [FORWARD[0] * facing, FORWARD[1]]
+    // Straight up or down without a side; a diagonal with one; straight ahead otherwise
+    const [x, y] = vertical === 0 ? [facing, 0]
         : side === 0 ? [0, vertical]
             : [DIAGONAL * side, DIAGONAL * vertical];
     bomb.vx = x * speed;
@@ -190,10 +206,14 @@ function throwBomb(bomb: BombState, thrower: FighterState): void {
     bomb.lifeSteps = lifetimeSteps();
 }
 
-/** Gravity, then the stage: solid platforms from every side, soft ones from above. */
+/**
+ * Gravity (light while armed, so a throw flies almost straight; a throw down keeps its speed), then the
+ * stage: solid platforms from every side, soft ones from above.
+ */
 function fly(bomb: BombState, layout: SimStage): void {
     const r = PhysicsConfig.BOMB_RADIUS;
-    bomb.vy = Math.min(bomb.vy + PhysicsConfig.GRAVITY * STEP_S, PhysicsConfig.MAX_FALL_SPEED);
+    const gravity = PhysicsConfig.GRAVITY * (bomb.armed ? PhysicsConfig.BOMB_FLIGHT_GRAVITY : 1);
+    if (bomb.vy < PhysicsConfig.MAX_FALL_SPEED) bomb.vy = Math.min(bomb.vy + gravity * STEP_S, PhysicsConfig.MAX_FALL_SPEED);
     bomb.x += bomb.vx * STEP_S;
     bomb.y += bomb.vy * STEP_S;
 

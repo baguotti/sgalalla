@@ -1352,3 +1352,11 @@ Part 2
 - **[Change]** Protocol version 23; the movement recording re-baselined (it pressed O).
 - **[S]** tsc (client, tests, server), 89 tests (new: a ground pound cancelled by a jump, an air dodge or the recovery; a fast downward launch from just above the floor lands; upward launches steeper past red), build, KO table (lights 250–300%, side sig 140%/110%, up and neutral sig 170%), headless CPU matches. In the browser (muted): Pe's taunt plays its sailor frames, O does nothing, no errors.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-19] Bombs thrown with any attack, charged like a heavy, flying straight (branch `experimental-branch`)
+- **[Gameplay]** Combining today's bombs with the old throw (v0.14, `PlayerCombat.executeThrow`): holding a bomb, light or heavy (or the throw button) charges a throw instead of attacking. The fighter all but stops and takes the charging pose, as charging a heavy (facing the way they point as they press), and letting go throws it in 8 directions, from 900 px/s tapped to 2100 px/s at full charge (1 s, as the old throw). Held to 2 s it goes off in the hand (as the old one).
+- **[Gameplay]** A thrown bomb flies almost straight: 15% of gravity while it's armed (forward is straight ahead now, not 15° up); after a bounce makes it safe it falls normally. A throw down keeps its speed. A throw straight up flies off the top.
+- **[Visuals]** Charging a throw shakes the fighter harder as it builds and plays the charge sound; past full charge the fighter flashes white, faster as it nears going off, and the bomb flickers red and blue and swells (as before).
+- **[Change]** Protocol version 24.
+- **[S]** tsc (client, tests, server), 90 tests (new: light and heavy charge a throw instead of attacking and hold the fighter; a thrown bomb flies almost straight; a full-charge throw goes straight ahead), build. In the browser (muted): a bomb picked up with light, charged with heavy (charging pose, no attack), thrown straight at 2100 px/s, dropping 19 px over 665 px, hitting the dummy; no errors.
+

@@ -212,18 +212,20 @@ export const PhysicsConfig = {
     // Bombs (Brawlhalla's Bouncy Bomb): the first drops BOMB_FIRST ms in, the next BOMB_GAP plus up to
     // BOMB_GAP_RANDOM ms after one is gone, one at a time (two with 4 fighters or more); a loose bomb is gone
     // after BOMB_LIFETIME ms. A throw charges from BOMB_THROW_SPEED_MIN to _MAX over BOMB_CHARGE_FULL ms, and
-    // held past BOMB_OVERCHARGE ms the bomb goes off in the hand. Thrown, it bounces keeping BOMB_BOUNCE of its
-    // speed, passes through everyone for BOMB_GRACE_STEPS, and is safe again once slower than BOMB_SAFE_SPEED.
+    // held past BOMB_OVERCHARGE ms the bomb goes off in the hand. Thrown, it flies under BOMB_FLIGHT_GRAVITY of
+    // gravity, bounces keeping BOMB_BOUNCE of its speed, passes through everyone for BOMB_GRACE_STEPS, and is
+    // safe again once slower than BOMB_SAFE_SPEED.
     BOMB_FIRST: 15000,
     BOMB_GAP: 5000,
     BOMB_GAP_RANDOM: 5000,
     BOMB_LIFETIME: 15000,
     BOMB_RADIUS: 15,
     BOMB_PICKUP_RANGE: 34,
-    BOMB_THROW_SPEED_MIN: 741,
-    BOMB_THROW_SPEED_MAX: 1550,
-    BOMB_CHARGE_FULL: 800,
+    BOMB_THROW_SPEED_MIN: 900,
+    BOMB_THROW_SPEED_MAX: 2100,
+    BOMB_CHARGE_FULL: 1000,
     BOMB_OVERCHARGE: 2000,
+    BOMB_FLIGHT_GRAVITY: 0.15,
     BOMB_BOUNCE: 0.7,
     BOMB_SAFE_SPEED: 337,
     BOMB_GRACE_STEPS: 8,

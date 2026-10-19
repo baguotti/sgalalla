@@ -197,6 +197,7 @@ export const COMBAT_GROUPS: Group<PhysicsKey>[] = [
         ['BOMB_THROW_SPEED_MAX', 'Throw speed, charged', 'px/s'],
         ['BOMB_CHARGE_FULL', 'Full charge after', 'ms'],
         ['BOMB_OVERCHARGE', 'Goes off in the hand after', 'ms', 'Charging a throw longer than this blows the bomb up on its holder.'],
+        ['BOMB_FLIGHT_GRAVITY', 'Gravity in flight', 'share', 'A thrown bomb falls at this share of gravity, so it flies almost straight (until a bounce makes it safe).', [0, 1, 0.01]],
         ['BOMB_BOUNCE', 'Bounce keeps', 'share'],
         ['BOMB_SAFE_SPEED', 'Safe again below', 'px/s', 'A thrown bomb slower than this stops being armed.'],
         ['BOMB_GRACE_STEPS', 'Passes through for', 'steps', 'After a throw, the bomb goes through everyone for this long.', [0, 30, 1]],

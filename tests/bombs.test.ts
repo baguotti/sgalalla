@@ -1,7 +1,8 @@
 /**
- * Bombs, as Brawlhalla's Bouncy Bomb: drops, picking up (light attack or
- * throw), charged throws in 8 directions, armed and safe, explosions (the
- * thrower too, and overcharging in the hand), catches, dropping one when hit.
+ * Bombs: drops, picking up (light attack or throw), throws charged with any
+ * attack and flying almost straight in 8 directions, armed and safe,
+ * explosions (the thrower too, and overcharging in the hand), catches,
+ * dropping one when hit.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,6 +24,10 @@ function newMatch(x0 = 700, x1 = 1300, bombs = true): MatchState {
 
 function step(match: MatchState, a: Partial<FighterInput> = {}, b: Partial<FighterInput> = {}, events: MatchEvent[] = []): void {
     stepMatch(match, [{ ...emptyInput(), ...a }, { ...emptyInput(), ...b }], events);
+}
+
+function steps(match: MatchState, count: number, a: Partial<FighterInput> = {}): void {
+    for (let i = 0; i < count; i++) step(match, a);
 }
 
 /** A loose, safe bomb resting at (x, y). */
@@ -79,17 +84,18 @@ test('throw picks a bomb up and throws it armed; it explodes on the fighter it t
     assert.equal(a.damagePercent, 0, 'the thrower was out of the blast');
 });
 
-test('a bomb thrown straight up comes down on its thrower', () => {
-    // Clear of the soft platform above the middle
+test('a thrown bomb flies almost straight', () => {
     const match = newMatch(450, 1500);
-    const a = match.fighters[0];
     placeBomb(match, 480);
     step(match, { throw: true });
     step(match);
-    throwHeld(match, { aimUp: true });
-    for (let i = 0; i < 120 && match.bombs!.list.length > 0; i++) step(match);
-    assert.equal(match.bombs!.list.length, 0);
-    assert.equal(a.damagePercent, PhysicsConfig.BOMB_DAMAGE, 'its own bomb hurts the thrower');
+    throwHeld(match, { aimRight: true });
+    const bomb = match.bombs!.list[0];
+    const y0 = bomb.y;
+    for (let i = 0; i < 20; i++) step(match);
+    const flown = bomb.x - 480;
+    assert.ok(flown > 250, `flies forward (${flown.toFixed(0)} px)`);
+    assert.ok(bomb.y - y0 < flown * 0.15, `drops only a little (${(bomb.y - y0).toFixed(0)} px)`);
 });
 
 test('a thrown bomb can be caught with throw', () => {
@@ -143,11 +149,25 @@ test('light attack picks a bomb up instead of attacking', () => {
     step(match, { lightAttack: true, lightAttackHeld: true });
     assert.equal(match.bombs!.list[0].holder, 0, 'picked up');
     assert.equal(a.isAttacking, false, 'no attack came out');
-    // Holding it, light attack attacks
-    step(match);
-    step(match, { lightAttack: true, lightAttackHeld: true });
-    assert.equal(a.isAttacking, true);
-    assert.equal(match.bombs!.list[0].holder, 0, 'still held');
+});
+
+test('holding a bomb, light or heavy charges a throw instead of attacking, like a heavy', () => {
+    for (const [press, held] of [['lightAttack', 'lightAttackHeld'], ['heavyAttack', 'heavyAttackHeld']] as const) {
+        const match = newMatch(700, 1500);
+        const a = match.fighters[0];
+        placeBomb(match, 730);
+        step(match, { throw: true });
+        step(match);
+        const bomb = match.bombs!.list[0];
+        step(match, { [press]: true, [held]: true, aimRight: true });
+        steps(match, 20, { [held]: true, moveRight: true });
+        assert.equal(a.isAttacking, false, `${press}: no attack`);
+        assert.ok(bomb.charge > 0 && bomb.holder === 0, `${press}: charging`);
+        assert.ok(Math.abs(a.body.vx) < 50, `${press}: all but still while charging`);
+        step(match, { aimRight: true });
+        assert.equal(bomb.holder, -1, `${press}: thrown on letting go`);
+        assert.ok(bomb.armed && bomb.vx > 0);
+    }
 });
 
 test('a charged throw goes faster than a tapped one, the way the thrower aims as they let go', () => {
@@ -162,6 +182,7 @@ test('a charged throw goes faster than a tapped one, the way the thrower aims as
     };
     const tapped = speedOf(0, { aimRight: true });
     const charged = speedOf(Math.round(PhysicsConfig.BOMB_CHARGE_FULL / SIM_STEP_MS), { aimRight: true });
+    assert.ok(Math.abs(charged.vy) < 1, 'straight ahead');
     assert.ok(charged.speed > tapped.speed * 1.5, `charged ${charged.speed.toFixed(0)}, tapped ${tapped.speed.toFixed(0)}`);
     const diagonal = speedOf(10, { aimRight: true, aimUp: true });
     assert.ok(diagonal.vx > 0 && diagonal.vy < 0 && Math.abs(diagonal.vx + diagonal.vy) < 80, 'up and forward at 45°');
