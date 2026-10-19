@@ -583,7 +583,6 @@ function animationFor(f: FighterState): string {
         case 'Recovery': return 'recovery';
         case 'GroundPound': return 'ground_pound';
         case 'Taunt': return 'taunt';
-        case 'Defeat': return 'defeat';
         default: return 'idle';
     }
 }

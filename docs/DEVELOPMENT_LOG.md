@@ -1343,3 +1343,12 @@ Part 2
 - **[Change]** Protocol version 22; recordings re-baselined.
 - **[S]** tsc (client, tests, server), 86 tests (the launch tests follow the new model: a slow launch carries on through the fall and ends on landing; the down light follow-up steps in), build, KO table, true combos, headless CPU matches (the CPU's own off-stage ground pounds, there before, flagged separately). Trajectories plotted before and after; in the browser (muted), a neutral light at 100% arcs up, over and down.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-19] Floor, top blast zone, ground pound cancel, taunts (branch `experimental-branch`)
+- **[Fix]** A fighter launched down hard from just above the floor could pass through it and fall to the bottom blast zone: landing only looked at where the feet ended up, and a fast step skipped past the top's 30 px window. It now checks where the feet were before the step's move.
+- **[Gameplay]** The top blast zone moves up from y −1000 to −1150: three jumps and a recovery from the top platform reached −1005, a KO on yourself; now they reach −1074. Red fighters fly higher: from 170% (the HUD's red) a launch's upward speed grows, up to 50% more at 270% (`HIGH_DAMAGE_*`, bombs too). Up and neutral signatures now KO through the top from about 170% in the middle of the stage (200–230% before).
+- **[Gameplay]** The ground pound can be cut short by a jump, an air dodge or the recovery (when there's one left), with no cooldown: one over nothing needn't be a KO. The chase dodge's cancel is now `cancelAttack`, shared by both.
+- **[Fix]** The defeat pose is gone: no O key, no defeat input or state, its atlas no longer loaded (the files stay in `public/assets/ui/defeat`). Online, Pe's taunt showing the defeat pose came from that input (O, beside the taunt's P); every taunt's frames checked: each character's taunt is its own (Fok, Sgu, Sga, Pe, Nock, Greg). The input's bit stays reserved, so the later bits (throw) keep their places.
+- **[Change]** Protocol version 23; the movement recording re-baselined (it pressed O).
+- **[S]** tsc (client, tests, server), 89 tests (new: a ground pound cancelled by a jump, an air dodge or the recovery; a fast downward launch from just above the floor lands; upward launches steeper past red), build, KO table (lights 250–300%, side sig 140%/110%, up and neutral sig 170%), headless CPU matches. In the browser (muted): Pe's taunt plays its sailor frames, O does nothing, no errors.
+

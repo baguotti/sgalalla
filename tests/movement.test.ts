@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AttackPhase, AttackRegistry } from '../shared/AttackData.ts';
-import { applyHit, findHit, isGroundPoundCharge } from '../shared/Combat.ts';
+import { applyHit, findHit, isGroundPoundCharge, launchFighter } from '../shared/Combat.ts';
 import { countDown, SIM_STEP_MS } from '../shared/FixedStepClock.ts';
 import { createMatch, stepMatch, type MatchState } from '../shared/GameSim.ts';
 import { emptyInput, type FighterInput } from '../shared/FighterInput.ts';
@@ -748,6 +748,49 @@ test('after a ground pound, jumping is no ground pound charge: facing follows mo
     steps(match, 10, { jumpHeld: true, moveLeft: true });
     assert.equal(isGroundPoundCharge(f), false);
     assert.equal(f.body.facingDirection, -1);
+});
+
+test('a ground pound can be cut short by a jump, an air dodge or the recovery', () => {
+    for (const press of [{ jump: true, jumpHeld: true }, { dodge: true, dodgeHeld: true }, { heavyAttack: true, heavyAttackHeld: true, aimUp: true }]) {
+        const match = newMatch(500);
+        const f = high(match);
+        f.body.x = 200;
+        f.body.y = 700;
+        step(match, { heavyAttack: true, heavyAttackHeld: true, aimDown: true });
+        step(match, { aimDown: true });
+        steps(match, 10);
+        assert.equal(f.combat.isGroundPounding, true);
+        step(match, press);
+        step(match);
+        assert.equal(f.combat.isGroundPounding, false, `cancelled by ${Object.keys(press)[0]}`);
+        assert.equal(f.isAttacking, false);
+        assert.ok(f.body.vy < PhysicsConfig.MAX_FALL_SPEED * PhysicsConfig.GROUND_POUND_FALL_MULT, 'no longer plunging');
+    }
+});
+
+test('a fast downward launch from just above the floor lands on it, not through it', () => {
+    const match = newMatch();
+    const f = match.fighters[0];
+    f.body.y = GROUND_Y - 8;
+    f.body.isGrounded = false;
+    launchFighter(f, 0, 0, 3500, 30, 0);
+    steps(match, 60);
+    assert.ok(f.body.y <= GROUND_Y + 0.001, `stays on the stage (y ${f.body.y.toFixed(0)})`);
+    assert.equal(f.lives, match.fighters[1].lives, 'no KO');
+});
+
+test('red fighters fly higher: upward launches gain speed past HIGH_DAMAGE_FROM', () => {
+    const launchAt = (damage: number) => {
+        const m = newMatch(700, 780);
+        m.fighters[1].damagePercent = damage;
+        landLight(m);
+        return m.fighters[1].body;
+    };
+    const below = launchAt(PhysicsConfig.HIGH_DAMAGE_FROM - 30);
+    const above = launchAt(PhysicsConfig.HIGH_DAMAGE_FROM + PhysicsConfig.HIGH_DAMAGE_RANGE);
+    // The neutral light launches at 45°: past red, the climb outgrows the sideways push
+    assert.ok(Math.abs(below.vy / below.vx) < 1.05, 'at 45° below red');
+    assert.ok(Math.abs(above.vy / above.vx) > 1 + PhysicsConfig.HIGH_DAMAGE_LIFT - 0.05, 'steeper at full lift');
 });
 
 test('side heavy in the air is a charged signature; up and neutral are the recovery', () => {

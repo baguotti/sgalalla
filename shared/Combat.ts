@@ -171,7 +171,11 @@ export function handleCombatInput(f: FighterState, events: MatchEvent[]): void {
     const c = f.combat;
     const b = f.body;
 
-    if (c.isGroundPounding) return;
+    if (c.isGroundPounding) {
+        // A ground pound over nothing can be saved: a jump, an air dodge or the recovery cuts it short
+        if (!canCancelGroundPound(f)) return;
+        cancelAttack(f);
+    }
     if (isGroundPoundCharge(f)) {
         b.vx = 0;
         b.vy = 0;
@@ -240,6 +244,13 @@ export function handleCombatInput(f: FighterState, events: MatchEvent[]): void {
     if (c.isCharging && !f.input.heavyAttackHeld) {
         executeChargedAttack(f, events);
     }
+}
+
+/** A jump, air dodge or recovery is pressed, and the fighter has one left. */
+function canCancelGroundPound(f: FighterState): boolean {
+    const b = f.body;
+    const recovery = isBuffered(f, 'heavyAttack') && f.input.aimUp && (b.recoveryAvailable || b.jumpsRemaining > 0);
+    return recovery || (isBuffered(f, 'jump') && b.jumpsRemaining > 0) || (isBuffered(f, 'dodge') && b.dodgeCooldownTimer <= 0);
 }
 
 function inputDirection(f: FighterState): AttackDirection {
@@ -344,8 +355,11 @@ function clearCharge(f: FighterState): void {
     f.combat.chargeTime = 0;
 }
 
-/** A chase dodge cuts the attack that hit short, leaving no cooldown so it can go straight into the next. */
-export function cancelAttackForChaseDodge(f: FighterState): void {
+/**
+ * Cuts the current attack short, leaving no cooldown so the fighter can go straight into
+ * the next thing: a chase dodge after a hit, or a jump, dodge or recovery out of a ground pound.
+ */
+export function cancelAttack(f: FighterState): void {
     const c = f.combat;
     f.isAttacking = false;
     c.isGroundPounding = false;
@@ -518,7 +532,7 @@ export function findHit(attacker: FighterState, target: FighterState): Hit | nul
 
     const knockback = knockbackSpeed(fixedForce, variableForce, target.damagePercent + damage);
     const [cos, sin] = KNOCKBACK_DIRECTIONS[angle];
-    let knockbackY = -sin * knockback;
+    let knockbackY = liftAtHighDamage(-sin * knockback, target.damagePercent + damage);
     // Spiking a grounded target pops it up
     const popUp = tb.isGrounded && knockbackY > 0;
     if (popUp) knockbackY *= -PhysicsConfig.GROUNDED_SPIKE_BOUNCE;
@@ -536,6 +550,16 @@ export function findHit(attacker: FighterState, target: FighterState): Hit | nul
 export function knockbackSpeed(fixedForce: number, variableForce: number, damageAfter: number): number {
     const d = Math.min(damageAfter, PhysicsConfig.MAX_DAMAGE);
     return (fixedForce + variableForce * (d / 100 + (d * d) / 20000)) * PhysicsConfig.FORCE_SCALE;
+}
+
+/**
+ * A launch's upward speed, raised once the target is red (HIGH_DAMAGE_FROM): up to HIGH_DAMAGE_LIFT more
+ * over the next HIGH_DAMAGE_RANGE of damage, so damaged fighters fly up and out of the top.
+ */
+export function liftAtHighDamage(knockbackY: number, damageAfter: number): number {
+    if (knockbackY >= 0) return knockbackY;
+    const past = Math.min(Math.max(damageAfter - PhysicsConfig.HIGH_DAMAGE_FROM, 0) / PhysicsConfig.HIGH_DAMAGE_RANGE, 1);
+    return knockbackY * (1 + past * PhysicsConfig.HIGH_DAMAGE_LIFT);
 }
 
 /** Hit pause in steps: a moment, longer for hits that launch harder. */

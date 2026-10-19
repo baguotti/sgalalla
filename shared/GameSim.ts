@@ -9,7 +9,7 @@
 
 import { countDown, SIM_STEP_MS } from './FixedStepClock.js';
 import { AttackPhase, AttackRegistry, AttackType } from './AttackData.js';
-import { applyHit, cancelAttackForChaseDodge, findHit, handleCombatInput, updateCombat, type Hit } from './Combat.js';
+import { applyHit, cancelAttack, findHit, handleCombatInput, updateCombat, type Hit } from './Combat.js';
 import type { FighterInput } from './FighterInput.js';
 import {
     FIGHTER_STATES, changeState, consumeBuffered, createFighter, holdInputBuffer, isBuffered, isInPlay, updateInputBuffer, updateState,
@@ -31,7 +31,7 @@ import { hashString } from './StateHash.js';
 const STEP_S = SIM_STEP_MS / 1000;
 
 /** States in which a fighter cannot start attacks. */
-const COMBAT_BLOCKED_STATES: ReadonlySet<FighterStateName> = new Set(['HitStun', 'Taunt', 'Defeat']);
+const COMBAT_BLOCKED_STATES: ReadonlySet<FighterStateName> = new Set(['HitStun', 'Taunt']);
 
 /** A KO'd fighter sits out RESPAWN_DELAY_STEPS (PhysicsConfig), then drops in above the stage centre. */
 const RESPAWN_X = 960;
@@ -214,7 +214,7 @@ function handlePhysicsEvents(f: FighterState, physicsEvents: readonly PhysicsEve
         if (event.type === 'consume') {
             consumeBuffered(f, event.input);
         } else if (event.type === 'dodge_start') {
-            if (event.chase) cancelAttackForChaseDodge(f);
+            if (event.chase) cancelAttack(f);
             changeState(f, event.isGrounded ? 'Dodge' : 'AirDodge');
         } else if (event.type === 'dash_start') {
             changeState(f, 'Dash');

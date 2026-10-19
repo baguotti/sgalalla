@@ -122,6 +122,9 @@ export const COMBAT_GROUPS: Group<PhysicsKey>[] = [
     group('KNOCKBACK', [
         ['FORCE_SCALE', 'px/s per force', 'px/s', 'Knockback = (fixed + variable × (d/100 + d²/20000)) × this, d the target\'s damage after the hit.', [0, 80, 0.5]],
         ['FULL_CHARGE_BONUS', 'Full charge +', 'share', 'A fully charged heavy: this share more damage and variable force.', [0, 1, 0.01]],
+        ['HIGH_DAMAGE_FROM', 'Lift from', '%', 'From this damage (red) launches fly higher.', [0, 400, 5]],
+        ['HIGH_DAMAGE_RANGE', 'Lift over', '%', 'The extra lift grows to its full amount over this much more damage.', [1, 300, 5]],
+        ['HIGH_DAMAGE_LIFT', 'Lift', 'share', 'At full, a launch\'s upward speed is this share faster.', [0, 2, 0.05]],
         ['MAX_DAMAGE', 'Most damage', '%'],
         ['GROUNDED_SPIKE_BOUNCE', 'Spike on ground: pop-up', 'share', 'A downward hit on a grounded fighter pops it up with this share of the knockback.'],
         ['GROUNDED_SPIKE_LIFT', 'Spike on ground: lift', 'px'],

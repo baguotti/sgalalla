@@ -10,7 +10,7 @@ import { createBody, endDash, type SimBody } from './PhysicsSimulation.js';
 
 export const FIGHTER_STATES = [
     'Idle', 'Run', 'Jump', 'Fall', 'WallSlide', 'Attack', 'Charging', 'HitStun',
-    'Dodge', 'AirDodge', 'Recovery', 'GroundPound', 'Taunt', 'Defeat', 'Dash',
+    'Dodge', 'AirDodge', 'Recovery', 'GroundPound', 'Taunt', 'Dash',
 ] as const;
 export type FighterStateName = typeof FIGHTER_STATES[number];
 
@@ -258,7 +258,6 @@ export function updateState(f: FighterState): void {
             if (f.isHitStunned) return changeState(f, 'HitStun');
             if (!b.isGrounded) return changeState(f, airborneState(f));
             if (input.taunt) return changeState(f, 'Taunt');
-            if (input.defeat) return changeState(f, 'Defeat');
             if (isMoving) return changeState(f, 'Run');
             return;
 
@@ -329,7 +328,6 @@ export function updateState(f: FighterState): void {
             return;
 
         case 'Taunt':
-        case 'Defeat':
             if (f.isHitStunned) return changeState(f, 'HitStun');
             if (isMoving || input.jump || input.lightAttack || input.heavyAttack || input.dodge || !b.isGrounded) {
                 return changeState(f, 'Idle');

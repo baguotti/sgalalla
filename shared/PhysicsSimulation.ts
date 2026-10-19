@@ -3,7 +3,7 @@
  * Sounds and state changes come back as PhysicsEvent[] for the caller.
  */
 
-import { countDown } from './FixedStepClock.js';
+import { countDown, SIM_STEP_MS } from './FixedStepClock.js';
 import { PhysicsConfig } from './PhysicsConfig.js';
 
 // ─── Attack Phase / Type constants ───
@@ -772,7 +772,9 @@ export function checkSinglePlatformCollision(
         if (!isNaN(body.droppingThroughY) && Math.abs(platCy - body.droppingThroughY) < 5) return;
     }
     if (body.vy < 0) return;
-    if (bodyBottom > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) return;
+    // Lands if its feet were above the top before this step's move: a fast fall can't skip past the top
+    const bottomBefore = bodyBottom - body.vy * SIM_STEP_MS / 1000;
+    if (bottomBefore > platTop + PhysicsConfig.PLATFORM_SNAP_THRESHOLD) return;
 
     // A stunned fighter coming down hard bounces off
     if (body.isHitStunned && body.vy > PhysicsConfig.BOUNCE_SPEED) {

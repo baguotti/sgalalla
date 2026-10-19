@@ -12,7 +12,7 @@
  * it. A loose bomb is gone after a while, and one past the blast zones at once.
  */
 
-import { hitstopFor, KNOCKBACK_DIRECTIONS, knockbackSpeed, launchFighter } from './Combat.js';
+import { hitstopFor, KNOCKBACK_DIRECTIONS, knockbackSpeed, launchFighter, liftAtHighDamage } from './Combat.js';
 import { SIM_STEP_MS } from './FixedStepClock.js';
 import { consumeBuffered, isBuffered, isInPlay, type FighterState } from './FighterState.js';
 import type { MatchEvent } from './MatchEvents.js';
@@ -250,7 +250,7 @@ function explode(match: Arena, bomb: BombState, events: MatchEvent[]): void {
         const dx = target.body.x - bomb.x;
         const side = Math.abs(dx) > PhysicsConfig.HURTBOX_WIDTH / 2 ? Math.sign(dx) : (Math.sign(bomb.vx) || 1);
         const knockback = knockbackSpeed(PhysicsConfig.BOMB_FIXED_FORCE, PhysicsConfig.BOMB_VARIABLE_FORCE, target.damagePercent + PhysicsConfig.BOMB_DAMAGE);
-        launchFighter(target, PhysicsConfig.BOMB_DAMAGE, cos * side * knockback, -sin * knockback, PhysicsConfig.BOMB_STUN, hitstopFor(knockback));
+        launchFighter(target, PhysicsConfig.BOMB_DAMAGE, cos * side * knockback, liftAtHighDamage(-sin * knockback, target.damagePercent + PhysicsConfig.BOMB_DAMAGE), PhysicsConfig.BOMB_STUN, hitstopFor(knockback));
         events.push({
             type: 'hit', attacker: bomb.thrower >= 0 ? bomb.thrower : target.id, target: target.id, attackKey: null,
             x: target.body.x, y: target.body.y, damage: PhysicsConfig.BOMB_DAMAGE, knockbackX: target.body.vx, knockbackY: target.body.vy,

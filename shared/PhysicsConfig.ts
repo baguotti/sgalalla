@@ -103,6 +103,10 @@ export const PhysicsConfig = {
     // force launches at this many px/s
     FORCE_SCALE: 19,
     FULL_CHARGE_BONUS: 0.25,
+    // From red damage (the HUD's red, 170%) a launch's upward speed grows, up to LIFT more over the next RANGE
+    HIGH_DAMAGE_FROM: 170,
+    HIGH_DAMAGE_RANGE: 100,
+    HIGH_DAMAGE_LIFT: 0.5,
     // A hit stuns for the move's stun frames, and on while the fighter still flies faster than this across
     // or upward, up to this much longer
     STUN_FLYING_SPEED: 630,
