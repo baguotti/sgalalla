@@ -9,12 +9,10 @@ export class MainMenuScene extends Phaser.Scene {
     private canInput: boolean = false;
     private selectedIndex: number = 0;
     private menuOptions = [
-        { label: 'CAMPAGNA', mode: 'campaign' },
+        // The release hides CAMPAGNA ('campaign'), STUDIO LAB ('lab') and CORSA ('racing'); experimental-branch shows the first two
         { label: 'ALLENAMENTO', mode: 'training' },
         { label: 'BOTTE IN LOCALE', mode: 'versus' },
         { label: 'BOTTE IN REMOTO', mode: 'online' },
-        // CORSA (RacingScene) is hidden until it's ready: { label: 'CORSA', mode: 'racing' },
-        { label: 'STUDIO LAB', mode: 'lab' },
         { label: 'IMPOSTAZIONI', mode: 'settings' }
     ];
     private menuTexts: Phaser.GameObjects.Text[] = [];

@@ -1369,3 +1369,9 @@ Part 2
 - **[S]** tsc (client, tests, server), 91 tests (new: an armed bomb goes off beside a fighter, within the art but off the hurtbox), build. In the browser (muted): the new bombs on the stage; the sprite checked at 12×.
 - **[Visuals]** Follow-up: the band is gone, just the bomb (one texture, armed or safe; a charging bomb swells instead of flickering red and blue).
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-20] v3.1.7 - Release (branch `main`)
+- **[Release]** `main` takes `experimental-branch` as it is (exact-tree merge): floor fall-through fixed, top blast zone raised with more lift at red damage, ground pound cancel, the defeat pose and O key removed, bombs thrown with any attack and charged like a heavy flying straight, a bigger bomb hit, damage and blast, the 16-bit bomb; protocol 25.
+- **[Menu]** As before, the release hides CAMPAGNA, STUDIO LAB and CORSA.
+- **[S]** tsc (client, tests, server), 91 tests, build.
+
