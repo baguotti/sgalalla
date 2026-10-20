@@ -50,8 +50,8 @@ function inset(zone: Bounds, by: number): Bounds {
 /** The collision layouts a match can be played on; a match keeps its own (MatchState.stage). */
 export type StageLayoutId = 'standard' | 'grande';
 
-/** Crossing these KOs a fighter. */
-const STANDARD_BLAST_ZONES: Bounds = { left: -1020, right: 2940, top: -1000, bottom: 1800 };
+/** Crossing these KOs a fighter (the top is out of reach of three jumps and a recovery from the top platform). */
+const STANDARD_BLAST_ZONES: Bounds = { left: -1020, right: 2940, top: -1150, bottom: 1800 };
 
 /** How much wider each half of Londra Grande's main platform is than the standard one's. */
 export const GRANDE_WIDEN = 210;

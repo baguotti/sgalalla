@@ -32,7 +32,6 @@ export interface GamepadState {
     throwHeld: boolean;
     pause: boolean; // START button for pause menu
     taunt: boolean; // R3 button for taunt
-    defeat: boolean; // Not officially mapped to gamepad
 
     // Direction for attacks
     aimUp: boolean;
@@ -150,7 +149,6 @@ export class GamepadInput {
             throwHeld: false,
             pause: false,
             taunt: false,
-            defeat: false,
             aimUp: false,
             aimDown: false,
             aimLeft: false,
@@ -233,8 +231,6 @@ export class GamepadInput {
         // Taunt (stick click)
         state.taunt = btns.taunt && !this.previousState.taunt;
 
-        // Defeat
-        state.defeat = false; // Add if you ever want to map it
 
         // Throw — map to light attack for Joy-Con (same button, context-dependent in game)
         state.throw = state.lightAttack;
@@ -369,8 +365,6 @@ export class GamepadInput {
         // Taunt
         state.taunt = tauntBtn && !this.previousState.taunt;
 
-        // Defeat
-        state.defeat = false; // Add if you ever want to map it
 
         this.previousState = { ...state };
         this.cacheButtonStates(gamepad);

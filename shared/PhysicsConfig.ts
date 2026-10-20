@@ -103,6 +103,10 @@ export const PhysicsConfig = {
     // force launches at this many px/s
     FORCE_SCALE: 19,
     FULL_CHARGE_BONUS: 0.25,
+    // From red damage (the HUD's red, 170%) a launch's upward speed grows, up to LIFT more over the next RANGE
+    HIGH_DAMAGE_FROM: 170,
+    HIGH_DAMAGE_RANGE: 100,
+    HIGH_DAMAGE_LIFT: 0.5,
     // A hit stuns for the move's stun frames, and on while the fighter still flies faster than this across
     // or upward, up to this much longer
     STUN_FLYING_SPEED: 630,
@@ -208,25 +212,29 @@ export const PhysicsConfig = {
     // Bombs (Brawlhalla's Bouncy Bomb): the first drops BOMB_FIRST ms in, the next BOMB_GAP plus up to
     // BOMB_GAP_RANDOM ms after one is gone, one at a time (two with 4 fighters or more); a loose bomb is gone
     // after BOMB_LIFETIME ms. A throw charges from BOMB_THROW_SPEED_MIN to _MAX over BOMB_CHARGE_FULL ms, and
-    // held past BOMB_OVERCHARGE ms the bomb goes off in the hand. Thrown, it bounces keeping BOMB_BOUNCE of its
-    // speed, passes through everyone for BOMB_GRACE_STEPS, and is safe again once slower than BOMB_SAFE_SPEED.
+    // held past BOMB_OVERCHARGE ms the bomb goes off in the hand. Thrown, it flies under BOMB_FLIGHT_GRAVITY of
+    // gravity, bounces keeping BOMB_BOUNCE of its speed, passes through everyone for BOMB_GRACE_STEPS, and is
+    // safe again once slower than BOMB_SAFE_SPEED.
     BOMB_FIRST: 15000,
     BOMB_GAP: 5000,
     BOMB_GAP_RANDOM: 5000,
     BOMB_LIFETIME: 15000,
     BOMB_RADIUS: 15,
-    BOMB_PICKUP_RANGE: 34,
-    BOMB_THROW_SPEED_MIN: 741,
-    BOMB_THROW_SPEED_MAX: 1550,
-    BOMB_CHARGE_FULL: 800,
+    // An armed bomb goes off within this much of a fighter's hurtbox (the hurtbox is narrower than the art)
+    BOMB_HIT_RANGE: 34,
+    BOMB_PICKUP_RANGE: 50,
+    BOMB_THROW_SPEED_MIN: 900,
+    BOMB_THROW_SPEED_MAX: 2100,
+    BOMB_CHARGE_FULL: 1000,
     BOMB_OVERCHARGE: 2000,
+    BOMB_FLIGHT_GRAVITY: 0.15,
     BOMB_BOUNCE: 0.7,
     BOMB_SAFE_SPEED: 337,
     BOMB_GRACE_STEPS: 8,
     // Its explosion hurts every fighter this close (thrower included), launching them away from it
-    BOMB_BLAST_RADIUS: 101,
-    BOMB_DAMAGE: 15,
-    BOMB_FIXED_FORCE: 55,
-    BOMB_VARIABLE_FORCE: 45,
+    BOMB_BLAST_RADIUS: 150,
+    BOMB_DAMAGE: 22,
+    BOMB_FIXED_FORCE: 62,
+    BOMB_VARIABLE_FORCE: 52,
     BOMB_STUN: 25,
 } as const;

@@ -1344,8 +1344,28 @@ Part 2
 - **[S]** tsc (client, tests, server), 86 tests (the launch tests follow the new model: a slow launch carries on through the fall and ends on landing; the down light follow-up steps in), build, KO table, true combos, headless CPU matches (the CPU's own off-stage ground pounds, there before, flagged separately). Trajectories plotted before and after; in the browser (muted), a neutral light at 100% arcs up, over and down.
 
 ------------------------------------------------------------------------------------------------------------------------------------
-### [2026-10-17] v3.1.6 - Release (branch `main`)
-- **[Release]** `main` takes `experimental-branch` as it is up to the launch arcs (exact-tree merge): Brawlhalla-measured sizes and movement with main's running and attack input, Unarmed hits (damage 15% lower), bombs (off by default, player 1 turns them on with Start), Londra Grande and the online stage choice (Adria, Londra, Londra Grande), walls and pillars fitted to the art, launches in arcs, quieter audio, protocol 22.
-- **[Menu]** As before, the release hides CAMPAGNA, STUDIO LAB and CORSA.
-- **[S]** tsc (client, tests, server), 86 tests, build.
+### [2026-10-19] Floor, top blast zone, ground pound cancel, taunts (branch `experimental-branch`)
+- **[Fix]** A fighter launched down hard from just above the floor could pass through it and fall to the bottom blast zone: landing only looked at where the feet ended up, and a fast step skipped past the top's 30 px window. It now checks where the feet were before the step's move.
+- **[Gameplay]** The top blast zone moves up from y −1000 to −1150: three jumps and a recovery from the top platform reached −1005, a KO on yourself; now they reach −1074. Red fighters fly higher: from 170% (the HUD's red) a launch's upward speed grows, up to 50% more at 270% (`HIGH_DAMAGE_*`, bombs too). Up and neutral signatures now KO through the top from about 170% in the middle of the stage (200–230% before).
+- **[Gameplay]** The ground pound can be cut short by a jump, an air dodge or the recovery (when there's one left), with no cooldown: one over nothing needn't be a KO. The chase dodge's cancel is now `cancelAttack`, shared by both.
+- **[Fix]** The defeat pose is gone: no O key, no defeat input or state, its atlas no longer loaded (the files stay in `public/assets/ui/defeat`). Online, Pe's taunt showing the defeat pose came from that input (O, beside the taunt's P); every taunt's frames checked: each character's taunt is its own (Fok, Sgu, Sga, Pe, Nock, Greg). The input's bit stays reserved, so the later bits (throw) keep their places.
+- **[Change]** Protocol version 23; the movement recording re-baselined (it pressed O).
+- **[S]** tsc (client, tests, server), 89 tests (new: a ground pound cancelled by a jump, an air dodge or the recovery; a fast downward launch from just above the floor lands; upward launches steeper past red), build, KO table (lights 250–300%, side sig 140%/110%, up and neutral sig 170%), headless CPU matches. In the browser (muted): Pe's taunt plays its sailor frames, O does nothing, no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-19] Bombs thrown with any attack, charged like a heavy, flying straight (branch `experimental-branch`)
+- **[Gameplay]** Combining today's bombs with the old throw (v0.14, `PlayerCombat.executeThrow`): holding a bomb, light or heavy (or the throw button) charges a throw instead of attacking. The fighter all but stops and takes the charging pose, as charging a heavy (facing the way they point as they press), and letting go throws it in 8 directions, from 900 px/s tapped to 2100 px/s at full charge (1 s, as the old throw). Held to 2 s it goes off in the hand (as the old one).
+- **[Gameplay]** A thrown bomb flies almost straight: 15% of gravity while it's armed (forward is straight ahead now, not 15° up); after a bounce makes it safe it falls normally. A throw down keeps its speed. A throw straight up flies off the top.
+- **[Visuals]** Charging a throw shakes the fighter harder as it builds and plays the charge sound; past full charge the fighter flashes white, faster as it nears going off, and the bomb flickers red and blue and swells (as before).
+- **[Change]** Protocol version 24.
+- **[S]** tsc (client, tests, server), 90 tests (new: light and heavy charge a throw instead of attacking and hold the fighter; a thrown bomb flies almost straight; a full-charge throw goes straight ahead), build. In the browser (muted): a bomb picked up with light, charged with heavy (charging pose, no attack), thrown straight at 2100 px/s, dropping 19 px over 665 px, hitting the dummy; no errors.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-19] Bombs: bigger hit, more damage, bigger blast, 16-bit look (branch `experimental-branch`)
+- **[Gameplay]** A thrown bomb goes off within 34 px of a fighter's hurtbox (`BOMB_HIT_RANGE`): it used to need to touch the hurtbox, 31 px wide against an 81 px fighter, so hits that looked like hits flew past. Picking up and catching reach 50 px (was 34), more than the hit range, so a slow throw can still be caught.
+- **[Balance]** Bomb damage 15 → 22, forces 55/45 → 62/52, blast radius 101 → 150 px (the explosion drawn to match).
+- **[Visuals]** The bomb is 16-bit pixel art now: a shaded shell with a highlight, a blue (safe) or red (armed) band, a cap, a fuse and a spark, drawn from a 16×18 pixel map with hard pixels.
+- **[Change]** Protocol version 25.
+- **[S]** tsc (client, tests, server), 91 tests (new: an armed bomb goes off beside a fighter, within the art but off the hurtbox), build. In the browser (muted): the new bombs on the stage; the sprite checked at 12×.
+- **[Visuals]** Follow-up: the band is gone, just the bomb (one texture, armed or safe; a charging bomb swells instead of flickering red and blue).
 
