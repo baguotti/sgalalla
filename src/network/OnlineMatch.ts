@@ -2,7 +2,7 @@ import type { NetClient } from './NetClient';
 import { packInput, type FighterInput } from '../../shared/FighterInput';
 import type { MatchState } from '../../shared/GameSim';
 import type { MatchEvent } from '../../shared/MatchEvents';
-import type { MatchStart, PlayerLeft } from '../../shared/NetProtocol';
+import { NetEvent, NET_REPORT_MS, type MatchStart, type NetReport, type PlayerLeft } from '../../shared/NetProtocol';
 import { SIM_STEP_MS } from '../../shared/FixedStepClock';
 import { RollbackSession } from '../../shared/Rollback';
 
@@ -19,11 +19,35 @@ export class OnlineMatch {
     private desyncReported = false;
     private lastSentFrame = -1;
     private lastSentAt = 0;
+    /** For the NetReport: since the last one. */
+    private reportAt = performance.now();
+    private rollbacksAtReport = 0;
+    private waitsAtReport = 0;
+    private skipsAtReport = 0;
+    private deepestRollback = 0;
+    private slowFrames = 0;
+    private slowestFrame = 0;
+    private lastPacketAt = 0;
+    private packetGaps = 0;
+    private longestGap = 0;
 
     constructor(client: NetClient, start: MatchStart) {
         this.client = client;
         this.start = start;
-        client.onPacket(packet => this.session?.receivePacket(packet));
+        client.onPacket(packet => {
+            const now = performance.now();
+            const gap = this.lastPacketAt > 0 ? now - this.lastPacketAt : 0;
+            if (gap > 100) this.packetGaps++;
+            this.longestGap = Math.max(this.longestGap, gap);
+            this.lastPacketAt = now;
+            this.session?.receivePacket(packet);
+        });
+    }
+
+    /** A rendered frame took `ms`: slow ones go in the NetReport. */
+    noteFrame(ms: number): void {
+        if (ms > 50) this.slowFrames++;
+        this.slowestFrame = Math.max(this.slowestFrame, ms);
     }
 
     /** Our fighter's index in the match. */
@@ -36,6 +60,10 @@ export class OnlineMatch {
         const { seed, slot, characters, inputDelay } = this.start;
         this.session = new RollbackSession(seed, slot, characters.length, inputDelay, match);
         this.desyncReported = false;
+        // A new session counts from 0
+        this.rollbacksAtReport = 0;
+        this.waitsAtReport = 0;
+        this.skipsAtReport = 0;
     }
 
     /** A player left: their fighter leaves the match, the same frame on every machine. */
@@ -84,10 +112,41 @@ export class OnlineMatch {
         this.lastSentFrame = session.frame;
         this.lastSentAt = now;
         this.client.sendPacket(session.buildPacket());
+        this.deepestRollback = Math.max(this.deepestRollback, session.lastRollbackDepth);
+        if (now - this.reportAt >= NET_REPORT_MS) this.report(now);
         if (session.desyncFrame >= 0 && !this.desyncReported) {
             this.desyncReported = true;
             console.error(`[Online] Our simulation differs from another player's at frame ${session.desyncFrame}`);
         }
+    }
+
+    /** Tells the server how play went since the last report (it logs it), then starts counting again. */
+    private report(now: number): void {
+        const s = this.session!;
+        const client = this.client;
+        const report: NetReport = {
+            rtt: Math.round(client.rtt), worstRtt: Math.round(client.worstRtt),
+            rollbacks: s.rollbacks - this.rollbacksAtReport, deepestRollback: this.deepestRollback,
+            waits: s.waits - this.waitsAtReport, skips: s.skips - this.skipsAtReport,
+            slowFrames: this.slowFrames, slowestFrame: Math.round(this.slowestFrame),
+            packetGaps: this.packetGaps, longestGap: Math.round(this.longestGap),
+        };
+        client.send(NetEvent.NET_REPORT, report);
+        this.reportAt = now;
+        this.rollbacksAtReport = s.rollbacks;
+        this.waitsAtReport = s.waits;
+        this.skipsAtReport = s.skips;
+        this.deepestRollback = 0;
+        this.slowFrames = 0;
+        this.slowestFrame = 0;
+        this.packetGaps = 0;
+        this.longestGap = 0;
+        client.worstRtt = 0;
+    }
+
+    /** How far rollbacks moved each fighter since the last call, by fighter (x, y), to ease into the drawing. */
+    takeCorrections(): [number, number][] {
+        return this.session?.takeCorrections() ?? [];
     }
 
     /** One line for the stats overlay. */

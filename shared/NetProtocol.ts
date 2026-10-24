@@ -47,6 +47,8 @@ export const NetEvent = {
     SEAT: 'seat',
     /** server → players `{ count }`: how many people are watching */
     SPECTATORS: 'spectators',
+    /** client (playing) → server a NetReport every NET_REPORT_MS: the server logs it, to tell network trouble from a stuttering machine */
+    NET_REPORT: 'net_report',
     /** client → server `{ t }`, echoed back unchanged as PONG */
     PING: 'ping',
     PONG: 'pong',
@@ -72,6 +74,25 @@ export interface RoomState {
 export interface MatchSettings {
     stage: string;
     bombs: boolean;
+}
+
+/** How often a playing client reports on its connection (ms). */
+export const NET_REPORT_MS = 30000;
+
+/** How online play went for one player over the last NET_REPORT_MS. Times in ms. */
+export interface NetReport {
+    rtt: number;
+    worstRtt: number;
+    rollbacks: number;
+    deepestRollback: number;
+    waits: number;
+    skips: number;
+    /** Frames that took longer than 50 ms on this machine, and the longest. */
+    slowFrames: number;
+    slowestFrame: number;
+    /** Gaps over 100 ms between the other players' packets, and the longest. */
+    packetGaps: number;
+    longestGap: number;
 }
 
 /** A player left mid-match: the last frame the server has their inputs for, and those final inputs from `first`. */
@@ -202,12 +223,13 @@ export function decodeInputPacket(bytes: Uint8Array): InputPacket | null {
 }
 
 /**
- * Input delay for a match, from each player's round trip to the server. It
- * covers about half the one-way trip between the two furthest players;
- * rollback hides the rest.
+ * Input delay for a match, from each player's round trip to the server: the
+ * trip between the two furthest players (half of each one's round trip, via the
+ * server), rounded up to whole frames, 1 to 3. Inputs then mostly arrive in time,
+ * so rollbacks are rare and short (a London–Treviso match: 2 frames, not 1).
  */
 export function inputDelayFor(rtts: readonly number[]): number {
     const [worst, second] = [...rtts].sort((a, b) => b - a);
-    const oneWayFrames = (worst + (second ?? worst)) / 2 / (1000 / 60);
-    return Math.min(Math.max(Math.round(oneWayFrames / 2), 1), 3);
+    const tripFrames = (worst + (second ?? worst)) / 2 / (1000 / 60);
+    return Math.min(Math.max(Math.ceil(tripFrames), 1), 3);
 }

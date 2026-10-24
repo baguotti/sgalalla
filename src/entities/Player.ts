@@ -67,6 +67,9 @@ export class Player extends Phaser.GameObjects.Container {
     private pose: string | null = null;
 
     private damageFlashMs = 0;
+    /** Online: drawn this far from the simulated position after a rollback moved the fighter, easing to 0. */
+    private correctionX = 0;
+    private correctionY = 0;
     private inHitstop = false;
     /** The fighter as last drawn, to spot landings, dashes and air jumps. */
     private wasGrounded = true;
@@ -175,7 +178,11 @@ export class Player extends Phaser.GameObjects.Container {
         this.damagePercent = f.damagePercent;
         this.lives = f.lives;
 
-        this.setPosition(f.body.x, f.body.y);
+        // A rollback's correction eases out: half of it left every CORRECTION_HALF_LIFE_MS
+        const kept = Math.pow(0.5, deltaMs / CORRECTION_HALF_LIFE_MS);
+        this.correctionX = Math.abs(this.correctionX * kept) < 0.5 ? 0 : this.correctionX * kept;
+        this.correctionY = Math.abs(this.correctionY * kept) < 0.5 ? 0 : this.correctionY * kept;
+        this.setPosition(f.body.x + this.correctionX, f.body.y + this.correctionY);
         this.setVisible(inPlay || this.pose !== null);
 
         const throwCharge = match.bombs?.list.find(b => b.holder === f.id && b.charge >= 0)?.charge ?? -1;
@@ -196,6 +203,18 @@ export class Player extends Phaser.GameObjects.Container {
             this.hurtboxRect.setSize(PhysicsConfig.HURTBOX_WIDTH, PhysicsConfig.HURTBOX_HEIGHT);
             this.drawHitbox(f, inPlay);
         }
+    }
+
+    /**
+     * Online, a rollback moved this fighter by (dx, dy) to where they really are: the drawing
+     * starts from where they were shown and slides there. A move too big to slide (a respawn) snaps.
+     */
+    public easeCorrection(dx: number, dy: number): void {
+        const x = this.correctionX - dx;
+        const y = this.correctionY - dy;
+        const tooFar = Math.hypot(x, y) > CORRECTION_MAX_PX;
+        this.correctionX = tooFar ? 0 : x;
+        this.correctionY = tooFar ? 0 : y;
     }
 
     /** Holds an animation (cutscenes, victory) until cleared with null. */
@@ -579,6 +598,11 @@ function setGhostBlur(blurFx: Phaser.FX.Blur | null, sprite: Phaser.GameObjects.
     blurFx.x = 0.5 + faded * 3;
     blurFx.y = 0.5 + faded * 3;
 }
+
+/** A rollback's correction to a fighter's drawn position halves every this many ms (gone in about a sixth of a second). */
+const CORRECTION_HALF_LIFE_MS = 40;
+/** A correction bigger than this (px) snaps instead of sliding. */
+const CORRECTION_MAX_PX = 400;
 
 /** The animation for a fighter's state. */
 function animationFor(f: FighterState): string {

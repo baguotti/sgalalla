@@ -10,7 +10,7 @@ import { createMatch, matchChecksum, stepMatch } from '../shared/GameSim.ts';
 import { unpackInput } from '../shared/FighterInput.ts';
 import type { MatchEvent } from '../shared/MatchEvents.ts';
 import { MAX_ROLLBACK, RollbackSession } from '../shared/Rollback.ts';
-import { decodeInputPacket } from '../shared/NetProtocol.ts';
+import { decodeInputPacket, inputDelayFor } from '../shared/NetProtocol.ts';
 import { SpectatorSession } from '../shared/Spectate.ts';
 
 const FRAME_MS = 1000 / 60;
@@ -317,3 +317,21 @@ test('a restored copy of the match continues exactly like the original', () => {
     }
     assert.equal(matchChecksum(copy), matchChecksum(match));
 });
+
+test('the input delay covers the trip between the two furthest players, 1 to 3 frames', () => {
+    assert.equal(inputDelayFor([5, 6]), 1, 'a LAN');
+    assert.equal(inputDelayFor([19, 32]), 2, 'London and Treviso via Frankfurt');
+    assert.equal(inputDelayFor([40, 45, 10]), 3, 'the two furthest count');
+    assert.equal(inputDelayFor([200, 180]), 3, 'capped');
+});
+
+test('a rollback reports how far it moved each fighter, for the drawing to ease in', () => {
+    const peers = play({ players: 2, latencyMs: 40, jitterMs: 0, loss: 0, inputDelay: 1, ticks: 600 });
+    const s = peers[0].session;
+    assert.ok(s.rollbacks > 0);
+    // Corrections are taken and cleared; the totals so far are finite numbers per fighter
+    const taken = s.takeCorrections();
+    assert.ok(taken.every(c => Number.isFinite(c[0]) && Number.isFinite(c[1])));
+    assert.deepEqual(s.takeCorrections(), [], 'cleared once taken');
+});
+

@@ -753,7 +753,10 @@ export class GameScene extends Phaser.Scene implements GameSceneInterface {
             // A step spent waiting for the opponent is dropped, not caught up later
             while (steps < due && !this.isGameOver && this.stepSimulation()) steps++;
         }
+        this.online?.noteFrame(this.game.loop.rawDelta);
         this.online?.flush();
+        // A rollback moves fighters to where they really are: the drawing slides there instead of jumping
+        this.online?.takeCorrections().forEach(([dx, dy], i) => this.players.find(p => p.fighterIndex === i)?.easeCorrection(dx, dy));
         this.players.forEach(p => p.render(this.match, delta));
         this.bombSprites?.update(this.match);
         this.contactShadows?.update(this.match, this.lighting?.look.shadow ?? DEFAULT_SHADOW_DARKNESS);
