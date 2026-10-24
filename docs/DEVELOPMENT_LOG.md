@@ -1377,4 +1377,5 @@ Part 2
 - **[Diagnostics]** Each playing client sends the server a NET_REPORT every 30 s (ping and worst ping, rollbacks and the deepest, waits, skips, slow frames on its machine, gaps in the others' packets), logged as `[Net]` lines, so the next laggy match shows whether it was a connection (whose) or a machine.
 - **[Tried]** Leveling the players out with a median or trimmed average of the frame advantage instead of the average, to stop skips after a spike: no clear gain (the median made both sides skip constantly), so the average stays.
 - **[S]** tsc (client, tests, server), 93 tests (new: the input delay for a LAN, London–Treviso, the two furthest of three, the cap; rollback corrections taken and cleared), build. In the browser (muted): a 60 px correction drawn 46 px back on the next frame, 1 px after 12 frames; no errors.
+- **[Diagnostics]** Follow-up: the game server keeps the last 1000 connection reports and match starts (London time) at `GET /net` (http://138.68.126.112:9208/net for the release), and `bash scripts/net-reports.sh [experimental]` prints them.
 

@@ -102,7 +102,23 @@ const httpServer = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ protocol: PROTOCOL_VERSION, rooms }, null, 2));
     }
+    // The players' connection reports since the server started, newest last
+    if (req.url === '/net' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(netLog.length ? netLog.join('\n') + '\n' : 'No connection reports yet: they come every 30 s from players in an online match.\n');
+    }
 });
+
+/** The latest NET_REPORT lines (and match starts, for context), for GET /net. */
+const netLog: string[] = [];
+const NET_LOG_LINES = 1000;
+
+function logNet(line: string): void {
+    console.log(line);
+    const time = new Date().toLocaleString('en-GB', { timeZone: 'Europe/London' });
+    netLog.push(`${time}  ${line}`);
+    if (netLog.length > NET_LOG_LINES) netLog.shift();
+}
 
 // Unordered and unreliable by default: input packets must never wait for a lost one
 const io: GeckosServer = geckos({
@@ -206,7 +222,7 @@ io.onConnection((channel: ServerChannel) => {
         if (!room?.start || slot < 0) return;
         const r = (data ?? {}) as Partial<NetReport>;
         const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : '?');
-        console.log(`[Net] P${slot + 1} (delay ${room.start.inputDelay}): ping ${n(r.rtt)} ms (worst ${n(r.worstRtt)}), `
+        logNet(`[Net] P${slot + 1} ${room.seats[slot].character} (delay ${room.start.inputDelay}): ping ${n(r.rtt)} ms (worst ${n(r.worstRtt)}), `
             + `rollbacks ${n(r.rollbacks)} (deepest ${n(r.deepestRollback)}), waits ${n(r.waits)}, skips ${n(r.skips)}, `
             + `slow frames ${n(r.slowFrames)} (slowest ${n(r.slowestFrame)} ms), packet gaps ${n(r.packetGaps)} (longest ${n(r.longestGap)} ms)`);
     });
@@ -411,7 +427,7 @@ function startMatch(room: Room, start: Omit<MatchStart, 'slot'>): void {
     room.spectators = [];
     for (const spectator of watching) watch(room, spectator.channel);
     tellSpectatorCount(room);
-    console.log(`[Server] Match started: ${start.characters.join(' vs ')}, input delay ${start.inputDelay}, ${watching.length} watching`);
+    logNet(`[Server] Match started: ${start.characters.join(' vs ')}, input delay ${start.inputDelay}, ${watching.length} watching`);
 }
 
 /** Tells every player in the room who is in it; each one's own index is their slot. */
