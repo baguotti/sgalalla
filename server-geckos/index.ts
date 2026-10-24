@@ -18,7 +18,7 @@ import geckos, { type GeckosServer, type ServerChannel } from '@geckos.io/server
 import http from 'http';
 import {
     MAX_PLAYERS, MAX_SPECTATORS, MIN_PLAYERS, NetEvent, MULTIPLAYER_STAGES, PROTOCOL_VERSION, decodeInputPacket, inputDelayFor,
-    type InputPacket, type MatchSettings, type MatchStart, type RoomState, type WatchInputs, type WatchStart,
+    type InputPacket, type MatchSettings, type MatchStart, type NetReport, type RoomState, type WatchInputs, type WatchStart,
 } from '../shared/NetProtocol.js';
 
 /** When a player leaves, the others get up to this many of their final inputs (10 s), more than anyone can be missing. */
@@ -197,6 +197,18 @@ io.onConnection((channel: ServerChannel) => {
         spectator.character = characterFrom(data) ?? spectator.character;
         spectator.booked = (data as { book?: unknown } | null)?.book === true;
         startRematchIfAgreed(room);
+    });
+
+    // How online play is going for a player: logged, to tell network trouble from a stuttering machine
+    channel.on(NetEvent.NET_REPORT, (data) => {
+        const room = roomsByChannel.get(channel.id!);
+        const slot = room ? room.seats.findIndex(s => s.channel === channel) : -1;
+        if (!room?.start || slot < 0) return;
+        const r = (data ?? {}) as Partial<NetReport>;
+        const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : '?');
+        console.log(`[Net] P${slot + 1} (delay ${room.start.inputDelay}): ping ${n(r.rtt)} ms (worst ${n(r.worstRtt)}), `
+            + `rollbacks ${n(r.rollbacks)} (deepest ${n(r.deepestRollback)}), waits ${n(r.waits)}, skips ${n(r.skips)}, `
+            + `slow frames ${n(r.slowFrames)} (slowest ${n(r.slowestFrame)} ms), packet gaps ${n(r.packetGaps)} (longest ${n(r.longestGap)} ms)`);
     });
 
     channel.on(NetEvent.REMATCH, () => {

@@ -55,6 +55,11 @@ export class RollbackSession {
     onConfirmed: ((frame: number, state: MatchState) => void) | null = null;
 
     rollbacks = 0;
+    /**
+     * By fighter, how far rollbacks moved them since the last takeCorrections() (x, y): where
+     * they really are minus where they had been guessed to be. Drawing eases these in.
+     */
+    private corrections: [number, number][] = [];
     lastRollbackDepth = 0;
     maxRollbackDepth = 0;
     /** Steps spent waiting for someone's inputs. */
@@ -136,6 +141,13 @@ export class RollbackSession {
         this.leftAfter[slot] = Math.max(lastFrame, this.inputDelay - 1);
         // Frames simulated with their fighter still in play are simulated again without it
         if (this.frame > this.leftAfter[slot] + 1) this.markWrong(this.leftAfter[slot] + 1);
+    }
+
+    /** The rollbacks' corrections since the last call, by fighter (see `corrections`), and starts over. */
+    takeCorrections(): [number, number][] {
+        const taken = this.corrections;
+        this.corrections = [];
+        return taken;
     }
 
     /** Whether player `slot` is still in the match. */
@@ -265,9 +277,15 @@ export class RollbackSession {
         const to = this.frame;
         this.firstWrongGuess = -1;
 
+        const guessed = this.match.fighters.map(f => [f.body.x, f.body.y]);
         this.match = this.saved.get(from)!;
         this.frame = from;
         while (this.frame < to) this.simulate(events);
+        this.match.fighters.forEach((f, i) => {
+            const c = this.corrections[i] ??= [0, 0];
+            c[0] += f.body.x - guessed[i][0];
+            c[1] += f.body.y - guessed[i][1];
+        });
 
         this.rollbacks++;
         this.lastRollbackDepth = to - from;

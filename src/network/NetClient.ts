@@ -24,6 +24,8 @@ const SERVER_EVENTS = [
 export class NetClient {
     /** Round trip to the server in ms, smoothed. */
     rtt = 0;
+    /** The worst round trip since it was last reset (ms). */
+    worstRtt = 0;
 
     private channel: ClientChannel | null = null;
     private connected = false;
@@ -112,6 +114,7 @@ export class NetClient {
         if (typeof sent !== 'number') return;
         const sample = performance.now() - sent;
         this.rtt = this.rtt === 0 ? sample : this.rtt * 0.8 + sample * 0.2;
+        this.worstRtt = Math.max(this.worstRtt, sample);
     }
 
     /** Applies the test network conditions, if any, to something that just arrived. */
