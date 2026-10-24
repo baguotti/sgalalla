@@ -1379,3 +1379,9 @@ Part 2
 - **[S]** tsc (client, tests, server), 93 tests (new: the input delay for a LAN, London–Treviso, the two furthest of three, the cap; rollback corrections taken and cleared), build. In the browser (muted): a 60 px correction drawn 46 px back on the next frame, 1 px after 12 frames; no errors.
 - **[Diagnostics]** Follow-up: the game server keeps the last 1000 connection reports and match starts (London time) at `GET /net` (http://138.68.126.112:9208/net for the release), and `bash scripts/net-reports.sh [experimental]` prints them.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-24] v3.1.8 - Release (branch `main`)
+- **[Release]** `main` takes `experimental-branch` as it is (exact-tree merge): the online input delay covering the whole trip between players, rollback corrections sliding instead of snapping, and connection reports (http://138.68.126.112:9208/net, `bash scripts/net-reports.sh`).
+- **[Menu]** As before, the release hides CAMPAGNA, STUDIO LAB and CORSA.
+- **[S]** tsc (client, tests, server), 93 tests, build.
+
