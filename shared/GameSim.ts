@@ -19,7 +19,7 @@ import { pushPhysicsSounds, type MatchEvent } from './MatchEvents.js';
 import { PhysicsConfig } from './PhysicsConfig.js';
 import {
     type SimInput as PhysicsInput, type PhysicsEvent,
-    stepPhysics, checkSinglePlatformCollision, resetWallState, checkSingleWallCollision, checkSingleCeilingCollision,
+    stepPhysics, checkSinglePlatformCollision, resetWallState, checkSingleWallCollision, checkSingleCeilingCollision, checkSolidCollision,
     ATTACK_PHASE_NONE, ATTACK_PHASE_STARTUP, ATTACK_PHASE_ACTIVE, ATTACK_PHASE_RECOVERY,
     ATTACK_TYPE_NONE, ATTACK_TYPE_LIGHT, ATTACK_TYPE_HEAVY,
 } from './PhysicsSimulation.js';
@@ -244,6 +244,9 @@ function collideWalls(f: FighterState, layout: SimStage): void {
     }
     for (const c of layout.ceilings) {
         checkSingleCeilingCollision(b, c.x, c.y, c.w, c.h);
+    }
+    for (const s of layout.solids) {
+        checkSolidCollision(b, s.x, s.y, s.w, s.h);
     }
     f.isDodging = b.isDodging;
 }

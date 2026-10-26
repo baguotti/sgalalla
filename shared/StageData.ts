@@ -26,6 +26,8 @@ export interface SimStage {
     walls: SimRect[];
     /** Undersides: they stop fighters moving up. */
     ceilings: SimRect[];
+    /** Solid rock no fighter's middle may be in: a safety net behind the walls and undersides. */
+    solids: SimRect[];
     blastZones: Bounds;
     /** What the camera may show (inside the blast zones): fighters beyond it show as bubbles at the screen's edge. */
     camera: Bounds;
@@ -83,6 +85,15 @@ const PILLAR_WALLS: SimRect[] = [
     // Outer side (the rock at x -66 to -70)
     { x: -51, y: 480, w: 20, h: 640 },
 ];
+/** The pillar's rock, for the solids safety net: its core between the walls, then its tapering bottom (above the undersides). */
+const PILLAR_SOLIDS: SimRect[] = [
+    { x: 42, y: 402.5, w: 206, h: 495 },
+    { x: 9.5, y: 697.5, w: 141, h: 95 },
+    { x: -5.5, y: 762.5, w: 111, h: 35 },
+];
+/** The main platform's rock: between its walls' faces, from its top down to its underside. */
+const MAIN_SOLID: SimRect = { x: 960, y: 1130, w: 1086, h: 520 };
+
 const PILLAR_CEILINGS: SimRect[] = [
     // Undersides, stepping up the tapering rock from its tip to the inner side
     { x: -30, y: 795, w: 80, h: 20 },
@@ -110,6 +121,7 @@ const STANDARD: SimStage = {
         // Main stage underside
         { x: 960, y: 1380, w: 1070, h: 20 },
     ],
+    solids: [MAIN_SOLID, ...PILLAR_SOLIDS],
     blastZones: STANDARD_BLAST_ZONES,
     camera: inset(STANDARD_BLAST_ZONES, CAMERA_INSET),
 };
@@ -150,6 +162,11 @@ const GRANDE: SimStage = {
         ...GRANDE_PILLAR_CEILINGS,
         ...GRANDE_PILLAR_CEILINGS.map(mirrored),
         { x: 960, y: 1380, w: 1070 + 2 * GRANDE_WIDEN, h: 20 },
+    ],
+    solids: [
+        { ...MAIN_SOLID, w: MAIN_SOLID.w + 2 * GRANDE_WIDEN },
+        ...PILLAR_SOLIDS.map(s => moved(s, -GRANDE_WIDEN)),
+        ...PILLAR_SOLIDS.map(s => mirrored(moved(s, -GRANDE_WIDEN))),
     ],
     blastZones: GRANDE_BLAST_ZONES,
     camera: inset(GRANDE_BLAST_ZONES, CAMERA_INSET),

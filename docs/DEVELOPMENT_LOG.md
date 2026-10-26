@@ -1386,3 +1386,9 @@ Part 2
 - **[Change]** Protocol version 26.
 - **[S]** tsc (client, tests, server), 95 tests (new: all 8 directions from a direction held only during the charge; a throw up comes back down soon), build.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-26] Fix: fighters launched into the stage's rock ending up inside it (branch `experimental-branch`)
+- **[Fix]** A fighter hit in the air beside the main platform could be thrown into its middle. Walls are thin (20 px) and pushed a fighter out the side its middle was on after the move, so a launch fast enough to carry the middle past the wall's in one step came out inside; and low launches slipped in under the side walls' bottom corner. Walls now push out the side the fighter came from (its position before the step), and each layout has `solids`, the main platform's and pillars' rock, as a safety net: a fighter whose middle ends up inside is put back out the way it came (out the top, standing on it).
+- **[Change]** Protocol version 27.
+- **[S]** tsc (client, tests, server), 96 tests (new: launches into the main platform's side at up to 6000 px/s from three heights stay out), build. Sweeps: 2400 launches at the main platform's left side, and launches at every solid from 40 directions at up to 6000 px/s on both layouts (8352): none ends inside rock (173 did before, at the main platform).
+
