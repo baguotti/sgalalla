@@ -228,6 +228,8 @@ export const PhysicsConfig = {
     BOMB_CHARGE_FULL: 1000,
     BOMB_OVERCHARGE: 2000,
     BOMB_FLIGHT_GRAVITY: 0.15,
+    // ...for its first BOMB_STRAIGHT_STEPS, then falls at full gravity (a throw up comes back down soon)
+    BOMB_STRAIGHT_STEPS: 15,
     BOMB_BOUNCE: 0.7,
     BOMB_SAFE_SPEED: 337,
     BOMB_GRACE_STEPS: 8,

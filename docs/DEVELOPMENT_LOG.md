@@ -1379,3 +1379,10 @@ Part 2
 - **[S]** tsc (client, tests, server), 93 tests (new: the input delay for a LAN, London–Treviso, the two furthest of three, the cap; rollback corrections taken and cleared), build. In the browser (muted): a 60 px correction drawn 46 px back on the next frame, 1 px after 12 frames; no errors.
 - **[Diagnostics]** Follow-up: the game server keeps the last 1000 connection reports and match starts (London time) at `GET /net` (http://138.68.126.112:9208/net for the release), and `bash scripts/net-reports.sh [experimental]` prints them.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-26] Bomb throws: 8 directions from the charge, gravity back after a moment (branch `experimental-branch`)
+- **[Gameplay]** The throw's direction is the last one held while charging (aim or movement, any of 8), not only what's held on the frame you let go; nothing held throws straight ahead.
+- **[Gameplay]** A throw flies straight (15% gravity) for its first 0.25 s, then falls at full gravity; a throw straight up or down is under full gravity from the start. Up throws used to hang for ages: a full-charge throw up now peaks at 906 px after 0.87 s and is back in 2 s (was 1343 px, 2.7 s); tapped, 170 px and 0.65 s.
+- **[Change]** Protocol version 26.
+- **[S]** tsc (client, tests, server), 95 tests (new: all 8 directions from a direction held only during the charge; a throw up comes back down soon), build.
+

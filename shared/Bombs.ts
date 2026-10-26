@@ -42,6 +42,11 @@ export interface BombState {
     lifeSteps: number;
     /** Its holder's throw charge so far (ms), or -1 while not charging. */
     charge: number;
+    /** While charging, the last direction held (-1, 0 or 1 each, y up), the throw's direction. */
+    aimX: number;
+    aimY: number;
+    /** Steps since it was thrown: it flies straight until BOMB_STRAIGHT_STEPS, then falls (a throw straight up or down starts there). */
+    flightSteps: number;
 }
 
 /** A match's bombs, and when the next one may drop (ms). */
@@ -82,7 +87,7 @@ export function updateBombs(match: Arena, layout: SimStage, events: MatchEvent[]
         if (bombs.dropTimer <= 0) {
             const main = layout.platforms[0];
             const x = randomInt(match, main.x - main.w / 2 + 120, main.x + main.w / 2 - 120);
-            bombs.list.push({ id: bombs.nextId++, x, y: layout.camera.top + 100, vx: 0, vy: 0, holder: -1, thrower: -1, armed: false, graceSteps: 0, lifeSteps: lifetimeSteps(), charge: -1 });
+            bombs.list.push({ id: bombs.nextId++, x, y: layout.camera.top + 100, vx: 0, vy: 0, holder: -1, thrower: -1, armed: false, graceSteps: 0, lifeSteps: lifetimeSteps(), charge: -1, aimX: 0, aimY: 0, flightSteps: 0 });
             bombs.dropTimer = PhysicsConfig.BOMB_GAP + randomInt(match, 0, PhysicsConfig.BOMB_GAP_RANDOM);
         }
     }
@@ -109,6 +114,8 @@ export function bombPresses(match: Arena): void {
         if (!press) continue;
         consumeBuffered(holder, press);
         bomb.charge = 0;
+        bomb.aimX = 0;
+        bomb.aimY = 0;
         // As a heavy's charge: it faces the way the fighter points as it presses
         const { aimLeft, aimRight, moveLeft, moveRight } = holder.input;
         const point = (aimRight || moveRight ? 1 : 0) - (aimLeft || moveLeft ? 1 : 0);
@@ -166,13 +173,26 @@ function hold(match: Arena, bomb: BombState, holder: FighterState, events: Match
     const { lightAttackHeld, heavyAttackHeld, throwHeld } = holder.input;
     if (lightAttackHeld || heavyAttackHeld || throwHeld) {
         bomb.charge += SIM_STEP_MS;
+        aimFrom(bomb, holder);
         if (bomb.charge < PhysicsConfig.BOMB_OVERCHARGE) return true;
         bomb.thrower = holder.id;
         explode(match, bomb, events);
         return false;
     }
+    aimFrom(bomb, holder);
     throwBomb(bomb, holder);
     return true;
+}
+
+/** The direction held now (aim or movement), kept until another is held: the throw needn't land on the release frame. */
+function aimFrom(bomb: BombState, holder: FighterState): void {
+    const { aimUp, aimDown, aimLeft, aimRight, moveUp, moveDown, moveLeft, moveRight } = holder.input;
+    const up = aimUp || moveUp, down = aimDown || moveDown, left = aimLeft || moveLeft, right = aimRight || moveRight;
+    const x = left === right ? 0 : right ? 1 : -1;
+    const y = up === down ? 0 : up ? 1 : -1;
+    if (x === 0 && y === 0) return;
+    bomb.aimX = x;
+    bomb.aimY = y;
 }
 
 /** In the holder's hand, moving with them (so a dropped bomb keeps their momentum). */
@@ -184,18 +204,17 @@ function carry(bomb: BombState, holder: FighterState): void {
     bomb.vy = b.vy;
 }
 
-/** Faster the longer the charge, the way the thrower aims as they let go: up, down, a diagonal, or straight ahead. */
+/** Faster the longer the charge, in one of 8 directions: the last held while charging, or straight ahead. */
 function throwBomb(bomb: BombState, thrower: FighterState): void {
-    const { aimUp, aimDown, aimLeft, aimRight } = thrower.input;
     const charge = Math.min(bomb.charge / PhysicsConfig.BOMB_CHARGE_FULL, 1);
     const speed = PhysicsConfig.BOMB_THROW_SPEED_MIN + charge * (PhysicsConfig.BOMB_THROW_SPEED_MAX - PhysicsConfig.BOMB_THROW_SPEED_MIN);
-    const vertical = aimUp === aimDown ? 0 : aimUp ? 1 : -1;
-    const side = aimLeft === aimRight ? 0 : aimRight ? 1 : -1;
-    const facing = side || thrower.body.facingDirection;
-    // Straight up or down without a side; a diagonal with one; straight ahead otherwise
-    const [x, y] = vertical === 0 ? [facing, 0]
+    const side = bomb.aimX, vertical = bomb.aimY;
+    // Straight up or down without a side; a diagonal with both; sideways, or ahead with neither
+    const [x, y] = vertical === 0 ? [side || thrower.body.facingDirection, 0]
         : side === 0 ? [0, vertical]
             : [DIAGONAL * side, DIAGONAL * vertical];
+    // Straight up or down falls under full gravity at once: only throws with some sideways flight fly straight first
+    bomb.flightSteps = x === 0 ? PhysicsConfig.BOMB_STRAIGHT_STEPS : 0;
     bomb.vx = x * speed;
     bomb.vy = -y * speed;
     bomb.charge = -1;
@@ -212,7 +231,8 @@ function throwBomb(bomb: BombState, thrower: FighterState): void {
  */
 function fly(bomb: BombState, layout: SimStage): void {
     const r = PhysicsConfig.BOMB_RADIUS;
-    const gravity = PhysicsConfig.GRAVITY * (bomb.armed ? PhysicsConfig.BOMB_FLIGHT_GRAVITY : 1);
+    const straight = bomb.armed && bomb.flightSteps++ < PhysicsConfig.BOMB_STRAIGHT_STEPS;
+    const gravity = PhysicsConfig.GRAVITY * (straight ? PhysicsConfig.BOMB_FLIGHT_GRAVITY : 1);
     if (bomb.vy < PhysicsConfig.MAX_FALL_SPEED) bomb.vy = Math.min(bomb.vy + gravity * STEP_S, PhysicsConfig.MAX_FALL_SPEED);
     bomb.x += bomb.vx * STEP_S;
     bomb.y += bomb.vy * STEP_S;
