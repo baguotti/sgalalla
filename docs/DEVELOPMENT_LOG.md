@@ -1380,8 +1380,28 @@ Part 2
 - **[Diagnostics]** Follow-up: the game server keeps the last 1000 connection reports and match starts (London time) at `GET /net` (http://138.68.126.112:9208/net for the release), and `bash scripts/net-reports.sh [experimental]` prints them.
 
 ------------------------------------------------------------------------------------------------------------------------------------
-### [2026-10-24] v3.1.8 - Release (branch `main`)
-- **[Release]** `main` takes `experimental-branch` as it is (exact-tree merge): the online input delay covering the whole trip between players, rollback corrections sliding instead of snapping, and connection reports (http://138.68.126.112:9208/net, `bash scripts/net-reports.sh`).
-- **[Menu]** As before, the release hides CAMPAGNA, STUDIO LAB and CORSA.
-- **[S]** tsc (client, tests, server), 93 tests, build.
+### [2026-10-26] Bomb throws: 8 directions from the charge, gravity back after a moment (branch `experimental-branch`)
+- **[Gameplay]** The throw's direction is the last one held while charging (aim or movement, any of 8), not only what's held on the frame you let go; nothing held throws straight ahead.
+- **[Gameplay]** A throw flies straight (15% gravity) for its first 0.25 s, then falls at full gravity; a throw straight up or down is under full gravity from the start. Up throws used to hang for ages: a full-charge throw up now peaks at 906 px after 0.87 s and is back in 2 s (was 1343 px, 2.7 s); tapped, 170 px and 0.65 s.
+- **[Change]** Protocol version 26.
+- **[S]** tsc (client, tests, server), 95 tests (new: all 8 directions from a direction held only during the charge; a throw up comes back down soon), build.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-26] Fix: fighters launched into the stage's rock ending up inside it (branch `experimental-branch`)
+- **[Fix]** A fighter hit in the air beside the main platform could be thrown into its middle. Walls are thin (20 px) and pushed a fighter out the side its middle was on after the move, so a launch fast enough to carry the middle past the wall's in one step came out inside; and low launches slipped in under the side walls' bottom corner. Walls now push out the side the fighter came from (its position before the step), and each layout has `solids`, the main platform's and pillars' rock, as a safety net: a fighter whose middle ends up inside is put back out the way it came (out the top, standing on it).
+- **[Change]** Protocol version 27.
+- **[S]** tsc (client, tests, server), 96 tests (new: launches into the main platform's side at up to 6000 px/s from three heights stay out), build. Sweeps: 2400 launches at the main platform's left side, and launches at every solid from 40 directions at up to 6000 px/s on both layouts (8352): none ends inside rock (173 did before, at the main platform).
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-27] Wall jumps more up than out; fighters stand on platforms by their feet (branch `experimental-branch`)
+- **[Gameplay]** A wall jump goes up at about 55° instead of 40° (806 px/s out, 1150 up; was 1078 and 901), so it's easier to get back on the stage: from the main stage's side, letting go, it rises 267 px and is 205 px out at the top (was 163 and 285).
+- **[Fix]** Fighters looked like they floated at platform edges: platforms held them by their whole 81 px body, so they could stand with their middle 40 px past the edge and their feet in the air. Platforms now hold them by their feet (`PLAYER_FOOT_WIDTH` 40): more than 20 px past the edge, they fall.
+- **[Change]** Protocol version 28.
+- **[S]** tsc (client, tests, server), tests (new: standing by the feet at an edge; a wall jump more up than out), build. In the browser (muted): the furthest a fighter stands on Londra's top platform's end, the front foot on it.
+
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-27] Online: a frame of input delay for the internet's jitter (branch `experimental-branch`)
+- **[Investigation]** Stutter online only, at a locked 60 fps. The connection reports (4 matches, London–Treviso) showed steady pings (19–35 ms) and frames drawn on time, but in every 30 s window, for both players, a longest gap of 60–100 ms between packets: the internet's jitter tail, packets arriving in clumps. Each clump rolls back 1–4 frames (1–3 times a second), and the other fighter's movement jerks as the correction plays. The two half-second freezes in the reports were a match loading. The step clock and the relay server checked out (one step per frame on a steady display; the server forwards each packet at once).
+- **[Fix]** The input delay adds a frame for that jitter: 2 to 4 frames, 3 for London–Treviso (was 2). Rollbacks of 1 frame, the most common, go; the rest are a frame shorter. Input lag 50 ms (was 33).
+- **[S]** tsc (client, tests, server), tests (the delay for a LAN, London–Treviso, the two furthest of three, the cap), build.
 

@@ -111,6 +111,7 @@ export const MOVEMENT_GROUPS: Group<PhysicsKey>[] = [
     ]),
     group('BODY AND INPUT', [
         ['PLAYER_WIDTH', 'Body width', 'px', 'For collisions with the stage. R starts a new match with it.'],
+        ['PLAYER_FOOT_WIDTH', 'Feet width', 'px', 'Platforms hold a fighter by their feet: off an edge by more than half this, they fall.', [10, 120, 1]],
         ['PLAYER_HEIGHT', 'Body height', 'px', 'For collisions with the stage. R starts a new match with it.'],
         ['HURTBOX_WIDTH', 'Hurtbox width', 'px', 'What attacks hit and blast zones test.'],
         ['HURTBOX_HEIGHT', 'Hurtbox height', 'px'],
@@ -198,7 +199,8 @@ export const COMBAT_GROUPS: Group<PhysicsKey>[] = [
         ['BOMB_THROW_SPEED_MAX', 'Throw speed, charged', 'px/s'],
         ['BOMB_CHARGE_FULL', 'Full charge after', 'ms'],
         ['BOMB_OVERCHARGE', 'Goes off in the hand after', 'ms', 'Charging a throw longer than this blows the bomb up on its holder.'],
-        ['BOMB_FLIGHT_GRAVITY', 'Gravity in flight', 'share', 'A thrown bomb falls at this share of gravity, so it flies almost straight (until a bounce makes it safe).', [0, 1, 0.01]],
+        ['BOMB_FLIGHT_GRAVITY', 'Gravity in flight', 'share', 'A thrown bomb falls at this share of gravity at first, so it flies almost straight.', [0, 1, 0.01]],
+        ['BOMB_STRAIGHT_STEPS', 'Straight for', 'steps', 'Steps of light gravity after a throw; then it falls normally.', [0, 120, 1]],
         ['BOMB_BOUNCE', 'Bounce keeps', 'share'],
         ['BOMB_SAFE_SPEED', 'Safe again below', 'px/s', 'A thrown bomb slower than this stops being armed.'],
         ['BOMB_GRACE_STEPS', 'Passes through for', 'steps', 'After a throw, the bomb goes through everyone for this long.', [0, 30, 1]],

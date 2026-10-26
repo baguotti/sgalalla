@@ -746,7 +746,8 @@ export function checkSinglePlatformCollision(
     platCx: number, platCy: number, platW: number, platH: number,
     isSoft: boolean, events: PhysicsEvent[],
 ): void {
-    const halfW = body.width / 2;
+    // By the feet: a fighter stands on a platform only with their feet on it, not the edge of their body
+    const halfW = PhysicsConfig.PLAYER_FOOT_WIDTH / 2;
     const halfH = body.height / 2;
 
     const platLeft = platCx - platW / 2;
@@ -847,12 +848,15 @@ export function checkSingleWallCollision(
         bodyBottom > wallTop && bodyTop < wallBottom;
 
     if (overlaps) {
+        // The side it came from (where it was before this step's move), not where it ended up: a fast
+        // launch can carry a fighter's middle past a thin wall in one step
+        const fromLeft = body.x - body.vx * SIM_STEP_MS / 1000 < wallCx;
         // A stunned fighter flying into a wall bounces off it
-        const intoWall = body.x < wallCx ? body.vx > 0 : body.vx < 0;
+        const intoWall = fromLeft ? body.vx > 0 : body.vx < 0;
         if (body.isHitStunned && intoWall && Math.abs(body.vx) > PhysicsConfig.BOUNCE_SPEED) {
             body.vx = -body.vx * PhysicsConfig.BOUNCE_KEEP;
         }
-        if (body.x < wallCx) {
+        if (fromLeft) {
             body.x = wallLeft - halfW;
             body.isTouchingWall = true;
             body.lastWallTouchTimer = PhysicsConfig.WALL_COYOTE_TIME;
@@ -866,6 +870,38 @@ export function checkSingleWallCollision(
             body.lastWallDirection = -1;
         }
     }
+}
+
+/**
+ * The safety net for solid rock (center-origin coordinates): a fighter whose middle got inside
+ * it anyhow (a corner between a wall and an underside, a launch faster than a wall is thick) is
+ * put back out the way it came in, where it was before this step's move; already inside, out the
+ * nearest side. Out the top, it stands on it.
+ */
+export function checkSolidCollision(
+    body: SimBody,
+    solidCx: number, solidCy: number, solidW: number, solidH: number,
+): void {
+    const left = solidCx - solidW / 2, right = solidCx + solidW / 2;
+    const top = solidCy - solidH / 2, bottom = solidCy + solidH / 2;
+    if (body.x <= left || body.x >= right || body.y <= top || body.y >= bottom) return;
+
+    const dt = SIM_STEP_MS / 1000;
+    const px = body.x - body.vx * dt, py = body.y - body.vy * dt;
+    const halfW = body.width / 2, halfH = body.height / 2;
+    // How far it was outside each side before the move (the largest is the way it came), or how near it is now
+    const came: [number, 'left' | 'right' | 'top' | 'bottom'][] = [
+        [left - px, 'left'], [px - right, 'right'], [top - py, 'top'], [py - bottom, 'bottom'],
+    ];
+    const outside = came.filter(([d]) => d >= 0);
+    const side = outside.length > 0
+        ? outside.reduce((a, b) => (b[0] > a[0] ? b : a))[1]
+        : ([[body.x - left, 'left'], [right - body.x, 'right'], [body.y - top, 'top'], [bottom - body.y, 'bottom']] as const)
+            .reduce((a, b) => (b[0] < a[0] ? b : a))[1];
+    if (side === 'left') { body.x = left - halfW; body.vx = Math.min(body.vx, 0); }
+    else if (side === 'right') { body.x = right + halfW; body.vx = Math.max(body.vx, 0); }
+    else if (side === 'top') { body.y = top - halfH; body.vy = Math.min(body.vy, 0); }
+    else { body.y = bottom + halfH; body.vy = Math.max(body.vy, 0); }
 }
 
 /**

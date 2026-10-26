@@ -32,7 +32,7 @@ function steps(match: MatchState, count: number, a: Partial<FighterInput> = {}):
 
 /** A loose, safe bomb resting at (x, y). */
 function placeBomb(match: MatchState, x: number, y = 870 - PhysicsConfig.BOMB_RADIUS): BombState {
-    const bomb: BombState = { id: 99, x, y, vx: 0, vy: 0, holder: -1, thrower: -1, armed: false, graceSteps: 0, lifeSteps: 600, charge: -1 };
+    const bomb: BombState = { id: 99, x, y, vx: 0, vy: 0, holder: -1, thrower: -1, armed: false, graceSteps: 0, lifeSteps: 600, charge: -1, aimX: 0, aimY: 0, flightSteps: 0 };
     match.bombs!.list.push(bomb);
     return bomb;
 }
@@ -198,6 +198,41 @@ test('a charged throw goes faster than a tapped one, the way the thrower aims as
     assert.ok(charged.speed > tapped.speed * 1.5, `charged ${charged.speed.toFixed(0)}, tapped ${tapped.speed.toFixed(0)}`);
     const diagonal = speedOf(10, { aimRight: true, aimUp: true });
     assert.ok(diagonal.vx > 0 && diagonal.vy < 0 && Math.abs(diagonal.vx + diagonal.vy) < 80, 'up and forward at 45°');
+});
+
+test('8 directions, from the last direction held while charging (released with nothing held)', () => {
+    const dirs: [Partial<FighterInput>, number, number][] = [
+        [{ aimRight: true }, 1, 0], [{ aimLeft: true }, -1, 0], [{ aimUp: true }, 0, -1], [{ aimDown: true }, 0, 1],
+        [{ aimUp: true, aimRight: true }, 1, -1], [{ aimUp: true, aimLeft: true }, -1, -1],
+        [{ moveDown: true, moveRight: true }, 1, 1], [{ moveDown: true, moveLeft: true }, -1, 1],
+    ];
+    for (const [aim, sx, sy] of dirs) {
+        const match = newMatch(900, 1500);
+        placeBomb(match, 930);
+        step(match, { throw: true });
+        step(match);
+        step(match, { throw: true, throwHeld: true });
+        steps(match, 10, { throwHeld: true, ...aim });
+        steps(match, 5, { throwHeld: true });
+        step(match);
+        const bomb = match.bombs!.list[0];
+        // (a step of gravity aside)
+        const sign = (v: number) => (Math.abs(v) < 100 ? 0 : Math.sign(v));
+        assert.equal(sign(bomb.vx), sx, `${JSON.stringify(aim)}: x`);
+        assert.equal(sign(bomb.vy), sy, `${JSON.stringify(aim)}: y`);
+    }
+});
+
+test('a throw up comes back down soon', () => {
+    const match = newMatch(450, 1500);
+    placeBomb(match, 480);
+    step(match, { throw: true });
+    step(match);
+    throwHeld(match, { aimUp: true }, Math.round(PhysicsConfig.BOMB_CHARGE_FULL / SIM_STEP_MS));
+    const bomb = match.bombs!.list[0];
+    let steps = 0;
+    while (bomb.vy < 0 && steps < 300) { step(match); steps++; }
+    assert.ok(steps < 75, `at the top after ${steps} steps`);
 });
 
 test('a throw charged too long blows up in the holder\'s hand', () => {

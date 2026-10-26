@@ -134,6 +134,8 @@ export const PhysicsConfig = {
 
     // Player dimensions (the body, for collisions; a new match picks them up)
     PLAYER_WIDTH: 81,
+    // Platforms hold a fighter by their feet, narrower than the body: off an edge by more than half this, they fall
+    PLAYER_FOOT_WIDTH: 40,
     PLAYER_HEIGHT: 124,
     // Hurtbox: what attacks hit and blast zones test, narrower and shorter than the body
     HURTBOX_WIDTH: 31,
@@ -175,8 +177,8 @@ export const PhysicsConfig = {
 
     // Wall mechanics
     WALL_SLIDE_SPEED: 270,
-    WALL_JUMP_FORCE_X: 1078,
-    WALL_JUMP_FORCE_Y: -901,
+    WALL_JUMP_FORCE_X: 806,
+    WALL_JUMP_FORCE_Y: -1150,
     WALL_COYOTE_TIME: 200,
 
     // Speed kept each half-step in these states (moving is RUN_SPEED and AIR_SPEED above)
@@ -228,6 +230,8 @@ export const PhysicsConfig = {
     BOMB_CHARGE_FULL: 1000,
     BOMB_OVERCHARGE: 2000,
     BOMB_FLIGHT_GRAVITY: 0.15,
+    // ...for its first BOMB_STRAIGHT_STEPS, then falls at full gravity (a throw up comes back down soon)
+    BOMB_STRAIGHT_STEPS: 15,
     BOMB_BOUNCE: 0.7,
     BOMB_SAFE_SPEED: 337,
     BOMB_GRACE_STEPS: 8,

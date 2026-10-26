@@ -779,6 +779,39 @@ test('a fast downward launch from just above the floor lands on it, not through 
     assert.equal(f.lives, match.fighters[1].lives, 'no KO');
 });
 
+test('a fighter stands on a platform by their feet: past the edge by more than half the feet, they fall', () => {
+    const edge = 960 - STAGE_LAYOUTS.standard.platforms[0].w / 2;
+    for (const [past, stands] of [[PhysicsConfig.PLAYER_FOOT_WIDTH / 2 - 5, true], [PhysicsConfig.PLAYER_FOOT_WIDTH / 2 + 5, false]] as const) {
+        const match = newMatch(700, 1300);
+        const f = match.fighters[0];
+        f.body.x = edge - past;
+        steps(match, 20);
+        assert.equal(f.body.y <= GROUND_Y + 1, stands, `${past} px past the edge: ${stands ? 'stands' : 'falls'} (y ${f.body.y.toFixed(0)})`);
+    }
+});
+
+test('a wall jump goes more up than away', () => {
+    assert.ok(-PhysicsConfig.WALL_JUMP_FORCE_Y > PhysicsConfig.WALL_JUMP_FORCE_X);
+});
+
+test('a fighter launched into the side of the main platform stays out of it, however fast', () => {
+    const solid = STAGE_LAYOUTS.standard.solids[0];
+    for (const speed of [1500, 3000, 6000]) {
+        for (const y of [900, 1100, 1300]) {
+            const match = newMatch(700, 1300);
+            const f = match.fighters[0];
+            Object.assign(f.body, { x: 330, y, isGrounded: false });
+            launchFighter(f, 0, speed, -200, 30, 0);
+            for (let i = 0; i < 40; i++) {
+                step(match);
+                const inside = f.body.x > solid.x - solid.w / 2 && f.body.x < solid.x + solid.w / 2
+                    && f.body.y > solid.y - solid.h / 2 && f.body.y < solid.y + solid.h / 2;
+                assert.equal(inside, false, `inside the platform at ${speed} px/s from y ${y} (${f.body.x.toFixed(0)}, ${f.body.y.toFixed(0)})`);
+            }
+        }
+    }
+});
+
 test('red fighters fly higher: upward launches gain speed past HIGH_DAMAGE_FROM', () => {
     const launchAt = (damage: number) => {
         const m = newMatch(700, 780);
