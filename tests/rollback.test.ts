@@ -318,11 +318,11 @@ test('a restored copy of the match continues exactly like the original', () => {
     assert.equal(matchChecksum(copy), matchChecksum(match));
 });
 
-test('the input delay covers the trip between the two furthest players, 1 to 3 frames', () => {
-    assert.equal(inputDelayFor([5, 6]), 1, 'a LAN');
-    assert.equal(inputDelayFor([19, 32]), 2, 'London and Treviso via Frankfurt');
-    assert.equal(inputDelayFor([40, 45, 10]), 3, 'the two furthest count');
-    assert.equal(inputDelayFor([200, 180]), 3, 'capped');
+test('the input delay covers the trip between the two furthest players and a frame of jitter, 2 to 4 frames', () => {
+    assert.equal(inputDelayFor([5, 6]), 2, 'a LAN');
+    assert.equal(inputDelayFor([19, 32]), 3, 'London and Treviso via Frankfurt');
+    assert.equal(inputDelayFor([40, 45, 10]), 4, 'the two furthest count');
+    assert.equal(inputDelayFor([200, 180]), 4, 'capped');
 });
 
 test('a rollback reports how far it moved each fighter, for the drawing to ease in', () => {

@@ -1399,3 +1399,9 @@ Part 2
 - **[Change]** Protocol version 28.
 - **[S]** tsc (client, tests, server), tests (new: standing by the feet at an edge; a wall jump more up than out), build. In the browser (muted): the furthest a fighter stands on Londra's top platform's end, the front foot on it.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-27] Online: a frame of input delay for the internet's jitter (branch `experimental-branch`)
+- **[Investigation]** Stutter online only, at a locked 60 fps. The connection reports (4 matches, London–Treviso) showed steady pings (19–35 ms) and frames drawn on time, but in every 30 s window, for both players, a longest gap of 60–100 ms between packets: the internet's jitter tail, packets arriving in clumps. Each clump rolls back 1–4 frames (1–3 times a second), and the other fighter's movement jerks as the correction plays. The two half-second freezes in the reports were a match loading. The step clock and the relay server checked out (one step per frame on a steady display; the server forwards each packet at once).
+- **[Fix]** The input delay adds a frame for that jitter: 2 to 4 frames, 3 for London–Treviso (was 2). Rollbacks of 1 frame, the most common, go; the rest are a frame shorter. Input lag 50 ms (was 33).
+- **[S]** tsc (client, tests, server), tests (the delay for a LAN, London–Treviso, the two furthest of three, the cap), build.
+

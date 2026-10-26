@@ -8,7 +8,7 @@
  */
 
 /** Bump whenever two builds can no longer play each other. */
-export const PROTOCOL_VERSION = 27;
+export const PROTOCOL_VERSION = 28;
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 5;
@@ -225,11 +225,12 @@ export function decodeInputPacket(bytes: Uint8Array): InputPacket | null {
 /**
  * Input delay for a match, from each player's round trip to the server: the
  * trip between the two furthest players (half of each one's round trip, via the
- * server), rounded up to whole frames, 1 to 3. Inputs then mostly arrive in time,
- * so rollbacks are rare and short (a London–Treviso match: 2 frames, not 1).
+ * server), rounded up to whole frames, plus a frame for the internet's jitter (a
+ * few packets every half minute arrive 50-100 ms late), 2 to 4. Inputs then
+ * mostly arrive in time, so rollbacks are rare and short (London–Treviso: 3 frames).
  */
 export function inputDelayFor(rtts: readonly number[]): number {
     const [worst, second] = [...rtts].sort((a, b) => b - a);
     const tripFrames = (worst + (second ?? worst)) / 2 / (1000 / 60);
-    return Math.min(Math.max(Math.ceil(tripFrames), 1), 3);
+    return Math.min(Math.max(Math.ceil(tripFrames) + 1, 2), 4);
 }
