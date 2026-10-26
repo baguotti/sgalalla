@@ -779,6 +779,21 @@ test('a fast downward launch from just above the floor lands on it, not through 
     assert.equal(f.lives, match.fighters[1].lives, 'no KO');
 });
 
+test('a fighter stands on a platform by their feet: past the edge by more than half the feet, they fall', () => {
+    const edge = 960 - STAGE_LAYOUTS.standard.platforms[0].w / 2;
+    for (const [past, stands] of [[PhysicsConfig.PLAYER_FOOT_WIDTH / 2 - 5, true], [PhysicsConfig.PLAYER_FOOT_WIDTH / 2 + 5, false]] as const) {
+        const match = newMatch(700, 1300);
+        const f = match.fighters[0];
+        f.body.x = edge - past;
+        steps(match, 20);
+        assert.equal(f.body.y <= GROUND_Y + 1, stands, `${past} px past the edge: ${stands ? 'stands' : 'falls'} (y ${f.body.y.toFixed(0)})`);
+    }
+});
+
+test('a wall jump goes more up than away', () => {
+    assert.ok(-PhysicsConfig.WALL_JUMP_FORCE_Y > PhysicsConfig.WALL_JUMP_FORCE_X);
+});
+
 test('a fighter launched into the side of the main platform stays out of it, however fast', () => {
     const solid = STAGE_LAYOUTS.standard.solids[0];
     for (const speed of [1500, 3000, 6000]) {

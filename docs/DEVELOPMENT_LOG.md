@@ -1392,3 +1392,10 @@ Part 2
 - **[Change]** Protocol version 27.
 - **[S]** tsc (client, tests, server), 96 tests (new: launches into the main platform's side at up to 6000 px/s from three heights stay out), build. Sweeps: 2400 launches at the main platform's left side, and launches at every solid from 40 directions at up to 6000 px/s on both layouts (8352): none ends inside rock (173 did before, at the main platform).
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-27] Wall jumps more up than out; fighters stand on platforms by their feet (branch `experimental-branch`)
+- **[Gameplay]** A wall jump goes up at about 55° instead of 40° (806 px/s out, 1150 up; was 1078 and 901), so it's easier to get back on the stage: from the main stage's side, letting go, it rises 267 px and is 205 px out at the top (was 163 and 285).
+- **[Fix]** Fighters looked like they floated at platform edges: platforms held them by their whole 81 px body, so they could stand with their middle 40 px past the edge and their feet in the air. Platforms now hold them by their feet (`PLAYER_FOOT_WIDTH` 40): more than 20 px past the edge, they fall.
+- **[Change]** Protocol version 28.
+- **[S]** tsc (client, tests, server), tests (new: standing by the feet at an edge; a wall jump more up than out), build. In the browser (muted): the furthest a fighter stands on Londra's top platform's end, the front foot on it.
+

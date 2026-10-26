@@ -746,7 +746,8 @@ export function checkSinglePlatformCollision(
     platCx: number, platCy: number, platW: number, platH: number,
     isSoft: boolean, events: PhysicsEvent[],
 ): void {
-    const halfW = body.width / 2;
+    // By the feet: a fighter stands on a platform only with their feet on it, not the edge of their body
+    const halfW = PhysicsConfig.PLAYER_FOOT_WIDTH / 2;
     const halfH = body.height / 2;
 
     const platLeft = platCx - platW / 2;

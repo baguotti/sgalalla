@@ -111,6 +111,7 @@ export const MOVEMENT_GROUPS: Group<PhysicsKey>[] = [
     ]),
     group('BODY AND INPUT', [
         ['PLAYER_WIDTH', 'Body width', 'px', 'For collisions with the stage. R starts a new match with it.'],
+        ['PLAYER_FOOT_WIDTH', 'Feet width', 'px', 'Platforms hold a fighter by their feet: off an edge by more than half this, they fall.', [10, 120, 1]],
         ['PLAYER_HEIGHT', 'Body height', 'px', 'For collisions with the stage. R starts a new match with it.'],
         ['HURTBOX_WIDTH', 'Hurtbox width', 'px', 'What attacks hit and blast zones test.'],
         ['HURTBOX_HEIGHT', 'Hurtbox height', 'px'],
