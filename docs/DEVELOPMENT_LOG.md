@@ -1405,3 +1405,9 @@ Part 2
 - **[Fix]** The input delay adds a frame for that jitter: 2 to 4 frames, 3 for London–Treviso (was 2). Rollbacks of 1 frame, the most common, go; the rest are a frame shorter. Input lag 50 ms (was 33).
 - **[S]** tsc (client, tests, server), tests (the delay for a LAN, London–Treviso, the two furthest of three, the cap), build.
 
+------------------------------------------------------------------------------------------------------------------------------------
+### [2026-10-27] v3.1.9 - Release (branch `main`)
+- **[Release]** `main` takes `experimental-branch` as it is (exact-tree merge): bomb throws in 8 directions from the charge with gravity back after a moment, fighters can't end up inside the stage's rock, wall jumps more up than out, fighters stand on platforms by their feet, and a frame of input delay for the internet's jitter; protocol 28.
+- **[Menu]** As before, the release hides CAMPAGNA, STUDIO LAB and CORSA.
+- **[S]** tsc (client, tests, server), tests, build.
+
